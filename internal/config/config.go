@@ -95,7 +95,10 @@ func save() error {
 func Get() Config {
 	mu.RLock()
 	defer mu.RUnlock()
-	return current
+	c := current
+	c.Clusters = make([]ClusterConfig, len(current.Clusters))
+	copy(c.Clusters, current.Clusters)
+	return c
 }
 
 func Update(c Config) error {
