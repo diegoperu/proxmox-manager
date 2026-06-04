@@ -1,0 +1,8 @@
+config.json
+proxmox.db
+*.db
+proxmox-manager
+*.exe
+/server
+*.db-shm
+*.db-wal

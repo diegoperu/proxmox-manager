@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROXMOX MANAGER</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0a0b0d;--bg2:#111318;--bg3:#181c23;--bg4:#1e2330;
+  --border:#2a3040;--border2:#3a4558;
+  --amber:#f59e0b;--amber2:#fbbf24;
+  --amber-dim:rgba(245,158,11,.12);--amber-glow:rgba(245,158,11,.06);
+  --red:#ef4444;--red-dim:rgba(239,68,68,.15);
+  --green:#22c55e;--green-dim:rgba(34,197,94,.15);
+  --blue:#3b82f6;--blue-dim:rgba(59,130,246,.15);
+  --cyan:#06b6d4;--purple:#a855f7;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --mono:'JetBrains Mono',monospace;--cond:'Barlow Condensed',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;display:flex;height:100vh;overflow:hidden}
+
+/* ── SIDEBAR ── */
+#sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh}
+.logo{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
+.logo-t{font-family:var(--cond);font-size:22px;font-weight:900;letter-spacing:.08em;color:var(--amber)}
+.logo-s{font-size:9px;color:var(--text3);letter-spacing:.2em;text-transform:uppercase;margin-top:3px}
+.conn-bar{padding:8px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text3)}
+#cdot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+#cdot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+#cdot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
+.nav{flex:1;overflow-y:auto;padding:6px 0}
+.nav-sec{padding:11px 16px 3px;font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 16px;color:var(--text2);cursor:pointer;font-size:11.5px;font-weight:500;border-left:2px solid transparent;transition:all .13s;user-select:none}
+.ni:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.ni.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
+.ni svg{width:14px;height:14px;flex-shrink:0;opacity:.7}.ni.active svg{opacity:1}
+.sb-bottom{padding:10px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--text3)}
+
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:10px;background:var(--bg2);flex-shrink:0}
+.top-title{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.05em;flex:1}
+.top-badge{font-size:9px;padding:2px 8px;border-radius:2px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,.3);letter-spacing:.1em;text-transform:uppercase}
+#content{flex:1;overflow-y:auto;padding:20px 22px}
+
+/* ── PAGE ── */
+.page{display:none}.page.active{display:block}
+
+/* ── GRID ── */
+.g{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+
+/* ── CARD ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent)}
+.card-t{font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;margin-bottom:8px}
+.card-v{font-family:var(--cond);font-size:40px;font-weight:900;line-height:1}
+.card-v.a{color:var(--amber)}.card-v.g{color:var(--green)}.card-v.r{color:var(--red)}
+.card-s{font-size:10px;color:var(--text3);margin-top:5px}
+
+/* ── SEC TITLE ── */
+.sec{font-family:var(--cond);font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto;border-radius:4px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{background:var(--bg3);position:sticky;top:0;z-index:5}
+th{padding:7px 11px;text-align:left;font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;font-weight:500;user-select:none}
+th.s{cursor:pointer}th.s:hover{color:var(--amber)}
+th.s.asc::after{content:' ↑';color:var(--amber)}th.s.desc::after{content:' ↓';color:var(--amber)}
+td{padding:7px 11px;border-bottom:1px solid rgba(42,48,64,.45);color:var(--text2);white-space:nowrap}
+tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018)}
+.tn{color:var(--text);font-weight:500}.tm{font-family:var(--mono);font-size:11px}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:2px;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.br{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.bs{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.bp{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.bq{background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+.bl{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
+.bn{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.bo{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.bf{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.bt{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
+
+/* ── BAR ── */
+.bw{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.bf2{height:100%;border-radius:2px;transition:width .35s;background:var(--amber)}
+.ok2{background:var(--green)}.warn2{background:var(--amber)}.crit2{background:var(--red)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:3px;border:none;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .13s;text-transform:uppercase;white-space:nowrap}
+.ba{background:var(--amber);color:#000}.ba:hover{background:var(--amber2)}
+.bg2{background:transparent;color:var(--text2);border:1px solid var(--border2)}.bg2:hover{border-color:var(--amber);color:var(--amber)}
+.bd{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}.bd:hover{background:rgba(239,68,68,.25)}
+.bsuc{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}.bsuc:hover{background:rgba(34,197,94,.25)}
+.bpurp{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}.bpurp:hover{background:rgba(168,85,247,.2)}
+.sm{padding:3px 9px;font-size:10px}.btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── INPUT ── */
+.inp{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:3px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .13s}
+.inp:focus{border-color:var(--amber)}select.inp{cursor:pointer}.inp.w{width:100%}
+
+/* ── FORM ── */
+.fr{margin-bottom:12px}.fl{display:block;font-size:9px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+
+/* ── CHART ── */
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
+.ct{font-size:9px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;margin-bottom:10px}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tab{padding:7px 16px;cursor:pointer;font-size:11px;font-weight:500;color:var(--text3);border-bottom:2px solid transparent;transition:all .13s;text-transform:uppercase;letter-spacing:.05em}
+.tab:hover{color:var(--text2)}.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+
+/* ── NODE CARD ── */
+.nd{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
+.nd-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.nd-name{font-family:var(--cond);font-size:18px;font-weight:700;letter-spacing:.05em}
+.mg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mb2{background:var(--bg3);border-radius:3px;padding:9px 11px}
+.ml{font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
+.mv{font-family:var(--cond);font-size:22px;font-weight:700}
+
+/* ── MULTI NODE SELECT ── */
+.node-sel-box{background:var(--bg3);border:1px solid var(--border);border-radius:3px;max-height:160px;overflow-y:auto;padding:4px 0}
+.node-sel-item{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;font-size:12px;transition:background .1s}
+.node-sel-item:hover{background:rgba(255,255,255,.04)}
+.node-sel-item input{accent-color:var(--amber);cursor:pointer}
+.node-sel-item label{cursor:pointer;flex:1}
+.node-sel-actions{display:flex;gap:6px;margin-bottom:6px}
+
+/* ── MODAL ── */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .18s}
+.ov.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:22px;min-width:360px;max-width:620px;max-height:90vh;overflow-y:auto;transform:translateY(8px);transition:transform .18s}
+.ov.open .modal{transform:translateY(0)}
+.mt{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.07em;margin-bottom:14px}
+.mf{margin-top:18px;display:flex;gap:7px;justify-content:flex-end}
+
+/* ── TOAST ── */
+#toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:7px;z-index:2000}
+.toast{background:var(--bg3);border:1px solid var(--border2);padding:9px 14px;border-radius:4px;font-size:11px;max-width:340px;animation:si .18s ease;display:flex;align-items:center;gap:7px}
+.toast.ok{border-left:3px solid var(--green)}.toast.err{border-left:3px solid var(--red)}.toast.info{border-left:3px solid var(--amber)}
+@keyframes si{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
+
+/* ── PROVISION LOG ── */
+.plog{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:11px;font-size:11px;font-family:var(--mono);color:var(--text2);min-height:80px;max-height:260px;overflow-y:auto;line-height:1.8}
+
+/* ── UTIL ── */
+.flex{display:flex}.fc{flex-direction:column}.fw{flex-wrap:wrap}
+.g8{gap:8px}.g12{gap:12px}.g16{gap:16px}
+.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb14{margin-bottom:14px}.mb16{margin-bottom:16px}.mt12{margin-top:12px}.mt16{margin-top:16px}
+.ac{align-items:center}.jb{justify-content:space-between}
+.ta{color:var(--amber)}.tr{color:var(--red)}.tg{color:var(--green)}.td{color:var(--text3)}
+.wf{width:100%}.ital{font-style:italic}
+.ldc{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--text3);gap:10px;font-size:11px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--amber);border-radius:50%;animation:sp .55s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.sep{height:1px;background:var(--border);margin:12px 0}
+.hint{font-size:10px;color:var(--text3);margin-top:4px}
+@media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:850px){.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+/* ── LIGHT THEME ── */
+html.light{
+  --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;--bg4:#e2e8f0;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --text:#0f172a;--text2:#334155;--text3:#64748b;
+  --amber-dim:rgba(245,158,11,.15);--amber-glow:rgba(245,158,11,.08);
+  --red-dim:rgba(239,68,68,.12);--green-dim:rgba(34,197,94,.12);--blue-dim:rgba(59,130,246,.12);
+}
+@media(prefers-color-scheme:light){html:not(.dark):not(.eva01):not(.catppuccino){
+  --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;--bg4:#e2e8f0;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --text:#0f172a;--text2:#334155;--text3:#64748b;
+  --amber-dim:rgba(245,158,11,.15);--amber-glow:rgba(245,158,11,.08);
+  --red-dim:rgba(239,68,68,.12);--green-dim:rgba(34,197,94,.12);--blue-dim:rgba(59,130,246,.12);
+}}
+html.light tr:hover td{background:rgba(0,0,0,.03)!important}
+html.light .ni:hover{background:rgba(0,0,0,.04)!important}
+html.light .node-sel-item:hover{background:rgba(0,0,0,.04)!important}
+html.light .ov{background:rgba(0,0,0,.45)!important}
+@media(prefers-color-scheme:light){
+  html:not(.dark):not(.eva01):not(.catppuccino) tr:hover td{background:rgba(0,0,0,.03)!important}
+  html:not(.dark):not(.eva01):not(.catppuccino) .ni:hover{background:rgba(0,0,0,.04)!important}
+  html:not(.dark):not(.eva01):not(.catppuccino) .node-sel-item:hover{background:rgba(0,0,0,.04)!important}
+  html:not(.dark):not(.eva01):not(.catppuccino) .ov{background:rgba(0,0,0,.45)!important}
+}
+
+/* ── EVA 01 THEME ── */
+html.eva01{
+  --bg:#0d0617;--bg2:#1a0f2e;--bg3:#261540;--bg4:#311d52;
+  --border:#4a2d7a;--border2:#6b3fa8;
+  --amber:#7cc443;--amber2:#95d45a;
+  --amber-dim:rgba(124,196,67,.15);--amber-glow:rgba(124,196,67,.08);
+  --red:#ef4444;--red-dim:rgba(239,68,68,.15);
+  --green:#4ade80;--green-dim:rgba(74,222,128,.15);
+  --blue:#c084fc;--blue-dim:rgba(192,132,252,.15);
+  --cyan:#a855f7;--purple:#d946ef;
+  --text:#f0e6ff;--text2:#c4a0e0;--text3:#8b6ab3;
+}
+
+/* ── CATPPUCCIN MOCHA THEME ── */
+html.catppuccino{
+  --bg:#1e1e2e;--bg2:#181825;--bg3:#313244;--bg4:#45475a;
+  --border:#45475a;--border2:#585b70;
+  --amber:#fab387;--amber2:#f9c29c;
+  --amber-dim:rgba(250,179,135,.15);--amber-glow:rgba(250,179,135,.08);
+  --red:#f38ba8;--red-dim:rgba(243,139,168,.15);
+  --green:#a6e3a1;--green-dim:rgba(166,227,161,.15);
+  --blue:#89b4fa;--blue-dim:rgba(137,180,250,.15);
+  --cyan:#89dceb;--purple:#cba6f7;
+  --text:#cdd6f4;--text2:#a6adc8;--text3:#6c7086;
+}
+
+/* ── BATCH NODE CHIPS ── */
+.node-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .13s;white-space:nowrap}
+.node-chip:hover{border-color:var(--amber);color:var(--amber)}
+.node-chip.active{background:var(--amber-dim);border-color:var(--amber);color:var(--amber);font-weight:600}
+#page-batch.active{display:flex!important;flex-direction:column;height:calc(100vh - 110px)}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="logo"><div class="logo-t">PROXMOX</div><div class="logo-s">Cluster Manager</div></div>
+  <div class="conn-bar"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
+  <nav class="nav">
+    <div class="nav-sec">Overview</div>
+    <div class="ni active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard
+    </div>
+    <div class="nav-sec">Risorse</div>
+    <div class="ni" data-page="nodes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>Nodi
+    </div>
+    <div class="ni" data-page="vms">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>VM & Container
+    </div>
+    <div class="nav-sec">Operazioni</div>
+    <div class="ni" data-page="provision">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
+    </div>
+    <div class="ni" data-page="batch">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/><circle cx="17" cy="17" r="3"/><path d="m19.5 19.5 2 2"/></svg>Batch
+    </div>
+    <div class="ni" data-page="cluster">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Cluster
+    </div>
+    <div class="nav-sec">Analytics</div>
+    <div class="ni" data-page="reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
+    </div>
+    <div class="nav-sec">Config</div>
+    <div class="ni" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
+    </div>
+  </nav>
+  <div class="sb-bottom"><div id="clk"></div></div>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div class="top-title" id="ptitle">DASHBOARD</div>
+    <div class="top-badge" id="pbadge">OVERVIEW</div>
+    <select id="cluster-select" class="inp sm" onchange="ClusterMgr.switchTo(this.value)"
+      style="font-size:10px;padding:3px 8px;min-width:100px;display:none"></select>
+    <button class="btn bg2 sm" onclick="App.refresh()">↻ Aggiorna</button>
+  </div>
+  <div id="content">
+
+    <!-- ██ DASHBOARD ██ -->
+    <div class="page active" id="page-dashboard">
+      <div class="g g4 mb16" id="dash-kpis"><div class="ldc" style="grid-column:1/-1"><div class="spin"></div> Connessione...</div></div>
+      <div class="g g2 mb16">
+        <div class="cc"><div class="ct">CPU cluster — ultime 6h</div><canvas id="cCpu" height="150"></canvas></div>
+        <div class="cc"><div class="ct">RAM cluster — ultime 6h</div><canvas id="cMem" height="150"></canvas></div>
+      </div>
+      <div class="sec">VM & Container</div>
+      <div class="tw"><table id="dtbl">
+        <thead><tr>
+          <th class="s" onclick="DashTbl.sort('type')">Tipo</th>
+          <th class="s" onclick="DashTbl.sort('vmid')">VMID</th>
+          <th class="s" onclick="DashTbl.sort('name')">Nome</th>
+          <th class="s" onclick="DashTbl.sort('node')">Nodo</th>
+          <th class="s" onclick="DashTbl.sort('status')">Stato</th>
+          <th class="s" onclick="DashTbl.sort('cpu')">CPU %</th>
+          <th class="s" onclick="DashTbl.sort('mem')">RAM %</th>
+          <th class="s" onclick="DashTbl.sort('disk')">Disco %</th>
+        </tr></thead>
+        <tbody id="dtbody"><tr><td colspan="8" class="ldc"><div class="spin"></div></td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ██ NODES ██ -->
+    <div class="page" id="page-nodes">
+      <div class="flex g12 mb14 ac fw">
+        <select class="inp" id="nfsel" onchange="Nodes.filter()"><option value="">Tutti i nodi</option></select>
+        <select class="inp" id="ntfsel" onchange="Nodes.loadRRD()">
+          <option value="hour">Ultima ora</option><option value="day">Ultimo giorno</option>
+          <option value="week">Ultima settimana</option><option value="month">Ultimo mese</option>
+        </select>
+        <button class="btn bg2 sm" onclick="Nodes.load()">↻</button>
+      </div>
+      <div class="g g2 mb16" id="ngrid"><div class="ldc"><div class="spin"></div></div></div>
+      <div class="sec">VM per nodo selezionato</div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th class="s" onclick="NodeVMs.sort('type')">Tipo</th>
+          <th class="s" onclick="NodeVMs.sort('vmid')">VMID</th>
+          <th class="s" onclick="NodeVMs.sort('name')">Nome</th>
+          <th class="s" onclick="NodeVMs.sort('status')">Stato</th>
+          <th class="s" onclick="NodeVMs.sort('cpu')">CPU %</th>
+          <th class="s" onclick="NodeVMs.sort('mem')">RAM %</th>
+          <th class="s" onclick="NodeVMs.sort('disk')">Disco</th>
+          <th>Net In</th><th>Net Out</th>
+        </tr></thead>
+        <tbody id="nvtbody"><tr><td colspan="9" style="padding:18px;text-align:center;color:var(--text3)">Seleziona un nodo</td></tr></tbody>
+      </table></div>
+      <div class="mt16 g g2">
+        <div class="cc"><div class="ct" id="ncpuT">CPU nodo</div><canvas id="cNcpu" height="150"></canvas></div>
+        <div class="cc"><div class="ct" id="nmemT">RAM nodo</div><canvas id="cNmem" height="150"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ██ VMs ██ -->
+    <div class="page" id="page-vms">
+      <div class="tabs">
+        <div class="tab active" onclick="VMs.tab('all')">Tutte</div>
+        <div class="tab" onclick="VMs.tab('qemu')">QEMU/KVM</div>
+        <div class="tab" onclick="VMs.tab('lxc')">LXC</div>
+      </div>
+      <div class="flex g12 mb14 ac fw">
+        <div>
+          <div class="fl">Filtra per</div>
+          <input class="inp" type="text" id="vsearch" placeholder="Nome / VMID..." oninput="VMs.filter()" style="width:170px">
+        </div>
+        <!-- MULTI NODE SELECTOR -->
+        <div>
+          <div class="fl">Nodi</div>
+          <div id="vm-node-sel-wrap" style="position:relative">
+            <button class="inp" onclick="VMs.toggleNodePicker()" id="vm-node-btn" style="cursor:pointer;min-width:130px;text-align:left;width:100%">Tutti i nodi ▾</button>
+            <div id="vm-node-picker" style="display:none;position:absolute;top:100%;left:0;z-index:50;min-width:180px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;margin-top:3px;padding:6px 0">
+              <div class="flex g6" style="padding:4px 8px">
+                <button class="btn bg2 sm" onclick="VMs.nodeAll()">Tutti</button>
+                <button class="btn bg2 sm" onclick="VMs.nodeNone()">Nessuno</button>
+              </div>
+              <div id="vm-node-list"></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="fl">Stato</div>
+          <select class="inp" id="vstatus" onchange="VMs.filter()">
+            <option value="">Tutti</option><option value="running">Running</option>
+            <option value="stopped">Stopped</option><option value="paused">Paused</option>
+          </select>
+        </div>
+        <div style="margin-top:18px"><button class="btn bg2 sm" onclick="VMs.load()">↻</button></div>
+      </div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th><input type="checkbox" id="vmca" onchange="VMs.checkAll(this)"></th>
+          <th class="s" onclick="VMs.sort('type')">Tipo</th>
+          <th class="s" onclick="VMs.sort('vmid')">VMID</th>
+          <th class="s" onclick="VMs.sort('name')">Nome</th>
+          <th class="s" onclick="VMs.sort('node')">Nodo</th>
+          <th class="s" onclick="VMs.sort('ip')">IP</th>
+          <th class="s" onclick="VMs.sort('status')">Stato</th>
+          <th class="s" onclick="VMs.sort('cpu')">CPU %</th>
+          <th class="s" onclick="VMs.sort('mem')">RAM</th>
+          <th class="s" onclick="VMs.sort('disk')">Disco</th>
+          <th>Azioni</th>
+        </tr></thead>
+        <tbody id="vmtbody"><tr><td colspan="11" class="ldc"><div class="spin"></div></td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ██ PROVISION ██ -->
+    <div class="page" id="page-provision">
+      <div class="g g2 g16">
+        <!-- LEFT: template + config -->
+        <div>
+          <div class="sec">1. Template CloudInit</div>
+          <div class="card mb14">
+            <div class="fr">
+              <label class="fl">Template disponibili</label>
+              <div class="ldc" id="tpl-loading" style="padding:12px"><div class="spin"></div> Ricerca template...</div>
+              <select class="inp w" id="tpl-select" style="display:none" onchange="Provision.onSelectTemplate()">
+                <option value="">— Seleziona template —</option>
+              </select>
+            </div>
+            <div id="tpl-info" style="display:none;font-size:11px;color:var(--text2);background:var(--bg3);border-radius:3px;padding:10px;line-height:1.9"></div>
+          </div>
+
+          <div class="sec">2. Configurazione VM</div>
+          <div class="card">
+            <div class="g g2 g8 mb12">
+              <div class="fr">
+                <label class="fl">Nome VM</label>
+                <input class="inp w" id="pv-name" type="text" placeholder="mia-vm">
+              </div>
+              <div class="fr">
+                <label class="fl">VMID <span class="td">(0 = auto)</span></label>
+                <input class="inp w" id="pv-vmid" type="number" value="0" min="0">
+              </div>
+            </div>
+            <div class="g g2 g8 mb12">
+              <div class="fr">
+                <label class="fl">CPU (cores)</label>
+                <input class="inp w" id="pv-cpu" type="number" value="2" min="1" max="128">
+              </div>
+              <div class="fr">
+                <label class="fl">RAM (MB)</label>
+                <input class="inp w" id="pv-ram" type="number" value="2048" min="128" step="128">
+              </div>
+            </div>
+            <div class="g g2 g8 mb12">
+              <div class="fr">
+                <label class="fl">Disco destinazione (GB totali)</label>
+                <input class="inp w" id="pv-disk" type="number" placeholder="es: 50" min="1">
+                <div class="hint" id="pv-disk-hint">Verrà calcolato il delta rispetto al template</div>
+              </div>
+              <div class="fr">
+                <label class="fl">Disco device</label>
+                <input class="inp w" id="pv-diskdev" type="text" value="scsi0">
+              </div>
+            </div>
+            <div class="fr">
+              <label class="fl">Nodo target</label>
+              <select class="inp w" id="pv-node"><option value="">— stesso del template —</option></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: cloud-init + go -->
+        <div>
+          <div class="sec">3. Cloud-Init</div>
+          <div class="card mb14">
+            <div class="g g2 g8 mb12">
+              <div class="fr">
+                <label class="fl">IP statico (CIDR obbligatorio)</label>
+                <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24">
+              </div>
+              <div class="fr">
+                <label class="fl">Gateway</label>
+                <input class="inp w" id="pv-gw" type="text" placeholder="192.168.1.1" value="">
+              </div>
+            </div>
+            <div class="g g2 g8 mb12">
+              <div class="fr">
+                <label class="fl">DNS</label>
+                <input class="inp w" id="pv-dns" type="text" placeholder="8.8.8.8" value="8.8.8.8">
+              </div>
+              <div class="fr">
+                <label class="fl">CI User</label>
+                <input class="inp w" id="pv-user" type="text" placeholder="ubuntu">
+              </div>
+            </div>
+            <div class="fr">
+              <label class="fl">CI Password <span class="td">(opzionale)</span></label>
+              <input class="inp w" id="pv-pass" type="password" placeholder="••••••">
+            </div>
+            <div class="fr">
+              <label class="fl">SSH Public Key <span class="td">(opzionale)</span></label>
+              <textarea class="inp w" id="pv-ssh" rows="3" placeholder="ssh-rsa AAAA..." style="resize:vertical"></textarea>
+            </div>
+          </div>
+
+          <div class="sec">4. Esegui</div>
+          <div class="card">
+            <div id="pv-summary" style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.9">
+              <span class="td">Configura i parametri e clicca Provisiona.</span>
+            </div>
+            <button class="btn ba wf mb12" onclick="Provision.run()" id="pv-btn">▶ Provisiona VM</button>
+            <div class="sec">Log provisioning</div>
+            <div class="plog" id="pv-log"><span class="td">In attesa...</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ██ BATCH ██ -->
+    <div class="page" id="page-batch">
+      <!-- Node chip row -->
+      <div class="card" style="padding:8px 12px;flex-shrink:0;margin-bottom:10px">
+        <div class="flex ac g8 fw">
+          <span style="font-size:9px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;flex-shrink:0">Nodi:</span>
+          <div id="batch-node-chips" class="flex" style="gap:5px;flex-wrap:wrap;flex:1"></div>
+          <button class="btn bg2 sm" onclick="Batch.nodeAll()">Tutti</button>
+          <button class="btn bg2 sm" onclick="Batch.nodeNone()">Nessuno</button>
+        </div>
+      </div>
+      <!-- Main 2-col layout -->
+      <div class="flex g16" style="flex:1;min-height:0">
+        <!-- Left: VM list -->
+        <div class="flex fc" style="flex:1;min-width:0;gap:8px">
+          <div class="sec" style="margin-bottom:0">1. Selezione VM</div>
+          <div class="flex g8 ac fw" style="flex-shrink:0">
+            <input class="inp" id="bsearch" type="text" placeholder="Cerca nome, IP, VMID…" style="flex:2;min-width:160px" oninput="Batch.filterBy()">
+            <select class="inp" id="btype" style="flex:1;min-width:100px"><option value="">Tutti i tipi</option><option value="qemu">QEMU</option><option value="lxc">LXC</option></select>
+            <select class="inp" id="bstatus" style="flex:1;min-width:130px"><option value="">Tutti gli stati</option><option value="running">Running</option><option value="stopped">Stopped</option></select>
+            <button class="btn bg2 sm" onclick="Batch.selAll()">✓ Tutti</button>
+            <button class="btn bg2 sm" onclick="Batch.selNone()">Deseleziona</button>
+          </div>
+          <div class="tw" style="flex:1;overflow-y:auto;min-height:0"><table>
+            <thead><tr>
+              <th><input type="checkbox" id="bca" onchange="Batch.checkAll(this)"></th>
+              <th class="s" onclick="BatchTbl.sort('type')">Tipo</th>
+              <th class="s" onclick="BatchTbl.sort('vmid')">VMID</th>
+              <th class="s" onclick="BatchTbl.sort('name')">Nome</th>
+              <th class="s" onclick="BatchTbl.sort('node')">Nodo</th>
+              <th class="s" onclick="BatchTbl.sort('ip')">IP</th>
+              <th class="s" onclick="BatchTbl.sort('status')">Stato</th>
+            </tr></thead>
+            <tbody id="btbody"><tr><td colspan="7" class="ldc"><div class="spin"></div></td></tr></tbody>
+          </table></div>
+        </div>
+        <!-- Right: operation + log -->
+        <div class="flex fc" style="width:260px;min-width:240px;gap:12px">
+          <div class="sec" style="margin-bottom:0">2. Operazione</div>
+          <div class="card" style="flex-shrink:0">
+            <div class="fr">
+              <label class="fl">Azione</label>
+              <select class="inp w" id="baction">
+                <optgroup label="Ciclo vita">
+                  <option value="start">▶ Start</option>
+                  <option value="stop">■ Stop (forzato)</option>
+                  <option value="shutdown">◼ Shutdown (graceful)</option>
+                  <option value="reboot">↺ Reboot</option>
+                  <option value="suspend">⏸ Suspend</option>
+                  <option value="resume">⏵ Resume</option>
+                  <option value="reset">⟳ Reset (hard)</option>
+                </optgroup>
+              </select>
+            </div>
+            <div id="binfo" class="td mb12" style="font-size:11px">Nessuna VM selezionata</div>
+            <button class="btn ba wf" onclick="Batch.run()">Esegui operazione batch</button>
+          </div>
+          <div class="sec" style="margin-bottom:0">Log</div>
+          <div class="plog" id="blog" style="flex:1;min-height:80px;max-height:none"><span class="td">In attesa...</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ██ CLUSTER ██ -->
+    <div class="page" id="page-cluster">
+      <div class="g g2 g16">
+        <div>
+          <div class="sec">Nodi cluster</div>
+          <div class="flex g8 mb10">
+            <button class="btn bg2 sm" onclick="Cluster.selAll()">Seleziona tutti</button>
+            <button class="btn bg2 sm" onclick="Cluster.selNone()">Deseleziona</button>
+            <button class="btn bg2 sm" onclick="Cluster.load()">↻</button>
+          </div>
+          <div id="cnlist"></div>
+        </div>
+        <div>
+          <div class="sec">Operazione nodi selezionati</div>
+          <div class="card mb14">
+            <div class="fr">
+              <label class="fl">Comando</label>
+              <select class="inp w" id="ccmd">
+                <option value="reboot">↺ Riavvia nodo</option>
+                <option value="shutdown">◼ Spegni nodo</option>
+              </select>
+            </div>
+            <div id="csinfo" class="td mb12" style="font-size:11px">Nessun nodo selezionato</div>
+            <button class="btn bd wf" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
+          </div>
+          <div class="sec">Dettaglio nodo</div>
+          <div id="cdetail" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:14px;min-height:100px">
+            <span class="td">Clicca su un nodo</span>
+          </div>
+          <div class="mt12">
+            <div class="cc"><div class="ct" id="cnchT">Utilizzo nodo</div><canvas id="cCN" height="170"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ██ REPORTS ██ -->
+    <div class="page" id="page-reports">
+      <div class="card mb14">
+        <div class="flex g12 ac fw">
+          <div><label class="fl">Periodo</label>
+            <select class="inp" id="rtf">
+              <option value="hour">Ultima ora</option>
+              <option value="day" selected>Ultimo giorno</option>
+              <option value="week">Ultima settimana</option>
+              <option value="month">Ultimo mese</option>
+              <option value="year">Ultimo anno</option>
+            </select></div>
+          <div><label class="fl">Tipo</label>
+            <select class="inp" id="rtype">
+              <option value="all">Tutte</option><option value="qemu">QEMU</option>
+              <option value="lxc">LXC</option>
+            </select></div>
+          <div><label class="fl">Nodo</label><select class="inp" id="rnode"><option value="">Tutti</option></select></div>
+          <div style="margin-top:18px"><button class="btn ba" onclick="Reports.load()">Genera</button></div>
+          <div style="margin-top:18px"><button class="btn bg2" onclick="Reports.xlsx()">⬇ Excel</button></div>
+        </div>
+      </div>
+      <div class="g g2 mb14">
+        <div class="cc"><div class="ct">CPU avg per risorsa</div><canvas id="rcpu" height="190"></canvas></div>
+        <div class="cc"><div class="ct">RAM avg per risorsa</div><canvas id="rmem" height="190"></canvas></div>
+      </div>
+      <div class="g g2 mb14">
+        <div class="cc"><div class="ct">Net In nel tempo</div><canvas id="rnet" height="190"></canvas></div>
+      </div>
+      <div class="sec">Dati tabellari</div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th class="s" onclick="RepTbl.sort('name')">Nome</th>
+          <th class="s" onclick="RepTbl.sort('node')">Nodo</th>
+          <th class="s" onclick="RepTbl.sort('type')">Tipo</th>
+          <th class="s" onclick="RepTbl.sort('avgCpu')">CPU avg %</th>
+          <th class="s" onclick="RepTbl.sort('maxCpu')">CPU max %</th>
+          <th class="s" onclick="RepTbl.sort('avgMem')">RAM avg %</th>
+          <th class="s" onclick="RepTbl.sort('avgNetIn')">Net In avg</th>
+          <th class="s" onclick="RepTbl.sort('avgNetOut')">Net Out avg</th>
+        </tr></thead>
+        <tbody id="rtbody"><tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text3)">Genera un report</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ██ SETTINGS ██ -->
+    <div class="page" id="page-settings">
+      <div class="g g2">
+        <div class="card">
+          <div class="sec">Cluster Proxmox</div>
+          <div style="margin-bottom:10px">
+            <button class="btn ba sm" onclick="ClusterMgr.showAdd()">+ Aggiungi cluster</button>
+          </div>
+          <div id="cluster-form" style="display:none"></div>
+          <div id="cluster-list"></div>
+          <div id="ctres" style="margin-top:8px;font-size:11px"></div>
+        </div>
+        <div class="card">
+          <div class="sec">Aspetto</div>
+          <div class="fr">
+            <label class="fl">Tema</label>
+            <select class="inp w" id="ctheme" onchange="Settings.applyTheme(this.value)">
+              <option value="">Segui sistema operativo</option>
+              <option value="dark">Scuro</option>
+              <option value="light">Chiaro</option>
+              <option value="eva01">Eva 01</option>
+              <option value="catppuccino">Catpuccino</option>
+            </select>
+          </div>
+          <button class="btn ba" onclick="Settings.saveTheme()">Salva tema</button>
+        </div>
+        <div class="card">
+          <div class="sec">Architettura</div>
+          <div style="font-size:12px;color:var(--text2);line-height:2.1">
+            <div>🖥 Browser → <span class="ta">localhost:8080</span></div>
+            <div>⚙ Go server → <span class="ta">Proxmox API</span></div>
+            <div class="sep"></div>
+            <div class="td" style="font-size:11px;line-height:1.8">Nessun CORS · TLS self-signed accettato<br>Dati storici via Proxmox RRD (hour/day/week/month/year)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div>
+
+<!-- MODAL VM DETAIL -->
+<div class="ov" id="mov"><div class="modal">
+  <div class="mt" id="movT">VM Detail</div>
+  <div id="movB"></div>
+  <div class="mf"><button class="btn bg2" onclick="closeModal('mov')">Chiudi</button></div>
+</div></div>
+
+<!-- MODAL CONFIRM -->
+<div class="ov" id="mconf"><div class="modal">
+  <div class="mt" id="mconfT">Conferma</div>
+  <div id="mconfB" style="color:var(--text2);font-size:13px;line-height:1.6;white-space:pre-wrap"></div>
+  <div class="mf">
+    <button class="btn bg2" onclick="closeModal('mconf')">Annulla</button>
+    <button class="btn bd" id="mconfOk">Conferma</button>
+  </div>
+</div></div>
+
+<!-- MODAL ADD USER -->
+<div class="ov" id="madduser"><div class="modal" style="min-width:420px">
+  <div class="mt">Aggiungi utente VM</div>
+  <div id="madduserB">
+    <div class="fr"><label class="fl">Nome utente</label><input class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
+    <div class="hint">Password iniziale: <code>p4ssw0rd</code> — scadrà al primo accesso.</div>
+    <div class="fr" style="align-items:flex-start;margin-top:10px"><label class="fl" style="padding-top:4px">Chiave pubblica SSH (opzionale)</label><textarea class="inp w" id="adduser-sshkey" rows="3" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="ssh-ed25519 AAAA... (opzionale)"></textarea></div>
+  </div>
+  <div id="adduser-out" style="display:none;margin-top:12px" class="plog"></div>
+  <div class="mf">
+    <button class="btn bg2" onclick="closeModal('madduser')">Chiudi</button>
+    <button class="btn ba" id="adduser-ok" onclick="VMs.submitAddUser()">Aggiungi</button>
+  </div>
+</div></div>
+
+<div id="toasts"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// CORE
+// ════════════════════════════════════════════════════════════════════════════
+async function api(path, opts={}) {
+  const NO_CLUSTER_ROUTES=['/clusters','/config'];
+  const needsCluster=!NO_CLUSTER_ROUTES.some(p=>path.startsWith(p));
+  let fullPath='/api'+path;
+  if(needsCluster){
+    const sep=path.includes('?')?'&':'?';
+    const cidx=(typeof ClusterMgr!=='undefined')?(ClusterMgr.current??0):0;
+    fullPath+=sep+'cluster='+cidx;
+  }
+  const r = await fetch(fullPath, {headers:{'Content-Type':'application/json'}, ...opts});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) { toast(d.error||r.statusText,'err'); throw new Error(d.error||r.statusText); }
+  return d;
+}
+function toast(msg,type='info'){
+  const d=document.createElement('div'); d.className=`toast ${type}`;
+  d.innerHTML=`<span>${type==='ok'?'✓':type==='err'?'✗':'ℹ'}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(d); setTimeout(()=>d.remove(),4500);
+}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function confirm(title,body,onOk){
+  document.getElementById('mconfT').textContent=title;
+  document.getElementById('mconfB').textContent=body;
+  const btn=document.getElementById('mconfOk');
+  btn.onclick=()=>{closeModal('mconf');onOk();};
+  openModal('mconf');
+}
+// Click outside picker to close
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#vm-node-sel-wrap')) document.getElementById('vm-node-picker').style.display='none';
+});
+
+// Formatting
+function fmtB(b){if(!b)return'0 B';const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return b.toFixed(1)+' '+u[i];}
+function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
+function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:9px;color:var(--text3);margin-top:1px">${p}%</div>`;}
+function sbadge(s){const m={running:'br',stopped:'bs',paused:'bp'};return `<span class="badge ${m[s]||'bs'}">${s||'?'}</span>`;}
+function tbadge(t){if(t==='qemu')return`<span class="badge bq">QEMU</span>`;if(t==='lxc')return`<span class="badge bl">LXC</span>`;if(t==='node')return`<span class="badge bn">NODE</span>`;if(t==='tmpl')return`<span class="badge bt">TPL</span>`;return`<span class="badge">${t}</span>`;}
+function nodeCell(v){const b=ClusterMgr?.clusters?.length>1&&v.cluster_label?`<span class="badge bn" style="font-size:8px;margin-right:4px">${v.cluster_label}</span>`:'';return`${b}<span class="td">${v.node}</span>`;}
+
+// Charts
+const _ch={};
+function mkChart(id,cfg){if(_ch[id])_ch[id].destroy();const c=document.getElementById(id);if(!c)return;_ch[id]=new Chart(c,cfg);return _ch[id];}
+const CD={responsive:true,animation:{duration:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'JetBrains Mono',size:10}}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9}},beginAtZero:true}}};
+const COLS=['#f59e0b','#22c55e','#3b82f6','#06b6d4','#a855f7','#ef4444','#f97316','#84cc16'];
+
+// Sortable table helper
+function mkSorter(tbodyId, headId){
+  let key='', asc=true;
+  return {
+    sort(data, k){
+      if(k===key) asc=!asc; else {key=k;asc=true;}
+      // update header classes
+      document.querySelectorAll(`#${headId} th.s`).forEach(th=>{
+        th.classList.remove('asc','desc');
+        if(th.getAttribute('onclick')&&th.getAttribute('onclick').includes(`'${k}'`)){
+          th.classList.add(asc?'asc':'desc');
+        }
+      });
+      return [...data].sort((a,b)=>{
+        let va=a[k],vb=b[k];
+        if(typeof va==='string') va=va.toLowerCase();
+        if(typeof vb==='string') vb=vb.toLowerCase();
+        return(va<vb?-1:va>vb?1:0)*(asc?1:-1);
+      });
+    }
+  };
+}
+
+// Clock
+setInterval(()=>{document.getElementById('clk').textContent=new Date().toLocaleTimeString('it-IT');},1000);
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLUSTER MANAGER
+// ════════════════════════════════════════════════════════════════════════════
+const ClusterMgr={
+  clusters:[],
+  current:0,
+  _editIdx:-1,
+  async load(){
+    try{
+      const data=await fetch('/api/clusters',{headers:{'Content-Type':'application/json'}}).then(r=>r.json());
+      this.clusters=Array.isArray(data)?data:[];
+      const sel=document.getElementById('cluster-select');
+      sel.innerHTML=this.clusters.map(c=>`<option value="${c.idx}">${c.label}</option>`).join('');
+      const def=this.clusters.find(c=>c.default);
+      this.current=def?def.idx:0;
+      sel.value=this.current;
+      sel.style.display=this.clusters.length>1?'':'none';
+    }catch(e){}
+  },
+  switchTo(idx){
+    this.current=parseInt(idx);
+    VMs.clearCache&&VMs.clearCache();
+    Nodes.clearCache&&Nodes.clearCache();
+    Batch.clearCache&&Batch.clearCache();
+    App.refresh();
+  },
+  async renderList(){
+    await this.load();
+    const list=document.getElementById('cluster-list');
+    if(!list)return;
+    if(!this.clusters.length){list.innerHTML='<div class="td" style="font-size:12px;padding:8px 0">Nessun cluster configurato</div>';return;}
+    list.innerHTML=this.clusters.map((c,i)=>`
+      <div style="border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="color:${c.default?'var(--amber)':'var(--text3)'}">${c.default?'★':'☆'}</span>
+          <strong style="font-size:13px">${c.label}</strong>
+          <span class="td" style="font-size:11px;flex:1">${c.url}</span>
+          <span class="td" style="font-size:10px;font-family:var(--mono)">${c.api_token_hint}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn bg2 sm" onclick="ClusterMgr.testCluster(${i})">Test</button>
+          <button class="btn bg2 sm" onclick="ClusterMgr.showEdit(${i})">Modifica</button>
+          ${!c.default?`<button class="btn bg2 sm" onclick="ClusterMgr.setDefault(${i})">Default</button>`:''}
+          ${this.clusters.length>1?`<button class="btn bd sm" onclick="ClusterMgr.deleteCluster(${i})">Elimina</button>`:''}
+        </div>
+      </div>`).join('');
+  },
+  _form(idx){
+    const c=idx>=0?this.clusters[idx]:null;
+    return`<div style="border:1px solid var(--amber-dim);border-radius:4px;padding:12px;margin-bottom:10px">
+      <div class="fr" style="margin-bottom:8px"><label class="fl">Label</label><input class="inp w" id="cf-label" type="text" value="${c?c.label:''}" placeholder="Prod"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${c?c.url:''}" placeholder="https://10.0.0.1:8006"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${c?c.api_token_hint:'root@pam!id=...'}"></div>
+      <div class="fr" style="margin-bottom:10px"><label class="fl">Default</label><input type="checkbox" id="cf-default" ${c&&c.default?'checked':''}></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn ba sm" onclick="ClusterMgr.saveForm(${idx})">Salva</button>
+        <button class="btn bg2 sm" onclick="ClusterMgr.hideForm()">Annulla</button>
+      </div>
+    </div>`;
+  },
+  showAdd(){this._editIdx=-1;document.getElementById('cluster-form').innerHTML=this._form(-1);document.getElementById('cluster-form').style.display='';},
+  showEdit(idx){this._editIdx=idx;document.getElementById('cluster-form').innerHTML=this._form(idx);document.getElementById('cluster-form').style.display='';},
+  hideForm(){document.getElementById('cluster-form').style.display='none';document.getElementById('cluster-form').innerHTML='';},
+  async saveForm(editIdx){
+    const label=document.getElementById('cf-label').value.trim();
+    const url=document.getElementById('cf-url').value.trim();
+    const token=document.getElementById('cf-token').value.trim();
+    const isDef=document.getElementById('cf-default').checked;
+    if(!label||!url){toast('Label e URL richiesti','err');return;}
+    if(editIdx<0&&!token){toast('API Token richiesto','err');return;}
+    const body={label,url,api_token:token};
+    try{
+      let savedIdx;
+      if(editIdx<0){
+        const res=await fetch('/api/clusters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        savedIdx=res.idx??this.clusters.length;
+        toast('Cluster aggiunto','ok');
+      }else{
+        await fetch(`/api/clusters/${editIdx}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        savedIdx=editIdx;
+        toast('Cluster aggiornato','ok');
+      }
+      if(isDef){
+        await fetch(`/api/clusters/${savedIdx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      }
+      this.hideForm();
+      await this.renderList();
+    }catch(e){toast(`Errore: ${e.message}`,'err');}
+  },
+  async deleteCluster(idx){
+    confirm('Elimina cluster',`Eliminare il cluster "${this.clusters[idx]?.label}"?`,async()=>{
+      try{
+        await fetch(`/api/clusters/${idx}`,{method:'DELETE',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await this.renderList();
+        toast('Cluster eliminato','ok');
+      }catch(e){toast(`Errore: ${e.message}`,'err');}
+    });
+  },
+  async setDefault(idx){
+    try{
+      await fetch(`/api/clusters/${idx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      await this.renderList();
+      toast('Default aggiornato','ok');
+    }catch(e){toast(`Errore: ${e.message}`,'err');}
+  },
+  async testCluster(idx){
+    const res=document.getElementById('ctres');
+    if(res)res.innerHTML='<span class="td">Test...</span>';
+    try{
+      await fetch(`/api/clusters/${idx}/test`,{method:'POST',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      if(res)res.innerHTML='<span class="tg">✓ Connessione OK</span>';
+      toast(`${this.clusters[idx]?.label||'Cluster'}: OK`,'ok');
+    }catch(e){
+      if(res)res.innerHTML=`<span class="tr">✗ ${e.message}</span>`;
+      toast(`Test fallito: ${e.message}`,'err');
+    }
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════════════════════════════════════════
+const PMETA={dashboard:['DASHBOARD','OVERVIEW'],nodes:['NODI','MONITORAGGIO'],vms:['VM & CONTAINER','GESTIONE'],provision:['NUOVA VM','PROVISIONING'],batch:['BATCH','OPERAZIONI'],cluster:['CLUSTER','GESTIONE NODI'],reports:['REPORT','ANALYTICS'],settings:['IMPOSTAZIONI','CONFIG']};
+const App={
+  cur:'dashboard',
+  init(){
+    document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>App.nav(el.dataset.page)));
+    ClusterMgr.load().then(()=>{Settings.load();App.nav('dashboard');App.checkConn();setInterval(App.checkConn,30000);});
+  },
+  nav(p){
+    document.querySelectorAll('.ni').forEach(el=>el.classList.toggle('active',el.dataset.page===p));
+    document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+p));
+    const[t,b]=PMETA[p]||[p.toUpperCase(),''];
+    document.getElementById('ptitle').textContent=t; document.getElementById('pbadge').textContent=b;
+    App.cur=p; App.refresh();
+  },
+  refresh(){
+    const p=App.cur;
+    if(p==='dashboard') Dashboard.load();
+    if(p==='nodes')     Nodes.load();
+    if(p==='vms')       VMs.load();
+    if(p==='provision') Provision.load();
+    if(p==='batch')     Batch.load();
+    if(p==='cluster')   Cluster.load();
+    if(p==='settings')  Settings.load();
+  },
+  async checkConn(){
+    const dot=document.getElementById('cdot'), lbl=document.getElementById('clbl');
+    try{await api('/nodes');dot.className='ok';lbl.textContent='Connesso';}
+    catch{dot.className='err';lbl.textContent='Non connesso';}
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// DASHBOARD TABLE SORTER
+// ════════════════════════════════════════════════════════════════════════════
+let _dashVMs=[];
+const DashTbl=(()=>{
+  const S=mkSorter('dtbody','dtbl');
+  let data=[];
+  return {
+    setData(d){data=d;DashTbl.renderWith(data);},
+    sort(k){DashTbl.renderWith(S.sort(data,k));},
+    renderWith(d){
+      document.getElementById('dtbody').innerHTML=d.map(v=>{
+        const diskCell=v.type==='qemu'
+          ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:10px">···</span>')
+          :bar(pct(v.disk,v.maxdisk));
+        return `<tr>
+        <td>${tbadge(v.type)}</td><td class="tm">${v.vmid||'-'}</td>
+        <td class="tn">${v.name||'—'}</td><td>${nodeCell(v)}</td>
+        <td>${sbadge(v.status)}</td>
+        <td>${v.cpu?(v.cpu*100).toFixed(1)+'%':'—'}</td>
+        <td>${bar(pct(v.mem,v.maxmem))}</td>
+        <td id="ddk-${v.node}-${v.vmid}">${diskCell}</td>
+      </tr>`;}).join('')||'<tr><td colspan="8" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
+    }
+  };
+})();
+
+async function loadDashFsinfo(vms){
+  const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
+  await Promise.allSettled(running.map(async v=>{
+    const fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`).catch(()=>[]);
+    const el=document.getElementById(`ddk-${v.node}-${v.vmid}`);
+    if(Array.isArray(fs)&&fs.length){
+      const root=fs.find(f=>f.mountpoint==='/')||fs[0];
+      if(root){
+        const used=root['used-bytes']||0,total=root['total-bytes']||root['disk-size']||0;
+        v.diskPct=total?Math.round(used/total*100):null;
+        if(el)el.innerHTML=v.diskPct!=null?bar(v.diskPct):'—';
+        return;
+      }
+    }
+    v.diskPct=null;
+    if(el)el.innerHTML='—';
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+const Dashboard={
+  async load(){
+    const d=await api('/dashboard').catch(()=>null);
+    if(!d){document.getElementById('dash-kpis').innerHTML='<div class="ldc tr" style="grid-column:1/-1">Impossibile connettersi — configura in Impostazioni</div>';return;}
+    const res=d.resources||[];
+    const vms=res.filter(r=>r.type==='qemu'||r.type==='lxc');
+    const nodes=res.filter(r=>r.type==='node');
+    const running=vms.filter(v=>v.status==='running').length;
+    const cpuA=nodes.length?(nodes.reduce((s,n)=>s+(n.cpu||0),0)/nodes.length*100).toFixed(1):0;
+    const memA=nodes.length?(nodes.reduce((s,n)=>s+pct(n.mem,n.maxmem),0)/nodes.length).toFixed(1):0;
+    const tDisk=nodes.reduce((s,n)=>s+(n.maxdisk||0),0), uDisk=nodes.reduce((s,n)=>s+(n.disk||0),0);
+    document.getElementById('dash-kpis').innerHTML=`
+      <div class="card"><div class="card-t">VM Totali</div><div class="card-v a">${vms.length}</div><div class="card-s">QEMU:${vms.filter(v=>v.type==='qemu').length} · LXC:${vms.filter(v=>v.type==='lxc').length}</div></div>
+      <div class="card"><div class="card-t">Running</div><div class="card-v g">${running}</div><div class="card-s">Ferme: ${vms.length-running}</div></div>
+      <div class="card"><div class="card-t">CPU avg</div><div class="card-v ${cpuA>80?'r':cpuA>60?'a':''}">${cpuA}%</div><div class="card-s">${nodes.length} nodi</div></div>
+      <div class="card"><div class="card-t">RAM avg / Storage</div><div class="card-v ${memA>80?'r':memA>60?'a':''}">${memA}%</div><div class="card-s">${fmtB(uDisk)} / ${fmtB(tDisk)}</div></div>`;
+    DashTbl.setData(vms);
+    loadDashFsinfo(vms);
+    Dashboard.charts();
+  },
+  async charts(){
+    const cutoff=Math.floor(Date.now()/1000)-6*3600;
+    const m=await api(`/metrics?timeframe=day`).catch(()=>[]);
+    if(!m||!m.length)return;
+    const pts=m.filter(x=>x.ts>=cutoff).sort((a,b)=>a.ts-b.ts);
+    if(!pts.length)return;
+    const labels=pts.map(x=>new Date(x.ts*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+    mkChart('cCpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:pts.map(x=>(x.avg_cpu*100).toFixed(1)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cMem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:pts.map(x=>(x.avg_mem*100).toFixed(1)),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.08)',tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// NODES
+// ════════════════════════════════════════════════════════════════════════════
+const NodeVMs=(()=>{
+  const S=mkSorter('nvtbody','page-nodes');
+  let data=[];
+  return{
+    setData(d){data=d;NodeVMs.renderWith(data);},
+    sort(k){NodeVMs.renderWith(S.sort(data,k));},
+    renderWith(d){
+      document.getElementById('nvtbody').innerHTML=d.map(v=>`<tr>
+        <td>${tbadge(v.type)}</td><td class="tm">${v.vmid}</td><td class="tn">${v.name||'—'}</td>
+        <td>${sbadge(v.status)}</td><td>${((v.cpu||0)*100).toFixed(1)}%</td>
+        <td>${bar(pct(v.mem,v.maxmem))}</td><td>${fmtB(v.maxdisk||0)}</td>
+        <td>${fmtB(v.netin)}/s</td><td>${fmtB(v.netout)}/s</td>
+      </tr>`).join('')||'<tr><td colspan="9" style="padding:14px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
+    }
+  };
+})();
+
+const Nodes={
+  data:[], sel:null,
+  clearCache(){this.data=[];const s=document.getElementById('nfsel');if(s)s.innerHTML='<option value="">Tutti i nodi</option>';},
+  async load(){
+    const nodes=await api('/nodes').catch(()=>[]);
+    if(!Array.isArray(nodes))return;
+    nodes.sort((a,b)=>a.node.localeCompare(b.node,undefined,{numeric:true,sensitivity:'base'}));
+    Nodes.data=nodes;
+    const sel=document.getElementById('nfsel');
+    const ex=[...sel.options].map(o=>o.value);
+    for(const n of nodes) if(!ex.includes(n.node)) sel.add(new Option(n.node,n.node));
+    Nodes.renderGrid(nodes);
+  },
+  filter(){const v=document.getElementById('nfsel').value;Nodes.renderGrid(v?Nodes.data.filter(n=>n.node===v):Nodes.data);if(v)Nodes.selNode(v);},
+  renderGrid(nodes){
+    const g=document.getElementById('ngrid');
+    if(!nodes.length){g.innerHTML='<div class="td">Nessun nodo</div>';return;}
+    g.innerHTML=nodes.map(n=>{
+      const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem),d=pct(n.disk,n.maxdisk);
+      return`<div class="nd" style="cursor:pointer" onclick="Nodes.selNode('${n.node}')">
+        <div class="nd-hdr">
+          <div class="nd-name">${n.node}</div>
+          <span class="badge ${n.status==='online'?'bo':'bf'}">${n.status}</span>
+          <div style="flex:1"></div>
+          <div style="font-size:9px;color:var(--text3)">${n.maxcpu||0} CPU · ${fmtB(n.maxmem)}</div>
+        </div>
+        <div class="mg">
+          <div class="mb2"><div class="ml">CPU</div><div class="mv ${c>80?'tr':c>60?'ta':'tg'}">${c}%</div>${bar(c)}</div>
+          <div class="mb2"><div class="ml">RAM</div><div class="mv ${m>80?'tr':m>60?'ta':'tg'}">${m}%</div>${bar(m)}</div>
+          <div class="mb2"><div class="ml">DISK</div><div class="mv ${d>80?'tr':d>60?'ta':'tg'}">${d}%</div>${bar(d)}</div>
+        </div>
+        <div style="margin-top:8px;font-size:9px;color:var(--text3)">Up: ${n.uptime?Math.floor(n.uptime/86400)+'g '+Math.floor((n.uptime%86400)/3600)+'h':'—'}</div>
+      </div>`;
+    }).join('');
+  },
+  async selNode(node){
+    Nodes.sel=node; document.getElementById('nfsel').value=node;
+    const all=await api('/vms').catch(()=>[]);
+    const nd=Array.isArray(all)?all.find(x=>x.node===node):null;
+    const vms=[...(nd?.vms||[]).map(v=>({...v,type:'qemu',node})), ...(nd?.lxcs||[]).map(v=>({...v,type:'lxc',node}))].sort((a,b)=>a.vmid-b.vmid);
+    NodeVMs.setData(vms);
+    Nodes.loadRRD();
+  },
+  async loadRRD(){
+    if(!Nodes.sel)return;
+    const tf=document.getElementById('ntfsel').value;
+    const rrd=await api(`/nodes/${Nodes.sel}/rrd?timeframe=${tf}`).catch(()=>[]);
+    if(!Array.isArray(rrd)||!rrd.length)return;
+    const fmt2=t=>{const d=new Date(t*1000);return tf==='hour'?d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('it-IT',{month:'2-digit',day:'2-digit'});};
+    const labels=rrd.map(p=>fmt2(p.time));
+    document.getElementById('ncpuT').textContent=`CPU — ${Nodes.sel} (${tf})`;
+    document.getElementById('nmemT').textContent=`RAM — ${Nodes.sel} (${tf})`;
+    mkChart('cNcpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.1)',tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cNmem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)',tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// VMs — multi-node filter
+// ════════════════════════════════════════════════════════════════════════════
+const VMs=(()=>{
+  const S=mkSorter('vmtbody','page-vms');
+  let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[];
+
+  function allNodes(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
+
+  function renderNodePicker(){
+    const list=document.getElementById('vm-node-list');
+    list.innerHTML=allNodes().map(n=>`
+      <div class="node-sel-item">
+        <input type="checkbox" id="vnn-${n}" ${selectedNodes.has(n)?'checked':''} onchange="VMs.onNodeCheck('${n}',this.checked)">
+        <label for="vnn-${n}">${n}</label>
+      </div>`).join('');
+    updateBtn();
+  }
+
+  function updateBtn(){
+    const ns=allNodes();
+    document.getElementById('vm-node-btn').textContent=
+      selectedNodes.size===0?'Nessun nodo ▾':selectedNodes.size===ns.length?'Tutti i nodi ▾':`${selectedNodes.size} nodo/i ▾`;
+  }
+
+  function doFilter(){
+    const search=document.getElementById('vsearch').value.toLowerCase();
+    const status=document.getElementById('vstatus').value;
+    filtered=all.filter(v=>{
+      if(currentTab!=='all'&&v.type!==currentTab)return false;
+      if(!selectedNodes.has(v.node))return false;
+      if(status&&v.status!==status)return false;
+      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search))return false;
+      return true;
+    });
+    sortedData=[...filtered];
+    renderRows(sortedData);
+  }
+
+  function renderRows(data){
+    document.getElementById('vmtbody').innerHTML=data.map(v=>{
+      const diskCell=v.type==='qemu'
+        ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:10px">···</span>')
+        :bar(pct(v.disk,v.maxdisk));
+      return `<tr>
+      <td><input type="checkbox" class="vc" value="${v.type}:${v.node}:${v.vmid}"></td>
+      <td>${tbadge(v.type)}</td><td class="tm">${v.vmid}</td>
+      <td class="tn" style="cursor:pointer" onclick="VMs.detail('${v.node}','${v.vmid}','${v.type}')">${v.name||'—'}</td>
+      <td>${nodeCell(v)}</td><td class="tm">${v.ip||'—'}</td><td>${sbadge(v.status)}</td>
+      <td>${((v.cpu||0)*100).toFixed(1)}%</td>
+      <td>${bar(pct(v.mem,v.maxmem))}</td>
+      <td id="dk-${v.node}-${v.vmid}">${diskCell}</td>
+      <td><div class="flex g8">
+        ${v.status==='running'
+          ?`<button class="btn bd sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','shutdown')">Stop</button>
+             <button class="btn bg2 sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','reboot')">Reboot</button>
+             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser('${v.node}',${v.vmid})">+ Utente</button>`:''}`
+          :`<button class="btn bsuc sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','start')">Start</button>`}
+        <button class="btn bg2 sm" onclick="VMs.detail('${v.node}','${v.vmid}','${v.type}')">Info</button>
+      </div></td>
+    </tr>`;}).join('')||'<tr><td colspan="11" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
+  }
+
+  async function loadFsinfo(){
+    const running=all.filter(v=>v.type==='qemu'&&v.status==='running');
+    await Promise.allSettled(running.map(async v=>{
+      const fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`).catch(()=>[]);
+      const el=document.getElementById(`dk-${v.node}-${v.vmid}`);
+      if(Array.isArray(fs)&&fs.length){
+        const root=fs.find(f=>f.mountpoint==='/')||fs[0];
+        if(root){
+          const used=root['used-bytes']||0,total=root['total-bytes']||root['disk-size']||0;
+          v.diskPct=total?Math.round(used/total*100):null;
+          if(el)el.innerHTML=v.diskPct!=null?bar(v.diskPct):'—';
+          return;
+        }
+      }
+      v.diskPct=null;
+      if(el)el.innerHTML='—';
+    }));
+  }
+
+  return {
+    clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];},
+    async load(){
+      const data=await api('/vms').catch(()=>[]);
+      all=[];
+      if(Array.isArray(data)){
+        for(const nd of data){
+          for(const v of (nd.vms||[])) all.push({...v,type:'qemu',node:nd.node});
+          for(const v of (nd.lxcs||[])) all.push({...v,type:'lxc',node:nd.node});
+        }
+      }
+      // initialize node selection with all nodes
+      const ns=allNodes();
+      if(selectedNodes.size===0) ns.forEach(n=>selectedNodes.add(n));
+      // populate batch node sel too
+      Batch.syncNodes(ns);
+      renderNodePicker();
+      doFilter();
+      loadFsinfo();
+    },
+    toggleNodePicker(){
+      const p=document.getElementById('vm-node-picker');
+      p.style.display=p.style.display==='none'?'block':'none';
+    },
+    onNodeCheck(node,checked){
+      if(checked) selectedNodes.add(node); else selectedNodes.delete(node);
+      updateBtn(); doFilter();
+    },
+    nodeAll(){allNodes().forEach(n=>selectedNodes.add(n));renderNodePicker();doFilter();},
+    nodeNone(){selectedNodes.clear();renderNodePicker();doFilter();},
+    tab(t){currentTab=t;document.querySelectorAll('#page-vms .tab').forEach((el,i)=>el.classList.toggle('active',['all','qemu','lxc'][i]===t));doFilter();},
+    filter(){doFilter();},
+    sort(k){const d=S.sort(sortedData,k);sortedData=d;renderRows(d);},
+    checkAll(cb){document.querySelectorAll('.vc').forEach(c=>c.checked=cb.checked);},
+    action(node,vmid,type,action){
+      confirm(`${action.toUpperCase()} — VM ${vmid}`,`Eseguire "${action}" su VM ${vmid} (nodo: ${node})?`,async()=>{
+        try{
+          if(type==='lxc') await api(`/nodes/${node}/lxc/${vmid}/action/${action}`,{method:'POST',body:'{}'});
+          else             await api(`/nodes/${node}/qemu/${vmid}/action/${action}`,{method:'POST',body:'{}'});
+          toast(`${action} → VM ${vmid}`,'ok'); setTimeout(()=>VMs.load(),2500);
+        }catch{}
+      });
+    },
+    async detail(node,vmid,type){
+      document.getElementById('movT').textContent=`VM ${vmid} — ${node}`;
+      document.getElementById('movB').innerHTML='<div class="ldc"><div class="spin"></div></div>';
+      openModal('mov');
+      try{
+        const [r, fsinfo] = await Promise.all([
+          api(`/nodes/${node}/qemu/${vmid}/status`).catch(()=>null),
+          type==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`).catch(()=>[]) : Promise.resolve([])
+        ]);
+        const s=r?.status||{},snaps=r?.snapshots||[];
+        const c=((s.cpu||0)*100).toFixed(1),m=pct(s.mem,s.maxmem);
+        const fsRows=Array.isArray(fsinfo)&&fsinfo.length
+          ? fsinfo.filter(f=>f.mountpoint).map(f=>{
+              const used=f['used-bytes']||0, total=f['total-bytes']||f['disk-size']||0;
+              const pctD=total?Math.round(used/total*100):0;
+              return `<div><span class="td">Disco ${f.mountpoint}:</span> ${bar(pctD)} ${fmtB(used)}/${fmtB(total)}</div>`;
+            }).join('')||`<div><span class="td">Disco:</span> ${fmtB(s.maxdisk||0)}</div>`
+          : `<div><span class="td">Disco:</span> ${fmtB(s.maxdisk||0)} (guest agent non disponibile)</div>`;
+        document.getElementById('movB').innerHTML=`
+          <div class="mg mb12">
+            <div class="mb2"><div class="ml">Stato</div>${sbadge(s.status)}</div>
+            <div class="mb2"><div class="ml">CPU</div><div class="mv">${c}%</div></div>
+            <div class="mb2"><div class="ml">RAM</div><div class="mv">${m}%</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);line-height:2;margin-bottom:12px">
+            <div><span class="td">Uptime:</span> ${s.uptime?Math.floor(s.uptime/3600)+'h '+Math.floor((s.uptime%3600)/60)+'m':'—'}</div>
+            <div><span class="td">CPU cores:</span> ${s.cpus||'—'} · <span class="td">RAM:</span> ${fmtB(s.maxmem)}</div>
+            ${fsRows}
+            <div><span class="td">Net:</span> ↓${fmtB(s.netin)}/s · ↑${fmtB(s.netout)}/s</div>
+            ${snaps.length?`<div><span class="td">Snapshot:</span> ${snaps.length}</div>`:''}
+          </div>
+          <div class="flex g8 fw">
+            <button class="btn bsuc sm" onclick="VMs.action('${node}',${vmid},'${type}','start');closeModal('mov')">Start</button>
+            <button class="btn bd sm" onclick="VMs.action('${node}',${vmid},'${type}','stop');closeModal('mov')">Stop</button>
+            <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','reboot');closeModal('mov')">Reboot</button>
+            <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','shutdown');closeModal('mov')">Shutdown</button>
+            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot('${node}',${vmid})">Snapshot</button>`:''}
+          </div>`;
+      }catch{document.getElementById('movB').innerHTML='<div class="td">Errore caricamento</div>';}
+    },
+    snapshot(node,vmid){
+      const name=`snap-${Date.now()}`;
+      confirm(`Snapshot VM ${vmid}`,`Creare snapshot "${name}"?`,async()=>{
+        try{await api(`/nodes/${node}/qemu/${vmid}/snapshot`,{method:'POST',body:JSON.stringify({name})});toast('Snapshot creato','ok');}catch{}
+      });
+    },
+    _addUserCtx:null,
+    addUser(node,vmid){
+      VMs._addUserCtx={node,vmid};
+      document.getElementById('adduser-name').value='';
+      document.getElementById('adduser-sshkey').value='';
+      const out=document.getElementById('adduser-out');
+      out.style.display='none'; out.innerHTML='';
+      document.getElementById('adduser-ok').disabled=false;
+      openModal('madduser');
+      setTimeout(()=>document.getElementById('adduser-name').focus(),120);
+    },
+    async submitAddUser(){
+      const username=document.getElementById('adduser-name').value.trim();
+      if(!username){toast('Inserisci un nome utente','err');return;}
+      if(!/^[a-z_][a-z0-9_-]{0,31}$/.test(username)){toast('Username non valido (solo a-z 0-9 _ -)','err');return;}
+      const out=document.getElementById('adduser-out');
+      const ok=document.getElementById('adduser-ok');
+      out.style.display='block'; out.innerHTML='<span class="td">Esecuzione tramite guest agent...</span>';
+      ok.disabled=true;
+      const sshKey=document.getElementById('adduser-sshkey').value.trim();
+      const {node,vmid}=VMs._addUserCtx;
+      try{
+        const payload={username};
+        if(sshKey) payload.ssh_key=sshKey;
+        const res=await api(`/nodes/${node}/qemu/${vmid}/adduser`,{method:'POST',body:JSON.stringify(payload)});
+        out.innerHTML=`<pre style="white-space:pre-wrap;font-size:10px;line-height:1.5">${res.output||''}</pre>`;
+        if(res.exitcode!==0) out.innerHTML+=`<div class="tr mt12">✗ exitcode ${res.exitcode}</div>`;
+        else{
+          if(res.temp_password) out.innerHTML+=`<div style="margin-top:8px;padding:6px 10px;background:var(--bg3);border-radius:3px;font-family:var(--mono);font-size:11px">Password temporanea: <strong>${res.temp_password}</strong></div>`;
+          toast(`Utente ${username} aggiunto alla VM ${vmid}`,'ok');
+        }
+      }catch(e){
+        out.innerHTML=`<span class="tr">✗ ${e.message}</span>`;
+        toast('Errore aggiunta utente','err');
+      }
+      ok.disabled=false;
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// PROVISION
+// ════════════════════════════════════════════════════════════════════════════
+const Provision=(()=>{
+  let templates=[], nodes=[];
+
+  return{
+    async load(){
+      // Load nodes for target selector
+      if(!nodes.length){
+        const ns=await api('/nodes').catch(()=>[]);
+        nodes=Array.isArray(ns)?ns:[];
+        const sel=document.getElementById('pv-node');
+        nodes.forEach(n=>{if(![...sel.options].find(o=>o.value===n.node))sel.add(new Option(n.node,n.node));});
+      }
+      // Load templates
+      document.getElementById('tpl-loading').style.display='flex';
+      document.getElementById('tpl-select').style.display='none';
+      document.getElementById('tpl-info').style.display='none';
+
+      try{
+        templates=await api('/templates');
+        const sel=document.getElementById('tpl-select');
+        sel.innerHTML='<option value="">— Seleziona template —</option>';
+        (templates||[]).forEach((t,i)=>{
+          const opt=new Option(`[${t.vmid}] ${t.name} (${t.node})`,i);
+          sel.add(opt);
+        });
+        document.getElementById('tpl-loading').style.display='none';
+        sel.style.display='block';
+        if(!templates||!templates.length) toast('Nessun template cloudinit trovato','info');
+      }catch{document.getElementById('tpl-loading').innerHTML='<span class="tr">Errore caricamento template</span>';}
+    },
+
+    onSelectTemplate(){
+      const idx=parseInt(document.getElementById('tpl-select').value);
+      const tpl=templates[idx];
+      const info=document.getElementById('tpl-info');
+      if(!tpl){info.style.display='none';document.getElementById('pv-disk-hint').textContent='Verrà calcolato il delta rispetto al template';return;}
+
+      // Auto-detect disk device from template config (virtio/scsi/sata/ide, first with size=)
+      if(tpl.config){
+        const prefixes=['virtio','scsi','sata','ide'];
+        for(const p of prefixes){
+          let found=false;
+          for(let i=0;i<8;i++){
+            const d=p+i;
+            if(tpl.config[d]&&typeof tpl.config[d]==='string'&&tpl.config[d].includes('size=')){
+              document.getElementById('pv-diskdev').value=d; found=true; break;
+            }
+          }
+          if(found) break;
+        }
+      }
+
+      // Parse config for disk info
+      let diskInfo='—', diskGB=0;
+      if(tpl.config){
+        try{
+          const cfg=tpl.config;
+          const dev=document.getElementById('pv-diskdev').value||'scsi0';
+          if(cfg[dev]){
+            diskInfo=cfg[dev];
+            const m=cfg[dev].match(/size=(\d+)G/);
+            if(m){diskGB=parseInt(m[1]);diskInfo=`${diskGB}G`;}
+          }
+        }catch{}
+      }
+      if(diskGB>0){
+        document.getElementById('pv-disk-hint').textContent=`Template: ${diskGB}G. Inserisci la dimensione totale desiderata (es: ${diskGB+20}). Delta calcolato automaticamente.`;
+        document.getElementById('pv-disk').placeholder=`min ${diskGB+1}`;
+      }
+
+      // Pre-fill cloud-init fields from template config
+      if(tpl.config){
+        const cfg=tpl.config;
+        if(cfg.ciuser) document.getElementById('pv-user').value=cfg.ciuser;
+        if(cfg.nameserver) document.getElementById('pv-dns').value=cfg.nameserver;
+        if(cfg.ipconfig0){
+          const ipM=cfg.ipconfig0.match(/ip=([^,\s]+)/);
+          const gwM=cfg.ipconfig0.match(/gw=([^,\s]+)/);
+          if(ipM&&ipM[1]!=='dhcp') document.getElementById('pv-ip').value=ipM[1];
+          if(gwM) document.getElementById('pv-gw').value=gwM[1];
+        }
+        if(cfg.sshkeys){try{document.getElementById('pv-ssh').value=decodeURIComponent(cfg.sshkeys);}catch{document.getElementById('pv-ssh').value=cfg.sshkeys;}}
+      }
+
+      info.style.display='block';
+      info.innerHTML=`
+        <div><span class="td">Template:</span> <strong>${tpl.name}</strong> (VMID ${tpl.vmid})</div>
+        <div><span class="td">Nodo:</span> ${tpl.node}</div>
+        <div><span class="td">Disco (${document.getElementById('pv-diskdev').value||'scsi0'}):</span> ${diskInfo}</div>`;
+    },
+
+    async run(){
+      const idx=parseInt(document.getElementById('tpl-select').value);
+      const tpl=templates[idx];
+      if(!tpl){toast('Seleziona un template','err');return;}
+
+      const payload={
+        template_node: tpl.node,
+        template_vmid: tpl.vmid,
+        target_node:   document.getElementById('pv-node').value||tpl.node,
+        new_vmid:      parseInt(document.getElementById('pv-vmid').value)||0,
+        name:          document.getElementById('pv-name').value,
+        cpu:           parseInt(document.getElementById('pv-cpu').value)||2,
+        memory:        parseInt(document.getElementById('pv-ram').value)||2048,
+        disk:          document.getElementById('pv-disk').value?document.getElementById('pv-disk').value+'G':'',
+        disk_device:   document.getElementById('pv-diskdev').value||'scsi0',
+        ip:            document.getElementById('pv-ip').value,
+        gateway:       document.getElementById('pv-gw').value,
+        dns:           document.getElementById('pv-dns').value,
+        ciuser:        document.getElementById('pv-user').value,
+        cipassword:    document.getElementById('pv-pass').value,
+        ssh_keys:      document.getElementById('pv-ssh').value,
+      };
+
+      const btn=document.getElementById('pv-btn');
+      btn.disabled=true; btn.textContent='Provisioning in corso...';
+      const log=document.getElementById('pv-log');
+      log.innerHTML=`<span class="ta">▶ Avvio provisioning "${payload.name||'vm'}"...</span>\n`;
+
+      try{
+        const res=await api('/provision',{method:'POST',body:JSON.stringify(payload)});
+        for(const line of (res.log||[])){
+          const c=line.startsWith('⚠')?'tr':line.startsWith('✓')?'tg':'ta';
+          log.innerHTML+=`<span class="${c}">${line}</span>\n`;
+        }
+        log.innerHTML+=`\n<span class="tg">✓ VM ${res.vmid} creata su ${res.node}</span>`;
+        toast(`VM ${res.name||res.vmid} creata!`,'ok');
+      }catch(e){
+        log.innerHTML+=`<span class="tr">✗ Errore: ${e.message}</span>`;
+      }finally{
+        btn.disabled=false; btn.textContent='▶ Provisiona VM';
+      }
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// BATCH — node chip selector + full-height table
+// ════════════════════════════════════════════════════════════════════════════
+const BatchTbl=(()=>{
+  const S=mkSorter('btbody','page-batch');
+  let data=[];
+  return{
+    setData(d){data=d;},
+    sort(k){Batch.renderRows(S.sort(data,k));BatchTbl.data=S.sort(data,k);}
+  };
+})();
+
+const Batch=(()=>{
+  let all=[], filtered=[], sel=new Set(), selNodes=new Set();
+
+  function allNodeList(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
+
+  function renderNodeChips(nodes){
+    document.getElementById('batch-node-chips').innerHTML=nodes.map(n=>
+      `<button class="node-chip${selNodes.has(n)?' active':''}" onclick="Batch.toggleNodeChip('${n}')">${n}</button>`
+    ).join('');
+  }
+
+  function doFilter(){
+    const type=document.getElementById('btype').value;
+    const status=document.getElementById('bstatus').value;
+    const q=(document.getElementById('bsearch').value||'').trim().toLowerCase();
+    filtered=all.filter(v=>
+      selNodes.has(v.node)&&
+      (!type||v.type===type)&&
+      (!status||v.status===status)&&
+      (!q||String(v.vmid).includes(q)||(v.name||'').toLowerCase().includes(q)||(v.ip||'').includes(q))
+    );
+    BatchTbl.setData(filtered);
+    Batch.renderRows(filtered);
+  }
+
+  return{
+    syncNodes(nodes){
+      const sorted=nodes.slice().sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
+      if(selNodes.size===0) sorted.forEach(n=>selNodes.add(n));
+      renderNodeChips(sorted);
+    },
+    async load(){
+      const data=await api('/vms').catch(()=>[]);
+      all=[];
+      if(Array.isArray(data)){
+        for(const nd of data){
+          for(const v of (nd.vms||[])) all.push({...v,type:'qemu',node:nd.node});
+          for(const v of (nd.lxcs||[])) all.push({...v,type:'lxc',node:nd.node});
+        }
+      }
+      const nodes=allNodeList();
+      if(selNodes.size===0) nodes.forEach(n=>selNodes.add(n));
+      renderNodeChips(nodes);
+      doFilter();
+    },
+    clearCache(){all=[];filtered=[];sel=new Set();selNodes=new Set();},
+    filterBy(){doFilter();},
+    toggleNodeChip(n){
+      if(selNodes.has(n)) selNodes.delete(n); else selNodes.add(n);
+      renderNodeChips(allNodeList());
+      doFilter();
+    },
+    nodeAll(){allNodeList().forEach(n=>selNodes.add(n));renderNodeChips(allNodeList());doFilter();},
+    nodeNone(){selNodes.clear();renderNodeChips(allNodeList());doFilter();},
+    renderRows(data){
+      document.getElementById('btbody').innerHTML=data.map(v=>`<tr>
+        <td><input type="checkbox" class="bc" value="${v.type}:${v.node}:${v.vmid}"
+          ${sel.has(`${v.type}:${v.node}:${v.vmid}`)?'checked':''}
+          onchange="Batch.onCheck(this)"></td>
+        <td>${tbadge(v.type)}</td><td class="tm">${v.vmid}</td>
+        <td class="tn">${v.name||'—'}</td><td>${nodeCell(v)}</td>
+        <td class="tm">${v.ip||'—'}</td><td>${sbadge(v.status)}</td>
+      </tr>`).join('')||'<tr><td colspan="7" style="padding:14px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
+      Batch.updateInfo();
+    },
+    onCheck(el){el.checked?sel.add(el.value):sel.delete(el.value);Batch.updateInfo();},
+    checkAll(cb){filtered.forEach(v=>{const k=`${v.type}:${v.node}:${v.vmid}`;cb.checked?sel.add(k):sel.delete(k);});Batch.renderRows(filtered);},
+    selAll(){filtered.forEach(v=>sel.add(`${v.type}:${v.node}:${v.vmid}`));Batch.renderRows(filtered);},
+    selNone(){sel.clear();Batch.renderRows(filtered);},
+    updateInfo(){document.getElementById('binfo').textContent=sel.size>0?`${sel.size} VM selezionata/e`:'Nessuna VM selezionata';},
+    async run(){
+      if(!sel.size){toast('Seleziona almeno una VM','err');return;}
+      const action=document.getElementById('baction').value;
+      confirm(`Batch: ${action.toUpperCase()}`,`Eseguire "${action}" su ${sel.size} VM/Container?`,async()=>{
+        const vms=[...sel].map(s=>{const[type,node,vmid]=s.split(':');return{type,node,vmid:parseInt(vmid)};});
+        const log=document.getElementById('blog');
+        log.innerHTML=`<span class="ta">▶ "${action}" su ${vms.length} VM...</span>\n`;
+        try{
+          const res=await api('/batch',{method:'POST',body:JSON.stringify({vms,action})});
+          for(const r of res) log.innerHTML+=r.error?`<span class="tr">✗ VM ${r.vmid} (${r.node}): ${r.error}</span>\n`:`<span class="tg">✓ VM ${r.vmid} (${r.node}): OK</span>\n`;
+          log.innerHTML+=`<span class="ta">■ ${res.filter(r=>!r.error).length}/${res.length} OK</span>`;
+          toast(`Batch ${action} OK`,'ok'); setTimeout(()=>Batch.load(),3000);
+        }catch(e){log.innerHTML+=`<span class="tr">✗ ${e.message}</span>`;}
+      });
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLUSTER — multi-node selector con checkbox
+// ════════════════════════════════════════════════════════════════════════════
+const Cluster={
+  nodes:[], sel:new Set(),
+  async load(){
+    const ns=await api('/nodes').catch(()=>[]);
+    Cluster.nodes=(Array.isArray(ns)?ns:[]).sort((a,b)=>a.node.localeCompare(b.node,undefined,{numeric:true,sensitivity:'base'}));
+    Cluster.render();
+  },
+  render(){
+    document.getElementById('cnlist').innerHTML=Cluster.nodes.map(n=>{
+      const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem);
+      return`<div class="nd mb8" style="cursor:pointer" onclick="Cluster.selDetail('${n.node}')">
+        <div class="flex ac g12 mb8">
+          <input type="checkbox" ${Cluster.sel.has(n.node)?'checked':''}
+            onchange="Cluster.onCheck(event,'${n.node}')" onclick="event.stopPropagation()" style="accent-color:var(--amber);width:14px;height:14px">
+          <div class="nd-name" style="font-size:30px">${n.node}</div>
+          <span class="badge ${n.status==='online'?'bo':'bf'}">${n.status}</span>
+          <div style="flex:1"></div>
+          <div style="font-size:9px;color:var(--text3)">CPU: <b>${c}%</b> · RAM: <b>${m}%</b></div>
+        </div>
+        <div style="font-size:20px;color:var(--text3)">Up: ${n.uptime?Math.floor(n.uptime/3600)+'h':'—'} · Cores: ${n.maxcpu||'?'} · RAM: ${fmtB(n.mem)}/${fmtB(n.maxmem)}</div>
+      </div>`;
+    }).join('')||'<div class="td">Nessun nodo</div>';
+    document.getElementById('csinfo').textContent=Cluster.sel.size>0?`${Cluster.sel.size} nodo/i selezionato/i`:'Nessun nodo selezionato';
+  },
+  onCheck(e,node){e.target.checked?Cluster.sel.add(node):Cluster.sel.delete(node);document.getElementById('csinfo').textContent=Cluster.sel.size>0?`${Cluster.sel.size} nodo/i selezionato/i`:'Nessun nodo selezionato';},
+  selAll(){Cluster.nodes.forEach(n=>Cluster.sel.add(n.node));Cluster.render();},
+  selNone(){Cluster.sel.clear();Cluster.render();},
+  async selDetail(node){
+    try{
+      const r=await api(`/nodes/${node}/status`);
+      const s=r.status||{};
+      document.getElementById('cdetail').innerHTML=`
+        <div style="font-family:var(--cond);font-size:16px;font-weight:700;margin-bottom:8px">${node}</div>
+        <div style="font-size:11px;color:var(--text2);line-height:2">
+          <div><span class="td">PVE:</span> ${s.pveversion||'—'}</div>
+          <div><span class="td">Kernel:</span> ${s.kversion||'—'}</div>
+          <div><span class="td">CPU:</span> ${s.cpuinfo?.model||'—'} (${s.cpuinfo?.cpus||'?'} cores)</div>
+          <div><span class="td">Load:</span> ${(s.loadavg||[]).join(' / ')}</div>
+          <div><span class="td">Up:</span> ${s.uptime?Math.floor(s.uptime/86400)+'g '+Math.floor((s.uptime%86400)/3600)+'h':'—'}</div>
+        </div>`;
+      const rrd=await api(`/nodes/${node}/rrd?timeframe=hour`).catch(()=>[]);
+      if(Array.isArray(rrd)&&rrd.length){
+        const labels=rrd.map(p=>new Date(p.time*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+        document.getElementById('cnchT').textContent=`${node} — ultima ora`;
+        mkChart('cCN',{type:'line',data:{labels,datasets:[
+          {label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:'#f59e0b',tension:.2,pointRadius:0},
+          {label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:'#3b82f6',tension:.2,pointRadius:0}
+        ]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+      }
+    }catch{}
+  },
+  async run(){
+    if(!Cluster.sel.size){toast('Seleziona almeno un nodo','err');return;}
+    const cmd=document.getElementById('ccmd').value;
+    const nodes=[...Cluster.sel];
+    confirm(`${cmd.toUpperCase()} nodi`,`Eseguire "${cmd}" su:\n${nodes.join(', ')}\n\n⚠ Operazione irreversibile!`,async()=>{
+      for(const n of nodes){
+        try{await api(`/nodes/${n}/cmd/${cmd}`,{method:'POST',body:'{}'});toast(`${cmd} → ${n}`,'ok');}
+        catch(e){toast(`Errore su ${n}: ${e.message}`,'err');}
+      }
+    });
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// REPORTS — sortable table
+// ════════════════════════════════════════════════════════════════════════════
+const RepTbl=(()=>{
+  const S=mkSorter('rtbody','page-reports');
+  let data=[];
+  return{
+    setData(d){data=d;RepTbl.renderWith(data);},
+    sort(k){RepTbl.renderWith(S.sort(data,k));},
+    renderWith(d){
+      document.getElementById('rtbody').innerHTML=d.map(r=>`<tr>
+        <td class="tn">${r.name||'—'}</td><td class="td">${r.node}</td><td>${tbadge(r.type||'qemu')}</td>
+        <td class="${r.avgCpu>80?'tr':r.avgCpu>60?'ta':'tg'}">${r.avgCpu.toFixed(1)}%</td>
+        <td class="td">${r.maxCpu.toFixed(1)}%</td>
+        <td>${r.avgMem.toFixed(1)}%</td>
+        <td>${fmtB(r.avgNetIn)}/s</td><td>${fmtB(r.avgNetOut)}/s</td>
+      </tr>`).join('')||'<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--text3)">Nessun dato</td></tr>';
+    }
+  };
+})();
+
+const Reports={
+  data:[],
+  init(){
+    api('/nodes').then(ns=>{if(!Array.isArray(ns))return;const sel=document.getElementById('rnode');for(const n of ns)sel.add(new Option(n.node,n.node));}).catch(()=>{});
+  },
+  agg(){
+    const map={};
+    for(const m of Reports.data){
+      const key=`${m.node}:${m.vmid!=null?m.vmid:m.name}`;
+      if(!map[key])map[key]={name:m.name||`VM${m.vmid}`,node:m.node,vmid:m.vmid,type:m.vmtype,cpu:[],mc:[],mem:[],ni:[],no:[]};
+      map[key].cpu.push(m.avg_cpu*100); map[key].mc.push(m.max_cpu*100);
+      map[key].mem.push(m.avg_mem*100);
+      map[key].ni.push(m.avg_netin);    map[key].no.push(m.avg_netout);
+    }
+    const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+    return Object.values(map).map(r=>({
+      ...r,avgCpu:avg(r.cpu),maxCpu:Math.max(...r.mc),
+      avgMem:avg(r.mem),
+      avgNetIn:avg(r.ni),avgNetOut:avg(r.no)
+    })).sort((a,b)=>b.avgCpu-a.avgCpu);
+  },
+  async load(){
+    const tf=document.getElementById('rtf').value;
+    const type=document.getElementById('rtype').value, node=document.getElementById('rnode').value;
+    let url=`/report?timeframe=${tf}&type=${type}`;
+    if(node) url+=`&node=${node}`;
+    const data=await api(url).catch(()=>[]);
+    Reports.data=Array.isArray(data)?data:[];
+    if(!Reports.data.length){toast('Nessun dato nel periodo','info');return;}
+    const agg=Reports.agg();
+    RepTbl.setData(agg);
+    const labels=agg.slice(0,15).map(r=>r.name||`VM${r.vmid}`);
+    const a15=agg.slice(0,15);
+    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU avg %',data:a15.map(r=>r.avgCpu.toFixed(1)),backgroundColor:labels.map((_,i)=>COLS[i%COLS.length]+'cc')},{label:'CPU max %',data:a15.map(r=>r.maxCpu.toFixed(1)),type:'line',borderColor:'#ef4444',backgroundColor:'transparent',borderWidth:1.5,pointRadius:3}]},options:{...CD,indexAxis:'y'}});
+    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM avg %',data:a15.map(r=>r.avgMem.toFixed(1)),backgroundColor:labels.map((_,i)=>COLS[i%COLS.length]+'cc')}]},options:{...CD,indexAxis:'y'}});
+    const byH={};for(const m of Reports.data){const h=Math.floor(m.ts/3600)*3600;if(!byH[h])byH[h]=0;byH[h]+=m.avg_netin;}
+    const tk=Object.keys(byH).sort();
+    mkChart('rnet',{type:'line',data:{labels:tk.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Net In (B/s)',data:tk.map(t=>byH[t]),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.1)',fill:true,tension:.3,pointRadius:0}]},options:CD});
+  },
+  xlsx(){
+    if(!Reports.data.length){toast('Nessun dato','err');return;}
+    const agg=Reports.agg();
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+      ['Nome','Nodo','Tipo','CPU avg %','CPU max %','RAM avg %','Net In avg (B/s)','Net Out avg (B/s)'],
+      ...agg.map(r=>[r.name,r.node,r.type,r.avgCpu.toFixed(1),r.maxCpu.toFixed(1),r.avgMem.toFixed(1),r.avgNetIn.toFixed(0),r.avgNetOut.toFixed(0)])
+    ]),'Riepilogo');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+      ['Timestamp','Nodo','VMID','Nome','Tipo','CPU avg %','CPU max %','RAM avg %','Net In','Net Out'],
+      ...Reports.data.map(m=>[new Date(m.ts*1000).toLocaleString('it-IT'),m.node,m.vmid||'',m.name||'',m.vmtype||'',(m.avg_cpu*100).toFixed(2),(m.max_cpu*100).toFixed(2),(m.avg_mem*100).toFixed(2),m.avg_netin.toFixed(0),m.avg_netout.toFixed(0)])
+    ]),'Dati grezzi');
+    XLSX.writeFile(wb,`proxmox-report-${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast('Excel esportato','ok');
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════════════════════════════
+function applyTheme(t){
+  const h=document.documentElement;
+  h.classList.remove('dark','light','eva01','catppuccino');
+  if(t) h.classList.add(t);
+  const isLight=t==='light'||(t===''&&window.matchMedia('(prefers-color-scheme:light)').matches);
+  const grid=isLight?'#e2e8f0':t==='eva01'?'#4a2d7a':t==='catppuccino'?'#45475a':'#2a3040';
+  const tick=isLight?'#94a3b8':t==='eva01'?'#8b6ab3':t==='catppuccino'?'#6c7086':'#64748b';
+  const leg=isLight?'#334155':t==='eva01'?'#c4a0e0':t==='catppuccino'?'#a6adc8':'#94a3b8';
+  CD.plugins.legend.labels.color=leg;
+  CD.scales.x.grid.color=grid; CD.scales.x.ticks.color=tick;
+  CD.scales.y.grid.color=grid; CD.scales.y.ticks.color=tick;
+}
+window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>{
+  const sel=document.getElementById('ctheme');
+  if(!sel||!sel.value) applyTheme('');
+});
+
+const Settings={
+  async load(){
+    await ClusterMgr.renderList();
+    const cfg=await api('/config').catch(()=>null); if(!cfg)return;
+    const t=cfg.theme||'';
+    document.getElementById('ctheme').value=t;
+    applyTheme(t);
+  },
+  applyTheme(t){applyTheme(t);},
+  async saveTheme(){
+    const t=document.getElementById('ctheme').value;
+    await api('/config',{method:'POST',body:JSON.stringify({theme:t})});
+    applyTheme(t); toast('Tema salvato','ok');
+  }
+};
+
+// INIT
+document.addEventListener('DOMContentLoaded',()=>{App.init();Reports.init();});
+</script>
+</body>
+</html>
