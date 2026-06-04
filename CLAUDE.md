@@ -95,7 +95,7 @@ type Config struct {
 }
 ```
 
-Helper config: `GetCluster(idx int)` e `GetDefaultCluster()` leggono con RLock.
+Helper config: `GetCluster(idx int)` e `GetDefaultCluster()` leggono con RLock. `Get()` ritorna deep copy della slice `Clusters` — i caller possono mutare liberamente il valore ritornato senza corrompere `current`.
 
 ## API Routes (tutte su /api/*)
 
@@ -347,4 +347,5 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 - Non usare "empty=all" per `selectedNodes` nei selettori nodi — modello esplicito, inizializzare con tutti i nodi al load.
 - Non mischiare selettori CSS con `@media` in liste comma — CSS non supporta quella sintassi (regole separate obbligatorie).
 - Non usare `command[N]` per agent exec — Proxmox vuole repeated `command` keys (`url.Values.Add`).
+- Non rimuovere il `copy()` in `config.Get()` — senza, handler che mutano `cfg.Clusters` (es. `GetConfig` che maschera i token) corrompono `current.Clusters` per aliasing Go; poi qualsiasi `SaveConfig` scrive i token mascherati su disco.
 - Non inviare `api_token` completo al frontend in nessuna risposta — mascherare sempre con `...last8chars`.
