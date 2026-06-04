@@ -1525,7 +1525,7 @@ func (h *Handler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 	if body.URL != "" {
 		existing.URL = body.URL
 	}
-	if body.APIToken != "" && !strings.HasPrefix(body.APIToken, "...") {
+	if body.APIToken != "" {
 		existing.APIToken = body.APIToken
 	}
 	// Default preservato: non modificato da questo endpoint

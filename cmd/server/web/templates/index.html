@@ -854,7 +854,9 @@ const ClusterMgr={
   async saveForm(editIdx){
     const label=document.getElementById('cf-label').value.trim();
     const url=document.getElementById('cf-url').value.trim();
-    const token=document.getElementById('cf-token').value.trim();
+    const hint=editIdx>=0&&this.clusters[editIdx]?this.clusters[editIdx].api_token_hint:'';
+    const rawToken=document.getElementById('cf-token').value.trim();
+    const token=rawToken===hint?'':rawToken;
     const isDef=document.getElementById('cf-default').checked;
     if(!label||!url){toast('Label e URL richiesti','err');return;}
     if(editIdx<0&&!token){toast('API Token richiesto','err');return;}
