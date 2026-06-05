@@ -1787,7 +1787,7 @@ const ConsolePage = {
                 </button>
             </div>
             <div id="con-term"
-                 style="flex:1;min-height:0;overflow:hidden;background:#0a0b0d"></div>
+                 style="flex:1;min-height:0;width:100%;overflow:hidden;background:#0a0b0d"></div>
         </div>`;
 
     const p     = new URLSearchParams(window.location.search);
@@ -1876,7 +1876,10 @@ const ConsolePage = {
         };
 
         const resizeObserver = new ResizeObserver(() => {
+            if (!term.element) return;
             requestAnimationFrame(() => {
+                const screen = term.element.querySelector('.xterm-screen');
+                if (screen) screen.style.width = '0px';
                 fitAddon.fit();
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(`1:${term.cols}:${term.rows}:`);
