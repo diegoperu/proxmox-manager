@@ -1760,34 +1760,37 @@ const Console = {
 
 const ConsolePage = {
   async init() {
+    document.body.style.cssText = 'margin:0;padding:0;overflow:hidden;width:100%;height:100vh;';
+
     document.body.innerHTML = `
-        <div style="display:flex;flex-direction:column;height:100vh;
-                    background:#0a0b0d;overflow:hidden">
-            <div style="height:40px;background:#111318;
-                        border-bottom:1px solid #2a3040;
-                        display:flex;align-items:center;
-                        padding:0 16px;gap:12px;flex-shrink:0">
-                <span id="con-title"
-                      style="font-family:'Barlow Condensed',sans-serif;
-                             font-size:16px;font-weight:700;
-                             color:#f59e0b;letter-spacing:.05em">
-                    CONSOLE
-                </span>
-                <span id="con-sub"
-                      style="font-size:10px;color:#64748b"></span>
+        <div id="con-wrap" style="
+            position:fixed;top:0;left:0;right:0;bottom:0;
+            display:flex;flex-direction:column;
+            background:#0a0b0d;overflow:hidden;
+        ">
+            <div id="con-topbar" style="
+                height:40px;flex-shrink:0;
+                background:#111318;border-bottom:1px solid #2a3040;
+                display:flex;align-items:center;padding:0 16px;gap:12px;
+            ">
+                <span id="con-title" style="
+                    font-family:'Barlow Condensed',sans-serif;
+                    font-size:16px;font-weight:700;
+                    color:#f59e0b;letter-spacing:.05em;
+                ">CONSOLE</span>
+                <span id="con-sub" style="font-size:10px;color:#64748b"></span>
                 <div style="flex:1"></div>
-                <button onclick="window.close()"
-                        style="background:transparent;
-                               border:1px solid #3a4558;
-                               color:#94a3b8;padding:3px 10px;
-                               border-radius:3px;cursor:pointer;
-                               font-family:'JetBrains Mono',monospace;
-                               font-size:11px;text-transform:uppercase">
-                    ✕ Chiudi
-                </button>
+                <button onclick="window.close()" style="
+                    background:transparent;border:1px solid #3a4558;
+                    color:#94a3b8;padding:3px 10px;border-radius:3px;
+                    cursor:pointer;font-family:'JetBrains Mono',monospace;
+                    font-size:11px;text-transform:uppercase;
+                ">✕ Chiudi</button>
             </div>
-            <div id="con-term"
-                 style="flex:1;min-height:0;width:100%;overflow:hidden;background:#0a0b0d"></div>
+            <div id="con-term" style="
+                position:relative;flex:1;min-height:0;min-width:0;
+                width:100%;overflow:hidden;background:#0a0b0d;
+            "></div>
         </div>`;
 
     const p     = new URLSearchParams(window.location.search);
@@ -1878,10 +1881,8 @@ const ConsolePage = {
         const resizeObserver = new ResizeObserver(() => {
             if (!term.element) return;
             requestAnimationFrame(() => {
-                const screen = term.element.querySelector('.xterm-screen');
-                if (screen) screen.style.width = '0px';
                 fitAddon.fit();
-                if (ws.readyState === WebSocket.OPEN) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(`1:${term.cols}:${term.rows}:`);
                 }
             });
