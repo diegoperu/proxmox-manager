@@ -1645,13 +1645,27 @@ func (h *Handler) SetDefaultCluster(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) TermproxyCreate(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
 	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
-	cfg, _ := config.GetCluster(clusterIdx(r))
-	client, err := h.getClientFor(clusterIdx(r))
+
+	cfg, err := config.GetCluster(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)
 		return
 	}
-	data, err := client.TermproxyCreate(node, vmid, cfg.URL)
+	if cfg.Username == "" || cfg.Password == "" {
+		writeError(w, fmt.Errorf("console non disponibile: configura username e password per questo cluster in Impostazioni"), 400)
+		return
+	}
+
+	// Use username+password client — the PVEVNC ticket must belong to the same
+	// user that presents the PVEAuthCookie on vncwebsocket, otherwise Proxmox returns 401.
+	consoleClient, err := api.NewClientWithCredentials(cfg.URL, cfg.Username, cfg.Password)
+	if err != nil {
+		writeError(w, fmt.Errorf("autenticazione console fallita: %w", err), 502)
+		return
+	}
+	log.Printf("[termproxy-create] node=%s vmid=%d user=%s", node, vmid, cfg.Username)
+
+	data, err := consoleClient.TermproxyCreate(node, vmid, cfg.URL)
 	if err != nil {
 		writeError(w, err, 502)
 		return
@@ -1681,6 +1695,7 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 		writeError(w, fmt.Errorf("console non disponibile: configura username e password per questo cluster in Impostazioni"), 400)
 		return
 	}
+	log.Printf("[termproxy-ws] authenticating as %s for vncwebsocket", clCfg.Username)
 	pveTicket, _, err := api.GetAccessTicket(clCfg.URL, clCfg.Username, clCfg.Password)
 	if err != nil {
 		log.Printf("[termproxy-ws] GetAccessTicket failed: %v", err)
