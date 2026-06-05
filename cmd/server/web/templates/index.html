@@ -1762,8 +1762,7 @@ const ConsolePage = {
   async init() {
     document.body.innerHTML = `
         <div style="display:flex;flex-direction:column;height:100vh;
-                    background:#0a0b0d;color:#e2e8f0;
-                    font-family:'JetBrains Mono',monospace">
+                    background:#0a0b0d;overflow:hidden">
             <div style="height:40px;background:#111318;
                         border-bottom:1px solid #2a3040;
                         display:flex;align-items:center;
@@ -1788,8 +1787,7 @@ const ConsolePage = {
                 </button>
             </div>
             <div id="con-term"
-                 style="flex:1;padding:4px;overflow:hidden;
-                        background:#0a0b0d"></div>
+                 style="flex:1;min-height:0;overflow:hidden;background:#0a0b0d"></div>
         </div>`;
 
     const p     = new URLSearchParams(window.location.search);
@@ -1877,8 +1875,19 @@ const ConsolePage = {
             }
         };
 
+        const resizeObserver = new ResizeObserver(() => {
+            requestAnimationFrame(() => {
+                fitAddon.fit();
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(`1:${term.cols}:${term.rows}:`);
+                }
+            });
+        });
+        resizeObserver.observe(document.getElementById('con-term'));
+
         ws.onclose = (e) => {
             if (ws._pingInterval) clearInterval(ws._pingInterval);
+            resizeObserver.disconnect();
             term.writeln(`\r\n\x1b[33mConnessione chiusa (code: ${e.code}).\x1b[0m`);
         };
         ws.onerror = () => {
@@ -1887,13 +1896,6 @@ const ConsolePage = {
 
         term.onData(data => {
             if (ws.readyState === WebSocket.OPEN) ws.send(data);
-        });
-
-        window.addEventListener('resize', () => {
-            fitAddon.fit();
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(`1:${term.cols}:${term.rows}:`);
-            }
         });
 
     } catch (e) {
