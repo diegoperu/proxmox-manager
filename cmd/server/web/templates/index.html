@@ -715,6 +715,7 @@ html.catppuccino{
 <div id="toasts"></div>
 
 <script>
+const _IS_CONSOLE = window.location.pathname === '/console';
 // ════════════════════════════════════════════════════════════════════════════
 // CORE
 // ════════════════════════════════════════════════════════════════════════════
@@ -789,7 +790,7 @@ function mkSorter(tbodyId, headId){
 }
 
 // Clock
-setInterval(()=>{document.getElementById('clk').textContent=new Date().toLocaleTimeString('it-IT');},1000);
+if (!_IS_CONSOLE) setInterval(()=>{document.getElementById('clk').textContent=new Date().toLocaleTimeString('it-IT');},1000);
 
 // ════════════════════════════════════════════════════════════════════════════
 // CLUSTER MANAGER
@@ -1885,12 +1886,12 @@ const ConsolePage = {
 
 // INIT
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.location.pathname === '/console') {
+    if (_IS_CONSOLE) {
         ConsolePage.init();
-    } else {
-        App.init();
-        Reports.init();
+        return;
     }
+    App.init();
+    Reports.init();
 });
 </script>
 </body>

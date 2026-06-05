@@ -1647,10 +1647,10 @@ func (h *Handler) TermproxyCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
-	node := chi.URLParam(r, "node")
-	vmid := chi.URLParam(r, "vmid")
+	node   := chi.URLParam(r, "node")
+	vmid   := chi.URLParam(r, "vmid")
 	ticket := r.URL.Query().Get("ticket")
-	port := r.URL.Query().Get("port")
+	port   := r.URL.Query().Get("port")
 
 	if ticket == "" || port == "" {
 		writeError(w, fmt.Errorf("ticket e port richiesti"), 400)
@@ -1663,36 +1663,53 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[termproxy-ws] node=%s vmid=%s port=%s proxmox=%s", node, vmid, port, clCfg.URL)
+
 	upgrader := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin:  func(r *http.Request) bool { return true },
+		Subprotocols: []string{"binary"},
 	}
 	browserConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("[termproxy-ws] upgrade browser: %v", err)
 		return
 	}
 	defer browserConn.Close()
 
 	proxmoxHost := extractHost(clCfg.URL)
-	proxmoxWS := fmt.Sprintf("wss://%s/api2/json/nodes/%s/qemu/%s/vncwebsocket?port=%s&vncticket=%s",
-		proxmoxHost, node, vmid, port, url.QueryEscape(ticket))
+	proxmoxWS := fmt.Sprintf(
+		"wss://%s/api2/json/nodes/%s/qemu/%s/vncwebsocket?port=%s&vncticket=%s",
+		proxmoxHost, node, vmid, port, url.QueryEscape(ticket),
+	)
+	log.Printf("[termproxy-ws] dialing proxmox: %s", proxmoxWS)
 
 	dialer := websocket.Dialer{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-		Subprotocols:    []string{"binary"},
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		Subprotocols:     []string{"binary"},
+		HandshakeTimeout: 10 * time.Second,
 	}
 	reqHeader := http.Header{}
 	if clCfg.APIToken != "" {
 		reqHeader.Set("Authorization", "PVEAPIToken="+clCfg.APIToken)
+		reqHeader.Set("Cookie", "PVEAPIToken="+clCfg.APIToken)
 	}
 
-	proxmoxConn, _, err := dialer.Dial(proxmoxWS, reqHeader)
+	proxmoxConn, resp, err := dialer.Dial(proxmoxWS, reqHeader)
 	if err != nil {
-		log.Printf("termproxy dial error: %v", err)
+		statusCode := 0
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}
+		log.Printf("[termproxy-ws] dial proxmox FAILED: %v (HTTP %d)", err, statusCode)
 		browserConn.WriteMessage(websocket.TextMessage,
-			[]byte("\r\n\x1b[31mErrore connessione console: "+err.Error()+"\x1b[0m\r\n"))
+			[]byte(fmt.Sprintf(
+				"\r\n\x1b[31mErrore connessione Proxmox (HTTP %d): %v\x1b[0m\r\n",
+				statusCode, err,
+			)))
 		return
 	}
 	defer proxmoxConn.Close()
+	log.Printf("[termproxy-ws] connected to proxmox OK")
 
 	errc := make(chan error, 2)
 
@@ -1700,11 +1717,11 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 		for {
 			mt, msg, err := proxmoxConn.ReadMessage()
 			if err != nil {
-				errc <- err
+				errc <- fmt.Errorf("proxmox→browser: %w", err)
 				return
 			}
 			if err := browserConn.WriteMessage(mt, msg); err != nil {
-				errc <- err
+				errc <- fmt.Errorf("write browser: %w", err)
 				return
 			}
 		}
@@ -1713,23 +1730,27 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 		for {
 			mt, msg, err := browserConn.ReadMessage()
 			if err != nil {
-				errc <- err
+				errc <- fmt.Errorf("browser→proxmox: %w", err)
 				return
 			}
 			if err := proxmoxConn.WriteMessage(mt, msg); err != nil {
-				errc <- err
+				errc <- fmt.Errorf("write proxmox: %w", err)
 				return
 			}
 		}
 	}()
 
-	<-errc
+	err = <-errc
+	log.Printf("[termproxy-ws] pipe closed: %v", err)
 }
 
 func extractHost(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return rawURL
+	}
+	if u.Port() == "" {
+		return u.Hostname() + ":8006"
 	}
 	return u.Host
 }
