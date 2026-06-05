@@ -1748,8 +1748,20 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 	defer proxmoxConn.Close()
 	log.Printf("[termproxy-ws] connected to proxmox OK")
 
+	// Send initial auth message — termproxy expects "USERNAME:PVEVNC_TICKET\n" as
+	// the very first WebSocket message or it closes the connection immediately (1006).
+	authMsg := fmt.Sprintf("%s:%s\n", clCfg.Username, ticket)
+	if err := proxmoxConn.WriteMessage(websocket.TextMessage, []byte(authMsg)); err != nil {
+		log.Printf("[termproxy-ws] send auth message failed: %v", err)
+		browserConn.WriteMessage(websocket.TextMessage,
+			[]byte("\r\n\x1b[31mErrore invio autenticazione console\x1b[0m\r\n"))
+		return
+	}
+	log.Printf("[termproxy-ws] auth message sent for user %s", clCfg.Username)
+
 	errc := make(chan error, 2)
 
+	// Proxmox → Browser: raw data, no wrapping
 	go func() {
 		for {
 			mt, msg, err := proxmoxConn.ReadMessage()
@@ -1763,6 +1775,9 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
+
+	// Browser → Proxmox: wrap input in pve-xtermjs protocol
+	// "0:LENGTH:DATA" for normal input, "1:COLS:ROWS:" for resize, "2" for ping
 	go func() {
 		for {
 			mt, msg, err := browserConn.ReadMessage()
@@ -1770,7 +1785,14 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 				errc <- fmt.Errorf("browser→proxmox: %w", err)
 				return
 			}
-			if err := proxmoxConn.WriteMessage(mt, msg); err != nil {
+			s := string(msg)
+			var wrapped string
+			if strings.HasPrefix(s, "1:") || s == "2" {
+				wrapped = s
+			} else {
+				wrapped = fmt.Sprintf("0:%d:%s", len(msg), s)
+			}
+			if err := proxmoxConn.WriteMessage(mt, []byte(wrapped)); err != nil {
 				errc <- fmt.Errorf("write proxmox: %w", err)
 				return
 			}

@@ -1860,8 +1860,13 @@ const ConsolePage = {
             term.writeln('\x1b[32mConnesso.\x1b[0m\r\n');
             fitAddon.fit();
             if (ws.readyState === WebSocket.OPEN) {
-                ws.send(`0:${term.cols}:${term.rows}:\n`);
+                ws.send(`1:${term.cols}:${term.rows}:`);
             }
+            const pingInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) ws.send('2');
+                else clearInterval(pingInterval);
+            }, 30000);
+            ws._pingInterval = pingInterval;
         };
 
         ws.onmessage = (e) => {
@@ -1873,6 +1878,7 @@ const ConsolePage = {
         };
 
         ws.onclose = (e) => {
+            if (ws._pingInterval) clearInterval(ws._pingInterval);
             term.writeln(`\r\n\x1b[33mConnessione chiusa (code: ${e.code}).\x1b[0m`);
         };
         ws.onerror = () => {
@@ -1886,7 +1892,7 @@ const ConsolePage = {
         window.addEventListener('resize', () => {
             fitAddon.fit();
             if (ws.readyState === WebSocket.OPEN) {
-                ws.send(`0:${term.cols}:${term.rows}:\n`);
+                ws.send(`1:${term.cols}:${term.rows}:`);
             }
         });
 
