@@ -7,9 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/addon-fit/addon-fit.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@xterm/xterm@5.3.0/css/xterm.css">
+<script src="https://unpkg.com/@xterm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://unpkg.com/@xterm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <style>
 :root{
   --bg:#0a0b0d;--bg2:#111318;--bg3:#181c23;--bg4:#1e2330;
@@ -1747,7 +1747,24 @@ const Console = {
 
 const ConsolePage = {
   async init() {
-    document.getElementById('sidebar').style.display = 'none';
+    document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;height:100vh;background:#0a0b0d">
+            <div style="height:40px;background:#111318;border-bottom:1px solid #2a3040;
+                        display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0">
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:16px;
+                             font-weight:700;color:#f59e0b;letter-spacing:.05em"
+                      id="console-title">CONSOLE</span>
+                <span style="font-size:10px;color:#64748b" id="console-sub"></span>
+                <div style="flex:1"></div>
+                <button onclick="window.close()"
+                        style="background:transparent;border:1px solid #3a4558;color:#94a3b8;
+                               padding:3px 10px;border-radius:3px;cursor:pointer;
+                               font-family:'JetBrains Mono',monospace;font-size:11px">
+                    ✕ Chiudi
+                </button>
+            </div>
+            <div id="terminal-container" style="flex:1;padding:4px;overflow:hidden"></div>
+        </div>`;
 
     const params = new URLSearchParams(window.location.search);
     const node  = params.get('node');
@@ -1756,14 +1773,8 @@ const ConsolePage = {
     const cidx  = params.get('cluster') || '0';
 
     document.title = `Console — ${label}`;
-    document.getElementById('ptitle').textContent = `CONSOLE — ${label}`;
-    document.getElementById('pbadge').textContent = `VM ${vmid}`;
-    const refreshBtn = document.querySelector('.topbar .btn');
-    if (refreshBtn) refreshBtn.remove();
-    document.getElementById('cluster-select').style.display = 'none';
-
-    document.getElementById('content').innerHTML =
-      `<div id="terminal-container" style="background:#000;height:calc(100vh - 48px);padding:4px"></div>`;
+    document.getElementById('console-title').textContent = `CONSOLE — ${label}`;
+    document.getElementById('console-sub').textContent   = `VM ${vmid} · ${node}`;
 
     const term = new Terminal({
       cursorBlink: true,
@@ -1771,7 +1782,7 @@ const ConsolePage = {
       fontFamily: "'JetBrains Mono','Fira Code',monospace",
       theme: { background:'#0a0b0d', foreground:'#e2e8f0', cursor:'#f59e0b', selection:'rgba(245,158,11,0.3)' }
     });
-    const fitAddon = new FitAddon.FitAddon();
+    const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(document.getElementById('terminal-container'));
     fitAddon.fit();
