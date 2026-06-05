@@ -11,6 +11,8 @@ type ClusterConfig struct {
 	Label    string `json:"label"`
 	URL      string `json:"url"`
 	APIToken string `json:"api_token"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 	Default  bool   `json:"default"`
 }
 

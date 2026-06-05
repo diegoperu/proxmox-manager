@@ -799,6 +799,10 @@ const ClusterMgr={
   clusters:[],
   current:0,
   _editIdx:-1,
+  get hasConsole() {
+    const c = this.clusters.find(x => x.idx === this.current);
+    return c ? (c.has_console_credentials === true) : false;
+  },
   async load(){
     try{
       const data=await fetch('/api/clusters',{headers:{'Content-Type':'application/json'}}).then(r=>r.json());
@@ -845,6 +849,12 @@ const ClusterMgr={
       <div class="fr" style="margin-bottom:8px"><label class="fl">Label</label><input class="inp w" id="cf-label" type="text" value="${c?c.label:''}" placeholder="Prod"></div>
       <div class="fr" style="margin-bottom:8px"><label class="fl">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${c?c.url:''}" placeholder="https://10.0.0.1:8006"></div>
       <div class="fr" style="margin-bottom:8px"><label class="fl">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${c?c.api_token_hint:'root@pam!id=...'}"></div>
+      <div style="margin:10px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
+        <div class="fl" style="color:var(--text2);letter-spacing:.1em;margin-bottom:4px">CONSOLE SERIALE <span class="td" style="font-size:9px;font-weight:400">— opzionale</span></div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Richiesto per la funzione Console. Proxmox non accetta API token per WebSocket.${c&&c.has_console_credentials?' <span style="color:var(--green)">✓ Credenziali configurate</span>':''} ${idx>=0?' Lascia vuoti per mantenere, svuota username per rimuovere.':''}</div>
+      </div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl">Username <span class="td" style="font-size:9px">(es. root@pam)</span></label><input class="inp w" id="cf-user" type="text" placeholder="root@pam"></div>
+      <div class="fr" style="margin-bottom:10px"><label class="fl">Password${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-pwd" type="password" placeholder="••••••••"></div>
       <div class="fr" style="margin-bottom:10px"><label class="fl">Default</label><input type="checkbox" id="cf-default" ${c&&c.default?'checked':''}></div>
       <div style="display:flex;gap:6px">
         <button class="btn ba sm" onclick="ClusterMgr.saveForm(${idx})">Salva</button>
@@ -864,7 +874,9 @@ const ClusterMgr={
     const isDef=document.getElementById('cf-default').checked;
     if(!label||!url){toast('Label e URL richiesti','err');return;}
     if(editIdx<0&&!token){toast('API Token richiesto','err');return;}
-    const body={label,url,api_token:token};
+    const username=document.getElementById('cf-user').value.trim();
+    const password=document.getElementById('cf-pwd').value;
+    const body={label,url,api_token:token,username,password};
     try{
       let savedIdx;
       if(editIdx<0){
@@ -1161,7 +1173,7 @@ const VMs=(()=>{
         ${v.status==='running'
           ?`<button class="btn bd sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','shutdown')">Stop</button>
              <button class="btn bg2 sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','reboot')">Reboot</button>
-             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser('${v.node}',${v.vmid})">+ Utente</button>${v.has_serial?`<button class="btn bpurp sm" onclick="Console.open('${v.node}',${v.vmid},'${v.name||v.vmid}',${v.cluster_idx??0})">⬛ Console</button>`:''}`:''}`
+             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser('${v.node}',${v.vmid})">+ Utente</button>${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="Console.open('${v.node}',${v.vmid},'${v.name||v.vmid}',${v.cluster_idx??0})">⬛ Console</button>`:''}`:''}`
           :`<button class="btn bsuc sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','start')">Start</button>`}
         <button class="btn bg2 sm" onclick="VMs.detail('${v.node}','${v.vmid}','${v.type}')">Info</button>
       </div></td>
@@ -1267,7 +1279,7 @@ const VMs=(()=>{
             <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','reboot');closeModal('mov')">Reboot</button>
             <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','shutdown');closeModal('mov')">Shutdown</button>
             ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot('${node}',${vmid})">Snapshot</button>`:''}
-            ${type==='qemu'&&r?.config?.serial0&&s.status==='running'?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open('${node}',${vmid},'${s.name||vmid}',ClusterMgr.current)">⬛ Console</button>`:''}
+            ${type==='qemu'&&r?.config?.serial0&&s.status==='running'&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open('${node}',${vmid},'${s.name||vmid}',ClusterMgr.current)">⬛ Console</button>`:''}
           </div>`;
       }catch{document.getElementById('movB').innerHTML='<div class="td">Errore caricamento</div>';}
     },
@@ -1880,6 +1892,11 @@ const ConsolePage = {
 
     } catch (e) {
         term.writeln(`\r\n\x1b[31mErrore: ${e.message}\x1b[0m`);
+        if (e.message.includes('400')) {
+            term.writeln('\x1b[33mConfigura username e password in Impostazioni → cluster per abilitare la console.\x1b[0m');
+        } else if (e.message.includes('502') || e.message.includes('500')) {
+            term.writeln('\x1b[33mVerifica che la VM abbia serial0 configurato e che sia running.\x1b[0m');
+        }
     }
   }
 };

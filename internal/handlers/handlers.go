@@ -1465,20 +1465,22 @@ func maskToken(tok string) string {
 func (h *Handler) GetClusters(w http.ResponseWriter, r *http.Request) {
 	cfg := config.Get()
 	type SafeCluster struct {
-		Label        string `json:"label"`
-		URL          string `json:"url"`
-		APITokenHint string `json:"api_token_hint"`
-		Default      bool   `json:"default"`
-		Idx          int    `json:"idx"`
+		Label                 string `json:"label"`
+		URL                   string `json:"url"`
+		APITokenHint          string `json:"api_token_hint"`
+		Default               bool   `json:"default"`
+		Idx                   int    `json:"idx"`
+		HasConsoleCredentials bool   `json:"has_console_credentials"`
 	}
 	result := make([]SafeCluster, len(cfg.Clusters))
 	for i, c := range cfg.Clusters {
 		result[i] = SafeCluster{
-			Label:        c.Label,
-			URL:          c.URL,
-			APITokenHint: maskToken(c.APIToken),
-			Default:      c.Default,
-			Idx:          i,
+			Label:                 c.Label,
+			URL:                   c.URL,
+			APITokenHint:          maskToken(c.APIToken),
+			Default:               c.Default,
+			Idx:                   i,
+			HasConsoleCredentials: c.Username != "" && c.Password != "",
 		}
 	}
 	writeJSON(w, result)
@@ -1534,6 +1536,16 @@ func (h *Handler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.APIToken != "" {
 		existing.APIToken = body.APIToken
+	}
+	if body.Username == "" {
+		// Empty username → clear both console credentials
+		existing.Username = ""
+		existing.Password = ""
+	} else {
+		existing.Username = body.Username
+		if body.Password != "" {
+			existing.Password = body.Password
+		}
 	}
 	// Default preservato: non modificato da questo endpoint
 	// Creare un nuovo slice per evitare aliasing
@@ -1633,12 +1645,13 @@ func (h *Handler) SetDefaultCluster(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) TermproxyCreate(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
 	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
+	cfg, _ := config.GetCluster(clusterIdx(r))
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)
 		return
 	}
-	data, err := client.TermproxyCreate(node, vmid)
+	data, err := client.TermproxyCreate(node, vmid, cfg.URL)
 	if err != nil {
 		writeError(w, err, 502)
 		return
@@ -1660,6 +1673,18 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 	clCfg, _ := config.GetCluster(clusterIdx(r))
 	if clCfg.URL == "" {
 		writeError(w, fmt.Errorf("cluster non configurato"), 400)
+		return
+	}
+
+	// Auth check before WS upgrade — vncwebsocket requires PVEAuthCookie, not API token
+	if clCfg.Username == "" || clCfg.Password == "" {
+		writeError(w, fmt.Errorf("console non disponibile: configura username e password per questo cluster in Impostazioni"), 400)
+		return
+	}
+	pveTicket, _, err := api.GetAccessTicket(clCfg.URL, clCfg.Username, clCfg.Password)
+	if err != nil {
+		log.Printf("[termproxy-ws] GetAccessTicket failed: %v", err)
+		writeError(w, fmt.Errorf("autenticazione console fallita: %w", err), 502)
 		return
 	}
 
@@ -1689,10 +1714,7 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 		HandshakeTimeout: 10 * time.Second,
 	}
 	reqHeader := http.Header{}
-	if clCfg.APIToken != "" {
-		reqHeader.Set("Authorization", "PVEAPIToken="+clCfg.APIToken)
-		reqHeader.Set("Cookie", "PVEAPIToken="+clCfg.APIToken)
-	}
+	reqHeader.Set("Cookie", "PVEAuthCookie="+pveTicket)
 
 	proxmoxConn, resp, err := dialer.Dial(proxmoxWS, reqHeader)
 	if err != nil {

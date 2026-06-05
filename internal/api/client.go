@@ -254,8 +254,66 @@ func (c *Client) DeleteVM(node string, vmid int) (json.RawMessage, error) {
 	return c.Delete(fmt.Sprintf("/nodes/%s/qemu/%d", node, vmid))
 }
 
-func (c *Client) TermproxyCreate(node string, vmid int) (json.RawMessage, error) {
-	return c.Post(fmt.Sprintf("/nodes/%s/qemu/%d/termproxy", node, vmid), url.Values{})
+func (c *Client) TermproxyCreate(node string, vmid int, proxmoxBaseURL string) (json.RawMessage, error) {
+	referer := fmt.Sprintf("%s/?console=kvm&xtermjs=1&vmid=%d&node=%s&cmd=", proxmoxBaseURL, vmid, node)
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/termproxy", node, vmid)
+	req, err := http.NewRequest("POST", c.BaseURL+"/api2/json"+path, strings.NewReader(url.Values{}.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	if c.Token != "" {
+		req.Header.Set("Authorization", "PVEAPIToken="+c.Token)
+	} else if c.Ticket != "" {
+		req.Header.Set("Cookie", "PVEAuthCookie="+c.Ticket)
+		req.Header.Set("CSRFPreventionToken", c.CSRFToken)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", referer)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("proxmox %d: %s", resp.StatusCode, string(b))
+	}
+	var r struct{ Data json.RawMessage `json:"data"` }
+	json.Unmarshal(b, &r)
+	return r.Data, nil
+}
+
+// GetAccessTicket autentica con username+password e ritorna (PVEAuthCookie, CSRFToken, error).
+// Necessario per autenticare il WebSocket vncwebsocket, che non accetta API token.
+func GetAccessTicket(baseURL, username, password string) (string, string, error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+	}
+	c := &http.Client{Timeout: 10 * time.Second, Transport: tr}
+	data := url.Values{}
+	data.Set("username", username)
+	data.Set("password", password)
+	resp, err := c.PostForm(baseURL+"/api2/json/access/ticket", data)
+	if err != nil {
+		return "", "", fmt.Errorf("access/ticket: %w", err)
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Data struct {
+			Ticket              string `json:"ticket"`
+			CSRFPreventionToken string `json:"CSRFPreventionToken"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", err
+	}
+	if result.Data.Ticket == "" {
+		return "", "", fmt.Errorf("autenticazione fallita (credenziali errate?)")
+	}
+	return result.Data.Ticket, result.Data.CSRFPreventionToken, nil
 }
 
 func (c *Client) AgentExec(node string, vmid int, args []string) (json.RawMessage, error) {
