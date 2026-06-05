@@ -254,6 +254,10 @@ func (c *Client) DeleteVM(node string, vmid int) (json.RawMessage, error) {
 	return c.Delete(fmt.Sprintf("/nodes/%s/qemu/%d", node, vmid))
 }
 
+func (c *Client) TermproxyCreate(node string, vmid int) (json.RawMessage, error) {
+	return c.Post(fmt.Sprintf("/nodes/%s/qemu/%d/termproxy", node, vmid), url.Values{})
+}
+
 func (c *Client) AgentExec(node string, vmid int, args []string) (json.RawMessage, error) {
 	v := url.Values{}
 	for _, a := range args {

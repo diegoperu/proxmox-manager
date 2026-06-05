@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -20,6 +21,7 @@ import (
 	"proxmox-manager/internal/config"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/websocket"
 )
 
 type Handler struct {
@@ -336,6 +338,8 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 									vms[j]["ip"] = ip
 								}
 							}
+							_, hasSerial := config["serial0"]
+							vms[j]["has_serial"] = hasSerial
 						}(j, vmid)
 					}
 					wg2.Wait()
@@ -371,6 +375,9 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 						}(j, vmid)
 					}
 					wg2.Wait()
+					for j := range lxcs {
+						lxcs[j]["has_serial"] = false
+					}
 					results[i].LXCs = lxcs
 				}
 			}
@@ -1619,4 +1626,110 @@ func (h *Handler) SetDefaultCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+// ── Termproxy / serial console ────────────────────────────────────────────────
+
+func (h *Handler) TermproxyCreate(w http.ResponseWriter, r *http.Request) {
+	node := chi.URLParam(r, "node")
+	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
+	client, err := h.getClientFor(clusterIdx(r))
+	if err != nil {
+		writeError(w, err, 400)
+		return
+	}
+	data, err := client.TermproxyCreate(node, vmid)
+	if err != nil {
+		writeError(w, err, 502)
+		return
+	}
+	writeJSON(w, data)
+}
+
+func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
+	node := chi.URLParam(r, "node")
+	vmid := chi.URLParam(r, "vmid")
+	ticket := r.URL.Query().Get("ticket")
+	port := r.URL.Query().Get("port")
+
+	if ticket == "" || port == "" {
+		writeError(w, fmt.Errorf("ticket e port richiesti"), 400)
+		return
+	}
+
+	clCfg, _ := config.GetCluster(clusterIdx(r))
+	if clCfg.URL == "" {
+		writeError(w, fmt.Errorf("cluster non configurato"), 400)
+		return
+	}
+
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	browserConn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer browserConn.Close()
+
+	proxmoxHost := extractHost(clCfg.URL)
+	proxmoxWS := fmt.Sprintf("wss://%s/api2/json/nodes/%s/qemu/%s/vncwebsocket?port=%s&vncticket=%s",
+		proxmoxHost, node, vmid, port, url.QueryEscape(ticket))
+
+	dialer := websocket.Dialer{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		Subprotocols:    []string{"binary"},
+	}
+	reqHeader := http.Header{}
+	if clCfg.APIToken != "" {
+		reqHeader.Set("Authorization", "PVEAPIToken="+clCfg.APIToken)
+	}
+
+	proxmoxConn, _, err := dialer.Dial(proxmoxWS, reqHeader)
+	if err != nil {
+		log.Printf("termproxy dial error: %v", err)
+		browserConn.WriteMessage(websocket.TextMessage,
+			[]byte("\r\n\x1b[31mErrore connessione console: "+err.Error()+"\x1b[0m\r\n"))
+		return
+	}
+	defer proxmoxConn.Close()
+
+	errc := make(chan error, 2)
+
+	go func() {
+		for {
+			mt, msg, err := proxmoxConn.ReadMessage()
+			if err != nil {
+				errc <- err
+				return
+			}
+			if err := browserConn.WriteMessage(mt, msg); err != nil {
+				errc <- err
+				return
+			}
+		}
+	}()
+	go func() {
+		for {
+			mt, msg, err := browserConn.ReadMessage()
+			if err != nil {
+				errc <- err
+				return
+			}
+			if err := proxmoxConn.WriteMessage(mt, msg); err != nil {
+				errc <- err
+				return
+			}
+		}
+	}()
+
+	<-errc
+}
+
+func extractHost(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	return u.Host
 }

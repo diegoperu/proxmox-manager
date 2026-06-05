@@ -7,6 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/addon-fit/addon-fit.min.js"></script>
 <style>
 :root{
   --bg:#0a0b0d;--bg2:#111318;--bg3:#181c23;--bg4:#1e2330;
@@ -1157,7 +1160,7 @@ const VMs=(()=>{
         ${v.status==='running'
           ?`<button class="btn bd sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','shutdown')">Stop</button>
              <button class="btn bg2 sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','reboot')">Reboot</button>
-             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser('${v.node}',${v.vmid})">+ Utente</button>`:''}`
+             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser('${v.node}',${v.vmid})">+ Utente</button>${v.has_serial?`<button class="btn bpurp sm" onclick="Console.open('${v.node}',${v.vmid},'${v.name||v.vmid}',${v.cluster_idx??0})">⬛ Console</button>`:''}`:''}`
           :`<button class="btn bsuc sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','start')">Start</button>`}
         <button class="btn bg2 sm" onclick="VMs.detail('${v.node}','${v.vmid}','${v.type}')">Info</button>
       </div></td>
@@ -1263,6 +1266,7 @@ const VMs=(()=>{
             <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','reboot');closeModal('mov')">Reboot</button>
             <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','shutdown');closeModal('mov')">Shutdown</button>
             ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot('${node}',${vmid})">Snapshot</button>`:''}
+            ${type==='qemu'&&r?.config?.serial0&&s.status==='running'?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open('${node}',${vmid},'${s.name||vmid}',ClusterMgr.current)">⬛ Console</button>`:''}
           </div>`;
       }catch{document.getElementById('movB').innerHTML='<div class="td">Errore caricamento</div>';}
     },
@@ -1731,8 +1735,99 @@ const Settings={
   }
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// Console — serial terminal via termproxy
+// ════════════════════════════════════════════════════════════════════════════
+const Console = {
+  open(node, vmid, label, cidx) {
+    const u = `/console?node=${node}&vmid=${vmid}&label=${encodeURIComponent(label)}&cluster=${cidx}`;
+    window.open(u, `console-${vmid}`, 'width=900,height=600,resizable=yes');
+  }
+};
+
+const ConsolePage = {
+  async init() {
+    document.getElementById('sidebar').style.display = 'none';
+
+    const params = new URLSearchParams(window.location.search);
+    const node  = params.get('node');
+    const vmid  = params.get('vmid');
+    const label = params.get('label') || vmid;
+    const cidx  = params.get('cluster') || '0';
+
+    document.title = `Console — ${label}`;
+    document.getElementById('ptitle').textContent = `CONSOLE — ${label}`;
+    document.getElementById('pbadge').textContent = `VM ${vmid}`;
+    const refreshBtn = document.querySelector('.topbar .btn');
+    if (refreshBtn) refreshBtn.remove();
+    document.getElementById('cluster-select').style.display = 'none';
+
+    document.getElementById('content').innerHTML =
+      `<div id="terminal-container" style="background:#000;height:calc(100vh - 48px);padding:4px"></div>`;
+
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: "'JetBrains Mono','Fira Code',monospace",
+      theme: { background:'#0a0b0d', foreground:'#e2e8f0', cursor:'#f59e0b', selection:'rgba(245,158,11,0.3)' }
+    });
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal-container'));
+    fitAddon.fit();
+
+    term.writeln('\x1b[33mConnessione console seriale...\x1b[0m');
+
+    try {
+      const res = await fetch(`/api/nodes/${node}/qemu/${vmid}/termproxy?cluster=${cidx}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const ticket = data.ticket;
+      const port   = data.port;
+
+      const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = `${wsProto}://${location.host}/api/nodes/${node}/qemu/${vmid}/termproxy-ws`
+                  + `?ticket=${encodeURIComponent(ticket)}&port=${port}&cluster=${cidx}`;
+
+      const ws = new WebSocket(wsUrl, ['binary']);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        term.writeln('\x1b[32mConnesso.\x1b[0m\r\n');
+        fitAddon.fit();
+        ConsolePage.sendResize(ws, term);
+      };
+      ws.onmessage = e => {
+        if (e.data instanceof ArrayBuffer) term.write(new Uint8Array(e.data));
+        else term.write(e.data);
+      };
+      ws.onclose = () => term.writeln('\r\n\x1b[33mConnessione chiusa.\x1b[0m');
+      ws.onerror = () => term.writeln('\r\n\x1b[31mErrore WebSocket.\x1b[0m');
+
+      term.onData(d => { if (ws.readyState === WebSocket.OPEN) ws.send(d); });
+
+      window.addEventListener('resize', () => { fitAddon.fit(); ConsolePage.sendResize(ws, term); });
+
+    } catch(e) {
+      term.writeln(`\r\n\x1b[31mErrore: ${e.message}\x1b[0m`);
+    }
+  },
+
+  sendResize(ws, term) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    // Proxmox termproxy resize format: "0:cols:rows:\n"
+    ws.send(`0:${term.cols}:${term.rows}:\n`);
+  }
+};
+
 // INIT
-document.addEventListener('DOMContentLoaded',()=>{App.init();Reports.init();});
+if (window.location.pathname === '/console') {
+  document.addEventListener('DOMContentLoaded', () => ConsolePage.init());
+} else {
+  document.addEventListener('DOMContentLoaded', () => { App.init(); Reports.init(); });
+}
 </script>
 </body>
 </html>

@@ -44,7 +44,7 @@ func main() {
 	}))
 
 	// SPA pages
-	for _, path := range []string{"/", "/nodes", "/vms", "/batch", "/cluster", "/provision", "/reports", "/settings"} {
+	for _, path := range []string{"/", "/nodes", "/vms", "/batch", "/cluster", "/provision", "/reports", "/settings", "/console"} {
 		r.Get(path, serveIndex)
 	}
 
@@ -77,6 +77,8 @@ func main() {
 		r.Post("/nodes/{node}/qemu/{vmid}/snapshot", h.VMSnapshot)
 		r.Post("/nodes/{node}/qemu/{vmid}/migrate", h.VMMigrate)
 		r.Post("/nodes/{node}/qemu/{vmid}/adduser", h.AddVMUser)
+		r.Post("/nodes/{node}/qemu/{vmid}/termproxy", h.TermproxyCreate)
+		r.Get("/nodes/{node}/qemu/{vmid}/termproxy-ws", h.TermproxyWS)
 		r.Delete("/nodes/{node}/qemu/{vmid}", h.DeleteVM)
 
 		r.Post("/batch", h.BatchAction)
