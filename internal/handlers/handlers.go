@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -1308,21 +1306,6 @@ func (h *Handler) GetClusterTasks(w http.ResponseWriter, r *http.Request) {
 
 var validUsername = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 
-// genTempPassword genera una password casuale di 12 caratteri con crypto/rand.
-// Charset sicuro per shell single-quoted: no apostrofi.
-func genTempPassword() (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
-	pw := make([]byte, 12)
-	for i := range pw {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			return "", err
-		}
-		pw[i] = charset[n.Int64()]
-	}
-	return string(pw), nil
-}
-
 func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
 	vmidStr := chi.URLParam(r, "vmid")
@@ -1369,21 +1352,14 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 
 	u := body.Username
 	var script string
-	var tempPassword string
 	if sshKey == "" {
-		tmpPwd, err := genTempPassword()
-		if err != nil {
-			writeError(w, fmt.Errorf("generazione password: %w", err), 500)
-			return
-		}
-		tempPassword = tmpPwd
 		script = fmt.Sprintf(
 			"useradd -m -s /bin/bash %s 2>/dev/null || true; "+
-				"echo '%s:%s' | chpasswd; "+
+				"echo '%s:p4ssw0rd' | chpasswd; "+
 				"usermod -aG sudo %s 2>/dev/null || true; "+
 				"usermod -aG wheel %s 2>/dev/null || true; "+
 				"chage -d 0 %s",
-			u, u, tmpPwd, u, u, u,
+			u, u, u, u, u,
 		)
 	} else {
 		script = fmt.Sprintf(
@@ -1443,11 +1419,7 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("adduser %s@%s/%d exitcode=%d", u, node, vmid, exitCode)
-	resp := map[string]interface{}{"output": output, "exitcode": exitCode}
-	if tempPassword != "" {
-		resp["temp_password"] = tempPassword
-	}
-	writeJSON(w, resp)
+	writeJSON(w, map[string]interface{}{"output": output, "exitcode": exitCode})
 }
 
 // ── Cluster management ────────────────────────────────────────────────────────

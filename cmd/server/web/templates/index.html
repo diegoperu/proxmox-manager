@@ -1317,7 +1317,6 @@ const VMs=(()=>{
         out.innerHTML=`<pre style="white-space:pre-wrap;font-size:10px;line-height:1.5">${res.output||''}</pre>`;
         if(res.exitcode!==0) out.innerHTML+=`<div class="tr mt12">✗ exitcode ${res.exitcode}</div>`;
         else{
-          if(res.temp_password) out.innerHTML+=`<div style="margin-top:8px;padding:6px 10px;background:var(--bg3);border-radius:3px;font-family:var(--mono);font-size:11px">Password temporanea: <strong>${res.temp_password}</strong></div>`;
           toast(`Utente ${username} aggiunto alla VM ${vmid}`,'ok');
         }
       }catch(e){
