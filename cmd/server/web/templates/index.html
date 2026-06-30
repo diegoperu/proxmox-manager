@@ -455,7 +455,7 @@ html.catppuccino{
             <div class="g g2 g8 mb12">
               <div class="fr">
                 <label class="fl">IP statico (CIDR obbligatorio)</label>
-                <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24">
+                <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24" oninput="Provision.calcGw()">
               </div>
               <div class="fr">
                 <label class="fl">Gateway</label>
@@ -1420,6 +1420,21 @@ const Provision=(()=>{
         <div><span class="td">Template:</span> <strong>${tpl.name}</strong> (VMID ${tpl.vmid})</div>
         <div><span class="td">Nodo:</span> ${tpl.node}</div>
         <div><span class="td">Disco (${document.getElementById('pv-diskdev').value||'scsi0'}):</span> ${diskInfo}</div>`;
+    },
+
+    calcGw(){
+      const cidr=document.getElementById('pv-ip').value.trim();
+      const m=cidr.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/);
+      if(!m) return;
+      const parts=m[1].split('.').map(Number);
+      if(parts.some(p=>p>255)) return;
+      const prefix=parseInt(m[2]);
+      if(prefix<1||prefix>30) return;
+      const mask=~(0xFFFFFFFF>>>prefix)>>>0;
+      const ip32=(parts[0]<<24|parts[1]<<16|parts[2]<<8|parts[3])>>>0;
+      const broadcast=(ip32|~mask)>>>0;
+      const gw=broadcast-1;
+      document.getElementById('pv-gw').value=[(gw>>>24)&255,(gw>>>16)&255,(gw>>>8)&255,gw&255].join('.');
     },
 
     async run(){
