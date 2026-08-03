@@ -260,7 +260,8 @@ Rilevamento nuovo device:
 1. `lsblk -ndo NAME,TYPE` baseline prima del rescan
 2. Rescan bus (`partprobe` + `echo "- - -" > /sys/class/scsi_host/host*/scan` + `udevadm settle`)
 3. Diff `lsblk` retry (5 tentativi, 2s apart) per trovare il device apparso
-4. **Fallback**: se il device non appare (hotplug non abilitato/supportato), forza `VMAction(reboot)` e attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), poi ripete il diff `lsblk` — autorizzato esplicitamente, nessuna conferma richiesta
+4. **Fallback**: se il device non appare (hotplug non abilitato/supportato — tipico per bus `virtio`, che non supporta hotplug di virtio-blk), forza uno **stop+start reale** della VM (`VMAction(shutdown, forceStop=1)` + `WaitForTask` + `VMAction(start)` + `WaitForTask`), poi attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), infine ripete il diff `lsblk` — autorizzato esplicitamente, nessuna conferma richiesta.
+   ⚠️ **Non usare `VMAction(reboot)` per questo**: è un riavvio ACPI a livello guest, il processo QEMU resta lo stesso e non rilegge la config — un disco virtio-blk aggiunto a runtime non si attacca mai finché non c'è un vero stop+start (nuovo processo QEMU).
 
 Setup: `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
 

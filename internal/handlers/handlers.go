@@ -1535,15 +1535,34 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second)
 	}
 	if newDevice == "" {
-		// Fallback: il device non è apparso con hotplug — forza un riavvio della VM e ritenta.
-		opLog = append(opLog, "Disco non rilevato — riavvio VM per forzare il rilevamento...")
+		// Fallback: il device non è apparso con hotplug — forza un ciclo stop+start della VM.
+		// NON basta un "reboot" (ACPI): il processo QEMU resta lo stesso e non rilegge la
+		// lista dei device, quindi un disco virtio-blk aggiunto a runtime non si attacca mai.
+		// Solo uno stop+start reale (nuovo processo QEMU) rilegge la config e collega il disco.
+		opLog = append(opLog, "Disco non rilevato — arresto VM per applicare la configurazione...")
 
-		if _, err := client.VMAction(node, vmid, "reboot", url.Values{}); err != nil {
-			writeError(w, fmt.Errorf("riavvio VM fallito: %w", err), 502)
+		shutdownUPID, err := client.VMAction(node, vmid, "shutdown", url.Values{"forceStop": {"1"}, "timeout": {"30"}})
+		if err != nil {
+			writeError(w, fmt.Errorf("arresto VM fallito: %w", err), 502)
+			return
+		}
+		if err := client.WaitForTask(shutdownUPID, 90*time.Second); err != nil {
+			writeError(w, fmt.Errorf("arresto VM non completato: %w", err), 502)
 			return
 		}
 
-		opLog = append(opLog, "Attesa completamento riavvio e guest agent pronto (max 2 minuti)...")
+		opLog = append(opLog, "VM arrestata, riavvio...")
+		startUPID, err := client.VMAction(node, vmid, "start", url.Values{})
+		if err != nil {
+			writeError(w, fmt.Errorf("avvio VM fallito: %w", err), 502)
+			return
+		}
+		if err := client.WaitForTask(startUPID, 60*time.Second); err != nil {
+			writeError(w, fmt.Errorf("avvio VM non completato: %w", err), 502)
+			return
+		}
+
+		opLog = append(opLog, "Attesa guest agent pronto (max 2 minuti)...")
 		agentReady := false
 		rebootDeadline := time.Now().Add(120 * time.Second)
 		for time.Now().Before(rebootDeadline) {
