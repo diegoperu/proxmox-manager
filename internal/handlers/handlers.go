@@ -68,6 +68,14 @@ func writeError(w http.ResponseWriter, err error, code int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 }
 
+// writeErrorLog is like writeError but attaches an accumulated step log, so the
+// caller can see exactly how far a multi-step operation got before failing.
+func writeErrorLog(w http.ResponseWriter, err error, code int, log []string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error(), "log": log})
+}
+
 // isForbidden returns true when Proxmox responded with 403 (missing privilege).
 // Used to silently return empty data for non-critical read endpoints instead of propagating 502.
 func isForbidden(err error) bool {
@@ -1507,7 +1515,7 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	opLog = append(opLog, "Rilevamento dischi esistenti...")
 	before, err := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
 	if err != nil {
-		writeError(w, fmt.Errorf("guest agent non raggiungibile: %w", err), 502)
+		writeErrorLog(w, fmt.Errorf("guest agent non raggiungibile: %w", err), 502, opLog)
 		return
 	}
 
@@ -1543,22 +1551,22 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 
 		shutdownUPID, err := client.VMAction(node, vmid, "shutdown", url.Values{"forceStop": {"1"}, "timeout": {"30"}})
 		if err != nil {
-			writeError(w, fmt.Errorf("arresto VM fallito: %w", err), 502)
+			writeErrorLog(w, fmt.Errorf("arresto VM fallito: %w", err), 502, opLog)
 			return
 		}
 		if err := client.WaitForTask(shutdownUPID, 90*time.Second); err != nil {
-			writeError(w, fmt.Errorf("arresto VM non completato: %w", err), 502)
+			writeErrorLog(w, fmt.Errorf("arresto VM non completato: %w", err), 502, opLog)
 			return
 		}
 
 		opLog = append(opLog, "VM arrestata, riavvio...")
 		startUPID, err := client.VMAction(node, vmid, "start", url.Values{})
 		if err != nil {
-			writeError(w, fmt.Errorf("avvio VM fallito: %w", err), 502)
+			writeErrorLog(w, fmt.Errorf("avvio VM fallito: %w", err), 502, opLog)
 			return
 		}
 		if err := client.WaitForTask(startUPID, 60*time.Second); err != nil {
-			writeError(w, fmt.Errorf("avvio VM non completato: %w", err), 502)
+			writeErrorLog(w, fmt.Errorf("avvio VM non completato: %w", err), 502, opLog)
 			return
 		}
 
@@ -1573,9 +1581,9 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !agentReady {
-			writeError(w, fmt.Errorf(
+			writeErrorLog(w, fmt.Errorf(
 				"la VM non ha completato il riavvio entro 2 minuti — riprova più tardi",
-			), 502)
+			), 502, opLog)
 			return
 		}
 		opLog = append(opLog, "Guest agent di nuovo raggiungibile, nuova ricerca disco...")
@@ -1588,10 +1596,10 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if newDevice == "" {
-			writeError(w, fmt.Errorf(
+			writeErrorLog(w, fmt.Errorf(
 				"disco non rilevato nemmeno dopo il riavvio — verifica la configurazione "+
 					"del disco in Proxmox (bus, storage, VMID)",
-			), 502)
+			), 502, opLog)
 			return
 		}
 		opLog = append(opLog, fmt.Sprintf("Nuovo disco rilevato dopo riavvio: /dev/%s", newDevice))
@@ -1639,7 +1647,7 @@ echo "OK"
 	opLog = append(opLog, fmt.Sprintf("Partizionamento GPT + ext4 su %s...", dev))
 	out, err := runScript(script)
 	if err != nil {
-		writeError(w, fmt.Errorf("setup disco fallito: %w (output: %s)", err, out), 502)
+		writeErrorLog(w, fmt.Errorf("setup disco fallito: %w (output: %s)", err, out), 502, opLog)
 		return
 	}
 	opLog = append(opLog, "Output: "+strings.TrimSpace(out))

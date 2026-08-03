@@ -786,7 +786,7 @@ async function api(path, opts={}) {
   }
   const r = await fetch(fullPath, {headers:{'Content-Type':'application/json'}, ...opts});
   const d = await r.json().catch(()=>({}));
-  if(!r.ok) { toast(d.error||r.statusText,'err'); throw new Error(d.error||r.statusText); }
+  if(!r.ok) { toast(d.error||r.statusText,'err'); const e=new Error(d.error||r.statusText); e.body=d; throw e; }
   return d;
 }
 function toast(msg,type='info'){
@@ -1472,6 +1472,7 @@ const DiskMgr = {
       (res.log || []).forEach(l => this.log(l));
       toast(`Disco montato su ${res.mount_point}`, 'ok');
     } catch (e) {
+      (e.body?.log || []).forEach(l => this.log(l));
       this.log(`<span class="tr">✗ ${e.message}</span>`);
     }
   }
