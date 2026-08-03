@@ -1522,7 +1522,9 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	// ": ; true" finale: senza set -e, l'exit code dello script è quello dell'ULTIMO test
 	// valutato nel loop (spesso falsy, es. l'ultimo disco esaminato non è candidato) — senza
 	// forzare 0, runScript scarta un output valido come se fosse un errore guest agent.
-	findBlank := `for d in $(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'); do n=$(lsblk -ln "/dev/$d" | wc -l); if [ "$n" = "1" ]; then ! blkid "/dev/$d" >/dev/null 2>&1 && echo "$d"; elif [ "$n" = "2" ]; then p="/dev/${d}1"; [ "$(blkid -o value -s TYPE "$p" 2>/dev/null)" = "ext4" ] && ! findmnt -S "$p" >/dev/null 2>&1 && echo "$d"; fi; done; true`
+	// Candidato (b) accetta anche TYPE vuoto (non solo ext4): copre il caso di un run
+	// interrotto TRA parted e mkfs.ext4 (partizione creata ma mai formattata).
+	findBlank := `for d in $(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'); do n=$(lsblk -ln "/dev/$d" | wc -l); if [ "$n" = "1" ]; then ! blkid "/dev/$d" >/dev/null 2>&1 && echo "$d"; elif [ "$n" = "2" ]; then p="/dev/${d}1"; t="$(blkid -o value -s TYPE "$p" 2>/dev/null)"; { [ -z "$t" ] || [ "$t" = "ext4" ]; } && ! findmnt -S "$p" >/dev/null 2>&1 && echo "$d"; fi; done; true`
 
 	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
 	out, err := runScript(findBlank)
