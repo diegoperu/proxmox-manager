@@ -1511,42 +1511,37 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		return "", fmt.Errorf("timeout esecuzione comando guest agent")
 	}
 
-	// Step 1: baseline dischi esistenti
-	opLog = append(opLog, "Rilevamento dischi esistenti...")
-	before, err := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
+	// Identificazione del nuovo disco per PROPRIETÀ (nessuna partizione, nessun filesystem),
+	// non per diff temporale prima/dopo: su molti setup Proxmox/QEMU (q35+PCIe) il disco
+	// virtio/scsi viene collegato a caldo IMMEDIATAMENTE alla PUT /config, quindi una baseline
+	// "prima" presa a inizio richiesta lo troverebbe già presente e nessun diff lo segnalerebbe
+	// mai come "nuovo" — bug osservato: lsblk manuale mostrava il disco, il diff no.
+	findBlank := `for d in $(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'); do n=$(lsblk -ln "/dev/$d" | wc -l); if [ "$n" = "1" ] && ! blkid "/dev/$d" >/dev/null 2>&1; then echo "$d"; fi; done`
+
+	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
+	out, err := runScript(findBlank)
 	if err != nil {
 		writeErrorLog(w, fmt.Errorf("guest agent non raggiungibile: %w", err), 502, opLog)
 		return
 	}
+	candidates := strings.Fields(out)
 
-	// Step 2: rescan bus (best effort — necessario soprattutto per SCSI)
-	opLog = append(opLog, "Rescan bus dischi...")
-	runScript(`partprobe 2>/dev/null; for h in /sys/class/scsi_host/host*; do [ -e "$h/scan" ] && echo "- - -" > "$h/scan" 2>/dev/null; done; udevadm settle 2>/dev/null; true`)
+	if len(candidates) == 0 {
+		opLog = append(opLog, "Nessun disco vuoto trovato — rescan bus...")
+		runScript(`partprobe 2>/dev/null; for h in /sys/class/scsi_host/host*; do [ -e "$h/scan" ] && echo "- - -" > "$h/scan" 2>/dev/null; done; udevadm settle 2>/dev/null; true`)
+		for attempt := 0; attempt < 5 && len(candidates) == 0; attempt++ {
+			time.Sleep(2 * time.Second)
+			out, _ = runScript(findBlank)
+			candidates = strings.Fields(out)
+		}
+	}
 
-	// Step 3: retry diff fino a trovare il nuovo device (max 5 tentativi, 2s apart)
-	beforeSet := map[string]bool{}
-	for _, d := range strings.Fields(before) {
-		beforeSet[d] = true
-	}
-	var newDevice string
-	for attempt := 0; attempt < 5; attempt++ {
-		after, _ := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
-		for _, d := range strings.Fields(after) {
-			if !beforeSet[d] {
-				newDevice = d
-				break
-			}
-		}
-		if newDevice != "" {
-			break
-		}
-		time.Sleep(2 * time.Second)
-	}
-	if newDevice == "" {
-		// Fallback: il device non è apparso con hotplug — forza un ciclo stop+start della VM.
-		// NON basta un "reboot" (ACPI): il processo QEMU resta lo stesso e non rilegge la
-		// lista dei device, quindi un disco virtio-blk aggiunto a runtime non si attacca mai.
-		// Solo uno stop+start reale (nuovo processo QEMU) rilegge la config e collega il disco.
+	if len(candidates) == 0 {
+		// Fallback: il device non è apparso nemmeno col rescan — forza un ciclo stop+start
+		// reale della VM (nuovo processo QEMU, config riletta da zero). NON basta un
+		// VMAction("reboot") senza attendere il task: senza WaitForTask si crea una race in
+		// cui il polling "guest agent pronto" può avere successo contro la sessione PRE-riavvio
+		// (VM non ancora spenta), portando a un diff/ricerca sullo stato vecchio.
 		opLog = append(opLog, "Disco non rilevato — arresto VM per applicare la configurazione...")
 
 		shutdownUPID, err := client.VMAction(node, vmid, "shutdown", url.Values{"forceStop": {"1"}, "timeout": {"30"}})
@@ -1588,24 +1583,30 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		}
 		opLog = append(opLog, "Guest agent di nuovo raggiungibile, nuova ricerca disco...")
 
-		after, _ := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
-		for _, d := range strings.Fields(after) {
-			if !beforeSet[d] {
-				newDevice = d
-				break
-			}
-		}
-		if newDevice == "" {
+		out, _ = runScript(findBlank)
+		candidates = strings.Fields(out)
+		if len(candidates) == 0 {
 			writeErrorLog(w, fmt.Errorf(
 				"disco non rilevato nemmeno dopo il riavvio — verifica la configurazione "+
 					"del disco in Proxmox (bus, storage, VMID)",
 			), 502, opLog)
 			return
 		}
-		opLog = append(opLog, fmt.Sprintf("Nuovo disco rilevato dopo riavvio: /dev/%s", newDevice))
+		opLog = append(opLog, fmt.Sprintf("Dischi vuoti trovati dopo riavvio: %s", strings.Join(candidates, ", ")))
 	} else {
-		opLog = append(opLog, fmt.Sprintf("Nuovo disco rilevato: /dev/%s", newDevice))
+		opLog = append(opLog, fmt.Sprintf("Dischi vuoti trovati: %s", strings.Join(candidates, ", ")))
 	}
+
+	if len(candidates) > 1 {
+		writeErrorLog(w, fmt.Errorf(
+			"trovati %d dischi vuoti candidati (%s) — impossibile determinare automaticamente "+
+				"quale sia quello appena aggiunto; rimuovi/configura gli altri dischi vuoti e riprova",
+			len(candidates), strings.Join(candidates, ", "),
+		), 409, opLog)
+		return
+	}
+	newDevice := candidates[0]
+	opLog = append(opLog, fmt.Sprintf("Disco selezionato: /dev/%s", newDevice))
 
 	// Step 4: partiziona, formatta, monta, fstab, permessi
 	perm := "1777"
@@ -1645,7 +1646,7 @@ echo "OK"
 	)
 
 	opLog = append(opLog, fmt.Sprintf("Partizionamento GPT + ext4 su %s...", dev))
-	out, err := runScript(script)
+	out, err = runScript(script)
 	if err != nil {
 		writeErrorLog(w, fmt.Errorf("setup disco fallito: %w (output: %s)", err, out), 502, opLog)
 		return

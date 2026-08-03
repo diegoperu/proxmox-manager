@@ -256,12 +256,13 @@ Legge config VM, trova primo slot libero per il bus (`nextDiskSlot`, limiti: scs
 ```
 Richiede VM `running` con guest agent attivo. Filesystem ext4, partizionamento GPT singola partizione 100%. Permessi: `1777` (sticky, default) o `0777` se `sticky_bit:false`. `mountPointPattern` + blocklist `forbiddenMounts` (`/`, `/etc`, `/boot`, `/usr`, `/bin`, `/sbin`, `/var`, `/proc`, `/sys`, `/dev`, `/root`, `/home`, `/lib`, `/opt`) impediscono mount point pericolosi.
 
-Rilevamento nuovo device:
-1. `lsblk -ndo NAME,TYPE` baseline prima del rescan
-2. Rescan bus (`partprobe` + `echo "- - -" > /sys/class/scsi_host/host*/scan` + `udevadm settle`)
-3. Diff `lsblk` retry (5 tentativi, 2s apart) per trovare il device apparso
-4. **Fallback**: se il device non appare (hotplug non abilitato/supportato), forza un ciclo `VMAction(shutdown, forceStop=1)` + `WaitForTask` + `VMAction(start)` + `WaitForTask`, poi attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), infine ripete il diff `lsblk` — autorizzato esplicitamente, nessuna conferma richiesta.
-   ⚠️ **Bug reale corretto**: la prima versione usava `VMAction(reboot)` **senza `WaitForTask`** — il codice iniziava subito a fare polling di `echo ready` senza attendere che il task di reboot completasse. Se il guest agent rispondeva ancora (VM non ancora spenta/riavviata), il polling dichiarava "pronto" contro la sessione PRE-riavvio, il diff `lsblk` girava sullo stato vecchio e falliva — mentre il riavvio vero proseguiva in background e il disco compariva solo dopo (da cui il falso negativo con lsblk manuale che invece mostrava `vdb`). `WaitForTask` su shutdown e start elimina la race, garantendo che il diff `lsblk` giri solo a riavvio realmente completato.
+Rilevamento nuovo device — **per proprietà, non per diff temporale**:
+1. `findBlank` script: tra tutti i `TYPE=disk` di `lsblk`, seleziona quelli senza partizioni figlie (`lsblk -ln /dev/$d | wc -l` == 1) e senza filesystem (`blkid` vuoto) — il disco appena aggiunto è l'unico "vuoto" nel sistema
+2. Se nessun candidato: rescan bus (`partprobe` + `echo "- - -" > /sys/class/scsi_host/host*/scan` + `udevadm settle`) e retry (5 tentativi, 2s apart)
+3. **Fallback**: se ancora nessun candidato, forza un ciclo `VMAction(shutdown, forceStop=1)` + `WaitForTask` + `VMAction(start)` + `WaitForTask`, poi attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), infine ripete `findBlank` — autorizzato esplicitamente, nessuna conferma richiesta
+4. Se `findBlank` trova **più di un candidato**: errore esplicito (409, disambiguazione richiesta all'utente) invece di sceglierne uno a caso — evita di formattare il disco sbagliato
+
+⚠️ **Perché non un diff prima/dopo `lsblk`** (bug reale osservato e corretto): su Proxmox/QEMU con machine type q35+PCIe il disco può venire collegato a caldo **immediatamente** alla `PUT /config` (prima ancora della chiamata a `setup-disk`). Una baseline "prima" presa a inizio richiesta lo troverebbe già presente, quindi nessun diff lo segnalerebbe mai come "nuovo" — risultato: `lsblk` manuale mostrava il disco (es. `vdb`), ma il diff falliva sempre, anche dopo un vero stop+start. La causa non era il tipo di riavvio (era già corretto: stop+start con `WaitForTask`, non `reboot` ACPI) ma il metodo di identificazione stesso.
 
 Setup: `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
 
