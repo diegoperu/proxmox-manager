@@ -1645,6 +1645,12 @@ for i in 1 2 3 4 5; do
     sleep 1
 done
 if [ -z "$UUID" ]; then
+    echo "DIAG whoami=$(whoami) path=$PATH" >&2
+    echo "DIAG blkid_bare=[$(blkid "${DEV}1" 2>&1)]" >&2
+    echo "DIAG blkid_type=[$(blkid -o value -s TYPE "${DEV}1" 2>&1)]" >&2
+    echo "DIAG blkid_uuid_nocache=[$(blkid -c /dev/null -o value -s UUID "${DEV}1" 2>&1)]" >&2
+    echo "DIAG lsblk=[$(lsblk -f "$DEV" 2>&1 | tr '\n' ';')]" >&2
+    echo "DIAG mkfs_path=[$(command -v mkfs.ext4 2>&1)] blkid_path=[$(command -v blkid 2>&1)]" >&2
     echo "impossibile determinare UUID di ${DEV}1 dopo 5 tentativi" >&2
     exit 1
 fi
