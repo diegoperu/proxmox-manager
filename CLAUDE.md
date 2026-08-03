@@ -257,14 +257,16 @@ Legge config VM, trova primo slot libero per il bus (`nextDiskSlot`, limiti: scs
 Richiede VM `running` con guest agent attivo. Filesystem ext4, partizionamento GPT singola partizione 100%. Permessi: `1777` (sticky, default) o `0777` se `sticky_bit:false`. `mountPointPattern` + blocklist `forbiddenMounts` (`/`, `/etc`, `/boot`, `/usr`, `/bin`, `/sbin`, `/var`, `/proc`, `/sys`, `/dev`, `/root`, `/home`, `/lib`, `/opt`) impediscono mount point pericolosi.
 
 Rilevamento nuovo device — **per proprietà, non per diff temporale**:
-1. `findBlank` script: tra tutti i `TYPE=disk` di `lsblk`, seleziona quelli senza partizioni figlie (`lsblk -ln /dev/$d | wc -l` == 1) e senza filesystem (`blkid` vuoto) — il disco appena aggiunto è l'unico "vuoto" nel sistema
+1. `findBlank` script: tra tutti i `TYPE=disk` di `lsblk`, candidato è o (a) un disco vergine — nessuna partizione figlia (`lsblk -ln /dev/$d | wc -l` == 1) e senza filesystem (`blkid` vuoto) — o (b) un disco con una sola partizione ext4 non montata (`findmnt -S`) — quest'ultimo caso copre il retry dopo un tentativo di setup fallito a metà (partizionato/formattato ma non montato/fstab)
 2. Se nessun candidato: rescan bus (`partprobe` + `echo "- - -" > /sys/class/scsi_host/host*/scan` + `udevadm settle`) e retry (5 tentativi, 2s apart)
 3. **Fallback**: se ancora nessun candidato, forza un ciclo `VMAction(shutdown, forceStop=1)` + `WaitForTask` + `VMAction(start)` + `WaitForTask`, poi attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), infine ripete `findBlank` — autorizzato esplicitamente, nessuna conferma richiesta
 4. Se `findBlank` trova **più di un candidato**: errore esplicito (409, disambiguazione richiesta all'utente) invece di sceglierne uno a caso — evita di formattare il disco sbagliato
 
 ⚠️ **Perché non un diff prima/dopo `lsblk`** (bug reale osservato e corretto): su Proxmox/QEMU con machine type q35+PCIe il disco può venire collegato a caldo **immediatamente** alla `PUT /config` (prima ancora della chiamata a `setup-disk`). Una baseline "prima" presa a inizio richiesta lo troverebbe già presente, quindi nessun diff lo segnalerebbe mai come "nuovo" — risultato: `lsblk` manuale mostrava il disco (es. `vdb`), ma il diff falliva sempre, anche dopo un vero stop+start. La causa non era il tipo di riavvio (era già corretto: stop+start con `WaitForTask`, non `reboot` ACPI) ma il metodo di identificazione stesso.
 
-Setup: `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
+Setup: `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` + `udevadm settle` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
+
+⚠️ **Bug reale corretto**: `UUID=$(blkid -o value -s UUID "${DEV}1")` subito dopo `mkfs.ext4`, senza `udevadm settle`, poteva restituire stringa vuota (race blkid/cache). Con `UUID=""`, `grep -q "$UUID" /etc/fstab` (pattern vuoto) matcha qualunque riga non vuota → il check "già presente" risultava vero per errore, la riga fstab non veniva mai scritta, e il successivo `mount /data` falliva con `can't find in /etc/fstab`. Fix: `udevadm settle` dopo `mkfs.ext4`, probe non cache (`blkid -c /dev/null`), e `exit 1` esplicito se `UUID` risulta vuoto invece di proseguire silenziosamente.
 
 Risponde `{"log":[...righe...], "device":"/dev/sdX", "mount_point":"/data"}`.
 

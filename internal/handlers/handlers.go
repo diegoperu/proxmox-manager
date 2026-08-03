@@ -1516,7 +1516,10 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	// virtio/scsi viene collegato a caldo IMMEDIATAMENTE alla PUT /config, quindi una baseline
 	// "prima" presa a inizio richiesta lo troverebbe già presente e nessun diff lo segnalerebbe
 	// mai come "nuovo" — bug osservato: lsblk manuale mostrava il disco, il diff no.
-	findBlank := `for d in $(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'); do n=$(lsblk -ln "/dev/$d" | wc -l); if [ "$n" = "1" ] && ! blkid "/dev/$d" >/dev/null 2>&1; then echo "$d"; fi; done`
+	// Un candidato è o un disco vergine (nessuna partizione, nessun filesystem) o un disco
+	// lasciato a metà da un tentativo di setup precedente (una sola partizione ext4, non
+	// montata) — così un retry dopo un errore a metà script trova ancora il disco giusto.
+	findBlank := `for d in $(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'); do n=$(lsblk -ln "/dev/$d" | wc -l); if [ "$n" = "1" ]; then ! blkid "/dev/$d" >/dev/null 2>&1 && echo "$d"; elif [ "$n" = "2" ]; then p="/dev/${d}1"; [ "$(blkid -o value -s TYPE "$p" 2>/dev/null)" = "ext4" ] && ! findmnt -S "$p" >/dev/null 2>&1 && echo "$d"; fi; done`
 
 	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
 	out, err := runScript(findBlank)
@@ -1625,9 +1628,14 @@ if ! blkid "${DEV}1" >/dev/null 2>&1; then
 fi
 if ! blkid -o value -s TYPE "${DEV}1" >/dev/null 2>&1; then
     mkfs.ext4 -F "${DEV}1"
+    udevadm settle 2>/dev/null || true
 fi
 mkdir -p %s
-UUID=$(blkid -o value -s UUID "${DEV}1")
+UUID=$(blkid -c /dev/null -o value -s UUID "${DEV}1")
+if [ -z "$UUID" ]; then
+    echo "impossibile determinare UUID di ${DEV}1" >&2
+    exit 1
+fi
 if ! grep -q "$UUID" /etc/fstab; then
     echo "UUID=$UUID %s ext4 defaults 0 2" >> /etc/fstab
 fi
