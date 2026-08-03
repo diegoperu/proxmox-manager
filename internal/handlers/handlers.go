@@ -1636,9 +1636,16 @@ if ! blkid -o value -s TYPE "${DEV}1" >/dev/null 2>&1; then
     udevadm settle 2>/dev/null || true
 fi
 mkdir -p %s
-UUID=$(blkid -c /dev/null -o value -s UUID "${DEV}1")
+UUID=""
+for i in 1 2 3 4 5; do
+    UUID=$(blkid -c /dev/null -o value -s UUID "${DEV}1" 2>/dev/null)
+    [ -n "$UUID" ] && break
+    sync
+    udevadm settle 2>/dev/null || true
+    sleep 1
+done
 if [ -z "$UUID" ]; then
-    echo "impossibile determinare UUID di ${DEV}1" >&2
+    echo "impossibile determinare UUID di ${DEV}1 dopo 5 tentativi" >&2
     exit 1
 fi
 if ! grep -q "$UUID" /etc/fstab; then
