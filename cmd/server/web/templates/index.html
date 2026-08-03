@@ -688,6 +688,62 @@ html.catppuccino{
 </div></div>
 
 <!-- MODAL CONFIRM -->
+<div class="ov" id="mdisk"><div class="modal" style="min-width:520px">
+  <div class="mt" id="mdiskTitle">Disco</div>
+
+  <div class="sec">1. Nuovo disco</div>
+  <div class="g g2 g8 mb12">
+    <div class="fr">
+      <label class="fl">Storage pool</label>
+      <select class="inp w" id="disk-storage"><option value="">Caricamento...</option></select>
+    </div>
+    <div class="fr">
+      <label class="fl">Dimensione (GB)</label>
+      <input class="inp w" id="disk-size" type="number" value="50" min="1">
+    </div>
+  </div>
+  <div class="fr">
+    <label class="fl">Bus</label>
+    <select class="inp w" id="disk-bus">
+      <option value="scsi" selected>SCSI (consigliato)</option>
+      <option value="virtio">VirtIO</option>
+      <option value="sata">SATA</option>
+    </select>
+  </div>
+  <button class="btn ba mb16" onclick="DiskMgr.addDisk()">+ Aggiungi disco</button>
+
+  <div class="sep"></div>
+
+  <div class="sec">2. Configura disco (partiziona, formatta, monta)</div>
+  <div class="fr">
+    <label class="fl">Disco da configurare</label>
+    <div class="flex g8">
+      <select class="inp w" id="disk-slot"></select>
+      <button class="btn bg2 sm" onclick="DiskMgr.refreshSlots()">↻</button>
+    </div>
+  </div>
+  <div class="g g2 g8 mb12">
+    <div class="fr">
+      <label class="fl">Mount point</label>
+      <input class="inp w" id="disk-mount" type="text" value="/data">
+    </div>
+    <div class="fr">
+      <label class="fl">Permessi</label>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="disk-sticky" checked>
+        <label for="disk-sticky" style="font-size:11px">Sticky bit (consigliato)</label>
+      </div>
+    </div>
+  </div>
+  <button class="btn bpurp wf mb12" onclick="DiskMgr.setupDisk()">⚙ Configura disco</button>
+  <div class="hint mb12">Può richiedere fino a 2 minuti se è necessario un riavvio della VM per rilevare il disco.</div>
+
+  <div class="sec">Log</div>
+  <div class="plog" id="disk-log"><span class="td">In attesa...</span></div>
+
+  <div class="mf"><button class="btn bg2" onclick="closeModal('mdisk')">Chiudi</button></div>
+</div></div>
+
 <div class="ov" id="mconf"><div class="modal">
   <div class="mt" id="mconfT">Conferma</div>
   <div id="mconfB" style="color:var(--text2);font-size:13px;line-height:1.6;white-space:pre-wrap"></div>
@@ -1279,6 +1335,7 @@ const VMs=(()=>{
             <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','reboot');closeModal('mov')">Reboot</button>
             <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','shutdown');closeModal('mov')">Shutdown</button>
             ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot('${node}',${vmid})">Snapshot</button>`:''}
+            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open('${node}',${vmid})">+ Disco</button>`:''}
             ${type==='qemu'&&r?.config?.serial0&&s.status==='running'&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open('${node}',${vmid},'${s.name||vmid}',ClusterMgr.current)">⬛ Console</button>`:''}
           </div>`;
       }catch{document.getElementById('movB').innerHTML='<div class="td">Errore caricamento</div>';}
@@ -1327,6 +1384,98 @@ const VMs=(()=>{
     }
   };
 })();
+
+// ════════════════════════════════════════════════════════════════════════════
+// DISK — add + guest-side partition/format/mount via QEMU guest agent
+// ════════════════════════════════════════════════════════════════════════════
+const DiskMgr = {
+  node: null, vmid: null,
+
+  async open(node, vmid) {
+    this.node = node; this.vmid = vmid;
+    document.getElementById('mdiskTitle').textContent = `Disco — VM ${vmid} (${node})`;
+    document.getElementById('disk-log').innerHTML = '<span class="td">In attesa...</span>';
+    openModal('mdisk');
+    await this.loadStoragePools();
+    await this.refreshSlots();
+  },
+
+  async loadStoragePools() {
+    const sel = document.getElementById('disk-storage');
+    sel.innerHTML = '<option value="">Caricamento...</option>';
+    try {
+      const storages = await api(`/nodes/${this.node}/storage`);
+      const pools = (Array.isArray(storages) ? storages : [])
+        .filter(s => (s.content || '').includes('images') && s.active !== 0);
+      sel.innerHTML = pools.map(s =>
+        `<option value="${s.storage}">${s.storage} (${fmtB(s.avail)} liberi)</option>`
+      ).join('') || '<option value="">Nessuno storage disponibile</option>';
+    } catch {
+      sel.innerHTML = '<option value="">Errore caricamento</option>';
+    }
+  },
+
+  async refreshSlots() {
+    const sel = document.getElementById('disk-slot');
+    sel.innerHTML = '<option value="">Caricamento...</option>';
+    try {
+      const r = await api(`/nodes/${this.node}/qemu/${this.vmid}/status`);
+      const cfg = r?.config || {};
+      const slots = Object.keys(cfg).filter(k => /^(scsi|virtio|sata)\d+$/.test(k));
+      sel.innerHTML = slots.map(k => `<option value="${k}">${k} — ${cfg[k]}</option>`).join('')
+        || '<option value="">Nessun disco trovato</option>';
+    } catch {
+      sel.innerHTML = '<option value="">Errore caricamento</option>';
+    }
+  },
+
+  log(msg) {
+    const el = document.getElementById('disk-log');
+    if (el.innerHTML.includes('In attesa')) el.innerHTML = '';
+    el.innerHTML += `<div>${msg}</div>`;
+    el.scrollTop = el.scrollHeight;
+  },
+
+  async addDisk() {
+    const storage = document.getElementById('disk-storage').value;
+    const size    = parseInt(document.getElementById('disk-size').value) || 50;
+    const bus     = document.getElementById('disk-bus').value;
+    if (!storage) { toast('Seleziona uno storage pool', 'err'); return; }
+
+    this.log(`<span class="ta">▶ Aggiunta disco ${size}GB su ${storage} (${bus})...</span>`);
+    try {
+      const res = await api(`/nodes/${this.node}/qemu/${this.vmid}/adddisk`, {
+        method: 'POST',
+        body: JSON.stringify({ storage, size_gb: size, bus })
+      });
+      this.log(`<span class="tg">✓ Disco ${res.disk} aggiunto (${res.size_gb}GB su ${res.storage})</span>`);
+      toast(`Disco ${res.disk} aggiunto`, 'ok');
+      await this.refreshSlots();
+      document.getElementById('disk-slot').value = res.disk;
+    } catch (e) {
+      this.log(`<span class="tr">✗ ${e.message}</span>`);
+    }
+  },
+
+  async setupDisk() {
+    const disk   = document.getElementById('disk-slot').value;
+    const mount  = document.getElementById('disk-mount').value || '/data';
+    const sticky = document.getElementById('disk-sticky').checked;
+    if (!disk) { toast('Seleziona un disco da configurare', 'err'); return; }
+
+    this.log(`<span class="ta">▶ Configurazione disco ${disk} → ${mount}...</span>`);
+    try {
+      const res = await api(`/nodes/${this.node}/qemu/${this.vmid}/setup-disk`, {
+        method: 'POST',
+        body: JSON.stringify({ disk, mount_point: mount, sticky_bit: sticky })
+      });
+      (res.log || []).forEach(l => this.log(l));
+      toast(`Disco montato su ${res.mount_point}`, 'ok');
+    } catch (e) {
+      this.log(`<span class="tr">✗ ${e.message}</span>`);
+    }
+  }
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // PROVISION

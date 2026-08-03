@@ -1306,6 +1306,333 @@ func (h *Handler) GetClusterTasks(w http.ResponseWriter, r *http.Request) {
 
 var validUsername = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 
+// ── VM disk add + guest setup ────────────────────────────────────────────────
+
+var (
+	storagePattern    = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	busPattern        = regexp.MustCompile(`^(scsi|virtio|sata)$`)
+	diskSlotPattern   = regexp.MustCompile(`^(scsi|virtio|sata)([0-9]|[12][0-9]|30)$`)
+	mountPointPattern = regexp.MustCompile(`^/[a-zA-Z0-9_/-]{1,64}$`)
+)
+
+var forbiddenMounts = map[string]bool{
+	"/": true, "/etc": true, "/boot": true, "/usr": true, "/bin": true,
+	"/sbin": true, "/var": true, "/proc": true, "/sys": true, "/dev": true,
+	"/root": true, "/home": true, "/lib": true, "/opt": true,
+}
+
+// nextDiskSlot trova il primo slot libero per il bus specificato, leggendo la config VM già fetchata.
+func nextDiskSlot(cfgMap map[string]interface{}, bus string) (string, error) {
+	limits := map[string]int{"scsi": 30, "virtio": 15, "sata": 5}
+	max, ok := limits[bus]
+	if !ok {
+		return "", fmt.Errorf("bus non supportato: %s (usa scsi, virtio o sata)", bus)
+	}
+	for i := 0; i <= max; i++ {
+		key := fmt.Sprintf("%s%d", bus, i)
+		if _, exists := cfgMap[key]; !exists {
+			return key, nil
+		}
+	}
+	return "", fmt.Errorf("nessuno slot libero per bus %s", bus)
+}
+
+func (h *Handler) AddVMDisk(w http.ResponseWriter, r *http.Request) {
+	node := chi.URLParam(r, "node")
+	vmid, err := strconv.Atoi(chi.URLParam(r, "vmid"))
+	if err != nil {
+		writeError(w, fmt.Errorf("vmid non valido"), 400)
+		return
+	}
+
+	var body struct {
+		Storage string `json:"storage"`
+		SizeGB  int    `json:"size_gb"`
+		Bus     string `json:"bus"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, err, 400)
+		return
+	}
+	if body.Bus == "" {
+		body.Bus = "scsi"
+	}
+	if !storagePattern.MatchString(body.Storage) {
+		writeError(w, fmt.Errorf("nome storage non valido"), 400)
+		return
+	}
+	if !busPattern.MatchString(body.Bus) {
+		writeError(w, fmt.Errorf("bus non valido (usa scsi, virtio o sata)"), 400)
+		return
+	}
+	if body.SizeGB < 1 || body.SizeGB > 16384 {
+		writeError(w, fmt.Errorf("dimensione non valida (1-16384 GB)"), 400)
+		return
+	}
+
+	client, err := h.getClientFor(clusterIdx(r))
+	if err != nil {
+		writeError(w, err, 400)
+		return
+	}
+
+	cfgRaw, err := client.GetVMConfig(node, vmid)
+	if err != nil {
+		writeError(w, err, 502)
+		return
+	}
+	var cfgMap map[string]interface{}
+	json.Unmarshal(cfgRaw, &cfgMap)
+
+	slot, err := nextDiskSlot(cfgMap, body.Bus)
+	if err != nil {
+		writeError(w, err, 400)
+		return
+	}
+
+	params := url.Values{}
+	params.Set(slot, fmt.Sprintf("%s:%d", body.Storage, body.SizeGB))
+
+	if _, err := client.VMSetConfig(node, vmid, params); err != nil {
+		writeError(w, fmt.Errorf("aggiunta disco fallita: %w", err), 502)
+		return
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"disk":    slot,
+		"storage": body.Storage,
+		"size_gb": body.SizeGB,
+	})
+}
+
+func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
+	node := chi.URLParam(r, "node")
+	vmid, err := strconv.Atoi(chi.URLParam(r, "vmid"))
+	if err != nil {
+		writeError(w, fmt.Errorf("vmid non valido"), 400)
+		return
+	}
+
+	var body struct {
+		Disk       string `json:"disk"`
+		MountPoint string `json:"mount_point"`
+		StickyBit  *bool  `json:"sticky_bit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, err, 400)
+		return
+	}
+	if body.MountPoint == "" {
+		body.MountPoint = "/data"
+	}
+	sticky := true
+	if body.StickyBit != nil {
+		sticky = *body.StickyBit
+	}
+
+	if !diskSlotPattern.MatchString(body.Disk) {
+		writeError(w, fmt.Errorf("slot disco non valido"), 400)
+		return
+	}
+	if !mountPointPattern.MatchString(body.MountPoint) {
+		writeError(w, fmt.Errorf("mount point non valido"), 400)
+		return
+	}
+	if forbiddenMounts[body.MountPoint] {
+		writeError(w, fmt.Errorf("mount point non permesso: %s", body.MountPoint), 400)
+		return
+	}
+
+	client, err := h.getClientFor(clusterIdx(r))
+	if err != nil {
+		writeError(w, err, 400)
+		return
+	}
+
+	statusRaw, err := client.GetVMStatus(node, vmid)
+	if err != nil {
+		writeError(w, err, 502)
+		return
+	}
+	var st struct {
+		Status string `json:"status"`
+	}
+	json.Unmarshal(statusRaw, &st)
+	if st.Status != "running" {
+		writeError(w, fmt.Errorf(
+			"la VM deve essere in esecuzione per configurare il disco lato guest",
+		), 400)
+		return
+	}
+
+	var opLog []string
+	runScript := func(script string) (string, error) {
+		execRaw, err := client.AgentExec(node, vmid, []string{"/bin/sh", "-c", script})
+		if err != nil {
+			return "", err
+		}
+		var execResp struct {
+			PID int `json:"pid"`
+		}
+		if err := json.Unmarshal(execRaw, &execResp); err != nil || execResp.PID == 0 {
+			return "", fmt.Errorf("agent exec risposta inattesa: %s", string(execRaw))
+		}
+		deadline := time.Now().Add(30 * time.Second)
+		for time.Now().Before(deadline) {
+			time.Sleep(1 * time.Second)
+			statusRaw, err := client.AgentExecStatus(node, vmid, execResp.PID)
+			if err != nil {
+				continue
+			}
+			var s struct {
+				Exited   int    `json:"exited"`
+				ExitCode int    `json:"exitcode"`
+				OutData  string `json:"out-data"`
+				ErrData  string `json:"err-data"`
+			}
+			if err := json.Unmarshal(statusRaw, &s); err != nil {
+				continue
+			}
+			if s.Exited == 1 {
+				if s.ExitCode != 0 {
+					return s.OutData, fmt.Errorf("exit %d: %s", s.ExitCode, s.ErrData)
+				}
+				return s.OutData, nil
+			}
+		}
+		return "", fmt.Errorf("timeout esecuzione comando guest agent")
+	}
+
+	// Step 1: baseline dischi esistenti
+	opLog = append(opLog, "Rilevamento dischi esistenti...")
+	before, err := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
+	if err != nil {
+		writeError(w, fmt.Errorf("guest agent non raggiungibile: %w", err), 502)
+		return
+	}
+
+	// Step 2: rescan bus (best effort — necessario soprattutto per SCSI)
+	opLog = append(opLog, "Rescan bus dischi...")
+	runScript(`partprobe 2>/dev/null; for h in /sys/class/scsi_host/host*; do [ -e "$h/scan" ] && echo "- - -" > "$h/scan" 2>/dev/null; done; udevadm settle 2>/dev/null; true`)
+
+	// Step 3: retry diff fino a trovare il nuovo device (max 5 tentativi, 2s apart)
+	beforeSet := map[string]bool{}
+	for _, d := range strings.Fields(before) {
+		beforeSet[d] = true
+	}
+	var newDevice string
+	for attempt := 0; attempt < 5; attempt++ {
+		after, _ := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
+		for _, d := range strings.Fields(after) {
+			if !beforeSet[d] {
+				newDevice = d
+				break
+			}
+		}
+		if newDevice != "" {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if newDevice == "" {
+		// Fallback: il device non è apparso con hotplug — forza un riavvio della VM e ritenta.
+		opLog = append(opLog, "Disco non rilevato — riavvio VM per forzare il rilevamento...")
+
+		if _, err := client.VMAction(node, vmid, "reboot", url.Values{}); err != nil {
+			writeError(w, fmt.Errorf("riavvio VM fallito: %w", err), 502)
+			return
+		}
+
+		opLog = append(opLog, "Attesa completamento riavvio e guest agent pronto (max 2 minuti)...")
+		agentReady := false
+		rebootDeadline := time.Now().Add(120 * time.Second)
+		for time.Now().Before(rebootDeadline) {
+			time.Sleep(5 * time.Second)
+			if _, err := runScript(`echo ready`); err == nil {
+				agentReady = true
+				break
+			}
+		}
+		if !agentReady {
+			writeError(w, fmt.Errorf(
+				"la VM non ha completato il riavvio entro 2 minuti — riprova più tardi",
+			), 502)
+			return
+		}
+		opLog = append(opLog, "Guest agent di nuovo raggiungibile, nuova ricerca disco...")
+
+		after, _ := runScript(`lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'`)
+		for _, d := range strings.Fields(after) {
+			if !beforeSet[d] {
+				newDevice = d
+				break
+			}
+		}
+		if newDevice == "" {
+			writeError(w, fmt.Errorf(
+				"disco non rilevato nemmeno dopo il riavvio — verifica la configurazione "+
+					"del disco in Proxmox (bus, storage, VMID)",
+			), 502)
+			return
+		}
+		opLog = append(opLog, fmt.Sprintf("Nuovo disco rilevato dopo riavvio: /dev/%s", newDevice))
+	} else {
+		opLog = append(opLog, fmt.Sprintf("Nuovo disco rilevato: /dev/%s", newDevice))
+	}
+
+	// Step 4: partiziona, formatta, monta, fstab, permessi
+	perm := "1777"
+	if !sticky {
+		perm = "0777"
+	}
+	dev := "/dev/" + newDevice
+
+	scriptTpl := `set -e
+DEV=%s
+if ! blkid "${DEV}1" >/dev/null 2>&1; then
+    parted -s "$DEV" mklabel gpt
+    parted -s "$DEV" mkpart primary 0%% 100%%
+    partprobe "$DEV" 2>/dev/null || true
+    sleep 1
+fi
+if ! blkid -o value -s TYPE "${DEV}1" >/dev/null 2>&1; then
+    mkfs.ext4 -F "${DEV}1"
+fi
+mkdir -p %s
+UUID=$(blkid -o value -s UUID "${DEV}1")
+if ! grep -q "$UUID" /etc/fstab; then
+    echo "UUID=$UUID %s ext4 defaults 0 2" >> /etc/fstab
+fi
+mountpoint -q %s || mount %s
+chmod %s %s
+echo "OK"
+`
+	script := fmt.Sprintf(scriptTpl,
+		dev,
+		body.MountPoint,
+		body.MountPoint,
+		body.MountPoint,
+		body.MountPoint,
+		perm,
+		body.MountPoint,
+	)
+
+	opLog = append(opLog, fmt.Sprintf("Partizionamento GPT + ext4 su %s...", dev))
+	out, err := runScript(script)
+	if err != nil {
+		writeError(w, fmt.Errorf("setup disco fallito: %w (output: %s)", err, out), 502)
+		return
+	}
+	opLog = append(opLog, "Output: "+strings.TrimSpace(out))
+	opLog = append(opLog, fmt.Sprintf("✓ Disco montato su %s (permessi %s)", body.MountPoint, perm))
+
+	writeJSON(w, map[string]interface{}{
+		"log":         opLog,
+		"device":      dev,
+		"mount_point": body.MountPoint,
+	})
+}
+
 func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
 	vmidStr := chi.URLParam(r, "vmid")

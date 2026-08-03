@@ -77,6 +77,8 @@ func main() {
 		r.Post("/nodes/{node}/qemu/{vmid}/snapshot", h.VMSnapshot)
 		r.Post("/nodes/{node}/qemu/{vmid}/migrate", h.VMMigrate)
 		r.Post("/nodes/{node}/qemu/{vmid}/adduser", h.AddVMUser)
+		r.Post("/nodes/{node}/qemu/{vmid}/adddisk", h.AddVMDisk)
+		r.Post("/nodes/{node}/qemu/{vmid}/setup-disk", h.SetupVMDisk)
 		r.Post("/nodes/{node}/qemu/{vmid}/termproxy", h.TermproxyCreate)
 		r.Get("/nodes/{node}/qemu/{vmid}/termproxy-ws", h.TermproxyWS)
 		r.Delete("/nodes/{node}/qemu/{vmid}", h.DeleteVM)

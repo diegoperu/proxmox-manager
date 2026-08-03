@@ -240,6 +240,34 @@ Nessuna password impostata; accesso solo via chiave SSH; sudo senza password via
 Client methods: `AgentExec`, `AgentExecStatus`.
 ⚠️ Proxmox agent exec vuole repeated `command` keys, **non** `command[0]`/`command[1]`.
 
+## Aggiunta disco VM (POST /api/nodes/{node}/qemu/{vmid}/adddisk + /setup-disk)
+
+Solo VM QEMU. Setup lato guest via QEMU Guest Agent exec (stesso meccanismo di `AddVMUser`), non Ansible reale.
+
+**`POST /nodes/{node}/qemu/{vmid}/adddisk`** — `AddVMDisk`
+```json
+{"storage": "local-lvm", "size_gb": 50, "bus": "scsi"}
+```
+Legge config VM, trova primo slot libero per il bus (`nextDiskSlot`, limiti: scsi 0-30, virtio 0-15, sata 0-5), chiama `VMSetConfig` con `<slot>=<storage>:<size_gb>`. Funziona indipendentemente dallo stato power della VM. Risponde `{"disk":"scsi1","storage":"...","size_gb":50}`.
+
+**`POST /nodes/{node}/qemu/{vmid}/setup-disk`** — `SetupVMDisk`
+```json
+{"disk": "scsi1", "mount_point": "/data", "sticky_bit": true}
+```
+Richiede VM `running` con guest agent attivo. Filesystem ext4, partizionamento GPT singola partizione 100%. Permessi: `1777` (sticky, default) o `0777` se `sticky_bit:false`. `mountPointPattern` + blocklist `forbiddenMounts` (`/`, `/etc`, `/boot`, `/usr`, `/bin`, `/sbin`, `/var`, `/proc`, `/sys`, `/dev`, `/root`, `/home`, `/lib`, `/opt`) impediscono mount point pericolosi.
+
+Rilevamento nuovo device:
+1. `lsblk -ndo NAME,TYPE` baseline prima del rescan
+2. Rescan bus (`partprobe` + `echo "- - -" > /sys/class/scsi_host/host*/scan` + `udevadm settle`)
+3. Diff `lsblk` retry (5 tentativi, 2s apart) per trovare il device apparso
+4. **Fallback**: se il device non appare (hotplug non abilitato/supportato), forza `VMAction(reboot)` e attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), poi ripete il diff `lsblk` — autorizzato esplicitamente, nessuna conferma richiesta
+
+Setup: `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
+
+Risponde `{"log":[...righe...], "device":"/dev/sdX", "mount_point":"/data"}`.
+
+Client methods riusati: `AgentExec`, `AgentExecStatus`, `VMSetConfig`, `VMAction`. Nessun nuovo metodo client aggiunto.
+
 ## Provisioning VM (POST /api/provision)
 
 Flusso sequenziale nel handler `ProvisionVM`:
