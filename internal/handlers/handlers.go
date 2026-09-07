@@ -1625,13 +1625,19 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 
 	scriptTpl := `set -e
 DEV=%s
-if ! blkid "${DEV}1" >/dev/null 2>&1; then
+if ! [ -b "${DEV}1" ]; then
     parted -s "$DEV" mklabel gpt
     parted -s "$DEV" mkpart primary 0%% 100%%
     partprobe "$DEV" 2>/dev/null || true
+    udevadm settle 2>/dev/null || true
     sleep 1
 fi
-if ! blkid -o value -s TYPE "${DEV}1" >/dev/null 2>&1; then
+# Formatta solo se la partizione non ha già un filesystem ext4.
+# NB: si controlla l'OUTPUT del tag TYPE, non l'exit code di blkid: su una
+# partizione GPT creata ma mai formattata blkid esce 0 (stampa PARTLABEL/
+# PARTUUID) pur senza TYPE, quindi un check exit-code salterebbe mkfs.ext4.
+FSTYPE=$(blkid -c /dev/null -o value -s TYPE "${DEV}1" 2>/dev/null || true)
+if [ "$FSTYPE" != ext4 ]; then
     mkfs.ext4 -F "${DEV}1"
     udevadm settle 2>/dev/null || true
 fi
