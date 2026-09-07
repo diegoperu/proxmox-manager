@@ -346,6 +346,25 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 							}
 							_, hasSerial := config["serial0"]
 							vms[j]["has_serial"] = hasSerial
+
+							// Il campo `mem` della lista /nodes/{node}/qemu è l'RSS del
+							// processo KVM lato host (≈ maxmem appena il guest tocca tutte
+							// le pagine). status/current riporta invece l'uso reale del
+							// guest quando il balloon/guest-agent fornisce free_mem
+							// (mem = actual - free_mem). Sovrascriviamo con quel valore.
+							if st, _ := vms[j]["status"].(string); st == "running" {
+								if raw, err := client.GetVMStatus(n.Node, int(vmid)); err == nil {
+									var cur map[string]interface{}
+									if json.Unmarshal(raw, &cur) == nil {
+										if m, ok := cur["mem"].(float64); ok && m > 0 {
+											vms[j]["mem"] = m
+										}
+										if mm, ok := cur["maxmem"].(float64); ok && mm > 0 {
+											vms[j]["maxmem"] = mm
+										}
+									}
+								}
+							}
 						}(j, vmid)
 					}
 					wg2.Wait()
