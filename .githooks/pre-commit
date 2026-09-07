@@ -1,0 +1,22 @@
+#!/bin/sh
+# Auto-bump della stringa di versione in index.html (sidebar in basso, vicino
+# all'orario). Serve a distinguere "la modifica non funziona" da "il binario
+# servito non e' aggiornato".
+#
+# Versione = v0.<numero-commit-incluso-questo>.0 - <data>
+# Il numero coincide con `git rev-list --count HEAD` dopo il commit.
+#
+# Attivazione (gia' fatta nel repo): git config core.hooksPath .githooks
+
+f="cmd/server/web/templates/index.html"
+[ -f "$f" ] || exit 0
+
+n=$(( $(git rev-list --count HEAD 2>/dev/null || echo 0) + 1 ))
+d=$(date +%Y-%m-%d)
+# NB: niente '&' nella stringa (in sed replacement '&' = intera corrispondenza).
+# Usare il carattere '·' letterale, non '&middot;'.
+ver="v0.${n}.0 · ${d}"
+
+tmp=$(mktemp)
+sed "s#<div id=\"ver\">[^<]*</div>#<div id=\"ver\">${ver}</div>#" "$f" > "$tmp" && mv "$tmp" "$f"
+git add "$f"

@@ -45,6 +45,14 @@ chmod +x build.sh && ./build.sh
 ./proxmox-manager          # ascolta su :8080
 ```
 
+## Versione UI (auto-bump)
+
+`<div id="ver">` nella `.sb-bottom` della sidebar (sotto l'orario) mostra `v0.<N>.0 · <data>`.
+Aggiornata dal hook `.githooks/pre-commit` ad ogni commit: `N = git rev-list --count HEAD + 1`
+(coincide col numero di commit dopo il commit). Attivazione: `git config core.hooksPath .githooks`
+(già impostato nel repo locale; ri-eseguire dopo un clone fresco).
+Serve a capire a colpo d'occhio se il binario servito è aggiornato o no.
+
 ## Regola critica: embed Go
 
 `//go:embed web/templates/index.html` è in `cmd/server/main.go`.
