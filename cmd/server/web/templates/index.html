@@ -1035,12 +1035,27 @@ const DashTbl=(()=>{
         <td class="tn">${v.name||'—'}</td><td>${nodeCell(v)}</td>
         <td>${sbadge(v.status)}</td>
         <td>${v.cpu?(v.cpu*100).toFixed(1)+'%':'—'}</td>
-        <td>${bar(pct(v.mem,v.maxmem))}</td>
+        <td id="dmem-${v.node}-${v.vmid}">${bar(pct(v.mem,v.maxmem))}</td>
         <td id="ddk-${v.node}-${v.vmid}">${diskCell}</td>
       </tr>`;}).join('')||'<tr><td colspan="8" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
     }
   };
 })();
+
+// /cluster/resources riporta mem = RSS del processo KVM lato host (tende a ~100%
+// appena il guest tocca tutte le pagine). status/current corregge con free_mem
+// dal balloon/guest-agent → uso reale. Patch progressiva della cella RAM%.
+async function loadDashMem(vms){
+  const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
+  await Promise.allSettled(running.map(async v=>{
+    const r=await api(`/nodes/${v.node}/qemu/${v.vmid}/status`).catch(()=>null);
+    const s=r?.status;
+    if(!s||!s.maxmem)return;
+    v.mem=s.mem; v.maxmem=s.maxmem;
+    const el=document.getElementById(`dmem-${v.node}-${v.vmid}`);
+    if(el)el.innerHTML=bar(pct(s.mem,s.maxmem));
+  }));
+}
 
 async function loadDashFsinfo(vms){
   const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
@@ -1081,6 +1096,7 @@ const Dashboard={
       <div class="card"><div class="card-t">CPU avg</div><div class="card-v ${cpuA>80?'r':cpuA>60?'a':''}">${cpuA}%</div><div class="card-s">${nodes.length} nodi</div></div>
       <div class="card"><div class="card-t">RAM avg / Storage</div><div class="card-v ${memA>80?'r':memA>60?'a':''}">${memA}%</div><div class="card-s">${fmtB(uDisk)} / ${fmtB(tDisk)}</div></div>`;
     DashTbl.setData(vms);
+    loadDashMem(vms);
     loadDashFsinfo(vms);
     Dashboard.charts();
   },
