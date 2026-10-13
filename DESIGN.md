@@ -176,7 +176,7 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 **Display / Titoli:** Barlow Condensed (con sans-serif)
 **Body / Dati / Label:** JetBrains Mono (con monospace)
 
-**Character:** coppia da strumentazione. La condensed dà peso ai numeri e ai titoli senza occupare spazio; la mono allinea colonne e rende leggibili ID, IP e nomi di nodo. Font caricati da Google Fonts (CDN) con fallback di sistema.
+**Character:** coppia da strumentazione. La condensed dà peso ai numeri e ai titoli senza occupare spazio; la mono allinea colonne e rende leggibili ID, IP e nomi di nodo. Font incorporati nel binario (subset latin, `/static/fonts/`), con fallback di sistema.
 
 ### Hierarchy
 - **Display** (900, 40px, 1): valore KPI delle card dashboard.

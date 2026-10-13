@@ -22,7 +22,7 @@ Web management interface for Proxmox VE clusters — no CORS, no frameworks
 
 ## Overview
 
-ProxmoxManager is a self-hosted web interface for managing one or more Proxmox VE clusters. It runs as a Go binary that acts as a local HTTP proxy: the browser talks to `localhost:8080`, and the proxy forwards requests to the Proxmox API over HTTPS — eliminating all CORS issues without any browser extensions or configuration. The entire frontend is a single vanilla JS + Chart.js file embedded in the binary; no Node.js, no npm, no build pipeline. Multi-cluster support lets you switch between Proxmox environments from a single tab. Ships as a single self-contained binary (~10 MB).
+ProxmoxManager is a self-hosted web interface for managing one or more Proxmox VE clusters. It runs as a Go binary that acts as a local HTTP proxy: the browser talks to `localhost:8080`, and the proxy forwards requests to the Proxmox API over HTTPS — eliminating all CORS issues without any browser extensions or configuration. The application frontend is a single vanilla JS file embedded in the binary, together with the vendored third-party libraries it uses (Chart.js, SheetJS, xterm.js) and its fonts — no CDN, so it also works on an isolated network; no Node.js, no npm, no build pipeline. Multi-cluster support lets you switch between Proxmox environments from a single tab. Ships as a single self-contained binary (~12 MB).
 
 ---
 

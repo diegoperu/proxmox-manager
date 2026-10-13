@@ -11,7 +11,7 @@ Browser → Go proxy (localhost:8080) → Proxmox API. Nessun CORS.
 | Router | `github.com/go-chi/chi/v5` |
 | CORS | `github.com/go-chi/cors` |
 | DB | SQLite via `github.com/mattn/go-sqlite3` (CGO_ENABLED=1) — solo cache API |
-| Frontend | Vanilla JS + Chart.js 4.4 + SheetJS (xlsx) — **nessun framework** |
+| Frontend | Vanilla JS + Chart.js 4.4 + SheetJS (xlsx 0.20.3) + xterm.js 5.3 — **nessun framework**. Librerie e font **incorporati nel binario** (`web/static/`), nessun CDN |
 | Config | `config.json` nella working dir del binario |
 | Storico | Proxmox RRD nativo (no collector locale) |
 
@@ -22,10 +22,12 @@ proxmox-manager/
 ├── go.mod
 ├── build.sh                        # CGO_ENABLED=1 go build ./cmd/server/
 ├── cmd/server/
-│   ├── main.go                     # entrypoint, router, embed
+│   ├── main.go                     # entrypoint, router, embed, /static, tema in <html>
+│   ├── main_test.go                # test: whitelist tema, /static (MIME, traversal), asset locali
 │   └── web/
-│       └── templates/
-│           └── index.html          # SPA intera (1 file)
+│       ├── templates/
+│       │   └── index.html          # codice dell'app: SPA intera (1 file)
+│       └── static/                 # librerie di terze parti + font vendorizzati (vedi THIRD_PARTY.md)
 └── internal/
     ├── api/
     │   └── client.go               # client HTTP verso Proxmox (TLS skip verify)
@@ -55,9 +57,19 @@ Serve a capire a colpo d'occhio se il binario servito è aggiornato o no.
 
 ## Regola critica: embed Go
 
-`//go:embed web/templates/index.html` è in `cmd/server/main.go`.
+`//go:embed web/templates/index.html web/static` è in `cmd/server/main.go`.
 La cartella `web/` **deve stare nella stessa directory di `main.go`** (`cmd/server/web/`).
 Go non supporta embed con path che escono dallo scope del file (`../../`).
+
+### Asset statici (decisione 2026-10-13)
+
+Chart.js, SheetJS, xterm.js, xterm-addon-fit e i font (JetBrains Mono, Barlow Condensed, subset latin) sono **vendorizzati** in `cmd/server/web/static/` e serviti da `GET /static/*` (`staticHandler`): allowlist di estensioni (`.js .css .woff2`), `nosniff`, nessun listing, niente traversal. Motivo: la UI deve funzionare su VPN isolata e non eseguire codice da CDN. `index.html` resta l'**unico file di codice dell'app**; in `<head>` solo `/static/...` con `defer`.
+Per aggiornare una libreria: scaricarla, confrontare l'hash con una seconda fonte, mettere la versione nel nome file, aggiornare `index.html` e `web/static/THIRD_PARTY.md` (versioni, licenze, SHA-256). `TestIndexUsesOnlyEmbeddedAssets` fallisce se compare una risorsa esterna o un file non incorporato.
+SheetJS: usare >= 0.20.2 (le 0.18.x hanno CVE note); l'app lo usa solo per **scrivere** l'export Excel.
+
+### Tema nel primo render
+
+`serveIndex` inserisce `class="<tema>"` nel tag `<html lang="it">` leggendo `theme` da `config.json` (whitelist `dark|light|eva01|catppuccino`, `injectTheme`); niente lampeggio e nessun `localStorage`. La pagina ha `Cache-Control: no-cache` perché varia col tema.
 
 ## Config (config.json)
 
@@ -149,6 +161,7 @@ POST /api/provision                                 ProvisionVM (vedi sotto)
 GET  /api/storage                                   GetStorage
 GET  /api/pools                                     GetPools
 GET  /api/tasks                                     GetClusterTasks
+GET  /static/*                                      asset incorporati (librerie, font); non è API
 GET  /api/metrics?timeframe=hour|day|week|month|year  GetMetrics: RRD nodi aggregato cluster (avg cpu/mem per 5min bucket)
 GET  /api/report?timeframe=...&type=qemu|lxc|all&node=  GetReportData: RRD per VM aggregato orario (parallel goroutine per VM)
 ```
@@ -359,11 +372,13 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 
 **Pattern sort tabelle**: `mkSorter(tbodyId, headId)` → `.sort(data, key)` con classi CSS `asc`/`desc`.
 
-**Charts**: `mkChart(id, cfg)` distrugge il precedente se esiste. Defaults `CD` (oggetto mutabile). Palette `COLS`.
+**Charts**: `mkChart(id, cfg)` distrugge il precedente se esiste. Defaults `CD` (oggetto mutabile; assi dai token del tema). Palette serie: `seriesCols()` (token del tema, non più una costante `COLS`).
 
 **Sicurezza output (2026-10-13)**: ogni dato esterno (API, config, input) interpolato in `innerHTML` passa da `esc(v)`. Argomenti JS dentro attributi `onclick="..."` passano da `js(v)` (JSON + escape attributo), mai `'${v}'`. Log e toast sono solo testo: `logLine(el, text, cls)` e `toast()` usano `textContent`.
 
 **Accessibilità (2026-10-13)**: nav sidebar e tab sono `<button>` (`aria-current`, `role=tab`/`aria-selected`, frecce); `th.s` ordinabili hanno `tabindex=0` + `aria-sort` (impostato in `mkSorter`), Invio/Spazio attivano `th.s` e `[role=button][tabindex]` (delegato in `document keydown`). Modal: `openModal`/`closeModal` gestiscono una pila (`_modalStack`): `role=dialog`, sfondo e modal sottostanti `inert`, i modal chiusi sono `inert`, Esc chiude quello in cima, il focus torna a chi l'ha aperto (`A11y.init()` all'avvio). Ogni `<label class="fl">` ha `for=`, ogni controllo ha etichetta o `aria-label`. `:focus-visible` globale con `--amber`; `prefers-reduced-motion` toglie animazioni di toast, modal e spinner (resta "…") e l'animazione dei grafici.
+
+**Richieste per-VM e colori dei grafici**: le richieste per ogni VM (fsinfo, status) passano da `pool(items, 6, fn)` (concorrenza limitata) e da `apiCached(path, ttl)` (cache 30s per cluster, errori non memorizzati; `dropVmCache`/`_tc.clear()` dopo azioni). `checkConn` salta il sondaggio se la scheda è nascosta. Le serie dei grafici e il popup console leggono i colori dai token (`tk('--amber')`, `tka('--amber',.1)`, `seriesCols()`): niente colori letterali.
 
 **Colori e contrasto**: ogni colore usato come testo deve essere ≥4.5:1 su `--bg/--bg2/--bg3` in tutti i temi (badge sul loro velo compresi). `--text3` ridefinito per tema. Il tema chiaro ridefinisce gli accenti come scuri (`--amber`, `--green`, `--red`, `--blue`, `--cyan`, `--purple`); il riempimento del bottone primario usa `--amber-fill`/`--amber2-fill` (non `--amber`). I colori degli assi dei grafici si leggono dai token (`applyTheme` → `getComputedStyle`), niente copie letterali.
 
@@ -388,7 +403,8 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 
 ## Cosa NON fare
 
-- Non aggiungere framework JS (React, Vue, ecc.) — il frontend deve restare un singolo file HTML.
+- Non aggiungere framework JS (React, Vue, ecc.) — il codice dell'app resta in un solo file HTML (`index.html`). Le librerie di terze parti stanno **solo** in `web/static/`.
+- Non caricare script, stili o font da CDN o da host esterni: vendorizzare in `web/static/` e aggiornare `THIRD_PARTY.md`.
 - Non spostare `web/` fuori da `cmd/server/` — rompe l'embed.
 - Non fare chiamate dirette da JS verso Proxmox — tutto passa per il proxy Go.
 - Non disabilitare CGO — go-sqlite3 ne ha bisogno.
