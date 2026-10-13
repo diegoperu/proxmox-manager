@@ -334,7 +334,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 ## Frontend (index.html — SPA vanilla)
 
 **Pagine** (routing client-side):
-- `dashboard` — KPI cluster + grafici CPU/RAM 6h (da `/api/metrics?timeframe=day`, slice last 6h) + tabella VM con disk% da fsinfo
+- `dashboard` — KPI cluster + grafici CPU/RAM 6h (da `/api/metrics?timeframe=day`, slice last 6h) + tabella VM con disk% da fsinfo; ordine iniziale: in esecuzione, poi spente, template in fondo (poi per VMID), intestazioni ordinabili come prima
 - `nodes` — card per nodo (ordinati natural sort) + RRD grafici (memused/memtotal) + VM per nodo
 - `vms` — tabella QEMU+LXC con colonna IP; multi-nodo selector (natural sort, modello esplicito); sort; disk% da fsinfo async; **nessuna selezione a checkbox** (le operazioni di massa stanno nella pagina `batch`; la colonna checkbox era inutilizzata ed è stata rimossa il 2026-10-13)
 - `provision` — form clone template cloudinit con calcolo delta disco
@@ -373,7 +373,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 
 **Pattern sort tabelle**: `mkSorter(tbodyId, headId)` → `.sort(data, key)` con classi CSS `asc`/`desc`.
 
-**Charts**: `mkChart(id, cfg)` distrugge il precedente se esiste. Defaults `CD` (oggetto mutabile; assi dai token del tema). Palette serie: `seriesCols()` (token del tema, non più una costante `COLS`).
+**Charts**: `mkChart(id, cfg)` (asincrona) distrugge il precedente se esiste. Defaults `CD` (oggetto mutabile; assi dai token del tema). Palette serie: `seriesCols()` (token del tema, non più una costante `COLS`). Le serie si dichiarano con `...ser('--amber', alpha)`: il colore viene dal token e la serie lo ricorda (`_tok`, `_a`; le barre per-VM usano `_cols:true`). `applyTheme` chiama `recolorCharts()`, che ricolora serie, assi e legenda dei grafici già disegnati **senza rifare le richieste**: un grafico nuovo deve usare `ser()` o `_cols`, mai colori letterali. Ogni grafico ha un riepilogo testuale (`describeChart`: ultimo/min/max, o i 3 valori più alti per le barre) in un `div.sr` collegato con `aria-describedby`.
 
 **Sicurezza output (2026-10-13)**: ogni dato esterno (API, config, input) interpolato in `innerHTML` passa da `esc(v)`. Argomenti JS dentro attributi `onclick="..."` passano da `js(v)` (JSON + escape attributo), mai `'${v}'`. Log e toast sono solo testo: `logLine(el, text, cls)` e `toast()` usano `textContent`.
 

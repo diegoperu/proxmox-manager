@@ -23,6 +23,57 @@ colors:
   text-primary: "#e2e8f0"
   text-secondary: "#94a3b8"
   text-muted: "#76869d"
+  # Tema chiaro (stessi ruoli, valori propri)
+  light-bg: "#f8fafc"
+  light-panel: "#ffffff"
+  light-panel-raised: "#f1f5f9"
+  light-panel-high: "#e2e8f0"
+  light-hairline: "#e2e8f0"
+  light-hairline-strong: "#cbd5e1"
+  light-text-primary: "#0f172a"
+  light-text-secondary: "#334155"
+  light-text-muted: "#617087"
+  light-amber-text: "#996206"
+  light-ok-green: "#167f3d"
+  light-alert-red: "#d41212"
+  light-info-blue: "#0b62f0"
+  light-qemu-cyan: "#047a8f"
+  light-container-purple: "#9530f5"
+  light-scrim: "rgba(0,0,0,.45)"
+  # Tema Eva 01
+  eva-bg: "#0d0617"
+  eva-panel: "#1a0f2e"
+  eva-panel-raised: "#261540"
+  eva-panel-high: "#311d52"
+  eva-hairline: "#4a2d7a"
+  eva-hairline-strong: "#6b3fa8"
+  eva-accent: "#7cc443"
+  eva-accent-bright: "#95d45a"
+  eva-warn: "#ffa24a"
+  eva-ok-green: "#4ade80"
+  eva-alert-red: "#f15757"
+  eva-info-blue: "#c084fc"
+  eva-qemu-cyan: "#2dd4bf"
+  eva-container-purple: "#d946ef"
+  eva-text-primary: "#f0e6ff"
+  eva-text-secondary: "#c4a0e0"
+  eva-text-muted: "#9779bb"
+  # Tema Catppuccin Mocha
+  mocha-bg: "#1e1e2e"
+  mocha-panel: "#181825"
+  mocha-panel-raised: "#313244"
+  mocha-panel-high: "#45475a"
+  mocha-hairline-strong: "#585b70"
+  mocha-accent: "#fab387"
+  mocha-accent-bright: "#f9c29c"
+  mocha-alert-red: "#f38ba8"
+  mocha-ok-green: "#a6e3a1"
+  mocha-info-blue: "#89b4fa"
+  mocha-qemu-cyan: "#89dceb"
+  mocha-container-purple: "#cba6f7"
+  mocha-text-primary: "#cdd6f4"
+  mocha-text-secondary: "#a6adc8"
+  mocha-text-muted: "#979cb4"
 typography:
   display:
     fontFamily: "'Barlow Condensed', sans-serif"
@@ -168,6 +219,7 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 - **Text Primary** (#e2e8f0), **Text Secondary** (#94a3b8), **Text Muted** (#76869d): testo, dati secondari, etichette.
 
 ### Altri temi (stesse variabili, valori diversi)
+I valori completi di ogni tema sono nel frontmatter con prefisso `light-`, `eva-` e `mocha-`; sotto, i tratti che li distinguono.
 - **Light**: sfondo #f8fafc, pannelli #ffffff, testo #0f172a, testo muted #617087. Gli accenti sono scuriti per il testo (ambra #996206, verde #167f3d, rosso #d41212, blu #0b62f0, ciano #047a8f, viola #9530f5); il riempimento del bottone primario resta ambra #f59e0b con testo nero (`--amber-fill`).
 - **Eva 01**: sfondo #0d0617, pannelli #1a0f2e; `--amber` diventa verde lime #7cc443; testo #f0e6ff; `--blue` vira al viola chiaro; `--warn` è arancio #ffa24a (il lime di marca si confonderebbe col verde "ok") e `--cyan`, usato per i badge QEMU, è azzurro-verde #2dd4bf.
 - **Catppuccin Mocha**: sfondo #1e1e2e, pannelli #181825; `--amber` diventa pesca #fab387; testo #cdd6f4.
