@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"io/fs"
 	"log"
 	"net/http"
+	"path"
+	"strings"
 
 	"proxmox-manager/internal/cache"
 	"proxmox-manager/internal/config"
@@ -16,8 +19,10 @@ import (
 )
 
 // web/ lives in the same directory as main.go — Go embed requires this.
+// web/static holds vendored third-party libraries and fonts (see web/static/THIRD_PARTY.md);
+// the application frontend itself stays the single file web/templates/index.html.
 //
-//go:embed web/templates/index.html
+//go:embed web/templates/index.html web/static
 var staticFiles embed.FS
 
 func main() {
@@ -42,6 +47,9 @@ func main() {
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"*"},
 	}))
+
+	// Vendored libraries and fonts (read-only, embedded)
+	r.Handle("/static/*", staticHandler())
 
 	// SPA pages
 	for _, path := range []string{"/", "/nodes", "/vms", "/batch", "/cluster", "/provision", "/reports", "/settings", "/console"} {
@@ -106,12 +114,56 @@ func main() {
 	log.Fatal(http.ListenAndServe(cfg.ListenAddr, r))
 }
 
+// staticTypes is the allowlist of served extensions: anything else under /static/ is a 404.
+// Types are explicit because Go's built-in MIME table has no woff2.
+var staticTypes = map[string]string{
+	".js":    "text/javascript; charset=utf-8",
+	".css":   "text/css; charset=utf-8",
+	".woff2": "font/woff2",
+}
+
+func staticHandler() http.Handler {
+	sub, err := fs.Sub(staticFiles, "web/static")
+	if err != nil {
+		log.Fatalf("static: %v", err)
+	}
+	files := http.StripPrefix("/static/", http.FileServer(http.FS(sub)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ct, ok := staticTypes[strings.ToLower(path.Ext(r.URL.Path))]
+		if !ok || strings.HasSuffix(r.URL.Path, "/") { // no directory listings, no unknown types
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", ct)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		files.ServeHTTP(w, r)
+	})
+}
+
+// validThemes mirrors the html.<theme> classes in index.html. The empty theme means
+// "follow the OS" and adds no class.
+var validThemes = map[string]bool{"dark": true, "light": true, "eva01": true, "catppuccino": true}
+
+// injectTheme puts the saved theme on <html> so the first paint already uses it
+// (no localStorage: the preference lives in config.json). Only whitelisted values
+// are ever written into the page.
+func injectTheme(page []byte, theme string) []byte {
+	if !validThemes[theme] {
+		return page
+	}
+	return bytes.Replace(page, []byte(`<html lang="it">`), []byte(`<html lang="it" class="`+theme+`">`), 1)
+}
+
 func serveIndex(w http.ResponseWriter, r *http.Request) {
 	b, err := fs.ReadFile(staticFiles, "web/templates/index.html")
 	if err != nil {
 		http.Error(w, "not found", 500)
 		return
 	}
+	b = injectTheme(b, config.Get().Theme)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "no-cache") // the page varies with the saved theme
 	w.Write(b)
 }

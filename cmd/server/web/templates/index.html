@@ -4,13 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PROXMOX MANAGER</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
-<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<link rel="preload" href="/static/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/barlow-condensed-latin-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/xterm-5.3.0.css">
+<script defer src="/static/chart-4.4.0.umd.min.js"></script>
+<script defer src="/static/xlsx-0.20.3.full.min.js"></script>
+<script defer src="/static/xterm-5.3.0.js"></script>
+<script defer src="/static/xterm-addon-fit-0.8.0.js"></script>
 <style>
+/* Font in locale (subset latin: include le lettere accentate italiane). Vedi web/static/THIRD_PARTY.md */
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:300 700;font-display:swap;src:url(/static/fonts/jetbrains-mono-latin-var.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:300;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-300.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:400;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-400.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-600.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-700.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:900;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-900.woff2) format('woff2')}
 :root{
   --bg:#0a0b0d;--bg2:#111318;--bg3:#181c23;--bg4:#1e2330;
   --border:#2a3040;--border2:#3a4558;
@@ -301,7 +309,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.36.0 · 2026-10-13</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.37.0 · 2026-10-13</div></div>
 </aside>
 
 <!-- MAIN -->
@@ -984,9 +992,32 @@ function logLine(el,text,cls=''){
 
 // Charts
 const _ch={};
-function mkChart(id,cfg){if(_ch[id])_ch[id].destroy();const c=document.getElementById(id);if(!c)return;_ch[id]=new Chart(c,cfg);return _ch[id];}
+function mkChart(id,cfg){if(typeof Chart==='undefined'){toast('Libreria grafici non caricata','err');return;}if(_ch[id])_ch[id].destroy();const c=document.getElementById(id);if(!c)return;_ch[id]=new Chart(c,cfg);return _ch[id];}
 const CD={responsive:true,animation:{duration:window.matchMedia('(prefers-reduced-motion:reduce)').matches?0:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'JetBrains Mono',size:10}}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9}},beginAtZero:true}}};
-const COLS=['#f59e0b','#22c55e','#3b82f6','#06b6d4','#a855f7','#ef4444','#f97316','#84cc16'];
+// Colori dai token del tema attivo: le serie dei grafici non hanno copie letterali.
+function tk(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+function tka(name,a){const h=tk(name).replace('#','');const n=h.length===3?h.replace(/./g,'$&$&'):h;return `rgba(${parseInt(n.slice(0,2),16)},${parseInt(n.slice(2,4),16)},${parseInt(n.slice(4,6),16)},${a})`;}
+function seriesCols(){return ['--amber','--green','--blue','--cyan','--purple','--red'].map(tk);}
+
+// Richieste per-VM con concorrenza limitata: senza limite una dashboard con 80 VM in esecuzione
+// lancia ~160 richieste insieme (il browser ne serve ~6 per host, il proxy le inoltra a Proxmox).
+async function pool(items,limit,fn){
+  let next=0;
+  const worker=async()=>{while(next<items.length){const it=items[next++];try{await fn(it);}catch(e){console.warn('richiesta per-VM fallita:',e.message);}}};
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));
+}
+// GET silenzioso con cache a scadenza breve, separata per cluster: evita di rifare le stesse richieste
+// per-VM passando da dashboard a lista VM. Gli errori non vengono memorizzati.
+const _tc=new Map();
+async function apiCached(path,ttlMs=30000){
+  const key=(ClusterMgr.current??0)+'|'+path, hit=_tc.get(key), now=Date.now();
+  if(hit&&now-hit.t<ttlMs)return hit.v;
+  const v=await api(path,{quiet:true});
+  _tc.set(key,{t:now,v});
+  if(_tc.size>1000)_tc.delete(_tc.keys().next().value);
+  return v;
+}
+function dropVmCache(node,vmid){const frag=`/nodes/${node}/qemu/${vmid}/`;for(const k of [..._tc.keys()])if(k.includes(frag))_tc.delete(k);}
 
 // Sortable table helper
 function mkSorter(tbodyId, headId){
@@ -1181,6 +1212,7 @@ const App={
     if(p==='settings')  Settings.load();
   },
   async checkConn(){
+    if(document.hidden)return; // scheda in background: niente sondaggio ogni 30s
     const dot=document.getElementById('cdot'), lbl=document.getElementById('clbl');
     // quiet: lo stato è già nel pallino; un cluster offline non deve produrre un toast ogni 30s
     try{await api('/nodes',{quiet:true});dot.className='ok';lbl.textContent='Connesso';lbl.title='';}
@@ -1220,23 +1252,23 @@ const DashTbl=(()=>{
 // dal balloon/guest-agent → uso reale. Patch progressiva della cella RAM%.
 async function loadDashMem(vms){
   const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
-  await Promise.allSettled(running.map(async v=>{
-    // quiet: in caso di errore resta il valore da cluster/resources
-    const r=await api(`/nodes/${v.node}/qemu/${v.vmid}/status`,{quiet:true}).catch(()=>null);
+  await pool(running,6,async v=>{
+    // in caso di errore resta il valore da cluster/resources
+    const r=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/status`).catch(()=>null);
     const s=r?.status;
     if(!s||!s.maxmem)return;
     v.mem=s.mem; v.maxmem=s.maxmem;
     const el=document.getElementById(`dmem-${v.node}-${v.vmid}`);
     if(el)el.innerHTML=bar(pct(s.mem,s.maxmem));
-  }));
+  });
 }
 
 async function loadDashFsinfo(vms){
   const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
-  await Promise.allSettled(running.map(async v=>{
-    // quiet: VM senza guest agent → cella "—" con tooltip, nessun toast
+  await pool(running,6,async v=>{
+    // VM senza guest agent → cella "—" con tooltip, nessun toast
     let fs=[], fsErr='';
-    try{fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`,{quiet:true});}catch(e){fsErr=e.message;}
+    try{fs=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`);}catch(e){fsErr=e.message;}
     const el=document.getElementById(`ddk-${v.node}-${v.vmid}`);
     if(el&&fsErr) el.title=`Guest agent non disponibile: ${fsErr}`;
     if(Array.isArray(fs)&&fs.length){
@@ -1250,7 +1282,7 @@ async function loadDashFsinfo(vms){
     }
     v.diskPct=null;
     if(el)el.innerHTML='—';
-  }));
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1289,8 +1321,8 @@ const Dashboard={
     const pts=m.filter(x=>x.ts>=cutoff).sort((a,b)=>a.ts-b.ts);
     if(!pts.length)return;
     const labels=pts.map(x=>new Date(x.ts*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
-    mkChart('cCpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:pts.map(x=>(x.avg_cpu*100).toFixed(1)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.08)',tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
-    mkChart('cMem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:pts.map(x=>(x.avg_mem*100).toFixed(1)),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.08)',tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cCpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:pts.map(x=>(x.avg_cpu*100).toFixed(1)),borderColor:tk('--amber'),backgroundColor:tka('--amber',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cMem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:pts.map(x=>(x.avg_mem*100).toFixed(1)),borderColor:tk('--blue'),backgroundColor:tka('--blue',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
   }
 };
 
@@ -1370,8 +1402,8 @@ const Nodes={
     const labels=rrd.map(p=>fmt2(p.time));
     document.getElementById('ncpuT').textContent=`CPU — ${Nodes.sel} (${tf})`;
     document.getElementById('nmemT').textContent=`RAM — ${Nodes.sel} (${tf})`;
-    mkChart('cNcpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.1)',tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
-    mkChart('cNmem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)',tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cNcpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:tk('--amber'),backgroundColor:tka('--amber',.1),tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cNmem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:tk('--blue'),backgroundColor:tka('--blue',.1),tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
   }
 };
 
@@ -1441,10 +1473,10 @@ const VMs=(()=>{
 
   async function loadFsinfo(){
     const running=all.filter(v=>v.type==='qemu'&&v.status==='running');
-    await Promise.allSettled(running.map(async v=>{
-      // quiet: VM senza guest agent → cella "—" con tooltip, nessun toast
+    await pool(running,6,async v=>{
+      // VM senza guest agent → cella "—" con tooltip, nessun toast
       let fs=[], fsErr='';
-      try{fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`,{quiet:true});}catch(e){fsErr=e.message;}
+      try{fs=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`);}catch(e){fsErr=e.message;}
       const el=document.getElementById(`dk-${v.node}-${v.vmid}`);
       if(el&&fsErr) el.title=`Guest agent non disponibile: ${fsErr}`;
       if(Array.isArray(fs)&&fs.length){
@@ -1458,7 +1490,7 @@ const VMs=(()=>{
       }
       v.diskPct=null;
       if(el)el.innerHTML='—';
-    }));
+    });
   }
 
   return {
@@ -1510,6 +1542,7 @@ const VMs=(()=>{
         try{
           const kind=type==='lxc'?'lxc':'qemu';
           await api(`/nodes/${node}/${kind}/${vmid}/action/${action}`,{method:'POST',body:'{}',quiet:true});
+          dropVmCache(node,vmid);
           toast(`${a.label} inviato a ${label}`,'ok'); setTimeout(()=>VMs.load(),2500);
         }catch(e){toast(`${a.label} su ${label} non riuscito: ${e.message}`,'err');}
       });
@@ -2026,6 +2059,7 @@ const Batch=(()=>{
         logLine(log,`■ ${list.length-failed}/${list.length} OK${failed?` · ${failed} falliti`:''}`,failed?'tr':'ta');
         if(failed) toast(`Batch ${a.label}: ${failed} su ${list.length} falliti, vedi log`,'err');
         else toast(`Batch ${a.label}: ${list.length} VM OK`,'ok');
+        _tc.clear();
         setTimeout(()=>Batch.load(),3000);
       }catch(e){
         logLine(log,`✗ ${e.message}`,'tr');
@@ -2085,8 +2119,8 @@ const Cluster={
         const labels=rrd.map(p=>new Date(p.time*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
         document.getElementById('cnchT').textContent=`${node} — ultima ora`;
         mkChart('cCN',{type:'line',data:{labels,datasets:[
-          {label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:'#f59e0b',tension:.2,pointRadius:0},
-          {label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:'#3b82f6',tension:.2,pointRadius:0}
+          {label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:tk('--amber'),tension:.2,pointRadius:0},
+          {label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:tk('--blue'),tension:.2,pointRadius:0}
         ]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
       }
     }catch(e){document.getElementById('cdetail').innerHTML=errBox(e.message,`Cluster.selDetail(${js(node)})`);}
@@ -2194,14 +2228,16 @@ const Reports={
     RepTbl.setData(agg);
     const labels=agg.slice(0,15).map(r=>r.name||`VM${r.vmid}`);
     const a15=agg.slice(0,15);
-    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU avg %',data:a15.map(r=>r.avgCpu.toFixed(1)),backgroundColor:labels.map((_,i)=>COLS[i%COLS.length]+'cc')},{label:'CPU max %',data:a15.map(r=>r.maxCpu.toFixed(1)),type:'line',borderColor:'#ef4444',backgroundColor:'transparent',borderWidth:1.5,pointRadius:3}]},options:{...CD,indexAxis:'y'}});
-    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM avg %',data:a15.map(r=>r.avgMem.toFixed(1)),backgroundColor:labels.map((_,i)=>COLS[i%COLS.length]+'cc')}]},options:{...CD,indexAxis:'y'}});
+    const cols=seriesCols();
+    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU avg %',data:a15.map(r=>r.avgCpu.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc')},{label:'CPU max %',data:a15.map(r=>r.maxCpu.toFixed(1)),type:'line',borderColor:tk('--red'),backgroundColor:'transparent',borderWidth:1.5,pointRadius:3}]},options:{...CD,indexAxis:'y'}});
+    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM avg %',data:a15.map(r=>r.avgMem.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc')}]},options:{...CD,indexAxis:'y'}});
     const byH={};for(const m of Reports.data){const h=Math.floor(m.ts/3600)*3600;if(!byH[h])byH[h]=0;byH[h]+=m.avg_netin;}
     const tk=Object.keys(byH).sort();
-    mkChart('rnet',{type:'line',data:{labels:tk.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Net In (B/s)',data:tk.map(t=>byH[t]),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.1)',fill:true,tension:.3,pointRadius:0}]},options:CD});
+    mkChart('rnet',{type:'line',data:{labels:tk.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Net In (B/s)',data:tk.map(t=>byH[t]),borderColor:tk('--green'),backgroundColor:tka('--green',.1),fill:true,tension:.3,pointRadius:0}]},options:CD});
   },
   xlsx(){
     if(!Reports.data.length){toast('Nessun dato','err');return;}
+    if(typeof XLSX==='undefined'){toast('Libreria Excel non caricata','err');return;}
     const agg=Reports.agg();
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
@@ -2270,30 +2306,30 @@ const ConsolePage = {
         <div id="con-wrap" style="
             position:fixed;top:0;left:0;right:0;bottom:0;
             display:flex;flex-direction:column;
-            background:#0a0b0d;overflow:hidden;
+            background:var(--bg);overflow:hidden;
         ">
             <div id="con-topbar" style="
                 height:40px;flex-shrink:0;
-                background:#111318;border-bottom:1px solid #2a3040;
+                background:var(--bg2);border-bottom:1px solid var(--border);
                 display:flex;align-items:center;padding:0 16px;gap:12px;
             ">
                 <span id="con-title" style="
                     font-family:'Barlow Condensed',sans-serif;
                     font-size:16px;font-weight:700;
-                    color:#f59e0b;letter-spacing:.05em;
+                    color:var(--amber);letter-spacing:.05em;
                 ">CONSOLE</span>
-                <span id="con-sub" style="font-size:10px;color:#64748b"></span>
+                <span id="con-sub" style="font-size:10px;color:var(--text3)"></span>
                 <div style="flex:1"></div>
                 <button onclick="window.close()" style="
-                    background:transparent;border:1px solid #3a4558;
-                    color:#94a3b8;padding:3px 10px;border-radius:3px;
+                    background:transparent;border:1px solid var(--border2);
+                    color:var(--text2);padding:3px 10px;border-radius:3px;
                     cursor:pointer;font-family:'JetBrains Mono',monospace;
                     font-size:11px;text-transform:uppercase;
                 ">✕ Chiudi</button>
             </div>
             <div id="con-term" style="
                 position:relative;flex:1;min-height:0;min-width:0;
-                width:100%;overflow:hidden;background:#0a0b0d;
+                width:100%;overflow:hidden;background:var(--bg);
             "></div>
         </div>`;
 
@@ -2311,7 +2347,7 @@ const ConsolePage = {
 
     if (typeof Terminal === 'undefined') {
         container.innerHTML =
-            '<div style="padding:20px;color:#ef4444">Errore: xterm.js non caricato.</div>';
+            '<div style="padding:20px;color:var(--red)">Errore: xterm.js non caricato.</div>';
         return;
     }
 
@@ -2319,11 +2355,12 @@ const ConsolePage = {
         cursorBlink: true,
         fontSize:    14,
         fontFamily:  "'JetBrains Mono', 'Fira Code', monospace",
+        // colori dal tema attivo (la classe tema arriva dal server, quindi vale anche per il popup)
         theme: {
-            background: '#0a0b0d',
-            foreground: '#e2e8f0',
-            cursor:     '#f59e0b',
-            selectionBackground: 'rgba(245,158,11,0.3)',
+            background: tk('--bg'),
+            foreground: tk('--text'),
+            cursor:     tk('--amber'),
+            selectionBackground: tka('--amber', 0.3),
         }
     });
 
