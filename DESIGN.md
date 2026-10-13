@@ -169,13 +169,14 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 
 ### Altri temi (stesse variabili, valori diversi)
 - **Light**: sfondo #f8fafc, pannelli #ffffff, testo #0f172a, testo muted #617087. Gli accenti sono scuriti per il testo (ambra #996206, verde #167f3d, rosso #d41212, blu #0b62f0, ciano #047a8f, viola #9530f5); il riempimento del bottone primario resta ambra #f59e0b con testo nero (`--amber-fill`).
-- **Eva 01**: sfondo #0d0617, pannelli #1a0f2e; `--amber` diventa verde lime #7cc443; testo #f0e6ff; `--blue` e `--cyan` virano al viola.
+- **Eva 01**: sfondo #0d0617, pannelli #1a0f2e; `--amber` diventa verde lime #7cc443; testo #f0e6ff; `--blue` vira al viola chiaro; `--warn` è arancio #ffa24a (il lime di marca si confonderebbe col verde "ok") e `--cyan`, usato per i badge QEMU, è azzurro-verde #2dd4bf.
 - **Catppuccin Mocha**: sfondo #1e1e2e, pannelli #181825; `--amber` diventa pesca #fab387; testo #cdd6f4.
 - **Auto** (nessuna classe): segue `prefers-color-scheme`, light o dark.
 
 ### Named Rules
 **The 4.5 Floor Rule.** Ogni colore usato come testo raggiunge 4.5:1 su `--bg`, `--bg2` e `--bg3` in tutti e cinque i temi, compresi i badge sul loro velo. Un nuovo ruolo colore si verifica prima di entrare nel sistema.
 **The Fill Is Not Text Rule.** Dove un colore è sia riempimento sia testo (ambra), i due ruoli hanno variabili separate (`--amber` testo, `--amber-fill` riempimento): così il tema chiaro scurisce il testo senza spegnere il bottone.
+**The Warn Is Not Brand Rule.** L'attenzione (soglie, barre `.warn2`, valori sopra il 60%) usa `--warn`, non `--amber`. Di norma coincidono; in un tema dove il marchio si confonde con "ok" (eva01) si separano.
 **The One Voice Rule.** L'ambra è l'unico accento di marca. Le altre tinte indicano stato o tipo di risorsa e non si usano come decorazione.
 **The Semantic Variable Rule.** Il codice usa `--amber`, `--green` ecc. come ruoli. Un tema cambia il valore, non il nome: non scrivere colori letterali nei componenti.
 

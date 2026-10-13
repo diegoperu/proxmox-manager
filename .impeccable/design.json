@@ -418,6 +418,11 @@
     ],
     "rules": [
       {
+        "name": "The Warn Is Not Brand Rule",
+        "body": "L'attenzione (soglie, barre `.warn2`, valori sopra il 60%) usa `--warn`, non `--amber`. Di norma coincidono; in un tema dove il marchio si confonde con \"ok\" (eva01) si separano.",
+        "section": "colors"
+      },
+      {
         "name": "The 4.5 Floor Rule",
         "body": "Ogni colore usato come testo raggiunge 4.5:1 su `--bg`, `--bg2` e `--bg3` in tutti e cinque i temi, compresi i badge sul loro velo. Un nuovo ruolo colore si verifica prima di entrare nel sistema.",
         "section": "colors"
