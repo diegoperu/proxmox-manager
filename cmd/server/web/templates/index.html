@@ -342,7 +342,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.45.0 · 2026-10-13</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.46.0 · 2026-10-13</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1071,16 +1071,41 @@ function logLine(el,text,cls=''){
 
 // Charts
 const _ch={};
+// Alternativa testuale di un grafico, letta dagli screen reader (aria-describedby) e mai mostrata a video.
+function describeChart(id,ch){
+  const c=document.getElementById(id); if(!c)return;
+  const f=n=>Number.isInteger(n)?String(n):n.toFixed(1);
+  const parts=[];
+  for(const ds of ch.data.datasets){
+    const v=(ds.data||[]).map(Number).filter(Number.isFinite); if(!v.length)continue;
+    const label=ds.label||'Serie';
+    if(ch.config.options?.indexAxis==='y'&&ds.type!=='line'){
+      const top=v.map((x,i)=>[x,ch.data.labels[i]]).sort((a,b)=>b[0]-a[0]).slice(0,3);
+      parts.push(`${label}, valori più alti: ${top.map(([x,l])=>`${l} ${f(x)}`).join(', ')}`);
+    } else if(ds.type==='line'&&ch.config.options?.indexAxis==='y'){
+      parts.push(`${label}: massimo ${f(Math.max(...v))}`);
+    } else {
+      parts.push(`${label}: ultimo ${f(v[v.length-1])}, minimo ${f(Math.min(...v))}, massimo ${f(Math.max(...v))}`);
+    }
+  }
+  const did=id+'-desc'; let el=document.getElementById(did);
+  if(!el){el=document.createElement('div');el.id=did;el.className='sr';c.insertAdjacentElement('afterend',el);}
+  el.textContent=parts.join('. ');
+  c.setAttribute('aria-describedby',did);
+}
 async function mkChart(id,cfg){
   try{await lib('chart');}catch(e){toast('Libreria grafici non caricata: '+e.message,'err');return;}
   if(_ch[id])_ch[id].destroy();
   const c=document.getElementById(id); if(!c)return;
-  _ch[id]=new Chart(c,cfg); return _ch[id];
+  _ch[id]=new Chart(c,cfg); describeChart(id,_ch[id]); return _ch[id];
 }
 const CD={responsive:true,animation:{duration:window.matchMedia('(prefers-reduced-motion:reduce)').matches?0:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'JetBrains Mono',size:10}}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9}},beginAtZero:true}}};
 // Colori dai token del tema attivo: le serie dei grafici non hanno copie letterali.
 function tk(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 function tka(name,a){const h=tk(name).replace('#','');const n=h.length===3?h.replace(/./g,'$&$&'):h;return `rgba(${parseInt(n.slice(0,2),16)},${parseInt(n.slice(2,4),16)},${parseInt(n.slice(4,6),16)},${a})`;}
+// Serie di un grafico: colore preso dal token del tema e ricordato (`_tok`, `_a`) così che
+// recolorCharts() possa ricolorarla sul posto quando cambia il tema, senza rifare le richieste.
+function ser(tok,a){return {borderColor:tk(tok),backgroundColor:tka(tok,a??0.1),_tok:tok,_a:a??0.1};}
 function seriesCols(){return ['--amber','--green','--blue','--cyan','--purple','--red'].map(tk);}
 
 // Richieste per-VM con concorrenza limitata: senza limite una dashboard con 80 VM in esecuzione
@@ -1313,7 +1338,12 @@ const DashTbl=(()=>{
   const S=mkSorter('dtbody','dtbl');
   let data=[];
   return {
-    setData(d){data=d;DashTbl.renderWith(data);},
+    // Ordine iniziale: prima le VM in esecuzione, i template in fondo, poi per VMID. Le intestazioni ordinano come prima.
+    setData(d){
+      const rank=v=>(isTemplate(v)?2:v.status==='running'?0:1);
+      data=[...d].sort((a,b)=>rank(a)-rank(b)||(a.vmid||0)-(b.vmid||0));
+      DashTbl.renderWith(data);
+    },
     sort(k){DashTbl.renderWith(S.sort(data,k));},
     renderWith(d){
       document.getElementById('dtbody').innerHTML=d.map(v=>{
@@ -1406,8 +1436,8 @@ const Dashboard={
     const pts=m.filter(x=>x.ts>=cutoff).sort((a,b)=>a.ts-b.ts);
     if(!pts.length)return;
     const labels=pts.map(x=>new Date(x.ts*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
-    mkChart('cCpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:pts.map(x=>(x.avg_cpu*100).toFixed(1)),borderColor:tk('--amber'),backgroundColor:tka('--amber',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
-    mkChart('cMem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:pts.map(x=>(x.avg_mem*100).toFixed(1)),borderColor:tk('--blue'),backgroundColor:tka('--blue',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cCpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:pts.map(x=>(x.avg_cpu*100).toFixed(1)),...ser('--amber',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cMem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:pts.map(x=>(x.avg_mem*100).toFixed(1)),...ser('--blue',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
   }
 };
 
@@ -1487,8 +1517,8 @@ const Nodes={
     const labels=rrd.map(p=>fmt2(p.time));
     document.getElementById('ncpuT').textContent=`CPU — ${Nodes.sel} (${tf})`;
     document.getElementById('nmemT').textContent=`RAM — ${Nodes.sel} (${tf})`;
-    mkChart('cNcpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:tk('--amber'),backgroundColor:tka('--amber',.1),tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
-    mkChart('cNmem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:tk('--blue'),backgroundColor:tka('--blue',.1),tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cNcpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),...ser('--amber',.1),tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+    mkChart('cNmem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),...ser('--blue',.1),tension:.2,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
   }
 };
 
@@ -2229,8 +2259,8 @@ const Cluster={
         const labels=rrd.map(p=>new Date(p.time*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
         document.getElementById('cnchT').textContent=`${node} — ultima ora`;
         mkChart('cCN',{type:'line',data:{labels,datasets:[
-          {label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),borderColor:tk('--amber'),tension:.2,pointRadius:0},
-          {label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:tk('--blue'),tension:.2,pointRadius:0}
+          {label:'CPU %',data:rrd.map(p=>((p.cpu||0)*100).toFixed(2)),...ser('--amber'),tension:.2,pointRadius:0},
+          {label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),...ser('--blue'),tension:.2,pointRadius:0}
         ]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
       }
     }catch(e){document.getElementById('cdetail').innerHTML=errBox(e.message,`Cluster.selDetail(${js(node)})`);}
@@ -2339,11 +2369,11 @@ const Reports={
     const labels=agg.slice(0,15).map(r=>r.name||`VM${r.vmid}`);
     const a15=agg.slice(0,15);
     const cols=seriesCols();
-    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU avg %',data:a15.map(r=>r.avgCpu.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc')},{label:'CPU max %',data:a15.map(r=>r.maxCpu.toFixed(1)),type:'line',borderColor:tk('--red'),backgroundColor:'transparent',borderWidth:1.5,pointRadius:3}]},options:{...CD,indexAxis:'y'}});
-    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM avg %',data:a15.map(r=>r.avgMem.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc')}]},options:{...CD,indexAxis:'y'}});
+    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU avg %',data:a15.map(r=>r.avgCpu.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc'),_cols:true},{label:'CPU max %',data:a15.map(r=>r.maxCpu.toFixed(1)),type:'line',...ser('--red',0),borderWidth:1.5,pointRadius:3}]},options:{...CD,indexAxis:'y'}});
+    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM avg %',data:a15.map(r=>r.avgMem.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc'),_cols:true}]},options:{...CD,indexAxis:'y'}});
     const byH={};for(const m of Reports.data){const h=Math.floor(m.ts/3600)*3600;if(!byH[h])byH[h]=0;byH[h]+=m.avg_netin;}
     const hours=Object.keys(byH).sort(); // NB: non chiamarla `tk`, oscura la funzione dei colori
-    mkChart('rnet',{type:'line',data:{labels:hours.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Net In (B/s)',data:hours.map(t=>byH[t]),borderColor:tk('--green'),backgroundColor:tka('--green',.1),fill:true,tension:.3,pointRadius:0}]},options:CD});
+    mkChart('rnet',{type:'line',data:{labels:hours.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Net In (B/s)',data:hours.map(t=>byH[t]),...ser('--green',.1),fill:true,tension:.3,pointRadius:0}]},options:CD});
   },
   async xlsx(){
     if(!Reports.data.length){toast('Nessun dato','err');return;}
@@ -2366,6 +2396,20 @@ const Reports={
 // ════════════════════════════════════════════════════════════════════════════
 // SETTINGS
 // ════════════════════════════════════════════════════════════════════════════
+// Ricolora i grafici già disegnati con i token del tema attivo (serie, assi, legenda) senza ricaricare i dati.
+function recolorCharts(){
+  const cols=seriesCols();
+  for(const ch of Object.values(_ch)){
+    for(const ds of ch.data.datasets){
+      if(ds._tok){ds.borderColor=tk(ds._tok);ds.backgroundColor=tka(ds._tok,ds._a);}
+      else if(ds._cols){ds.backgroundColor=ds.data.map((_,i)=>cols[i%cols.length]+'cc');}
+    }
+    const o=ch.options;
+    for(const ax of ['x','y']){const sc=o.scales&&o.scales[ax];if(sc){sc.grid.color=CD.scales[ax].grid.color;sc.ticks.color=CD.scales[ax].ticks.color;}}
+    if(o.plugins&&o.plugins.legend&&o.plugins.legend.labels)o.plugins.legend.labels.color=CD.plugins.legend.labels.color;
+    ch.update('none');
+  }
+}
 function applyTheme(t){
   const h=document.documentElement;
   h.classList.remove('dark','light','eva01','catppuccino');
@@ -2376,6 +2420,7 @@ function applyTheme(t){
   CD.plugins.legend.labels.color=leg;
   CD.scales.x.grid.color=grid; CD.scales.x.ticks.color=tick;
   CD.scales.y.grid.color=grid; CD.scales.y.ticks.color=tick;
+  recolorCharts();
 }
 window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>{
   const sel=document.getElementById('ctheme');
