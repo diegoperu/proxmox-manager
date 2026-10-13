@@ -321,6 +321,7 @@ Note provisioning:
 - SSH keys: encoding con `strings.ReplaceAll(url.QueryEscape(keys), "+", "%20")` — Proxmox richiede RFC 3986
 - Cloud-init pre-compilato dal frontend leggendo config template
 - Default gateway: `10.75.4.254`, default IP prefix: `10.75.4.`
+- Frontend (2026-10-13): il gateway digitato a mano non viene sovrascritto dall'auto-calcolo (`gwManual`; svuotarlo o scegliere un template lo riattiva); il nome VM è validato (`^[A-Za-z0-9][A-Za-z0-9.-]*$`, max 253) prima della chiamata; `#pv-summary` mostra cosa verrà creato e si aggiorna mentre si compila (solo `textContent`).
 
 ## SQLite schema (solo cache)
 
@@ -335,7 +336,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 **Pagine** (routing client-side):
 - `dashboard` — KPI cluster + grafici CPU/RAM 6h (da `/api/metrics?timeframe=day`, slice last 6h) + tabella VM con disk% da fsinfo
 - `nodes` — card per nodo (ordinati natural sort) + RRD grafici (memused/memtotal) + VM per nodo
-- `vms` — tabella QEMU+LXC con colonna IP; multi-nodo selector (natural sort, modello esplicito); sort; disk% da fsinfo async
+- `vms` — tabella QEMU+LXC con colonna IP; multi-nodo selector (natural sort, modello esplicito); sort; disk% da fsinfo async; **nessuna selezione a checkbox** (le operazioni di massa stanno nella pagina `batch`; la colonna checkbox era inutilizzata ed è stata rimossa il 2026-10-13)
 - `provision` — form clone template cloudinit con calcolo delta disco
 - `batch` — chip selector nodi (natural sort, modello esplicito), filtri tipo/stato/testo, tabella full-height con IP, 7 azioni, log real-time
 - `cluster` — gestione nodi (natural sort), dettaglio RRD, reboot/shutdown batch
