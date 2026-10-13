@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PROXMOX MANAGER</title>
 <link rel="preload" href="/static/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/fonts/barlow-condensed-latin-700.woff2" as="font" type="font/woff2" crossorigin>
@@ -32,10 +32,10 @@
   --mono:'JetBrains Mono',monospace;--cond:'Barlow Condensed',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;display:flex;height:100vh;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;display:flex;height:100vh;height:100dvh;overflow:hidden}
 
 /* ── SIDEBAR ── */
-#sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh}
+#sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;height:100dvh}
 .logo{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
 .logo-t{font-family:var(--cond);font-size:22px;font-weight:900;letter-spacing:.08em;color:var(--amber)}
 .logo-s{font-size:9px;color:var(--text3);letter-spacing:.2em;text-transform:uppercase;margin-top:3px}
@@ -116,7 +116,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018
 .bsuc{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}.bsuc:hover{background:rgba(34,197,94,.25)}
 .bpurp{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}.bpurp:hover{background:rgba(168,85,247,.2)}
 .bx{background:var(--red);color:#000;border:1px solid var(--red)}.bx:hover{filter:brightness(1.12)}
-.sm{padding:3px 9px;font-size:10px}.btn:disabled{opacity:.35;cursor:not-allowed}
+.sm{padding:3px 9px;font-size:10px;min-height:24px}.btn:disabled{opacity:.35;cursor:not-allowed}
 
 /* ── INPUT ── */
 .inp{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:3px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .13s}
@@ -155,7 +155,7 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 /* ── MODAL ── */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .18s}
 .ov.open{opacity:1;pointer-events:all}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:22px;min-width:360px;max-width:620px;max-height:90vh;overflow-y:auto;transform:translateY(8px);transition:transform .18s}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:22px;min-width:min(360px,calc(100vw - 24px));max-width:min(620px,calc(100vw - 24px));max-height:90vh;max-height:90dvh;overflow-y:auto;transform:translateY(8px);transition:transform .18s}
 .ov.open .modal{transform:translateY(0)}
 .mt{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.07em;margin-bottom:14px}
 .mf{margin-top:18px;display:flex;gap:7px;justify-content:flex-end}
@@ -193,6 +193,40 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 @media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:850px){.g3{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+/* ── ADATTAMENTO ── desktop-first: sotto 850px la sidebar diventa un menu a scomparsa */
+.menu-btn{display:none}.sb-scrim{display:none}
+#page-batch.active{display:flex!important;flex-direction:column;height:calc(100vh - 110px);height:calc(100dvh - 110px)}
+.batch-side{width:260px;min-width:240px;gap:12px}
+@media(max-width:850px){
+  .menu-btn{display:inline-flex}
+  #sidebar{position:fixed;top:0;bottom:0;left:0;width:min(280px,85vw);min-width:0;z-index:900;padding-left:env(safe-area-inset-left);
+    transform:translateX(-100%);visibility:hidden;transition:transform .2s,visibility 0s .2s}
+  #sidebar.open{transform:none;visibility:visible;transition-delay:0s}
+  #sidebar.open + .sb-scrim{display:block;position:fixed;inset:0;z-index:899;background:rgba(0,0,0,.5)}
+  /* Batch: colonne impilate, la pagina scorre */
+  #page-batch.active{height:auto}
+  .batch-cols{flex-direction:column}
+  .batch-side{width:auto;min-width:0}
+  .batch-cols .tw{max-height:55vh}
+}
+@media(max-width:650px){
+  .top-badge{display:none}
+  .topbar{padding:0 12px}
+  #content{padding:14px max(12px,env(safe-area-inset-right)) 14px max(12px,env(safe-area-inset-left))}
+  #toasts{left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom))}
+  .toast{max-width:none}
+}
+/* Puntatore grosso (dito): bersagli da 44px, campi a 16px (iOS non zooma al focus) */
+@media(pointer:coarse){
+  .btn,.sm,.tab,.ni,.inp,.node-chip{min-height:44px}
+  .btn.sm{padding-left:12px;padding-right:12px}
+  .inp{font-size:16px}
+  th.s{padding-top:13px;padding-bottom:13px}
+  input[type=checkbox]{width:22px;height:22px}
+  .node-sel-item{padding:11px 12px}
+}
+@media(prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
 /* ── FOCUS ── */
 :focus-visible{outline:2px solid var(--amber);outline-offset:2px}
@@ -269,7 +303,6 @@ html.catppuccino{
 .node-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .13s;white-space:nowrap}
 .node-chip:hover{border-color:var(--amber);color:var(--amber)}
 .node-chip.active{background:var(--amber-dim);border-color:var(--amber);color:var(--amber);font-weight:600}
-#page-batch.active{display:flex!important;flex-direction:column;height:calc(100vh - 110px)}
 </style>
 </head>
 <body>
@@ -309,12 +342,14 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.38.0 · 2026-10-13</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.39.0 · 2026-10-13</div></div>
 </aside>
+<div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
 <!-- MAIN -->
 <div id="main">
   <div class="topbar">
+    <button type="button" class="btn bg2 sm menu-btn" id="menu-btn" aria-label="Apri menu" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     <div class="top-title" id="ptitle">DASHBOARD</div>
     <div class="top-badge" id="pbadge">OVERVIEW</div>
     <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)"
@@ -546,7 +581,7 @@ html.catppuccino{
         </div>
       </div>
       <!-- Main 2-col layout -->
-      <div class="flex g16" style="flex:1;min-height:0">
+      <div class="flex g16 batch-cols" style="flex:1;min-height:0">
         <!-- Left: VM list -->
         <div class="flex fc" style="flex:1;min-width:0;gap:8px">
           <div class="sec" style="margin-bottom:0">1. Selezione VM</div>
@@ -572,7 +607,7 @@ html.catppuccino{
           </table></div>
         </div>
         <!-- Right: operation + log -->
-        <div class="flex fc" style="width:260px;min-width:240px;gap:12px">
+        <div class="flex fc batch-side">
           <div class="sec" style="margin-bottom:0">2. Operazione</div>
           <div class="card" style="flex-shrink:0">
             <div class="fr">
@@ -728,7 +763,7 @@ html.catppuccino{
 </div></div>
 
 <!-- MODAL CONFIRM -->
-<div class="ov" id="mdisk"><div class="modal" style="min-width:520px">
+<div class="ov" id="mdisk"><div class="modal" style="min-width:min(520px,calc(100vw - 24px))">
   <div class="mt" id="mdiskTitle">Disco</div>
 
   <div class="sec">1. Nuovo disco</div>
@@ -794,7 +829,7 @@ html.catppuccino{
 </div></div>
 
 <!-- MODAL ADD USER -->
-<div class="ov" id="madduser"><div class="modal" style="min-width:420px">
+<div class="ov" id="madduser"><div class="modal" style="min-width:min(420px,calc(100vw - 24px))">
   <div class="mt">Aggiungi utente VM</div>
   <div id="madduserB">
     <div class="fr"><label class="fl" for="adduser-name">Nome utente</label><input class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
@@ -946,6 +981,7 @@ const VM_ACTIONS={
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if(_modalStack.length){e.preventDefault();closeModal(_modalStack[_modalStack.length-1].id);return;}
+    if(Drawer.isOpen()){e.preventDefault();Drawer.set(false);return;}
     const pk=document.getElementById('vm-node-picker');
     if(pk&&pk.style.display!=='none'){pk.style.display='none';document.getElementById('vm-node-btn')?.focus();}
     return;
@@ -968,6 +1004,27 @@ const A11y={
     });
     document.querySelectorAll('th.s').forEach(th=>{th.tabIndex=0;th.setAttribute('aria-sort','none');});
     _syncModals(); // modal chiusi: inert, fuori dall'ordine di tabulazione
+  }
+};
+// Menu a scomparsa (sotto 850px la sidebar è un drawer). Chiuso: `visibility:hidden` da CSS, quindi
+// fuori dall'ordine di tabulazione; aperto: il contenuto sotto è `inert`. Su desktop non fa nulla.
+const Drawer={
+  mq:window.matchMedia('(max-width:850px)'),
+  isOpen(){return document.getElementById('sidebar').classList.contains('open');},
+  set(open){
+    const sb=document.getElementById('sidebar'), btn=document.getElementById('menu-btn'), main=document.getElementById('main');
+    const was=sb.classList.contains('open');
+    open=open&&Drawer.mq.matches;
+    sb.classList.toggle('open',open);
+    btn.setAttribute('aria-expanded',open); btn.setAttribute('aria-label',open?'Chiudi menu':'Apri menu');
+    if(!_modalStack.length) main.inert=open;
+    if(open) (sb.querySelector('.ni.active')||sb.querySelector('.ni'))?.focus();
+    else if(was) btn.focus();
+  },
+  init(){
+    document.getElementById('menu-btn').addEventListener('click',()=>Drawer.set(!Drawer.isOpen()));
+    document.getElementById('sb-scrim').addEventListener('click',()=>Drawer.set(false));
+    Drawer.mq.addEventListener('change',()=>{Drawer.set(false);});
   }
 };
 // Click outside picker to close
@@ -1191,7 +1248,7 @@ const PMETA={dashboard:['DASHBOARD','OVERVIEW'],nodes:['NODI','MONITORAGGIO'],vm
 const App={
   cur:'dashboard',
   init(){
-    document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>App.nav(el.dataset.page)));
+    document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
     ClusterMgr.load().then(()=>{Settings.load();App.nav('dashboard');App.checkConn();setInterval(App.checkConn,30000);});
   },
   nav(p){
@@ -2461,6 +2518,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     A11y.init();
+    Drawer.init();
     App.init();
     Reports.init();
 });
