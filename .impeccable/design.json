@@ -127,16 +127,16 @@
       "alert-red": {
         "role": "secondary",
         "displayName": "Alert Red",
-        "canonical": "#ef4444",
+        "canonical": "#f05050",
         "tonalRamp": [
-          "oklch(15.0% 0.208 25)",
-          "oklch(26.4% 0.208 25)",
-          "oklch(37.9% 0.208 25)",
-          "oklch(49.3% 0.208 25)",
-          "oklch(60.7% 0.208 25)",
-          "oklch(72.1% 0.208 25)",
-          "oklch(83.6% 0.208 25)",
-          "oklch(95.0% 0.208 25)"
+          "oklch(15.0% 0.197 24)",
+          "oklch(26.4% 0.197 24)",
+          "oklch(37.9% 0.197 24)",
+          "oklch(49.3% 0.197 24)",
+          "oklch(60.7% 0.197 24)",
+          "oklch(72.1% 0.197 24)",
+          "oklch(83.6% 0.197 24)",
+          "oklch(95.0% 0.197 24)"
         ]
       },
       "ok-green": {
@@ -157,16 +157,16 @@
       "info-blue": {
         "role": "secondary",
         "displayName": "Info Blue",
-        "canonical": "#3b82f6",
+        "canonical": "#478af7",
         "tonalRamp": [
-          "oklch(15.0% 0.188 260)",
-          "oklch(26.4% 0.188 260)",
-          "oklch(37.9% 0.188 260)",
-          "oklch(49.3% 0.188 260)",
-          "oklch(60.7% 0.188 260)",
-          "oklch(72.1% 0.188 260)",
-          "oklch(83.6% 0.188 260)",
-          "oklch(95.0% 0.188 260)"
+          "oklch(15.0% 0.177 260)",
+          "oklch(26.4% 0.177 260)",
+          "oklch(37.9% 0.177 260)",
+          "oklch(49.3% 0.177 260)",
+          "oklch(60.7% 0.177 260)",
+          "oklch(72.1% 0.177 260)",
+          "oklch(83.6% 0.177 260)",
+          "oklch(95.0% 0.177 260)"
         ]
       },
       "qemu-cyan": {
@@ -187,16 +187,16 @@
       "container-purple": {
         "role": "tertiary",
         "displayName": "Container Purple",
-        "canonical": "#a855f7",
+        "canonical": "#ad5ff7",
         "tonalRamp": [
-          "oklch(15.0% 0.233 304)",
-          "oklch(26.4% 0.233 304)",
-          "oklch(37.9% 0.233 304)",
-          "oklch(49.3% 0.233 304)",
-          "oklch(60.7% 0.233 304)",
-          "oklch(72.1% 0.233 304)",
-          "oklch(83.6% 0.233 304)",
-          "oklch(95.0% 0.233 304)"
+          "oklch(15.0% 0.221 305)",
+          "oklch(26.4% 0.221 305)",
+          "oklch(37.9% 0.221 305)",
+          "oklch(49.3% 0.221 305)",
+          "oklch(60.7% 0.221 305)",
+          "oklch(72.1% 0.221 305)",
+          "oklch(83.6% 0.221 305)",
+          "oklch(95.0% 0.221 305)"
         ]
       },
       "text-primary": {
@@ -232,16 +232,16 @@
       "text-muted": {
         "role": "neutral",
         "displayName": "Text Muted",
-        "canonical": "#64748b",
+        "canonical": "#76869d",
         "tonalRamp": [
-          "oklch(15.0% 0.041 257)",
-          "oklch(26.4% 0.041 257)",
-          "oklch(37.9% 0.041 257)",
-          "oklch(49.3% 0.041 257)",
-          "oklch(60.7% 0.041 257)",
-          "oklch(72.1% 0.041 257)",
-          "oklch(83.6% 0.041 257)",
-          "oklch(95.0% 0.041 257)"
+          "oklch(15.0% 0.040 257)",
+          "oklch(26.4% 0.040 257)",
+          "oklch(37.9% 0.040 257)",
+          "oklch(49.3% 0.040 257)",
+          "oklch(60.7% 0.040 257)",
+          "oklch(72.1% 0.040 257)",
+          "oklch(83.6% 0.040 257)",
+          "oklch(95.0% 0.040 257)"
         ]
       }
     },
@@ -409,6 +409,16 @@
       "Angoli piccoli: 2-5px, tranne i chip nodo (pillola)."
     ],
     "rules": [
+      {
+        "name": "The 4.5 Floor Rule",
+        "body": "Ogni colore usato come testo raggiunge 4.5:1 su `--bg`, `--bg2` e `--bg3` in tutti e cinque i temi, compresi i badge sul loro velo. Un nuovo ruolo colore si verifica prima di entrare nel sistema.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fill Is Not Text Rule",
+        "body": "Dove un colore è sia riempimento sia testo (ambra), i due ruoli hanno variabili separate (`--amber` testo, `--amber-fill` riempimento): così il tema chiaro scurisce il testo senza spegnere il bottone.",
+        "section": "colors"
+      },
       {
         "name": "The One Voice Rule",
         "body": "L'ambra è l'unico accento di marca. Le altre tinte indicano stato o tipo di risorsa e non si usano come decorazione.",

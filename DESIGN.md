@@ -12,17 +12,17 @@ colors:
   amber-bright: "#fbbf24"
   amber-wash: "rgba(245,158,11,.12)"
   amber-glow: "rgba(245,158,11,.06)"
-  alert-red: "#ef4444"
+  alert-red: "#f05050"
   alert-red-wash: "rgba(239,68,68,.15)"
   ok-green: "#22c55e"
   ok-green-wash: "rgba(34,197,94,.15)"
-  info-blue: "#3b82f6"
+  info-blue: "#478af7"
   info-blue-wash: "rgba(59,130,246,.15)"
   qemu-cyan: "#06b6d4"
-  container-purple: "#a855f7"
+  container-purple: "#ad5ff7"
   text-primary: "#e2e8f0"
   text-secondary: "#94a3b8"
-  text-muted: "#64748b"
+  text-muted: "#76869d"
 typography:
   display:
     fontFamily: "'Barlow Condensed', sans-serif"
@@ -143,13 +143,13 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 - **Amber Wash** (rgba(245,158,11,.12)) e **Amber Glow** (rgba(245,158,11,.06)): sfondo di badge/chip attivi e voce di nav attiva.
 
 ### Secondary (stato e tipo risorsa)
-- **Alert Red** (#ef4444): errore, stop, pulsanti distruttivi, barra critica, pallino connessione KO.
+- **Alert Red** (#f05050): errore, stop, pulsanti distruttivi, barra critica, pallino connessione KO.
 - **OK Green** (#22c55e): in esecuzione, successo, barra sana, pallino connessione OK.
-- **Info Blue** (#3b82f6): badge VM prima/pausa e informazioni neutre.
+- **Info Blue** (#478af7): badge VM prima/pausa e informazioni neutre.
 
 ### Tertiary
 - **QEMU Cyan** (#06b6d4): badge delle VM QEMU.
-- **Container Purple** (#a855f7): badge LXC e template, azioni speciali.
+- **Container Purple** (#ad5ff7): badge LXC e template, azioni speciali.
 
 ### Neutral
 - **Deck Black** (#0a0b0d): sfondo pagina.
@@ -157,15 +157,17 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 - **Panel Raised** (#181c23): intestazioni tabella, input, blocchi interni.
 - **Panel High** (#1e2330): tracce di barre di avanzamento.
 - **Hairline** (#2a3040) e **Hairline Strong** (#3a4558): bordi di card/tabelle e bordi di controlli.
-- **Text Primary** (#e2e8f0), **Text Secondary** (#94a3b8), **Text Muted** (#64748b): testo, dati secondari, etichette.
+- **Text Primary** (#e2e8f0), **Text Secondary** (#94a3b8), **Text Muted** (#76869d): testo, dati secondari, etichette.
 
 ### Altri temi (stesse variabili, valori diversi)
-- **Light**: sfondo #f8fafc, pannelli #ffffff, testo #0f172a; ambra invariata.
+- **Light**: sfondo #f8fafc, pannelli #ffffff, testo #0f172a, testo muted #617087. Gli accenti sono scuriti per il testo (ambra #996206, verde #167f3d, rosso #d41212, blu #0b62f0, ciano #047a8f, viola #9530f5); il riempimento del bottone primario resta ambra #f59e0b con testo nero (`--amber-fill`).
 - **Eva 01**: sfondo #0d0617, pannelli #1a0f2e; `--amber` diventa verde lime #7cc443; testo #f0e6ff; `--blue` e `--cyan` virano al viola.
 - **Catppuccin Mocha**: sfondo #1e1e2e, pannelli #181825; `--amber` diventa pesca #fab387; testo #cdd6f4.
 - **Auto** (nessuna classe): segue `prefers-color-scheme`, light o dark.
 
 ### Named Rules
+**The 4.5 Floor Rule.** Ogni colore usato come testo raggiunge 4.5:1 su `--bg`, `--bg2` e `--bg3` in tutti e cinque i temi, compresi i badge sul loro velo. Un nuovo ruolo colore si verifica prima di entrare nel sistema.
+**The Fill Is Not Text Rule.** Dove un colore è sia riempimento sia testo (ambra), i due ruoli hanno variabili separate (`--amber` testo, `--amber-fill` riempimento): così il tema chiaro scurisce il testo senza spegnere il bottone.
 **The One Voice Rule.** L'ambra è l'unico accento di marca. Le altre tinte indicano stato o tipo di risorsa e non si usano come decorazione.
 **The Semantic Variable Rule.** Il codice usa `--amber`, `--green` ecc. come ruoli. Un tema cambia il valore, non il nome: non scrivere colori letterali nei componenti.
 
