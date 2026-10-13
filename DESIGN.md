@@ -196,7 +196,7 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 
 Shell a due colonne a tutta altezza (`100vh`, nessuno scroll sul body): sidebar fissa da 220px e area principale con topbar da 48px e contenuto scrollabile (padding 20px 22px). Griglie CSS a 2, 3 o 4 colonne con gap 14px; sotto 1200px le 4 colonne diventano 2, sotto 850px le 3 diventano 2, sotto 650px tutto a 1 colonna. La pagina batch riempie l'altezza residua.
 
-Ritmo compatto: gap 8-16px, padding celle 7px 11px, padding card 14px. La densità è intenzionale; non aumentare il padding per "respirare". Il target è desktop; il mobile è consultazione e non ha un layout dedicato oltre al collasso delle griglie.
+Ritmo compatto: gap 8-16px, padding celle 7px 11px, padding card 14px. La densità è intenzionale; non aumentare il padding per "respirare". Il target è desktop; il mobile è consultazione. Sotto 850px la sidebar diventa un menu a scomparsa e il Batch impila le colonne; sotto 650px le griglie vanno a una colonna. Con puntatore grosso (dito) i controlli salgono a 44px e i campi a 16px; con il mouse il minimo è 24px.
 
 ## Elevation & Depth
 
