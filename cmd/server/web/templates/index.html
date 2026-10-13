@@ -16,11 +16,11 @@
   --border:#2a3040;--border2:#3a4558;
   --amber:#f59e0b;--amber2:#fbbf24;
   --amber-dim:rgba(245,158,11,.12);--amber-glow:rgba(245,158,11,.06);
-  --red:#ef4444;--red-dim:rgba(239,68,68,.15);
+  --red:#f05050;--red-dim:rgba(239,68,68,.15);
   --green:#22c55e;--green-dim:rgba(34,197,94,.15);
-  --blue:#3b82f6;--blue-dim:rgba(59,130,246,.15);
-  --cyan:#06b6d4;--purple:#a855f7;
-  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --blue:#478af7;--blue-dim:rgba(59,130,246,.15);
+  --cyan:#06b6d4;--purple:#ad5ff7;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#76869d;
   --mono:'JetBrains Mono',monospace;--cond:'Barlow Condensed',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -37,12 +37,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13
 #cdot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
 .nav{flex:1;overflow-y:auto;padding:6px 0}
 .nav-sec{padding:11px 16px 3px;font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase}
-.ni{display:flex;align-items:center;gap:9px;padding:8px 16px;color:var(--text2);cursor:pointer;font-size:11.5px;font-weight:500;border-left:2px solid transparent;transition:all .13s;user-select:none}
+.ni{display:flex;align-items:center;gap:9px;width:100%;padding:8px 16px;color:var(--text2);cursor:pointer;font-family:inherit;text-align:left;font-size:11.5px;font-weight:500;background:transparent;border:0;border-left:2px solid transparent;transition:all .13s;user-select:none}
 .ni:hover{color:var(--text);background:rgba(255,255,255,.03)}
 .ni.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
 .ni svg{width:14px;height:14px;flex-shrink:0;opacity:.7}.ni.active svg{opacity:1}
 .sb-bottom{padding:10px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--text3)}
-.sb-bottom #ver{margin-top:2px;opacity:.7;font-variant-numeric:tabular-nums}
+.sb-bottom #ver{margin-top:2px;font-variant-numeric:tabular-nums}
 
 /* ── MAIN ── */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
@@ -102,7 +102,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018
 
 /* ── BUTTONS ── */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:3px;border:none;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .13s;text-transform:uppercase;white-space:nowrap}
-.ba{background:var(--amber);color:#000}.ba:hover{background:var(--amber2)}
+.ba{background:var(--amber-fill,var(--amber));color:#000}.ba:hover{background:var(--amber2-fill,var(--amber2))}
 .bg2{background:transparent;color:var(--text2);border:1px solid var(--border2)}.bg2:hover{border-color:var(--amber);color:var(--amber)}
 .bd{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}.bd:hover{background:rgba(239,68,68,.25)}
 .bsuc{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}.bsuc:hover{background:rgba(34,197,94,.25)}
@@ -123,13 +123,14 @@ tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018
 
 /* ── TABS ── */
 .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:14px}
-.tab{padding:7px 16px;cursor:pointer;font-size:11px;font-weight:500;color:var(--text3);border-bottom:2px solid transparent;transition:all .13s;text-transform:uppercase;letter-spacing:.05em}
+.tab{padding:7px 16px;cursor:pointer;font-family:inherit;background:transparent;border:0;font-size:11px;font-weight:500;color:var(--text3);border-bottom:2px solid transparent;transition:all .13s;text-transform:uppercase;letter-spacing:.05em}
 .tab:hover{color:var(--text2)}.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
 
 /* ── NODE CARD ── */
 .nd{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
 .nd-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
 .nd-name{font-family:var(--cond);font-size:18px;font-weight:700;letter-spacing:.05em}
+button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;text-align:left}
 .mg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mb2{background:var(--bg3);border-radius:3px;padding:9px 11px}
 .ml{font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
@@ -185,18 +186,37 @@ tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018
 @media(max-width:850px){.g3{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.g2,.g3,.g4{grid-template-columns:1fr}}
 
+/* ── FOCUS ── */
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.ni:focus-visible,.tab:focus-visible,th.s:focus-visible{outline-offset:-2px}
+.modal:focus-visible{outline:none}
+.inp:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+
+/* ── MOVIMENTO RIDOTTO ── mantiene lo stato (toast che compare, caricamento in corso) senza movimento */
+@media(prefers-reduced-motion:reduce){
+  .toast{animation:none}
+  .modal,.ov.open .modal{transform:none;transition:none}
+  .bf2{transition:none}
+  .spin{animation:none;width:auto;height:auto;border:0;border-radius:0}
+  .spin::before{content:'…';color:var(--amber);font-weight:700}
+}
+
 /* ── LIGHT THEME ── */
 html.light{
   --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;--bg4:#e2e8f0;
   --border:#e2e8f0;--border2:#cbd5e1;
-  --text:#0f172a;--text2:#334155;--text3:#64748b;
+  --text:#0f172a;--text2:#334155;--text3:#617087;
+  --amber:#996206;--green:#167f3d;--red:#d41212;--blue:#0b62f0;--cyan:#047a8f;--purple:#9530f5;
+  --amber-fill:#f59e0b;--amber2-fill:#fbbf24;
   --amber-dim:rgba(245,158,11,.15);--amber-glow:rgba(245,158,11,.08);
   --red-dim:rgba(239,68,68,.12);--green-dim:rgba(34,197,94,.12);--blue-dim:rgba(59,130,246,.12);
 }
 @media(prefers-color-scheme:light){html:not(.dark):not(.eva01):not(.catppuccino){
   --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;--bg4:#e2e8f0;
   --border:#e2e8f0;--border2:#cbd5e1;
-  --text:#0f172a;--text2:#334155;--text3:#64748b;
+  --text:#0f172a;--text2:#334155;--text3:#617087;
+  --amber:#996206;--green:#167f3d;--red:#d41212;--blue:#0b62f0;--cyan:#047a8f;--purple:#9530f5;
+  --amber-fill:#f59e0b;--amber2-fill:#fbbf24;
   --amber-dim:rgba(245,158,11,.15);--amber-glow:rgba(245,158,11,.08);
   --red-dim:rgba(239,68,68,.12);--green-dim:rgba(34,197,94,.12);--blue-dim:rgba(59,130,246,.12);
 }}
@@ -217,11 +237,11 @@ html.eva01{
   --border:#4a2d7a;--border2:#6b3fa8;
   --amber:#7cc443;--amber2:#95d45a;
   --amber-dim:rgba(124,196,67,.15);--amber-glow:rgba(124,196,67,.08);
-  --red:#ef4444;--red-dim:rgba(239,68,68,.15);
+  --red:#f15757;--red-dim:rgba(239,68,68,.15);
   --green:#4ade80;--green-dim:rgba(74,222,128,.15);
   --blue:#c084fc;--blue-dim:rgba(192,132,252,.15);
-  --cyan:#a855f7;--purple:#d946ef;
-  --text:#f0e6ff;--text2:#c4a0e0;--text3:#8b6ab3;
+  --cyan:#af64f8;--purple:#d946ef;
+  --text:#f0e6ff;--text2:#c4a0e0;--text3:#9779bb;
 }
 
 /* ── CATPPUCCIN MOCHA THEME ── */
@@ -234,7 +254,7 @@ html.catppuccino{
   --green:#a6e3a1;--green-dim:rgba(166,227,161,.15);
   --blue:#89b4fa;--blue-dim:rgba(137,180,250,.15);
   --cyan:#89dceb;--purple:#cba6f7;
-  --text:#cdd6f4;--text2:#a6adc8;--text3:#6c7086;
+  --text:#cdd6f4;--text2:#a6adc8;--text3:#979cb4;
 }
 
 /* ── BATCH NODE CHIPS ── */
@@ -250,38 +270,38 @@ html.catppuccino{
 <aside id="sidebar">
   <div class="logo"><div class="logo-t">PROXMOX</div><div class="logo-s">Cluster Manager</div></div>
   <div class="conn-bar"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
-  <nav class="nav">
+  <nav class="nav" aria-label="Navigazione principale">
     <div class="nav-sec">Overview</div>
-    <div class="ni active" data-page="dashboard">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard
-    </div>
+    <button type="button" class="ni active" data-page="dashboard" aria-current="page">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard
+    </button>
     <div class="nav-sec">Risorse</div>
-    <div class="ni" data-page="nodes">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>Nodi
-    </div>
-    <div class="ni" data-page="vms">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>VM & Container
-    </div>
+    <button type="button" class="ni" data-page="nodes">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>Nodi
+    </button>
+    <button type="button" class="ni" data-page="vms">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>VM & Container
+    </button>
     <div class="nav-sec">Operazioni</div>
-    <div class="ni" data-page="provision">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
-    </div>
-    <div class="ni" data-page="batch">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/><circle cx="17" cy="17" r="3"/><path d="m19.5 19.5 2 2"/></svg>Batch
-    </div>
-    <div class="ni" data-page="cluster">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Cluster
-    </div>
+    <button type="button" class="ni" data-page="provision">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
+    </button>
+    <button type="button" class="ni" data-page="batch">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/><circle cx="17" cy="17" r="3"/><path d="m19.5 19.5 2 2"/></svg>Batch
+    </button>
+    <button type="button" class="ni" data-page="cluster">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Cluster
+    </button>
     <div class="nav-sec">Analytics</div>
-    <div class="ni" data-page="reports">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
-    </div>
+    <button type="button" class="ni" data-page="reports">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
+    </button>
     <div class="nav-sec">Config</div>
-    <div class="ni" data-page="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
-    </div>
+    <button type="button" class="ni" data-page="settings">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
+    </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.34.0 · 2026-10-13</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.35.0 · 2026-10-13</div></div>
 </aside>
 
 <!-- MAIN -->
@@ -289,7 +309,7 @@ html.catppuccino{
   <div class="topbar">
     <div class="top-title" id="ptitle">DASHBOARD</div>
     <div class="top-badge" id="pbadge">OVERVIEW</div>
-    <select id="cluster-select" class="inp sm" onchange="ClusterMgr.switchTo(this.value)"
+    <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)"
       style="font-size:10px;padding:3px 8px;min-width:100px;display:none"></select>
     <button class="btn bg2 sm" onclick="App.refresh()">↻ Aggiorna</button>
   </div>
@@ -321,8 +341,8 @@ html.catppuccino{
     <!-- ██ NODES ██ -->
     <div class="page" id="page-nodes">
       <div class="flex g12 mb14 ac fw">
-        <select class="inp" id="nfsel" onchange="Nodes.filter()"><option value="">Tutti i nodi</option></select>
-        <select class="inp" id="ntfsel" onchange="Nodes.loadRRD()">
+        <select class="inp" id="nfsel" aria-label="Filtra per nodo" onchange="Nodes.filter()"><option value="">Tutti i nodi</option></select>
+        <select class="inp" id="ntfsel" aria-label="Periodo del grafico" onchange="Nodes.loadRRD()">
           <option value="hour">Ultima ora</option><option value="day">Ultimo giorno</option>
           <option value="week">Ultima settimana</option><option value="month">Ultimo mese</option>
         </select>
@@ -351,15 +371,15 @@ html.catppuccino{
 
     <!-- ██ VMs ██ -->
     <div class="page" id="page-vms">
-      <div class="tabs">
-        <div class="tab active" onclick="VMs.tab('all')">Tutte</div>
-        <div class="tab" onclick="VMs.tab('qemu')">QEMU/KVM</div>
-        <div class="tab" onclick="VMs.tab('lxc')">LXC</div>
+      <div class="tabs" role="tablist" aria-label="Tipo di risorsa">
+        <button type="button" class="tab active" role="tab" aria-selected="true" onclick="VMs.tab('all')">Tutte</button>
+        <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('qemu')">QEMU/KVM</button>
+        <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('lxc')">LXC</button>
       </div>
       <div class="flex g12 mb14 ac fw">
         <div>
           <div class="fl">Filtra per</div>
-          <input class="inp" type="text" id="vsearch" placeholder="Nome / VMID..." oninput="VMs.filter()" style="width:170px">
+          <input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome o VMID" placeholder="Nome / VMID..." oninput="VMs.filter()" style="width:170px">
         </div>
         <!-- MULTI NODE SELECTOR -->
         <div>
@@ -377,7 +397,7 @@ html.catppuccino{
         </div>
         <div>
           <div class="fl">Stato</div>
-          <select class="inp" id="vstatus" onchange="VMs.filter()">
+          <select class="inp" id="vstatus" aria-label="Filtra per stato" onchange="VMs.filter()">
             <option value="">Tutti</option><option value="running">Running</option>
             <option value="stopped">Stopped</option><option value="paused">Paused</option>
           </select>
@@ -386,7 +406,7 @@ html.catppuccino{
       </div>
       <div class="tw"><table>
         <thead><tr>
-          <th><input type="checkbox" id="vmca" onchange="VMs.checkAll(this)"></th>
+          <th><input type="checkbox" id="vmca" aria-label="Seleziona tutte le VM visibili" onchange="VMs.checkAll(this)"></th>
           <th class="s" onclick="VMs.sort('type')">Tipo</th>
           <th class="s" onclick="VMs.sort('vmid')">VMID</th>
           <th class="s" onclick="VMs.sort('name')">Nome</th>
@@ -410,7 +430,7 @@ html.catppuccino{
           <div class="sec">1. Template CloudInit</div>
           <div class="card mb14">
             <div class="fr">
-              <label class="fl">Template disponibili</label>
+              <label class="fl" for="tpl-select">Template disponibili</label>
               <div class="ldc" id="tpl-loading" style="padding:12px"><div class="spin"></div> Ricerca template...</div>
               <select class="inp w" id="tpl-select" style="display:none" onchange="Provision.onSelectTemplate()">
                 <option value="">— Seleziona template —</option>
@@ -423,37 +443,37 @@ html.catppuccino{
           <div class="card">
             <div class="g g2 g8 mb12">
               <div class="fr">
-                <label class="fl">Nome VM</label>
+                <label class="fl" for="pv-name">Nome VM</label>
                 <input class="inp w" id="pv-name" type="text" placeholder="mia-vm">
               </div>
               <div class="fr">
-                <label class="fl">VMID <span class="td">(0 = auto)</span></label>
+                <label class="fl" for="pv-vmid">VMID <span class="td">(0 = auto)</span></label>
                 <input class="inp w" id="pv-vmid" type="number" value="0" min="0">
               </div>
             </div>
             <div class="g g2 g8 mb12">
               <div class="fr">
-                <label class="fl">CPU (cores)</label>
+                <label class="fl" for="pv-cpu">CPU (cores)</label>
                 <input class="inp w" id="pv-cpu" type="number" value="2" min="1" max="128">
               </div>
               <div class="fr">
-                <label class="fl">RAM (GB)</label>
+                <label class="fl" for="pv-ram">RAM (GB)</label>
                 <input class="inp w" id="pv-ram" type="number" value="4" min="1" step="1">
               </div>
             </div>
             <div class="g g2 g8 mb12">
               <div class="fr">
-                <label class="fl">Disco destinazione (GB totali)</label>
+                <label class="fl" for="pv-disk">Disco destinazione (GB totali)</label>
                 <input class="inp w" id="pv-disk" type="number" placeholder="es: 50" min="1">
                 <div class="hint" id="pv-disk-hint">Verrà calcolato il delta rispetto al template</div>
               </div>
               <div class="fr">
-                <label class="fl">Disco device</label>
+                <label class="fl" for="pv-diskdev">Disco device</label>
                 <input class="inp w" id="pv-diskdev" type="text" value="scsi0">
               </div>
             </div>
             <div class="fr">
-              <label class="fl">Nodo target</label>
+              <label class="fl" for="pv-node">Nodo target</label>
               <select class="inp w" id="pv-node"><option value="">— stesso del template —</option></select>
             </div>
           </div>
@@ -465,30 +485,30 @@ html.catppuccino{
           <div class="card mb14">
             <div class="g g2 g8 mb12">
               <div class="fr">
-                <label class="fl">IP statico (CIDR obbligatorio)</label>
+                <label class="fl" for="pv-ip">IP statico (CIDR obbligatorio)</label>
                 <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24" oninput="Provision.calcGw()">
               </div>
               <div class="fr">
-                <label class="fl">Gateway</label>
+                <label class="fl" for="pv-gw">Gateway</label>
                 <input class="inp w" id="pv-gw" type="text" placeholder="192.168.1.1" value="">
               </div>
             </div>
             <div class="g g2 g8 mb12">
               <div class="fr">
-                <label class="fl">DNS</label>
+                <label class="fl" for="pv-dns">DNS</label>
                 <input class="inp w" id="pv-dns" type="text" placeholder="8.8.8.8" value="8.8.8.8">
               </div>
               <div class="fr">
-                <label class="fl">CI User</label>
+                <label class="fl" for="pv-user">CI User</label>
                 <input class="inp w" id="pv-user" type="text" placeholder="ubuntu">
               </div>
             </div>
             <div class="fr">
-              <label class="fl">CI Password <span class="td">(opzionale)</span></label>
+              <label class="fl" for="pv-pass">CI Password <span class="td">(opzionale)</span></label>
               <input class="inp w" id="pv-pass" type="password" placeholder="••••••">
             </div>
             <div class="fr">
-              <label class="fl">SSH Public Key <span class="td">(opzionale)</span></label>
+              <label class="fl" for="pv-ssh">SSH Public Key <span class="td">(opzionale)</span></label>
               <textarea class="inp w" id="pv-ssh" rows="3" placeholder="ssh-rsa AAAA..." style="resize:vertical"></textarea>
             </div>
           </div>
@@ -523,16 +543,16 @@ html.catppuccino{
         <div class="flex fc" style="flex:1;min-width:0;gap:8px">
           <div class="sec" style="margin-bottom:0">1. Selezione VM</div>
           <div class="flex g8 ac fw" style="flex-shrink:0">
-            <input class="inp" id="bsearch" type="text" placeholder="Cerca nome, IP, VMID…" style="flex:2;min-width:160px" oninput="Batch.filterBy()">
-            <select class="inp" id="btype" style="flex:1;min-width:100px"><option value="">Tutti i tipi</option><option value="qemu">QEMU</option><option value="lxc">LXC</option></select>
-            <select class="inp" id="bstatus" style="flex:1;min-width:130px"><option value="">Tutti gli stati</option><option value="running">Running</option><option value="stopped">Stopped</option></select>
+            <input class="inp" id="bsearch" aria-label="Cerca per nome, IP o VMID" type="text" placeholder="Cerca nome, IP, VMID…" style="flex:2;min-width:160px" oninput="Batch.filterBy()">
+            <select class="inp" id="btype" aria-label="Filtra per tipo" style="flex:1;min-width:100px"><option value="">Tutti i tipi</option><option value="qemu">QEMU</option><option value="lxc">LXC</option></select>
+            <select class="inp" id="bstatus" aria-label="Filtra per stato" style="flex:1;min-width:130px"><option value="">Tutti gli stati</option><option value="running">Running</option><option value="stopped">Stopped</option></select>
             <label class="flex ac" style="gap:5px;font-size:11px;color:var(--text2);cursor:pointer"><input type="checkbox" id="btpl" onchange="Batch.filterBy()" style="accent-color:var(--amber)">Mostra template</label>
             <button class="btn bg2 sm" onclick="Batch.selAll()">✓ Tutti</button>
             <button class="btn bg2 sm" onclick="Batch.selNone()">Deseleziona</button>
           </div>
           <div class="tw" style="flex:1;overflow-y:auto;min-height:0"><table>
             <thead><tr>
-              <th><input type="checkbox" id="bca" onchange="Batch.checkAll(this)"></th>
+              <th><input type="checkbox" id="bca" aria-label="Seleziona tutte le VM visibili" onchange="Batch.checkAll(this)"></th>
               <th class="s" onclick="BatchTbl.sort('type')">Tipo</th>
               <th class="s" onclick="BatchTbl.sort('vmid')">VMID</th>
               <th class="s" onclick="BatchTbl.sort('name')">Nome</th>
@@ -548,7 +568,7 @@ html.catppuccino{
           <div class="sec" style="margin-bottom:0">2. Operazione</div>
           <div class="card" style="flex-shrink:0">
             <div class="fr">
-              <label class="fl">Azione</label>
+              <label class="fl" for="baction">Azione</label>
               <select class="inp w" id="baction">
                 <optgroup label="Ciclo vita">
                   <option value="start">▶ Start</option>
@@ -586,7 +606,7 @@ html.catppuccino{
           <div class="sec">Operazione nodi selezionati</div>
           <div class="card mb14">
             <div class="fr">
-              <label class="fl">Comando</label>
+              <label class="fl" for="ccmd">Comando</label>
               <select class="inp w" id="ccmd">
                 <option value="reboot">↺ Riavvia nodo</option>
                 <option value="shutdown">◼ Spegni nodo</option>
@@ -610,7 +630,7 @@ html.catppuccino{
     <div class="page" id="page-reports">
       <div class="card mb14">
         <div class="flex g12 ac fw">
-          <div><label class="fl">Periodo</label>
+          <div><label class="fl" for="rtf">Periodo</label>
             <select class="inp" id="rtf">
               <option value="hour">Ultima ora</option>
               <option value="day" selected>Ultimo giorno</option>
@@ -618,12 +638,12 @@ html.catppuccino{
               <option value="month">Ultimo mese</option>
               <option value="year">Ultimo anno</option>
             </select></div>
-          <div><label class="fl">Tipo</label>
+          <div><label class="fl" for="rtype">Tipo</label>
             <select class="inp" id="rtype">
               <option value="all">Tutte</option><option value="qemu">QEMU</option>
               <option value="lxc">LXC</option>
             </select></div>
-          <div><label class="fl">Nodo</label><select class="inp" id="rnode"><option value="">Tutti</option></select></div>
+          <div><label class="fl" for="rnode">Nodo</label><select class="inp" id="rnode"><option value="">Tutti</option></select></div>
           <div style="margin-top:18px"><button class="btn ba" onclick="Reports.load()">Genera</button></div>
           <div style="margin-top:18px"><button class="btn bg2" onclick="Reports.xlsx()">⬇ Excel</button></div>
         </div>
@@ -666,7 +686,7 @@ html.catppuccino{
         <div class="card">
           <div class="sec">Aspetto</div>
           <div class="fr">
-            <label class="fl">Tema</label>
+            <label class="fl" for="ctheme">Tema</label>
             <select class="inp w" id="ctheme" onchange="Settings.applyTheme(this.value)">
               <option value="">Segui sistema operativo</option>
               <option value="dark">Scuro</option>
@@ -706,16 +726,16 @@ html.catppuccino{
   <div class="sec">1. Nuovo disco</div>
   <div class="g g2 g8 mb12">
     <div class="fr">
-      <label class="fl">Storage pool</label>
+      <label class="fl" for="disk-storage">Storage pool</label>
       <select class="inp w" id="disk-storage"><option value="">Caricamento...</option></select>
     </div>
     <div class="fr">
-      <label class="fl">Dimensione (GB)</label>
+      <label class="fl" for="disk-size">Dimensione (GB)</label>
       <input class="inp w" id="disk-size" type="number" value="50" min="1">
     </div>
   </div>
   <div class="fr">
-    <label class="fl">Bus</label>
+    <label class="fl" for="disk-bus">Bus</label>
     <select class="inp w" id="disk-bus">
       <option value="scsi" selected>SCSI (consigliato)</option>
       <option value="virtio">VirtIO</option>
@@ -728,7 +748,7 @@ html.catppuccino{
 
   <div class="sec">2. Configura disco (partiziona, formatta, monta)</div>
   <div class="fr">
-    <label class="fl">Disco da configurare</label>
+    <label class="fl" for="disk-slot">Disco da configurare</label>
     <div class="flex g8">
       <select class="inp w" id="disk-slot"></select>
       <button class="btn bg2 sm" onclick="DiskMgr.refreshSlots()">↻</button>
@@ -736,7 +756,7 @@ html.catppuccino{
   </div>
   <div class="g g2 g8 mb12">
     <div class="fr">
-      <label class="fl">Mount point</label>
+      <label class="fl" for="disk-mount">Mount point</label>
       <input class="inp w" id="disk-mount" type="text" value="/data">
     </div>
     <div class="fr">
@@ -769,9 +789,9 @@ html.catppuccino{
 <div class="ov" id="madduser"><div class="modal" style="min-width:420px">
   <div class="mt">Aggiungi utente VM</div>
   <div id="madduserB">
-    <div class="fr"><label class="fl">Nome utente</label><input class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
+    <div class="fr"><label class="fl" for="adduser-name">Nome utente</label><input class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
     <div class="hint" id="adduser-pwhint">Password iniziale: <code>p4ssw0rd</code> — scadrà al primo accesso.</div>
-    <div class="fr" style="align-items:flex-start;margin-top:10px"><label class="fl" style="padding-top:4px">Chiave pubblica SSH (opzionale)</label><textarea class="inp w" id="adduser-sshkey" rows="3" oninput="document.getElementById('adduser-pwhint').hidden=this.value.trim()!==''" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="ssh-ed25519 AAAA... (opzionale)"></textarea></div>
+    <div class="fr" style="align-items:flex-start;margin-top:10px"><label class="fl" style="padding-top:4px" for="adduser-sshkey">Chiave pubblica SSH (opzionale)</label><textarea class="inp w" id="adduser-sshkey" rows="3" oninput="document.getElementById('adduser-pwhint').hidden=this.value.trim()!==''" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="ssh-ed25519 AAAA... (opzionale)"></textarea></div>
   </div>
   <div id="adduser-out" style="display:none;margin-top:12px" class="plog"></div>
   <div class="mf">
@@ -831,8 +851,32 @@ function toast(msg,type='info'){
   document.getElementById('toasts').appendChild(d);
   setTimeout(()=>d.remove(),type==='err'?8000:4500);
 }
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+// Modal accessibili: role=dialog (impostato in A11y.init), sfondo e modal sottostanti `inert`,
+// Esc chiude il modal in cima, il focus torna all'elemento che lo ha aperto.
+const FOCUSABLE='button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+const _modalStack=[];
+function _syncModals(){
+  const top=_modalStack.length?_modalStack[_modalStack.length-1].id:null;
+  document.querySelectorAll('.ov').forEach(o=>{o.inert=(o.id!==top);});
+  for(const id of ['sidebar','main']){const el=document.getElementById(id);if(el)el.inert=_modalStack.length>0;}
+}
+function openModal(id){
+  const el=document.getElementById(id); if(!el)return;
+  const i=_modalStack.findIndex(m=>m.id===id); if(i>=0)_modalStack.splice(i,1);
+  _modalStack.push({id,opener:document.activeElement});
+  el.classList.add('open'); _syncModals();
+  // focus iniziale sul primo controllo, a meno che il chiamante non lo sposti subito dopo
+  setTimeout(()=>{
+    if(el.contains(document.activeElement)&&document.activeElement!==el)return;
+    (el.querySelector(FOCUSABLE)||el.querySelector('.modal'))?.focus();
+  },0);
+}
+function closeModal(id){
+  const el=document.getElementById(id); if(el)el.classList.remove('open');
+  const i=_modalStack.findIndex(m=>m.id===id); if(i<0)return;
+  const [m]=_modalStack.splice(i,1); _syncModals();
+  if(m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
+}
 
 // Riga di errore con "Riprova" per tabelle che non hanno caricato. retry = codice JS statico.
 function errRow(colspan,msg,retry){
@@ -889,6 +933,35 @@ const VM_ACTIONS={
   stop:    {label:'Stop forzato', level:'danger', cons:'Spegnimento immediato, come togliere la corrente: i dati non salvati nel guest vanno persi.'},
   reset:   {label:'Reset',        level:'danger', cons:'Riavvio hardware immediato: i dati non salvati nel guest vanno persi.'},
 };
+// Tastiera: Esc chiude il modal in cima (o il selettore nodi); Invio/Spazio attivano intestazioni
+// ordinabili e elementi role=button; frecce spostano tra le tab.
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if(_modalStack.length){e.preventDefault();closeModal(_modalStack[_modalStack.length-1].id);return;}
+    const pk=document.getElementById('vm-node-picker');
+    if(pk&&pk.style.display!=='none'){pk.style.display='none';document.getElementById('vm-node-btn')?.focus();}
+    return;
+  }
+  const t=e.target;
+  if((e.key==='Enter'||e.key===' ')&&t.matches?.('th.s,[role=button][tabindex]')&&t===e.target){e.preventDefault();t.click();return;}
+  if(t.matches?.('[role=tab]')&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){
+    const tabs=[...t.closest('[role=tablist]').querySelectorAll('[role=tab]')];
+    let i=tabs.indexOf(t);
+    i=e.key==='Home'?0:e.key==='End'?tabs.length-1:(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+    e.preventDefault(); tabs[i].focus(); tabs[i].click();
+  }
+});
+const A11y={
+  init(){
+    document.querySelectorAll('.ov>.modal').forEach(m=>{
+      m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true'); m.tabIndex=-1;
+      const t=m.querySelector('.mt');
+      if(t){if(!t.id)t.id=m.parentElement.id+'-title'; m.setAttribute('aria-labelledby',t.id);}
+    });
+    document.querySelectorAll('th.s').forEach(th=>{th.tabIndex=0;th.setAttribute('aria-sort','none');});
+    _syncModals(); // modal chiusi: inert, fuori dall'ordine di tabulazione
+  }
+};
 // Click outside picker to close
 document.addEventListener('click',e=>{
   if(!e.target.closest('#vm-node-sel-wrap')) document.getElementById('vm-node-picker').style.display='none';
@@ -912,7 +985,7 @@ function logLine(el,text,cls=''){
 // Charts
 const _ch={};
 function mkChart(id,cfg){if(_ch[id])_ch[id].destroy();const c=document.getElementById(id);if(!c)return;_ch[id]=new Chart(c,cfg);return _ch[id];}
-const CD={responsive:true,animation:{duration:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'JetBrains Mono',size:10}}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9}},beginAtZero:true}}};
+const CD={responsive:true,animation:{duration:window.matchMedia('(prefers-reduced-motion:reduce)').matches?0:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'JetBrains Mono',size:10}}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9}},beginAtZero:true}}};
 const COLS=['#f59e0b','#22c55e','#3b82f6','#06b6d4','#a855f7','#ef4444','#f97316','#84cc16'];
 
 // Sortable table helper
@@ -923,9 +996,9 @@ function mkSorter(tbodyId, headId){
       if(k===key) asc=!asc; else {key=k;asc=true;}
       // update header classes
       document.querySelectorAll(`#${headId} th.s`).forEach(th=>{
-        th.classList.remove('asc','desc');
+        th.classList.remove('asc','desc'); th.setAttribute('aria-sort','none');
         if(th.getAttribute('onclick')&&th.getAttribute('onclick').includes(`'${k}'`)){
-          th.classList.add(asc?'asc':'desc');
+          th.classList.add(asc?'asc':'desc'); th.setAttribute('aria-sort',asc?'ascending':'descending');
         }
       });
       return [...data].sort((a,b)=>{
@@ -995,16 +1068,16 @@ const ClusterMgr={
   _form(idx){
     const c=idx>=0?this.clusters[idx]:null;
     return`<div style="border:1px solid var(--amber-dim);border-radius:4px;padding:12px;margin-bottom:10px">
-      <div class="fr" style="margin-bottom:8px"><label class="fl">Label</label><input class="inp w" id="cf-label" type="text" value="${esc(c?c.label:'')}" placeholder="Prod"></div>
-      <div class="fr" style="margin-bottom:8px"><label class="fl">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${esc(c?c.url:'')}" placeholder="https://10.0.0.1:8006"></div>
-      <div class="fr" style="margin-bottom:8px"><label class="fl">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${esc(c?c.api_token_hint:'root@pam!id=...')}"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-label">Label</label><input class="inp w" id="cf-label" type="text" value="${esc(c?c.label:'')}" placeholder="Prod"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-url">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${esc(c?c.url:'')}" placeholder="https://10.0.0.1:8006"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-token">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${esc(c?c.api_token_hint:'root@pam!id=...')}"></div>
       <div style="margin:10px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
         <div class="fl" style="color:var(--text2);letter-spacing:.1em;margin-bottom:4px">CONSOLE SERIALE <span class="td" style="font-size:9px;font-weight:400">— opzionale</span></div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Richiesto per la funzione Console. Proxmox non accetta API token per WebSocket.${c&&c.has_console_credentials?' <span style="color:var(--green)">✓ Credenziali configurate</span>':''} ${idx>=0?' Lascia vuoti per mantenere, svuota username per rimuovere.':''}</div>
       </div>
-      <div class="fr" style="margin-bottom:8px"><label class="fl">Username <span class="td" style="font-size:9px">(es. root@pam)</span></label><input class="inp w" id="cf-user" type="text" placeholder="root@pam"></div>
-      <div class="fr" style="margin-bottom:10px"><label class="fl">Password${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-pwd" type="password" placeholder="••••••••"></div>
-      <div class="fr" style="margin-bottom:10px"><label class="fl">Default</label><input type="checkbox" id="cf-default" ${c&&c.default?'checked':''}></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-user">Username <span class="td" style="font-size:9px">(es. root@pam)</span></label><input class="inp w" id="cf-user" type="text" placeholder="root@pam"></div>
+      <div class="fr" style="margin-bottom:10px"><label class="fl" for="cf-pwd">Password${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-pwd" type="password" placeholder="••••••••"></div>
+      <div class="fr" style="margin-bottom:10px"><label class="fl" for="cf-default">Default</label><input type="checkbox" id="cf-default" ${c&&c.default?'checked':''}></div>
       <div style="display:flex;gap:6px">
         <button class="btn ba sm" onclick="ClusterMgr.saveForm(${idx})">Salva</button>
         <button class="btn bg2 sm" onclick="ClusterMgr.hideForm()">Annulla</button>
@@ -1091,7 +1164,7 @@ const App={
     ClusterMgr.load().then(()=>{Settings.load();App.nav('dashboard');App.checkConn();setInterval(App.checkConn,30000);});
   },
   nav(p){
-    document.querySelectorAll('.ni').forEach(el=>el.classList.toggle('active',el.dataset.page===p));
+    document.querySelectorAll('.ni').forEach(el=>{const on=el.dataset.page===p;el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+p));
     const[t,b]=PMETA[p]||[p.toUpperCase(),''];
     document.getElementById('ptitle').textContent=t; document.getElementById('pbadge').textContent=b;
@@ -1262,7 +1335,7 @@ const Nodes={
     if(!nodes.length){g.innerHTML='<div class="td">Nessun nodo</div>';return;}
     g.innerHTML=nodes.map(n=>{
       const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem),d=pct(n.disk,n.maxdisk);
-      return`<div class="nd" style="cursor:pointer" onclick="Nodes.selNode(${js(n.node)})">
+      return`<div class="nd" style="cursor:pointer" role="button" tabindex="0" aria-label="Dettagli nodo ${esc(n.node)}" onclick="Nodes.selNode(${js(n.node)})">
         <div class="nd-hdr">
           <div class="nd-name">${esc(n.node)}</div>
           <span class="badge ${n.status==='online'?'bo':'bf'}">${esc(n.status)}</span>
@@ -1348,7 +1421,7 @@ const VMs=(()=>{
         :bar(pct(v.disk,v.maxdisk));
       const n=js(v.node), id=js(v.vmid), t=js(v.type);
       return `<tr>
-      <td><input type="checkbox" class="vc" value="${esc(`${v.type}:${v.node}:${v.vmid}`)}"></td>
+      <td><input type="checkbox" class="vc" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(`${v.type}:${v.node}:${v.vmid}`)}"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
       <td class="tn" style="cursor:pointer" onclick="VMs.detail(${n},${id},${t})">${esc(v.name||'—')}</td>
       <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td>${sbadge(v.status)}</td>
@@ -1420,7 +1493,7 @@ const VMs=(()=>{
     },
     nodeAll(){allNodes().forEach(n=>selectedNodes.add(n));renderNodePicker();doFilter();},
     nodeNone(){selectedNodes.clear();renderNodePicker();doFilter();},
-    tab(t){currentTab=t;document.querySelectorAll('#page-vms .tab').forEach((el,i)=>el.classList.toggle('active',['all','qemu','lxc'][i]===t));doFilter();},
+    tab(t){currentTab=t;document.querySelectorAll('#page-vms .tab').forEach((el,i)=>{const on=['all','qemu','lxc'][i]===t;el.classList.toggle('active',on);el.setAttribute('aria-selected',on);el.tabIndex=on?0:-1;});doFilter();},
     filter(){doFilter();},
     sort(k){const d=S.sort(sortedData,k);sortedData=d;renderRows(d);},
     checkAll(cb){document.querySelectorAll('.vc').forEach(c=>c.checked=cb.checked);},
@@ -1895,7 +1968,7 @@ const Batch=(()=>{
     nodeNone(){selNodes.clear();renderNodeChips(allNodeList());doFilter();},
     renderRows(data){
       document.getElementById('btbody').innerHTML=data.map(v=>`<tr>
-        <td><input type="checkbox" class="bc" value="${esc(keyOf(v))}"
+        <td><input type="checkbox" class="bc" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}"
           ${sel.has(keyOf(v))?'checked':''}
           onchange="Batch.onCheck(this)"></td>
         <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
@@ -1979,9 +2052,9 @@ const Cluster={
       const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem);
       return`<div class="nd mb8" style="cursor:pointer" onclick="Cluster.selDetail(${js(n.node)})">
         <div class="flex ac g12 mb8">
-          <input type="checkbox" ${Cluster.sel.has(n.node)?'checked':''}
+          <input type="checkbox" aria-label="Seleziona nodo ${esc(n.node)}" ${Cluster.sel.has(n.node)?'checked':''}
             onchange="Cluster.onCheck(event,${js(n.node)})" onclick="event.stopPropagation()" style="accent-color:var(--amber);width:14px;height:14px">
-          <div class="nd-name" style="font-size:30px">${esc(n.node)}</div>
+          <button type="button" class="nd-name" style="font-size:30px" aria-label="Dettagli nodo ${esc(n.node)}">${esc(n.node)}</button>
           <span class="badge ${n.status==='online'?'bo':'bf'}">${esc(n.status)}</span>
           <div style="flex:1"></div>
           <div style="font-size:9px;color:var(--text3)">CPU: <b>${c}%</b> · RAM: <b>${m}%</b></div>
@@ -2151,10 +2224,9 @@ function applyTheme(t){
   const h=document.documentElement;
   h.classList.remove('dark','light','eva01','catppuccino');
   if(t) h.classList.add(t);
-  const isLight=t==='light'||(t===''&&window.matchMedia('(prefers-color-scheme:light)').matches);
-  const grid=isLight?'#e2e8f0':t==='eva01'?'#4a2d7a':t==='catppuccino'?'#45475a':'#2a3040';
-  const tick=isLight?'#94a3b8':t==='eva01'?'#8b6ab3':t==='catppuccino'?'#6c7086':'#64748b';
-  const leg=isLight?'#334155':t==='eva01'?'#c4a0e0':t==='catppuccino'?'#a6adc8':'#94a3b8';
+  // Colori degli assi dai token del tema attivo (--border, --text3, --text2): niente copie hard-coded
+  const cs=getComputedStyle(h), tok=n=>cs.getPropertyValue(n).trim();
+  const grid=tok('--border'), tick=tok('--text3'), leg=tok('--text2');
   CD.plugins.legend.labels.color=leg;
   CD.scales.x.grid.color=grid; CD.scales.x.ticks.color=tick;
   CD.scales.y.grid.color=grid; CD.scales.y.ticks.color=tick;
@@ -2351,6 +2423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ConsolePage.init();
         return;
     }
+    A11y.init();
     App.init();
     Reports.init();
 });
