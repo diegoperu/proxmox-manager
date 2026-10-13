@@ -107,6 +107,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018
 .bd{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}.bd:hover{background:rgba(239,68,68,.25)}
 .bsuc{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}.bsuc:hover{background:rgba(34,197,94,.25)}
 .bpurp{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}.bpurp:hover{background:rgba(168,85,247,.2)}
+.bx{background:var(--red);color:#000;border:1px solid var(--red)}.bx:hover{filter:brightness(1.12)}
 .sm{padding:3px 9px;font-size:10px}.btn:disabled{opacity:.35;cursor:not-allowed}
 
 /* ── INPUT ── */
@@ -153,11 +154,20 @@ tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018
 /* ── TOAST ── */
 #toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:7px;z-index:2000}
 .toast{background:var(--bg3);border:1px solid var(--border2);padding:9px 14px;border-radius:4px;font-size:11px;max-width:340px;animation:si .18s ease;display:flex;align-items:center;gap:7px}
+.toast{cursor:pointer}
 .toast.ok{border-left:3px solid var(--green)}.toast.err{border-left:3px solid var(--red)}.toast.info{border-left:3px solid var(--amber)}
 @keyframes si{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
 
 /* ── PROVISION LOG ── */
 .plog{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:11px;font-size:11px;font-family:var(--mono);color:var(--text2);min-height:80px;max-height:260px;overflow-y:auto;line-height:1.8}
+
+/* ── CONFIRM ── */
+.cf-line{margin-bottom:6px}
+.cf-cons{color:var(--text);margin:8px 0 10px}
+.cf-list{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 10px;max-height:180px;overflow-y:auto;font-size:11px;line-height:1.7;list-style:none}
+.cf-type{margin-top:12px}
+.errrow{padding:16px;text-align:center;color:var(--red)}
+.errrow .btn{margin-left:10px}
 
 /* ── UTIL ── */
 .flex{display:flex}.fc{flex-direction:column}.fw{flex-wrap:wrap}
@@ -271,7 +281,7 @@ html.catppuccino{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </div>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.32.0 · 2026-09-07</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.33.0 · 2026-10-13</div></div>
 </aside>
 
 <!-- MAIN -->
@@ -516,6 +526,7 @@ html.catppuccino{
             <input class="inp" id="bsearch" type="text" placeholder="Cerca nome, IP, VMID…" style="flex:2;min-width:160px" oninput="Batch.filterBy()">
             <select class="inp" id="btype" style="flex:1;min-width:100px"><option value="">Tutti i tipi</option><option value="qemu">QEMU</option><option value="lxc">LXC</option></select>
             <select class="inp" id="bstatus" style="flex:1;min-width:130px"><option value="">Tutti gli stati</option><option value="running">Running</option><option value="stopped">Stopped</option></select>
+            <label class="flex ac" style="gap:5px;font-size:11px;color:var(--text2);cursor:pointer"><input type="checkbox" id="btpl" onchange="Batch.filterBy()" style="accent-color:var(--amber)">Mostra template</label>
             <button class="btn bg2 sm" onclick="Batch.selAll()">✓ Tutti</button>
             <button class="btn bg2 sm" onclick="Batch.selNone()">Deseleziona</button>
           </div>
@@ -551,7 +562,7 @@ html.catppuccino{
               </select>
             </div>
             <div id="binfo" class="td mb12" style="font-size:11px">Nessuna VM selezionata</div>
-            <button class="btn ba wf" onclick="Batch.run()">Esegui operazione batch</button>
+            <button class="btn ba wf" id="brun" onclick="Batch.run()">Esegui operazione batch</button>
           </div>
           <div class="sec" style="margin-bottom:0">Log</div>
           <div class="plog" id="blog" style="flex:1;min-height:80px;max-height:none"><span class="td">In attesa...</span></div>
@@ -582,7 +593,7 @@ html.catppuccino{
               </select>
             </div>
             <div id="csinfo" class="td mb12" style="font-size:11px">Nessun nodo selezionato</div>
-            <button class="btn bd wf" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
+            <button class="btn bd wf" id="crun" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
           </div>
           <div class="sec">Dettaglio nodo</div>
           <div id="cdetail" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:14px;min-height:100px">
@@ -711,7 +722,7 @@ html.catppuccino{
       <option value="sata">SATA</option>
     </select>
   </div>
-  <button class="btn ba mb16" onclick="DiskMgr.addDisk()">+ Aggiungi disco</button>
+  <button class="btn ba mb16" id="disk-add-btn" onclick="DiskMgr.addDisk()">+ Aggiungi disco</button>
 
   <div class="sep"></div>
 
@@ -736,8 +747,8 @@ html.catppuccino{
       </div>
     </div>
   </div>
-  <button class="btn bpurp wf mb12" onclick="DiskMgr.setupDisk()">⚙ Configura disco</button>
-  <div class="hint mb12">Può richiedere fino a 2 minuti se è necessario un riavvio della VM per rilevare il disco.</div>
+  <button class="btn bpurp wf mb12" id="disk-setup-btn" onclick="DiskMgr.setupDisk()">⚙ Configura disco</button>
+  <div class="hint mb12">Partiziona e formatta il disco scelto (i dati presenti vengono cancellati). Se il disco non viene rilevato, la VM viene spenta e riaccesa: fino a 2 minuti.</div>
 
   <div class="sec">Log</div>
   <div class="plog" id="disk-log"><span class="td">In attesa...</span></div>
@@ -747,9 +758,9 @@ html.catppuccino{
 
 <div class="ov" id="mconf"><div class="modal">
   <div class="mt" id="mconfT">Conferma</div>
-  <div id="mconfB" style="color:var(--text2);font-size:13px;line-height:1.6;white-space:pre-wrap"></div>
+  <div id="mconfB" style="color:var(--text2);font-size:13px;line-height:1.6"></div>
   <div class="mf">
-    <button class="btn bg2" onclick="closeModal('mconf')">Annulla</button>
+    <button class="btn bg2" id="mconfCancel" onclick="closeModal('mconf')">Annulla</button>
     <button class="btn bd" id="mconfOk">Conferma</button>
   </div>
 </div></div>
@@ -759,8 +770,8 @@ html.catppuccino{
   <div class="mt">Aggiungi utente VM</div>
   <div id="madduserB">
     <div class="fr"><label class="fl">Nome utente</label><input class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
-    <div class="hint">Password iniziale: <code>p4ssw0rd</code> — scadrà al primo accesso.</div>
-    <div class="fr" style="align-items:flex-start;margin-top:10px"><label class="fl" style="padding-top:4px">Chiave pubblica SSH (opzionale)</label><textarea class="inp w" id="adduser-sshkey" rows="3" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="ssh-ed25519 AAAA... (opzionale)"></textarea></div>
+    <div class="hint" id="adduser-pwhint">Password iniziale: <code>p4ssw0rd</code> — scadrà al primo accesso.</div>
+    <div class="fr" style="align-items:flex-start;margin-top:10px"><label class="fl" style="padding-top:4px">Chiave pubblica SSH (opzionale)</label><textarea class="inp w" id="adduser-sshkey" rows="3" oninput="document.getElementById('adduser-pwhint').hidden=this.value.trim()!==''" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="ssh-ed25519 AAAA... (opzionale)"></textarea></div>
   </div>
   <div id="adduser-out" style="display:none;margin-top:12px" class="plog"></div>
   <div class="mf">
@@ -769,7 +780,7 @@ html.catppuccino{
   </div>
 </div></div>
 
-<div id="toasts"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
 
 <script>
 const _IS_CONSOLE = window.location.pathname === '/console';
@@ -785,25 +796,99 @@ async function api(path, opts={}) {
     const cidx=(typeof ClusterMgr!=='undefined')?(ClusterMgr.current??0):0;
     fullPath+=sep+'cluster='+cidx;
   }
-  const r = await fetch(fullPath, {headers:{'Content-Type':'application/json'}, ...opts});
+  // quiet: il chiamante gestisce l'errore in pagina, niente toast
+  const {quiet=false,...fetchOpts}=opts;
+  let r;
+  try{
+    r = await fetch(fullPath, {headers:{'Content-Type':'application/json'}, ...fetchOpts});
+  }catch(netErr){
+    const e=new Error('Proxy non raggiungibile');
+    if(!quiet) toast(e.message,'err');
+    throw e;
+  }
   const d = await r.json().catch(()=>({}));
-  if(!r.ok) { toast(d.error||r.statusText,'err'); const e=new Error(d.error||r.statusText); e.body=d; throw e; }
+  if(!r.ok) { const e=new Error(d.error||r.statusText||`HTTP ${r.status}`); e.body=d; e.status=r.status; if(!quiet) toast(e.message,'err'); throw e; }
   return d;
 }
+
+// Escaping per innerHTML: ogni dato esterno (API, config, input) passa da qui.
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Argomento JS dentro un attributo onclick="...": JSON per il contesto JS, poi escape per l'attributo.
+function js(v){return esc(JSON.stringify(v??null));}
+
+// Toast: testo sempre via textContent; messaggi identici ravvicinati non si ripetono.
+const _toastSeen=new Map();
 function toast(msg,type='info'){
-  const d=document.createElement('div'); d.className=`toast ${type}`;
-  d.innerHTML=`<span>${type==='ok'?'✓':type==='err'?'✗':'ℹ'}</span><span>${msg}</span>`;
-  document.getElementById('toasts').appendChild(d); setTimeout(()=>d.remove(),4500);
+  const text=String(msg??'');
+  const key=type+'|'+text, now=Date.now();
+  if(now-(_toastSeen.get(key)||0)<5000) return;
+  _toastSeen.set(key,now);
+  const d=document.createElement('div'); d.className=`toast ${type}`; d.title='Clic per chiudere';
+  const icon=document.createElement('span'); icon.textContent=type==='ok'?'✓':type==='err'?'✗':'ℹ';
+  const body=document.createElement('span'); body.textContent=text;
+  d.append(icon,body);
+  d.addEventListener('click',()=>d.remove());
+  document.getElementById('toasts').appendChild(d);
+  setTimeout(()=>d.remove(),type==='err'?8000:4500);
 }
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-function confirm(title,body,onOk){
-  document.getElementById('mconfT').textContent=title;
-  document.getElementById('mconfB').textContent=body;
-  const btn=document.getElementById('mconfOk');
-  btn.onclick=()=>{closeModal('mconf');onOk();};
-  openModal('mconf');
+
+// Riga di errore con "Riprova" per tabelle che non hanno caricato. retry = codice JS statico.
+function errRow(colspan,msg,retry){
+  return `<tr><td colspan="${colspan}" class="errrow">✗ Caricamento non riuscito: ${esc(msg)}<button class="btn bg2 sm" onclick="${retry}">Riprova</button></td></tr>`;
 }
+function errBox(msg,retry){
+  return `<div class="errrow">✗ Caricamento non riuscito: ${esc(msg)}<button class="btn bg2 sm" onclick="${retry}">Riprova</button></div>`;
+}
+
+// Conferma a livelli.
+//  level 'safe'   → bottone ambra (azione non distruttiva)
+//  level 'warn'   → bottone rosso tenue (interrompe servizi, recuperabile)
+//  level 'danger' → bottone rosso pieno (perdita dati o fermo prolungato)
+//  typed          → testo da digitare per abilitare il bottone (solo azioni più gravi)
+//  Tutto il contenuto è inserito via textContent.
+function askConfirm({title,lines=[],consequence='',items=[],level='warn',typed=null,okLabel='Conferma'},onOk){
+  document.getElementById('mconfT').textContent=title;
+  const box=document.getElementById('mconfB'); box.replaceChildren();
+  for(const l of lines){const p=document.createElement('div');p.className='cf-line';p.textContent=l;box.append(p);}
+  if(consequence){const p=document.createElement('div');p.className='cf-cons';p.textContent=consequence;box.append(p);}
+  if(items.length){
+    const MAX=10, ul=document.createElement('ul'); ul.className='cf-list';
+    for(const it of items.slice(0,MAX)){const li=document.createElement('li');li.textContent=it;ul.append(li);}
+    if(items.length>MAX){const li=document.createElement('li');li.className='td';li.textContent=`+ altre ${items.length-MAX}`;ul.append(li);}
+    box.append(ul);
+  }
+  const btn=document.getElementById('mconfOk');
+  btn.className='btn '+(level==='safe'?'ba':level==='danger'?'bx':'bd');
+  btn.textContent=okLabel;
+  let inp=null;
+  if(typed!=null){
+    const wrap=document.createElement('div'); wrap.className='cf-type';
+    const lab=document.createElement('label'); lab.className='fl'; lab.htmlFor='mconfType';
+    lab.textContent=`Per confermare digita: ${typed}`;
+    inp=document.createElement('input'); inp.className='inp w'; inp.id='mconfType'; inp.autocomplete='off'; inp.spellcheck=false;
+    wrap.append(lab,inp); box.append(wrap);
+    btn.disabled=true;
+    inp.addEventListener('input',()=>{btn.disabled=inp.value.trim()!==String(typed);});
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!btn.disabled)btn.click();});
+  }else btn.disabled=false;
+  btn.onclick=()=>{if(btn.disabled)return;closeModal('mconf');onOk();};
+  openModal('mconf');
+  // focus su campo da digitare, altrimenti su Annulla per le azioni non sicure
+  setTimeout(()=>{(inp||(level==='safe'?btn:document.getElementById('mconfCancel'))).focus();},120);
+}
+
+// Azioni ciclo di vita VM/LXC: etichetta, livello e conseguenza mostrata nella conferma.
+const VM_ACTIONS={
+  start:   {label:'Start',        level:'safe',   cons:'La VM viene avviata.'},
+  resume:  {label:'Resume',       level:'safe',   cons:'La VM sospesa riprende l\'esecuzione.'},
+  suspend: {label:'Suspend',      level:'warn',   cons:'La VM viene sospesa: i servizi non rispondono finché non viene ripresa.'},
+  shutdown:{label:'Shutdown',     level:'warn',   cons:'Spegnimento ordinato del sistema operativo guest.'},
+  reboot:  {label:'Reboot',       level:'warn',   cons:'Riavvio ordinato del sistema operativo guest.'},
+  stop:    {label:'Stop forzato', level:'danger', cons:'Spegnimento immediato, come togliere la corrente: i dati non salvati nel guest vanno persi.'},
+  reset:   {label:'Reset',        level:'danger', cons:'Riavvio hardware immediato: i dati non salvati nel guest vanno persi.'},
+};
 // Click outside picker to close
 document.addEventListener('click',e=>{
   if(!e.target.closest('#vm-node-sel-wrap')) document.getElementById('vm-node-picker').style.display='none';
@@ -813,9 +898,16 @@ document.addEventListener('click',e=>{
 function fmtB(b){if(!b)return'0 B';const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return b.toFixed(1)+' '+u[i];}
 function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
 function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:9px;color:var(--text3);margin-top:1px">${p}%</div>`;}
-function sbadge(s){const m={running:'br',stopped:'bs',paused:'bp'};return `<span class="badge ${m[s]||'bs'}">${s||'?'}</span>`;}
-function tbadge(t){if(t==='qemu')return`<span class="badge bq">QEMU</span>`;if(t==='lxc')return`<span class="badge bl">LXC</span>`;if(t==='node')return`<span class="badge bn">NODE</span>`;if(t==='tmpl')return`<span class="badge bt">TPL</span>`;return`<span class="badge">${t}</span>`;}
-function nodeCell(v){const b=ClusterMgr?.clusters?.length>1&&v.cluster_label?`<span class="badge bn" style="font-size:8px;margin-right:4px">${v.cluster_label}</span>`:'';return`${b}<span class="td">${v.node}</span>`;}
+function sbadge(s){const m={running:'br',stopped:'bs',paused:'bp'};return `<span class="badge ${m[s]||'bs'}">${esc(s||'?')}</span>`;}
+function tbadge(t){if(t==='qemu')return`<span class="badge bq">QEMU</span>`;if(t==='lxc')return`<span class="badge bl">LXC</span>`;if(t==='node')return`<span class="badge bn">NODE</span>`;if(t==='tmpl')return`<span class="badge bt">TPL</span>`;return`<span class="badge">${esc(t)}</span>`;}
+function nodeCell(v){const b=ClusterMgr?.clusters?.length>1&&v.cluster_label?`<span class="badge bn" style="font-size:8px;margin-right:4px">${esc(v.cluster_label)}</span>`:'';return`${b}<span class="td">${esc(v.node)}</span>`;}
+// Stesso criterio di GetTemplates lato backend: flag template=1 o nome che contiene "template".
+function isTemplate(v){return v.template===1||v.template==='1'||/template/i.test(v.name||'');}
+// Riga di log testuale (mai HTML) in un contenitore .plog
+function logLine(el,text,cls=''){
+  if(el.querySelector('.td')&&el.childElementCount===1&&/In attesa/.test(el.textContent)) el.replaceChildren();
+  const d=document.createElement('div'); if(cls)d.className=cls; d.textContent=text; el.append(d); el.scrollTop=el.scrollHeight;
+}
 
 // Charts
 const _ch={};
@@ -865,7 +957,7 @@ const ClusterMgr={
       const data=await fetch('/api/clusters',{headers:{'Content-Type':'application/json'}}).then(r=>r.json());
       this.clusters=Array.isArray(data)?data:[];
       const sel=document.getElementById('cluster-select');
-      sel.innerHTML=this.clusters.map(c=>`<option value="${c.idx}">${c.label}</option>`).join('');
+      sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
       const def=this.clusters.find(c=>c.default);
       this.current=def?def.idx:0;
       sel.value=this.current;
@@ -888,9 +980,9 @@ const ClusterMgr={
       <div style="border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="color:${c.default?'var(--amber)':'var(--text3)'}">${c.default?'★':'☆'}</span>
-          <strong style="font-size:13px">${c.label}</strong>
-          <span class="td" style="font-size:11px;flex:1">${c.url}</span>
-          <span class="td" style="font-size:10px;font-family:var(--mono)">${c.api_token_hint}</span>
+          <strong style="font-size:13px">${esc(c.label)}</strong>
+          <span class="td" style="font-size:11px;flex:1">${esc(c.url)}</span>
+          <span class="td" style="font-size:10px;font-family:var(--mono)">${esc(c.api_token_hint)}</span>
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn bg2 sm" onclick="ClusterMgr.testCluster(${i})">Test</button>
@@ -903,9 +995,9 @@ const ClusterMgr={
   _form(idx){
     const c=idx>=0?this.clusters[idx]:null;
     return`<div style="border:1px solid var(--amber-dim);border-radius:4px;padding:12px;margin-bottom:10px">
-      <div class="fr" style="margin-bottom:8px"><label class="fl">Label</label><input class="inp w" id="cf-label" type="text" value="${c?c.label:''}" placeholder="Prod"></div>
-      <div class="fr" style="margin-bottom:8px"><label class="fl">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${c?c.url:''}" placeholder="https://10.0.0.1:8006"></div>
-      <div class="fr" style="margin-bottom:8px"><label class="fl">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${c?c.api_token_hint:'root@pam!id=...'}"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl">Label</label><input class="inp w" id="cf-label" type="text" value="${esc(c?c.label:'')}" placeholder="Prod"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${esc(c?c.url:'')}" placeholder="https://10.0.0.1:8006"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${esc(c?c.api_token_hint:'root@pam!id=...')}"></div>
       <div style="margin:10px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
         <div class="fl" style="color:var(--text2);letter-spacing:.1em;margin-bottom:4px">CONSOLE SERIALE <span class="td" style="font-size:9px;font-weight:400">— opzionale</span></div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Richiesto per la funzione Console. Proxmox non accetta API token per WebSocket.${c&&c.has_console_credentials?' <span style="color:var(--green)">✓ Credenziali configurate</span>':''} ${idx>=0?' Lascia vuoti per mantenere, svuota username per rimuovere.':''}</div>
@@ -953,7 +1045,13 @@ const ClusterMgr={
     }catch(e){toast(`Errore: ${e.message}`,'err');}
   },
   async deleteCluster(idx){
-    confirm('Elimina cluster',`Eliminare il cluster "${this.clusters[idx]?.label}"?`,async()=>{
+    const c=this.clusters[idx];
+    askConfirm({
+      title:'Elimina cluster',
+      lines:[`Cluster: ${c?.label??'?'}`,`URL: ${c?.url??'?'}`],
+      consequence:'La configurazione e il token di questo cluster vengono rimossi da config.json. Il cluster Proxmox non viene toccato.',
+      level:'danger', okLabel:'Elimina cluster'
+    },async()=>{
       try{
         await fetch(`/api/clusters/${idx}`,{method:'DELETE',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
         await this.renderList();
@@ -976,7 +1074,7 @@ const ClusterMgr={
       if(res)res.innerHTML='<span class="tg">✓ Connessione OK</span>';
       toast(`${this.clusters[idx]?.label||'Cluster'}: OK`,'ok');
     }catch(e){
-      if(res)res.innerHTML=`<span class="tr">✗ ${e.message}</span>`;
+      if(res)res.innerHTML=`<span class="tr">✗ ${esc(e.message)}</span>`;
       toast(`Test fallito: ${e.message}`,'err');
     }
   }
@@ -1011,8 +1109,9 @@ const App={
   },
   async checkConn(){
     const dot=document.getElementById('cdot'), lbl=document.getElementById('clbl');
-    try{await api('/nodes');dot.className='ok';lbl.textContent='Connesso';}
-    catch{dot.className='err';lbl.textContent='Non connesso';}
+    // quiet: lo stato è già nel pallino; un cluster offline non deve produrre un toast ogni 30s
+    try{await api('/nodes',{quiet:true});dot.className='ok';lbl.textContent='Connesso';lbl.title='';}
+    catch(e){dot.className='err';lbl.textContent='Non connesso';lbl.title=e.message;}
   }
 };
 
@@ -1032,12 +1131,12 @@ const DashTbl=(()=>{
           ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:10px">···</span>')
           :bar(pct(v.disk,v.maxdisk));
         return `<tr>
-        <td>${tbadge(v.type)}</td><td class="tm">${v.vmid||'-'}</td>
-        <td class="tn">${v.name||'—'}</td><td>${nodeCell(v)}</td>
+        <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid||'-')}</td>
+        <td class="tn">${esc(v.name||'—')}</td><td>${nodeCell(v)}</td>
         <td>${sbadge(v.status)}</td>
         <td>${v.cpu?(v.cpu*100).toFixed(1)+'%':'—'}</td>
-        <td id="dmem-${v.node}-${v.vmid}">${bar(pct(v.mem,v.maxmem))}</td>
-        <td id="ddk-${v.node}-${v.vmid}">${diskCell}</td>
+        <td id="${esc(`dmem-${v.node}-${v.vmid}`)}">${bar(pct(v.mem,v.maxmem))}</td>
+        <td id="${esc(`ddk-${v.node}-${v.vmid}`)}">${diskCell}</td>
       </tr>`;}).join('')||'<tr><td colspan="8" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
     }
   };
@@ -1049,7 +1148,8 @@ const DashTbl=(()=>{
 async function loadDashMem(vms){
   const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
   await Promise.allSettled(running.map(async v=>{
-    const r=await api(`/nodes/${v.node}/qemu/${v.vmid}/status`).catch(()=>null);
+    // quiet: in caso di errore resta il valore da cluster/resources
+    const r=await api(`/nodes/${v.node}/qemu/${v.vmid}/status`,{quiet:true}).catch(()=>null);
     const s=r?.status;
     if(!s||!s.maxmem)return;
     v.mem=s.mem; v.maxmem=s.maxmem;
@@ -1061,8 +1161,11 @@ async function loadDashMem(vms){
 async function loadDashFsinfo(vms){
   const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
   await Promise.allSettled(running.map(async v=>{
-    const fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`).catch(()=>[]);
+    // quiet: VM senza guest agent → cella "—" con tooltip, nessun toast
+    let fs=[], fsErr='';
+    try{fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`,{quiet:true});}catch(e){fsErr=e.message;}
     const el=document.getElementById(`ddk-${v.node}-${v.vmid}`);
+    if(el&&fsErr) el.title=`Guest agent non disponibile: ${fsErr}`;
     if(Array.isArray(fs)&&fs.length){
       const root=fs.find(f=>f.mountpoint==='/')||fs[0];
       if(root){
@@ -1082,8 +1185,13 @@ async function loadDashFsinfo(vms){
 // ════════════════════════════════════════════════════════════════════════════
 const Dashboard={
   async load(){
-    const d=await api('/dashboard').catch(()=>null);
-    if(!d){document.getElementById('dash-kpis').innerHTML='<div class="ldc tr" style="grid-column:1/-1">Impossibile connettersi — configura in Impostazioni</div>';return;}
+    let d;
+    try{d=await api('/dashboard',{quiet:true});}
+    catch(e){
+      document.getElementById('dash-kpis').innerHTML=`<div style="grid-column:1/-1">${errBox(e.message+' — verifica il cluster in Impostazioni','Dashboard.load()')}</div>`;
+      document.getElementById('dtbody').innerHTML=errRow(8,e.message,'Dashboard.load()');
+      return;
+    }
     const res=d.resources||[];
     const vms=res.filter(r=>r.type==='qemu'||r.type==='lxc');
     const nodes=res.filter(r=>r.type==='node');
@@ -1103,7 +1211,7 @@ const Dashboard={
   },
   async charts(){
     const cutoff=Math.floor(Date.now()/1000)-6*3600;
-    const m=await api(`/metrics?timeframe=day`).catch(()=>[]);
+    const m=await api(`/metrics?timeframe=day`,{quiet:true}).catch(()=>[]);
     if(!m||!m.length)return;
     const pts=m.filter(x=>x.ts>=cutoff).sort((a,b)=>a.ts-b.ts);
     if(!pts.length)return;
@@ -1124,7 +1232,7 @@ const NodeVMs=(()=>{
     sort(k){NodeVMs.renderWith(S.sort(data,k));},
     renderWith(d){
       document.getElementById('nvtbody').innerHTML=d.map(v=>`<tr>
-        <td>${tbadge(v.type)}</td><td class="tm">${v.vmid}</td><td class="tn">${v.name||'—'}</td>
+        <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td><td class="tn">${esc(v.name||'—')}</td>
         <td>${sbadge(v.status)}</td><td>${((v.cpu||0)*100).toFixed(1)}%</td>
         <td>${bar(pct(v.mem,v.maxmem))}</td><td>${fmtB(v.maxdisk||0)}</td>
         <td>${fmtB(v.netin)}/s</td><td>${fmtB(v.netout)}/s</td>
@@ -1137,7 +1245,9 @@ const Nodes={
   data:[], sel:null,
   clearCache(){this.data=[];const s=document.getElementById('nfsel');if(s)s.innerHTML='<option value="">Tutti i nodi</option>';},
   async load(){
-    const nodes=await api('/nodes').catch(()=>[]);
+    let nodes;
+    try{nodes=await api('/nodes',{quiet:true});}
+    catch(e){document.getElementById('ngrid').innerHTML=errBox(e.message,'Nodes.load()');return;}
     if(!Array.isArray(nodes))return;
     nodes.sort((a,b)=>a.node.localeCompare(b.node,undefined,{numeric:true,sensitivity:'base'}));
     Nodes.data=nodes;
@@ -1152,12 +1262,12 @@ const Nodes={
     if(!nodes.length){g.innerHTML='<div class="td">Nessun nodo</div>';return;}
     g.innerHTML=nodes.map(n=>{
       const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem),d=pct(n.disk,n.maxdisk);
-      return`<div class="nd" style="cursor:pointer" onclick="Nodes.selNode('${n.node}')">
+      return`<div class="nd" style="cursor:pointer" onclick="Nodes.selNode(${js(n.node)})">
         <div class="nd-hdr">
-          <div class="nd-name">${n.node}</div>
-          <span class="badge ${n.status==='online'?'bo':'bf'}">${n.status}</span>
+          <div class="nd-name">${esc(n.node)}</div>
+          <span class="badge ${n.status==='online'?'bo':'bf'}">${esc(n.status)}</span>
           <div style="flex:1"></div>
-          <div style="font-size:9px;color:var(--text3)">${n.maxcpu||0} CPU · ${fmtB(n.maxmem)}</div>
+          <div style="font-size:9px;color:var(--text3)">${esc(n.maxcpu||0)} CPU · ${fmtB(n.maxmem)}</div>
         </div>
         <div class="mg">
           <div class="mb2"><div class="ml">CPU</div><div class="mv ${c>80?'tr':c>60?'ta':'tg'}">${c}%</div>${bar(c)}</div>
@@ -1170,7 +1280,9 @@ const Nodes={
   },
   async selNode(node){
     Nodes.sel=node; document.getElementById('nfsel').value=node;
-    const all=await api('/vms').catch(()=>[]);
+    let all;
+    try{all=await api('/vms',{quiet:true});}
+    catch(e){document.getElementById('nvtbody').innerHTML=errRow(9,e.message,`Nodes.selNode(${js(node)})`);return;}
     const nd=Array.isArray(all)?all.find(x=>x.node===node):null;
     const vms=[...(nd?.vms||[]).map(v=>({...v,type:'qemu',node})), ...(nd?.lxcs||[]).map(v=>({...v,type:'lxc',node}))].sort((a,b)=>a.vmid-b.vmid);
     NodeVMs.setData(vms);
@@ -1179,7 +1291,7 @@ const Nodes={
   async loadRRD(){
     if(!Nodes.sel)return;
     const tf=document.getElementById('ntfsel').value;
-    const rrd=await api(`/nodes/${Nodes.sel}/rrd?timeframe=${tf}`).catch(()=>[]);
+    const rrd=await api(`/nodes/${Nodes.sel}/rrd?timeframe=${tf}`,{quiet:true}).catch(()=>[]);
     if(!Array.isArray(rrd)||!rrd.length)return;
     const fmt2=t=>{const d=new Date(t*1000);return tf==='hour'?d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('it-IT',{month:'2-digit',day:'2-digit'});};
     const labels=rrd.map(p=>fmt2(p.time));
@@ -1203,8 +1315,8 @@ const VMs=(()=>{
     const list=document.getElementById('vm-node-list');
     list.innerHTML=allNodes().map(n=>`
       <div class="node-sel-item">
-        <input type="checkbox" id="vnn-${n}" ${selectedNodes.has(n)?'checked':''} onchange="VMs.onNodeCheck('${n}',this.checked)">
-        <label for="vnn-${n}">${n}</label>
+        <input type="checkbox" id="${esc('vnn-'+n)}" ${selectedNodes.has(n)?'checked':''} onchange="VMs.onNodeCheck(${js(n)},this.checked)">
+        <label for="${esc('vnn-'+n)}">${esc(n)}</label>
       </div>`).join('');
     updateBtn();
   }
@@ -1234,21 +1346,22 @@ const VMs=(()=>{
       const diskCell=v.type==='qemu'
         ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:10px">···</span>')
         :bar(pct(v.disk,v.maxdisk));
+      const n=js(v.node), id=js(v.vmid), t=js(v.type);
       return `<tr>
-      <td><input type="checkbox" class="vc" value="${v.type}:${v.node}:${v.vmid}"></td>
-      <td>${tbadge(v.type)}</td><td class="tm">${v.vmid}</td>
-      <td class="tn" style="cursor:pointer" onclick="VMs.detail('${v.node}','${v.vmid}','${v.type}')">${v.name||'—'}</td>
-      <td>${nodeCell(v)}</td><td class="tm">${v.ip||'—'}</td><td>${sbadge(v.status)}</td>
+      <td><input type="checkbox" class="vc" value="${esc(`${v.type}:${v.node}:${v.vmid}`)}"></td>
+      <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
+      <td class="tn" style="cursor:pointer" onclick="VMs.detail(${n},${id},${t})">${esc(v.name||'—')}</td>
+      <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
-      <td id="dk-${v.node}-${v.vmid}">${diskCell}</td>
+      <td id="${esc(`dk-${v.node}-${v.vmid}`)}">${diskCell}</td>
       <td><div class="flex g8">
         ${v.status==='running'
-          ?`<button class="btn bd sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','shutdown')">Stop</button>
-             <button class="btn bg2 sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','reboot')">Reboot</button>
-             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser('${v.node}',${v.vmid})">+ Utente</button>${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="Console.open('${v.node}',${v.vmid},'${v.name||v.vmid}',${v.cluster_idx??0})">⬛ Console</button>`:''}`:''}`
-          :`<button class="btn bsuc sm" onclick="VMs.action('${v.node}',${v.vmid},'${v.type}','start')">Start</button>`}
-        <button class="btn bg2 sm" onclick="VMs.detail('${v.node}','${v.vmid}','${v.type}')">Info</button>
+          ?`<button class="btn bd sm" onclick="VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
+             <button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'reboot')">Reboot</button>
+             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">⬛ Console</button>`:''}`:''}`
+          :`<button class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
+        <button class="btn bg2 sm" onclick="VMs.detail(${n},${id},${t})">Info</button>
       </div></td>
     </tr>`;}).join('')||'<tr><td colspan="11" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
   }
@@ -1256,8 +1369,11 @@ const VMs=(()=>{
   async function loadFsinfo(){
     const running=all.filter(v=>v.type==='qemu'&&v.status==='running');
     await Promise.allSettled(running.map(async v=>{
-      const fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`).catch(()=>[]);
+      // quiet: VM senza guest agent → cella "—" con tooltip, nessun toast
+      let fs=[], fsErr='';
+      try{fs=await api(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`,{quiet:true});}catch(e){fsErr=e.message;}
       const el=document.getElementById(`dk-${v.node}-${v.vmid}`);
+      if(el&&fsErr) el.title=`Guest agent non disponibile: ${fsErr}`;
       if(Array.isArray(fs)&&fs.length){
         const root=fs.find(f=>f.mountpoint==='/')||fs[0];
         if(root){
@@ -1275,7 +1391,9 @@ const VMs=(()=>{
   return {
     clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];},
     async load(){
-      const data=await api('/vms').catch(()=>[]);
+      let data;
+      try{data=await api('/vms',{quiet:true});}
+      catch(e){document.getElementById('vmtbody').innerHTML=errRow(11,e.message,'VMs.load()');return;}
       all=[];
       if(Array.isArray(data)){
         for(const nd of data){
@@ -1307,12 +1425,20 @@ const VMs=(()=>{
     sort(k){const d=S.sort(sortedData,k);sortedData=d;renderRows(d);},
     checkAll(cb){document.querySelectorAll('.vc').forEach(c=>c.checked=cb.checked);},
     action(node,vmid,type,action){
-      confirm(`${action.toUpperCase()} — VM ${vmid}`,`Eseguire "${action}" su VM ${vmid} (nodo: ${node})?`,async()=>{
+      const a=VM_ACTIONS[action];
+      if(!a){toast(`Azione non supportata: ${action}`,'err');return;}
+      const v=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
+      const label=v?.name?`${v.name} (${vmid})`:`VM ${vmid}`;
+      askConfirm({
+        title:`${a.label} — ${label}`,
+        lines:[`VM: ${label}`,`Tipo: ${type==='lxc'?'LXC':'QEMU'} · Nodo: ${node}`],
+        consequence:a.cons, level:a.level, okLabel:a.label
+      },async()=>{
         try{
-          if(type==='lxc') await api(`/nodes/${node}/lxc/${vmid}/action/${action}`,{method:'POST',body:'{}'});
-          else             await api(`/nodes/${node}/qemu/${vmid}/action/${action}`,{method:'POST',body:'{}'});
-          toast(`${action} → VM ${vmid}`,'ok'); setTimeout(()=>VMs.load(),2500);
-        }catch{}
+          const kind=type==='lxc'?'lxc':'qemu';
+          await api(`/nodes/${node}/${kind}/${vmid}/action/${action}`,{method:'POST',body:'{}',quiet:true});
+          toast(`${a.label} inviato a ${label}`,'ok'); setTimeout(()=>VMs.load(),2500);
+        }catch(e){toast(`${a.label} su ${label} non riuscito: ${e.message}`,'err');}
       });
     },
     async detail(node,vmid,type){
@@ -1321,16 +1447,18 @@ const VMs=(()=>{
       openModal('mov');
       try{
         const [r, fsinfo] = await Promise.all([
-          api(`/nodes/${node}/qemu/${vmid}/status`).catch(()=>null),
-          type==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`).catch(()=>[]) : Promise.resolve([])
+          // tollerante: per gli LXC questo endpoint QEMU può fallire, il modal resta usabile con le azioni
+          api(`/nodes/${node}/qemu/${vmid}/status`,{quiet:true}).catch(()=>null),
+          type==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([])
         ]);
+        const n=js(node), id=js(vmid), t=js(type);
         const s=r?.status||{},snaps=r?.snapshots||[];
         const c=((s.cpu||0)*100).toFixed(1),m=pct(s.mem,s.maxmem);
         const fsRows=Array.isArray(fsinfo)&&fsinfo.length
           ? fsinfo.filter(f=>f.mountpoint).map(f=>{
               const used=f['used-bytes']||0, total=f['total-bytes']||f['disk-size']||0;
               const pctD=total?Math.round(used/total*100):0;
-              return `<div><span class="td">Disco ${f.mountpoint}:</span> ${bar(pctD)} ${fmtB(used)}/${fmtB(total)}</div>`;
+              return `<div><span class="td">Disco ${esc(f.mountpoint)}:</span> ${bar(pctD)} ${fmtB(used)}/${fmtB(total)}</div>`;
             }).join('')||`<div><span class="td">Disco:</span> ${fmtB(s.maxdisk||0)}</div>`
           : `<div><span class="td">Disco:</span> ${fmtB(s.maxdisk||0)} (guest agent non disponibile)</div>`;
         document.getElementById('movB').innerHTML=`
@@ -1341,26 +1469,34 @@ const VMs=(()=>{
           </div>
           <div style="font-size:11px;color:var(--text2);line-height:2;margin-bottom:12px">
             <div><span class="td">Uptime:</span> ${s.uptime?Math.floor(s.uptime/3600)+'h '+Math.floor((s.uptime%3600)/60)+'m':'—'}</div>
-            <div><span class="td">CPU cores:</span> ${s.cpus||'—'} · <span class="td">RAM:</span> ${fmtB(s.maxmem)}</div>
+            <div><span class="td">CPU cores:</span> ${esc(s.cpus||'—')} · <span class="td">RAM:</span> ${fmtB(s.maxmem)}</div>
             ${fsRows}
             <div><span class="td">Net:</span> ↓${fmtB(s.netin)}/s · ↑${fmtB(s.netout)}/s</div>
             ${snaps.length?`<div><span class="td">Snapshot:</span> ${snaps.length}</div>`:''}
           </div>
           <div class="flex g8 fw">
-            <button class="btn bsuc sm" onclick="VMs.action('${node}',${vmid},'${type}','start');closeModal('mov')">Start</button>
-            <button class="btn bd sm" onclick="VMs.action('${node}',${vmid},'${type}','stop');closeModal('mov')">Stop</button>
-            <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','reboot');closeModal('mov')">Reboot</button>
-            <button class="btn bg2 sm" onclick="VMs.action('${node}',${vmid},'${type}','shutdown');closeModal('mov')">Shutdown</button>
-            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot('${node}',${vmid})">Snapshot</button>`:''}
-            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open('${node}',${vmid})">+ Disco</button>`:''}
-            ${type==='qemu'&&r?.config?.serial0&&s.status==='running'&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open('${node}',${vmid},'${s.name||vmid}',ClusterMgr.current)">⬛ Console</button>`:''}
+            <button class="btn bsuc sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'start')">Start</button>
+            <button class="btn bg2 sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
+            <button class="btn bg2 sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'reboot')">Reboot</button>
+            <button class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
+            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>`:''}
+            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>`:''}
+            ${type==='qemu'&&r?.config?.serial0&&s.status==='running'&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">⬛ Console</button>`:''}
           </div>`;
-      }catch{document.getElementById('movB').innerHTML='<div class="td">Errore caricamento</div>';}
+      }catch(e){document.getElementById('movB').innerHTML=errBox(e.message,`VMs.detail(${js(node)},${js(vmid)},${js(type)})`);}
     },
     snapshot(node,vmid){
       const name=`snap-${Date.now()}`;
-      confirm(`Snapshot VM ${vmid}`,`Creare snapshot "${name}"?`,async()=>{
-        try{await api(`/nodes/${node}/qemu/${vmid}/snapshot`,{method:'POST',body:JSON.stringify({name})});toast('Snapshot creato','ok');}catch{}
+      const v=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
+      const label=v?.name?`${v.name} (${vmid})`:`VM ${vmid}`;
+      askConfirm({
+        title:`Snapshot — ${label}`,
+        lines:[`VM: ${label} · Nodo: ${node}`,`Nome snapshot: ${name}`],
+        consequence:'Crea un punto di ripristino. La VM continua a funzionare.',
+        level:'safe', okLabel:'Crea snapshot'
+      },async()=>{
+        try{await api(`/nodes/${node}/qemu/${vmid}/snapshot`,{method:'POST',body:JSON.stringify({name}),quiet:true});toast(`Snapshot ${name} creato su ${label}`,'ok');}
+        catch(e){toast(`Snapshot su ${label} non riuscito: ${e.message}`,'err');}
       });
     },
     _addUserCtx:null,
@@ -1368,6 +1504,7 @@ const VMs=(()=>{
       VMs._addUserCtx={node,vmid};
       document.getElementById('adduser-name').value='';
       document.getElementById('adduser-sshkey').value='';
+      document.getElementById('adduser-pwhint').hidden=false;
       const out=document.getElementById('adduser-out');
       out.style.display='none'; out.innerHTML='';
       document.getElementById('adduser-ok').disabled=false;
@@ -1388,14 +1525,13 @@ const VMs=(()=>{
         const payload={username};
         if(sshKey) payload.ssh_key=sshKey;
         const res=await api(`/nodes/${node}/qemu/${vmid}/adduser`,{method:'POST',body:JSON.stringify(payload)});
-        out.innerHTML=`<pre style="white-space:pre-wrap;font-size:10px;line-height:1.5">${res.output||''}</pre>`;
-        if(res.exitcode!==0) out.innerHTML+=`<div class="tr mt12">✗ exitcode ${res.exitcode}</div>`;
+        out.innerHTML=`<pre style="white-space:pre-wrap;font-size:10px;line-height:1.5">${esc(res.output||'')}</pre>`;
+        if(res.exitcode!==0) out.innerHTML+=`<div class="tr mt12">✗ exitcode ${esc(res.exitcode)}</div>`;
         else{
           toast(`Utente ${username} aggiunto alla VM ${vmid}`,'ok');
         }
       }catch(e){
-        out.innerHTML=`<span class="tr">✗ ${e.message}</span>`;
-        toast('Errore aggiunta utente','err');
+        out.innerHTML=`<span class="tr">✗ ${esc(e.message)}</span>`;
       }
       ok.disabled=false;
     }
@@ -1406,7 +1542,7 @@ const VMs=(()=>{
 // DISK — add + guest-side partition/format/mount via QEMU guest agent
 // ════════════════════════════════════════════════════════════════════════════
 const DiskMgr = {
-  node: null, vmid: null,
+  node: null, vmid: null, slotCfg: null,
 
   async open(node, vmid) {
     this.node = node; this.vmid = vmid;
@@ -1425,10 +1561,10 @@ const DiskMgr = {
       const pools = (Array.isArray(storages) ? storages : [])
         .filter(s => (s.content || '').includes('images') && s.active !== 0);
       sel.innerHTML = pools.map(s =>
-        `<option value="${s.storage}">${s.storage} (${fmtB(s.avail)} liberi)</option>`
+        `<option value="${esc(s.storage)}">${esc(s.storage)} (${fmtB(s.avail)} liberi)</option>`
       ).join('') || '<option value="">Nessuno storage disponibile</option>';
-    } catch {
-      sel.innerHTML = '<option value="">Errore caricamento</option>';
+    } catch (e) {
+      sel.innerHTML = `<option value="">Errore caricamento: ${esc(e.message)}</option>`;
     }
   },
 
@@ -1439,18 +1575,20 @@ const DiskMgr = {
       const r = await api(`/nodes/${this.node}/qemu/${this.vmid}/status`);
       const cfg = r?.config || {};
       const slots = Object.keys(cfg).filter(k => /^(scsi|virtio|sata)\d+$/.test(k));
-      sel.innerHTML = slots.map(k => `<option value="${k}">${k} — ${cfg[k]}</option>`).join('')
+      this.slotCfg = cfg;
+      sel.innerHTML = slots.map(k => `<option value="${esc(k)}">${esc(k)} — ${esc(cfg[k])}</option>`).join('')
         || '<option value="">Nessun disco trovato</option>';
-    } catch {
-      sel.innerHTML = '<option value="">Errore caricamento</option>';
+    } catch (e) {
+      sel.innerHTML = `<option value="">Errore caricamento: ${esc(e.message)}</option>`;
     }
   },
 
-  log(msg) {
-    const el = document.getElementById('disk-log');
-    if (el.innerHTML.includes('In attesa')) el.innerHTML = '';
-    el.innerHTML += `<div>${msg}</div>`;
-    el.scrollTop = el.scrollHeight;
+  // Riga di log testuale; cls = classe colore (ta/tg/tr)
+  log(text, cls = '') { logLine(document.getElementById('disk-log'), text, cls); },
+
+  busy(on) {
+    document.getElementById('disk-add-btn').disabled = on;
+    document.getElementById('disk-setup-btn').disabled = on;
   },
 
   async addDisk() {
@@ -1459,38 +1597,63 @@ const DiskMgr = {
     const bus     = document.getElementById('disk-bus').value;
     if (!storage) { toast('Seleziona uno storage pool', 'err'); return; }
 
-    this.log(`<span class="ta">▶ Aggiunta disco ${size}GB su ${storage} (${bus})...</span>`);
+    this.log(`▶ Aggiunta disco ${size}GB su ${storage} (${bus})...`, 'ta');
+    this.busy(true);
     try {
       const res = await api(`/nodes/${this.node}/qemu/${this.vmid}/adddisk`, {
         method: 'POST',
-        body: JSON.stringify({ storage, size_gb: size, bus })
+        body: JSON.stringify({ storage, size_gb: size, bus }),
+        quiet: true
       });
-      this.log(`<span class="tg">✓ Disco ${res.disk} aggiunto (${res.size_gb}GB su ${res.storage})</span>`);
+      this.log(`✓ Disco ${res.disk} aggiunto (${res.size_gb}GB su ${res.storage})`, 'tg');
       toast(`Disco ${res.disk} aggiunto`, 'ok');
       await this.refreshSlots();
       document.getElementById('disk-slot').value = res.disk;
     } catch (e) {
-      this.log(`<span class="tr">✗ ${e.message}</span>`);
+      this.log(`✗ ${e.message}`, 'tr');
+      toast(`Aggiunta disco non riuscita: ${e.message}`, 'err');
+    } finally {
+      this.busy(false);
     }
   },
 
-  async setupDisk() {
+  setupDisk() {
     const disk   = document.getElementById('disk-slot').value;
     const mount  = document.getElementById('disk-mount').value || '/data';
     const sticky = document.getElementById('disk-sticky').checked;
     if (!disk) { toast('Seleziona un disco da configurare', 'err'); return; }
 
-    this.log(`<span class="ta">▶ Configurazione disco ${disk} → ${mount}...</span>`);
+    // Formattare è irreversibile: conferma digitando il VMID.
+    askConfirm({
+      title: `Formatta disco — VM ${this.vmid}`,
+      lines: [
+        `VM: ${this.vmid} · Nodo: ${this.node}`,
+        `Disco: ${disk}${this.slotCfg?.[disk] ? ' — ' + this.slotCfg[disk] : ''}`,
+        `Mount point: ${mount} · Permessi: ${sticky ? '1777 (sticky)' : '0777'}`
+      ],
+      consequence: 'Il disco viene partizionato e formattato in ext4: i dati presenti su quel disco vengono cancellati. Se il guest non lo rileva, la VM viene spenta e riaccesa senza ulteriori conferme.',
+      level: 'danger', typed: String(this.vmid), okLabel: 'Formatta e monta'
+    }, () => this.runSetup(disk, mount, sticky));
+  },
+
+  async runSetup(disk, mount, sticky) {
+    this.log(`▶ Configurazione disco ${disk} → ${mount}...`, 'ta');
+    this.busy(true);
     try {
       const res = await api(`/nodes/${this.node}/qemu/${this.vmid}/setup-disk`, {
         method: 'POST',
-        body: JSON.stringify({ disk, mount_point: mount, sticky_bit: sticky })
+        body: JSON.stringify({ disk, mount_point: mount, sticky_bit: sticky }),
+        quiet: true
       });
       (res.log || []).forEach(l => this.log(l));
+      this.log(`✓ Disco montato su ${res.mount_point}`, 'tg');
       toast(`Disco montato su ${res.mount_point}`, 'ok');
     } catch (e) {
       (e.body?.log || []).forEach(l => this.log(l));
-      this.log(`<span class="tr">✗ ${e.message}</span>`);
+      this.log(`✗ ${e.message}`, 'tr');
+      toast(`Configurazione disco non riuscita: ${e.message}`, 'err');
+    } finally {
+      this.busy(false);
     }
   }
 };
@@ -1505,18 +1668,19 @@ const Provision=(()=>{
     async load(){
       // Load nodes for target selector
       if(!nodes.length){
-        const ns=await api('/nodes').catch(()=>[]);
+        const ns=await api('/nodes',{quiet:true}).catch(()=>[]);
         nodes=Array.isArray(ns)?ns:[];
         const sel=document.getElementById('pv-node');
         nodes.forEach(n=>{if(![...sel.options].find(o=>o.value===n.node))sel.add(new Option(n.node,n.node));});
       }
       // Load templates
-      document.getElementById('tpl-loading').style.display='flex';
+      const tl=document.getElementById('tpl-loading');
+      tl.innerHTML='<div class="spin"></div> Ricerca template...'; tl.style.display='flex';
       document.getElementById('tpl-select').style.display='none';
       document.getElementById('tpl-info').style.display='none';
 
       try{
-        templates=await api('/templates');
+        templates=await api('/templates',{quiet:true});
         const sel=document.getElementById('tpl-select');
         sel.innerHTML='<option value="">— Seleziona template —</option>';
         (templates||[]).forEach((t,i)=>{
@@ -1526,7 +1690,7 @@ const Provision=(()=>{
         document.getElementById('tpl-loading').style.display='none';
         sel.style.display='block';
         if(!templates||!templates.length) toast('Nessun template cloudinit trovato','info');
-      }catch{document.getElementById('tpl-loading').innerHTML='<span class="tr">Errore caricamento template</span>';}
+      }catch(e){document.getElementById('tpl-loading').innerHTML=errBox(e.message,'Provision.load()');}
     },
 
     onSelectTemplate(){
@@ -1584,9 +1748,9 @@ const Provision=(()=>{
 
       info.style.display='block';
       info.innerHTML=`
-        <div><span class="td">Template:</span> <strong>${tpl.name}</strong> (VMID ${tpl.vmid})</div>
-        <div><span class="td">Nodo:</span> ${tpl.node}</div>
-        <div><span class="td">Disco (${document.getElementById('pv-diskdev').value||'scsi0'}):</span> ${diskInfo}</div>`;
+        <div><span class="td">Template:</span> <strong>${esc(tpl.name)}</strong> (VMID ${esc(tpl.vmid)})</div>
+        <div><span class="td">Nodo:</span> ${esc(tpl.node)}</div>
+        <div><span class="td">Disco (${esc(document.getElementById('pv-diskdev').value||'scsi0')}):</span> ${esc(diskInfo)}</div>`;
     },
 
     calcGw(){
@@ -1630,18 +1794,21 @@ const Provision=(()=>{
       const btn=document.getElementById('pv-btn');
       btn.disabled=true; btn.textContent='Provisioning in corso...';
       const log=document.getElementById('pv-log');
-      log.innerHTML=`<span class="ta">▶ Avvio provisioning "${payload.name||'vm'}"...</span>\n`;
+      log.replaceChildren();
+      logLine(log,`▶ Avvio provisioning "${payload.name||'vm'}"...`,'ta');
 
       try{
-        const res=await api('/provision',{method:'POST',body:JSON.stringify(payload)});
+        const res=await api('/provision',{method:'POST',body:JSON.stringify(payload),quiet:true});
         for(const line of (res.log||[])){
           const c=line.startsWith('⚠')?'tr':line.startsWith('✓')?'tg':'ta';
-          log.innerHTML+=`<span class="${c}">${line}</span>\n`;
+          logLine(log,line,c);
         }
-        log.innerHTML+=`\n<span class="tg">✓ VM ${res.vmid} creata su ${res.node}</span>`;
-        toast(`VM ${res.name||res.vmid} creata!`,'ok');
+        logLine(log,`✓ VM ${res.vmid} creata su ${res.node}`,'tg');
+        toast(`VM ${res.name||res.vmid} creata`,'ok');
       }catch(e){
-        log.innerHTML+=`<span class="tr">✗ Errore: ${e.message}</span>`;
+        (e.body?.log||[]).forEach(l=>logLine(log,l,l.startsWith('⚠')?'tr':'ta'));
+        logLine(log,`✗ Errore: ${e.message}`,'tr');
+        toast(`Provisioning non riuscito: ${e.message}`,'err');
       }finally{
         btn.disabled=false; btn.textContent='▶ Provisiona VM';
       }
@@ -1668,16 +1835,25 @@ const Batch=(()=>{
 
   function renderNodeChips(nodes){
     document.getElementById('batch-node-chips').innerHTML=nodes.map(n=>
-      `<button class="node-chip${selNodes.has(n)?' active':''}" onclick="Batch.toggleNodeChip('${n}')">${n}</button>`
+      `<button class="node-chip${selNodes.has(n)?' active':''}" onclick="Batch.toggleNodeChip(${js(n)})">${esc(n)}</button>`
     ).join('');
+  }
+
+  const keyOf=v=>`${v.type}:${v.node}:${v.vmid}`;
+  function vmLabel(k){
+    const v=all.find(x=>keyOf(x)===k);
+    if(!v){const[,node,vmid]=k.split(':');return`VM ${vmid} · ${node}`;}
+    return `${v.name||'VM '+v.vmid} (${v.vmid}) · ${v.node}`;
   }
 
   function doFilter(){
     const type=document.getElementById('btype').value;
     const status=document.getElementById('bstatus').value;
     const q=(document.getElementById('bsearch').value||'').trim().toLowerCase();
+    const showTpl=document.getElementById('btpl').checked;
     filtered=all.filter(v=>
       selNodes.has(v.node)&&
+      (showTpl||!isTemplate(v))&&
       (!type||v.type===type)&&
       (!status||v.status===status)&&
       (!q||String(v.vmid).includes(q)||(v.name||'').toLowerCase().includes(q)||(v.ip||'').includes(q))
@@ -1693,7 +1869,9 @@ const Batch=(()=>{
       renderNodeChips(sorted);
     },
     async load(){
-      const data=await api('/vms').catch(()=>[]);
+      let data;
+      try{data=await api('/vms',{quiet:true});}
+      catch(e){document.getElementById('btbody').innerHTML=errRow(7,e.message,'Batch.load()');return;}
       all=[];
       if(Array.isArray(data)){
         for(const nd of data){
@@ -1717,34 +1895,69 @@ const Batch=(()=>{
     nodeNone(){selNodes.clear();renderNodeChips(allNodeList());doFilter();},
     renderRows(data){
       document.getElementById('btbody').innerHTML=data.map(v=>`<tr>
-        <td><input type="checkbox" class="bc" value="${v.type}:${v.node}:${v.vmid}"
-          ${sel.has(`${v.type}:${v.node}:${v.vmid}`)?'checked':''}
+        <td><input type="checkbox" class="bc" value="${esc(keyOf(v))}"
+          ${sel.has(keyOf(v))?'checked':''}
           onchange="Batch.onCheck(this)"></td>
-        <td>${tbadge(v.type)}</td><td class="tm">${v.vmid}</td>
-        <td class="tn">${v.name||'—'}</td><td>${nodeCell(v)}</td>
-        <td class="tm">${v.ip||'—'}</td><td>${sbadge(v.status)}</td>
+        <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
+        <td class="tn">${esc(v.name||'—')}</td><td>${nodeCell(v)}</td>
+        <td class="tm">${esc(v.ip||'—')}</td><td>${sbadge(v.status)}</td>
       </tr>`).join('')||'<tr><td colspan="7" style="padding:14px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
       Batch.updateInfo();
     },
     onCheck(el){el.checked?sel.add(el.value):sel.delete(el.value);Batch.updateInfo();},
-    checkAll(cb){filtered.forEach(v=>{const k=`${v.type}:${v.node}:${v.vmid}`;cb.checked?sel.add(k):sel.delete(k);});Batch.renderRows(filtered);},
-    selAll(){filtered.forEach(v=>sel.add(`${v.type}:${v.node}:${v.vmid}`));Batch.renderRows(filtered);},
+    checkAll(cb){filtered.forEach(v=>{const k=keyOf(v);cb.checked?sel.add(k):sel.delete(k);});Batch.renderRows(filtered);},
+    selAll(){filtered.forEach(v=>sel.add(keyOf(v)));Batch.renderRows(filtered);},
     selNone(){sel.clear();Batch.renderRows(filtered);},
-    updateInfo(){document.getElementById('binfo').textContent=sel.size>0?`${sel.size} VM selezionata/e`:'Nessuna VM selezionata';},
-    async run(){
+    // La selezione sopravvive ai filtri (scelta voluta): le VM selezionate ma non visibili vengono dichiarate.
+    updateInfo(){
+      const el=document.getElementById('binfo');
+      if(!sel.size){el.textContent='Nessuna VM selezionata';el.className='td mb12';return;}
+      const visible=new Set(filtered.map(keyOf));
+      const hidden=[...sel].filter(k=>!visible.has(k)).length;
+      el.textContent=`${sel.size} VM selezionate`+(hidden?` (${hidden} non visibili con i filtri attuali)`:'');
+      el.className=hidden?'ta mb12':'td mb12';
+    },
+    run(){
       if(!sel.size){toast('Seleziona almeno una VM','err');return;}
       const action=document.getElementById('baction').value;
-      confirm(`Batch: ${action.toUpperCase()}`,`Eseguire "${action}" su ${sel.size} VM/Container?`,async()=>{
-        const vms=[...sel].map(s=>{const[type,node,vmid]=s.split(':');return{type,node,vmid:parseInt(vmid)};});
-        const log=document.getElementById('blog');
-        log.innerHTML=`<span class="ta">▶ "${action}" su ${vms.length} VM...</span>\n`;
-        try{
-          const res=await api('/batch',{method:'POST',body:JSON.stringify({vms,action})});
-          for(const r of res) log.innerHTML+=r.error?`<span class="tr">✗ VM ${r.vmid} (${r.node}): ${r.error}</span>\n`:`<span class="tg">✓ VM ${r.vmid} (${r.node}): OK</span>\n`;
-          log.innerHTML+=`<span class="ta">■ ${res.filter(r=>!r.error).length}/${res.length} OK</span>`;
-          toast(`Batch ${action} OK`,'ok'); setTimeout(()=>Batch.load(),3000);
-        }catch(e){log.innerHTML+=`<span class="tr">✗ ${e.message}</span>`;}
-      });
+      const a=VM_ACTIONS[action];
+      if(!a){toast(`Azione non supportata: ${action}`,'err');return;}
+      const keys=[...sel];
+      const visible=new Set(filtered.map(keyOf));
+      const hidden=keys.filter(k=>!visible.has(k)).length;
+      askConfirm({
+        title:`Batch: ${a.label} su ${keys.length} VM`,
+        lines:hidden?[`Attenzione: ${hidden} delle VM selezionate non sono visibili con i filtri attuali.`]:[],
+        consequence:a.cons,
+        items:keys.map(vmLabel),
+        level:a.level, okLabel:`${a.label} ${keys.length} VM`
+      },()=>Batch.exec(action,keys));
+    },
+    async exec(action,keys){
+      const a=VM_ACTIONS[action];
+      const vms=keys.map(s=>{const[type,node,vmid]=s.split(':');return{type,node,vmid:parseInt(vmid)};});
+      const names=new Map(keys.map(k=>[k,vmLabel(k)]));
+      const log=document.getElementById('blog'), btn=document.getElementById('brun');
+      log.replaceChildren();
+      logLine(log,`▶ ${a.label} su ${vms.length} VM...`,'ta');
+      btn.disabled=true;
+      try{
+        const res=await api('/batch',{method:'POST',body:JSON.stringify({vms,action}),quiet:true});
+        const list=Array.isArray(res)?res:[];
+        for(const r of list){
+          const k=keys.find(x=>{const[,node,vmid]=x.split(':');return node===r.node&&String(vmid)===String(r.vmid);});
+          const who=k?names.get(k):`VM ${r.vmid} · ${r.node}`;
+          logLine(log,r.error?`✗ ${who}: ${r.error}`:`✓ ${who}: OK`,r.error?'tr':'tg');
+        }
+        const failed=list.filter(r=>r.error).length;
+        logLine(log,`■ ${list.length-failed}/${list.length} OK${failed?` · ${failed} falliti`:''}`,failed?'tr':'ta');
+        if(failed) toast(`Batch ${a.label}: ${failed} su ${list.length} falliti, vedi log`,'err');
+        else toast(`Batch ${a.label}: ${list.length} VM OK`,'ok');
+        setTimeout(()=>Batch.load(),3000);
+      }catch(e){
+        logLine(log,`✗ ${e.message}`,'tr');
+        toast(`Batch ${a.label} non riuscito: ${e.message}`,'err');
+      }finally{btn.disabled=false;}
     }
   };
 })();
@@ -1755,23 +1968,25 @@ const Batch=(()=>{
 const Cluster={
   nodes:[], sel:new Set(),
   async load(){
-    const ns=await api('/nodes').catch(()=>[]);
+    let ns;
+    try{ns=await api('/nodes',{quiet:true});}
+    catch(e){document.getElementById('cnlist').innerHTML=errBox(e.message,'Cluster.load()');return;}
     Cluster.nodes=(Array.isArray(ns)?ns:[]).sort((a,b)=>a.node.localeCompare(b.node,undefined,{numeric:true,sensitivity:'base'}));
     Cluster.render();
   },
   render(){
     document.getElementById('cnlist').innerHTML=Cluster.nodes.map(n=>{
       const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem);
-      return`<div class="nd mb8" style="cursor:pointer" onclick="Cluster.selDetail('${n.node}')">
+      return`<div class="nd mb8" style="cursor:pointer" onclick="Cluster.selDetail(${js(n.node)})">
         <div class="flex ac g12 mb8">
           <input type="checkbox" ${Cluster.sel.has(n.node)?'checked':''}
-            onchange="Cluster.onCheck(event,'${n.node}')" onclick="event.stopPropagation()" style="accent-color:var(--amber);width:14px;height:14px">
-          <div class="nd-name" style="font-size:30px">${n.node}</div>
-          <span class="badge ${n.status==='online'?'bo':'bf'}">${n.status}</span>
+            onchange="Cluster.onCheck(event,${js(n.node)})" onclick="event.stopPropagation()" style="accent-color:var(--amber);width:14px;height:14px">
+          <div class="nd-name" style="font-size:30px">${esc(n.node)}</div>
+          <span class="badge ${n.status==='online'?'bo':'bf'}">${esc(n.status)}</span>
           <div style="flex:1"></div>
           <div style="font-size:9px;color:var(--text3)">CPU: <b>${c}%</b> · RAM: <b>${m}%</b></div>
         </div>
-        <div style="font-size:20px;color:var(--text3)">Up: ${n.uptime?Math.floor(n.uptime/3600)+'h':'—'} · Cores: ${n.maxcpu||'?'} · RAM: ${fmtB(n.mem)}/${fmtB(n.maxmem)}</div>
+        <div style="font-size:20px;color:var(--text3)">Up: ${n.uptime?Math.floor(n.uptime/3600)+'h':'—'} · Cores: ${esc(n.maxcpu||'?')} · RAM: ${fmtB(n.mem)}/${fmtB(n.maxmem)}</div>
       </div>`;
     }).join('')||'<div class="td">Nessun nodo</div>';
     document.getElementById('csinfo').textContent=Cluster.sel.size>0?`${Cluster.sel.size} nodo/i selezionato/i`:'Nessun nodo selezionato';
@@ -1781,18 +1996,18 @@ const Cluster={
   selNone(){Cluster.sel.clear();Cluster.render();},
   async selDetail(node){
     try{
-      const r=await api(`/nodes/${node}/status`);
+      const r=await api(`/nodes/${node}/status`,{quiet:true});
       const s=r.status||{};
       document.getElementById('cdetail').innerHTML=`
-        <div style="font-family:var(--cond);font-size:16px;font-weight:700;margin-bottom:8px">${node}</div>
+        <div style="font-family:var(--cond);font-size:16px;font-weight:700;margin-bottom:8px">${esc(node)}</div>
         <div style="font-size:11px;color:var(--text2);line-height:2">
-          <div><span class="td">PVE:</span> ${s.pveversion||'—'}</div>
-          <div><span class="td">Kernel:</span> ${s.kversion||'—'}</div>
-          <div><span class="td">CPU:</span> ${s.cpuinfo?.model||'—'} (${s.cpuinfo?.cpus||'?'} cores)</div>
-          <div><span class="td">Load:</span> ${(s.loadavg||[]).join(' / ')}</div>
+          <div><span class="td">PVE:</span> ${esc(s.pveversion||'—')}</div>
+          <div><span class="td">Kernel:</span> ${esc(s.kversion||'—')}</div>
+          <div><span class="td">CPU:</span> ${esc(s.cpuinfo?.model||'—')} (${esc(s.cpuinfo?.cpus||'?')} cores)</div>
+          <div><span class="td">Load:</span> ${esc((s.loadavg||[]).join(' / '))}</div>
           <div><span class="td">Up:</span> ${s.uptime?Math.floor(s.uptime/86400)+'g '+Math.floor((s.uptime%86400)/3600)+'h':'—'}</div>
         </div>`;
-      const rrd=await api(`/nodes/${node}/rrd?timeframe=hour`).catch(()=>[]);
+      const rrd=await api(`/nodes/${node}/rrd?timeframe=hour`,{quiet:true}).catch(()=>[]);
       if(Array.isArray(rrd)&&rrd.length){
         const labels=rrd.map(p=>new Date(p.time*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
         document.getElementById('cnchT').textContent=`${node} — ultima ora`;
@@ -1801,18 +2016,51 @@ const Cluster={
           {label:'RAM %',data:rrd.map(p=>((p.memused||0)/(p.memtotal||1)*100).toFixed(2)),borderColor:'#3b82f6',tension:.2,pointRadius:0}
         ]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
       }
-    }catch{}
+    }catch(e){document.getElementById('cdetail').innerHTML=errBox(e.message,`Cluster.selDetail(${js(node)})`);}
   },
   async run(){
     if(!Cluster.sel.size){toast('Seleziona almeno un nodo','err');return;}
     const cmd=document.getElementById('ccmd').value;
+    const CMDS={
+      reboot:{label:'Reboot',cons:'I nodi vengono riavviati in sequenza. Le VM in esecuzione su questi nodi vengono spente o migrate secondo la configurazione del cluster (HA, avvio automatico).'},
+      shutdown:{label:'Shutdown',cons:'I nodi vengono spenti e restano spenti finché non vengono riaccesi fisicamente o via IPMI. Le VM in esecuzione su questi nodi si fermano.'}
+    };
+    const c=CMDS[cmd];
+    if(!c){toast(`Comando non supportato: ${cmd}`,'err');return;}
     const nodes=[...Cluster.sel];
-    confirm(`${cmd.toUpperCase()} nodi`,`Eseguire "${cmd}" su:\n${nodes.join(', ')}\n\n⚠ Operazione irreversibile!`,async()=>{
+    const btn=document.getElementById('crun'); btn.disabled=true;
+    // Conteggio VM in esecuzione per nodo: se non disponibile lo si dichiara, non si blocca.
+    let running=null;
+    try{
+      const all=await api('/vms',{quiet:true});
+      running=new Map(nodes.map(n=>{
+        const nd=(Array.isArray(all)?all:[]).find(x=>x.node===n);
+        const cnt=[...(nd?.vms||[]),...(nd?.lxcs||[])].filter(v=>v.status==='running').length;
+        return [n,cnt];
+      }));
+    }catch{running=null;}
+    btn.disabled=false;
+    const total=running?[...running.values()].reduce((a,b)=>a+b,0):null;
+    askConfirm({
+      title:`${c.label} di ${nodes.length} nodo/i`,
+      lines:[total==null?'VM in esecuzione: conteggio non disponibile':`VM in esecuzione coinvolte: ${total}`],
+      consequence:c.cons,
+      items:nodes.map(n=>running?`${n} — ${running.get(n)} VM in esecuzione`:n),
+      level:'danger',
+      typed:nodes.length===1?nodes[0]:String(nodes.length),
+      okLabel:`${c.label} ${nodes.length===1?nodes[0]:nodes.length+' nodi'}`
+    },()=>Cluster.exec(cmd,c.label,nodes));
+  },
+  async exec(cmd,label,nodes){
+    const btn=document.getElementById('crun'); btn.disabled=true;
+    let failed=0;
+    try{
       for(const n of nodes){
-        try{await api(`/nodes/${n}/cmd/${cmd}`,{method:'POST',body:'{}'});toast(`${cmd} → ${n}`,'ok');}
-        catch(e){toast(`Errore su ${n}: ${e.message}`,'err');}
+        try{await api(`/nodes/${n}/cmd/${cmd}`,{method:'POST',body:'{}',quiet:true});toast(`${label} inviato a ${n}`,'ok');}
+        catch(e){failed++;toast(`${label} su ${n} non riuscito: ${e.message}`,'err');}
       }
-    });
+      if(nodes.length>1) toast(`${label}: ${nodes.length-failed}/${nodes.length} nodi OK`,failed?'err':'ok');
+    }finally{btn.disabled=false;}
   }
 };
 
@@ -1827,7 +2075,7 @@ const RepTbl=(()=>{
     sort(k){RepTbl.renderWith(S.sort(data,k));},
     renderWith(d){
       document.getElementById('rtbody').innerHTML=d.map(r=>`<tr>
-        <td class="tn">${r.name||'—'}</td><td class="td">${r.node}</td><td>${tbadge(r.type||'qemu')}</td>
+        <td class="tn">${esc(r.name||'—')}</td><td class="td">${esc(r.node)}</td><td>${tbadge(r.type||'qemu')}</td>
         <td class="${r.avgCpu>80?'tr':r.avgCpu>60?'ta':'tg'}">${r.avgCpu.toFixed(1)}%</td>
         <td class="td">${r.maxCpu.toFixed(1)}%</td>
         <td>${r.avgMem.toFixed(1)}%</td>
@@ -1840,7 +2088,8 @@ const RepTbl=(()=>{
 const Reports={
   data:[],
   init(){
-    api('/nodes').then(ns=>{if(!Array.isArray(ns))return;const sel=document.getElementById('rnode');for(const n of ns)sel.add(new Option(n.node,n.node));}).catch(()=>{});
+    // quiet: se fallisce resta solo "tutti i nodi"; l'errore di connessione è già nel pallino di stato
+    api('/nodes',{quiet:true}).then(ns=>{if(!Array.isArray(ns))return;const sel=document.getElementById('rnode');for(const n of ns)sel.add(new Option(n.node,n.node));}).catch(e=>console.warn('Report: elenco nodi non caricato:',e.message));
   },
   agg(){
     const map={};
@@ -1862,8 +2111,10 @@ const Reports={
     const tf=document.getElementById('rtf').value;
     const type=document.getElementById('rtype').value, node=document.getElementById('rnode').value;
     let url=`/report?timeframe=${tf}&type=${type}`;
-    if(node) url+=`&node=${node}`;
-    const data=await api(url).catch(()=>[]);
+    if(node) url+=`&node=${encodeURIComponent(node)}`;
+    let data;
+    try{data=await api(url,{quiet:true});}
+    catch(e){document.getElementById('rtbody').innerHTML=errRow(8,e.message,'Reports.load()');return;}
     Reports.data=Array.isArray(data)?data:[];
     if(!Reports.data.length){toast('Nessun dato nel periodo','info');return;}
     const agg=Reports.agg();
@@ -1916,7 +2167,7 @@ window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>
 const Settings={
   async load(){
     await ClusterMgr.renderList();
-    const cfg=await api('/config').catch(()=>null); if(!cfg)return;
+    const cfg=await api('/config',{quiet:true}).catch(()=>null); if(!cfg)return;
     const t=cfg.theme||'';
     document.getElementById('ctheme').value=t;
     applyTheme(t);
@@ -1934,8 +2185,8 @@ const Settings={
 // ════════════════════════════════════════════════════════════════════════════
 const Console = {
   open(node, vmid, label, cidx) {
-    const u = `/console?node=${node}&vmid=${vmid}&label=${encodeURIComponent(label)}&cluster=${cidx}`;
-    window.open(u, `console-${vmid}`, 'width=900,height=600,resizable=yes');
+    const u = `/console?node=${encodeURIComponent(node)}&vmid=${encodeURIComponent(vmid)}&label=${encodeURIComponent(label)}&cluster=${encodeURIComponent(cidx)}`;
+    window.open(u, `console-${String(vmid).replace(/\W/g,'')}`, 'width=900,height=600,resizable=yes');
   }
 };
 
@@ -2013,7 +2264,7 @@ const ConsolePage = {
 
     try {
         const res = await fetch(
-            `/api/nodes/${node}/qemu/${vmid}/termproxy?cluster=${cidx}`,
+            `/api/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(vmid)}/termproxy?cluster=${encodeURIComponent(cidx)}`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' } }
         );
         if (!res.ok) {
@@ -2030,10 +2281,10 @@ const ConsolePage = {
 
         const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
         const wsUrl   = `${wsProto}://${location.host}`
-                      + `/api/nodes/${node}/qemu/${vmid}/termproxy-ws`
+                      + `/api/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(vmid)}/termproxy-ws`
                       + `?ticket=${encodeURIComponent(ticket)}`
-                      + `&port=${port}`
-                      + `&cluster=${cidx}`;
+                      + `&port=${encodeURIComponent(port)}`
+                      + `&cluster=${encodeURIComponent(cidx)}`;
 
         const ws = new WebSocket(wsUrl, ['binary']);
         ws.binaryType = 'arraybuffer';

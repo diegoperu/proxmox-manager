@@ -214,21 +214,22 @@ Client methods: `GetVMConfig`, `GetContainerConfig` (aggiunto).
 Flusso handler `AddVMUser`:
 1. Valida username con regex `^[a-z_][a-z0-9_-]{0,31}$`
 2. Se `ssh_key` presente: valida prefisso (`ssh-rsa`, `ssh-ed25519`, `ecdsa-*`, `sk-`), sanitizza newline
-3. Branch **solo password**: genera password random 12 char con `genTempPassword()` (`crypto/rand`, charset `[a-zA-Z0-9!@#$%]`)
+3. Branch **solo password**: imposta la password fissa `p4ssw0rd`, scaduta al primo login (vedi sotto). **Nessuna generazione casuale**
 4. `AgentExec(node, vmid, ["/bin/sh", "-c", script])` → POST `/agent/exec` con body `command=/bin/sh&command=-c&command=<script>` (repeated keys, **non** `command[N]`)
 5. Estrae PID dalla risposta
 6. Polling `AgentExecStatus(node, vmid, pid)` ogni 1s fino a `exited==1` (timeout 30s)
-7. Risponde `{"output":"...", "exitcode":N}` — aggiunge `"temp_password":"..."` se branch password
+7. Risponde `{"output":"...", "exitcode":N}` (nessun campo password nella risposta)
 
 **Branch solo password** (SSHKey assente):
 ```sh
 useradd -m -s /bin/bash <user> 2>/dev/null || true
-echo '<user>:<RANDOM_12>' | chpasswd
+echo '<user>:p4ssw0rd' | chpasswd
 usermod -aG sudo <user> 2>/dev/null || true
 usermod -aG wheel <user> 2>/dev/null || true
 chage -d 0 <user>                              # password scade al primo login
 ```
-La password è generata con `crypto/rand` — mai stringa fissa. Inclusa nel JSON di risposta come `temp_password` e mostrata nel frontend nel log output del modal.
+Password fissa `p4ssw0rd` **voluta** (decisione utente 2026-10-13): scade al primo accesso e l'utente imposta la sua. **Non introdurre password casuali** in questo flusso. Rischio accettato esplicitamente (VM interne, rete fidata/VPN): chi conosce `p4ssw0rd` e accede per primo via SSH con password può impostarla al posto dell'utente legittimo.
+Il frontend (modal add-user) mostra l'hint `Password iniziale: p4ssw0rd` solo quando il campo chiave SSH è vuoto (`#adduser-pwhint`, nascosto su `oninput` della textarea).
 
 **Branch SSH key** (SSHKey presente):
 ```sh
@@ -243,7 +244,7 @@ chown -R <user>:<user> /home/<user>/.ssh
 echo '<user> ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/<user>
 chmod 440 /etc/sudoers.d/<user>
 ```
-Nessuna password impostata; accesso solo via chiave SSH; sudo senza password via file dedicato in `/etc/sudoers.d/`.
+Nessuna password impostata; accesso solo via chiave SSH; sudo senza password via file dedicato in `/etc/sudoers.d/`. Comportamento confermato dall'utente il 2026-10-13: questo ramo resta invariato e il frontend nasconde l'hint della password.
 
 Client methods: `AgentExec`, `AgentExecStatus`.
 ⚠️ Proxmox agent exec vuole repeated `command` keys, **non** `command[0]`/`command[1]`.
@@ -359,6 +360,14 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 **Pattern sort tabelle**: `mkSorter(tbodyId, headId)` → `.sort(data, key)` con classi CSS `asc`/`desc`.
 
 **Charts**: `mkChart(id, cfg)` distrugge il precedente se esiste. Defaults `CD` (oggetto mutabile). Palette `COLS`.
+
+**Sicurezza output (2026-10-13)**: ogni dato esterno (API, config, input) interpolato in `innerHTML` passa da `esc(v)`. Argomenti JS dentro attributi `onclick="..."` passano da `js(v)` (JSON + escape attributo), mai `'${v}'`. Log e toast sono solo testo: `logLine(el, text, cls)` e `toast()` usano `textContent`.
+
+**Conferme**: `askConfirm({title, lines, consequence, items, level, typed, okLabel}, onOk)` sostituisce la vecchia `confirm()` (che oscurava `window.confirm`). Livelli: `safe` (start, resume, snapshot), `warn` (shutdown, reboot, suspend), `danger` (stop forzato, reset, formattazione disco, reboot/shutdown nodo, elimina cluster). `typed` (testo da digitare) solo per formattazione disco (VMID) e reboot/shutdown nodo (nome nodo, o numero di nodi se più d'uno). Mappa azioni VM in `VM_ACTIONS`.
+
+**Errori**: `api(path, {quiet:true})` non mostra toast; il chiamante gestisce l'errore in pagina. Liste che non caricano mostrano `errRow()`/`errBox()` con "Riprova", mai "Nessuna VM". fsinfo/status/rrd/checkConn sono `quiet`. Toast identici entro 5s deduplicati; errori visibili 8s, chiusura al click.
+
+**Batch**: template nascosti di default (`isTemplate()`: `template==1` o nome contiene "template", stesso criterio di `GetTemplates`), checkbox "Mostra template". La selezione sopravvive ai filtri (scelta utente): `#binfo` e la conferma dichiarano le VM selezionate non visibili. Il risultato riporta i fallimenti reali.
 
 ## Convenzioni codice Go
 
