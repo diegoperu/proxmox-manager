@@ -273,6 +273,14 @@
       "button": {
         "displayName": "Button",
         "purpose": "Pulsanti, maiuscolo."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Sotto-righe e suggerimenti (uptime, core, hint)."
+      },
+      "input-touch": {
+        "displayName": "Input touch",
+        "purpose": "Campi a 16px solo con puntatore grosso (niente zoom su iOS)."
       }
     },
     "shadows": [
@@ -431,7 +439,7 @@
       },
       {
         "name": "The Number Is Condensed Rule",
-        "body": "Le metriche grandi sono sempre Barlow Condensed. Gli identificatori (VMID, IP, nodo) restano in mono.",
+        "body": "Le metriche grandi sono sempre Barlow Condensed, con cifre tabulari (`tabular-nums`): i valori non ballano quando si aggiornano. Gli identificatori (VMID, IP, nodo) restano in mono.",
         "section": "typography"
       },
       {
@@ -443,6 +451,11 @@
         "name": "The Flat-By-Default Rule",
         "body": "Le superfici non hanno ombre a riposo. Il glow serve solo a dire \"stato vivo\".",
         "section": "elevation"
+      },
+      {
+        "name": "The Ramp Is Closed Rule",
+        "body": "Le dimensioni ammesse sono quelle dei ruoli sopra (40, 22, 17, 13, 12, 11, 10, 9). Un valore nuovo si aggiunge qui prima di comparire nel CSS.",
+        "section": "typography"
       }
     ],
     "dos": [

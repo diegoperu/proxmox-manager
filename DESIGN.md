@@ -57,6 +57,14 @@ typography:
     fontSize: "11px"
     fontWeight: 600
     letterSpacing: "0.04em"
+  meta:
+    fontFamily: "'JetBrains Mono', monospace"
+    fontSize: "10px"
+    fontWeight: 400
+  input-touch:
+    fontFamily: "'JetBrains Mono', monospace"
+    fontSize: "16px"
+    fontWeight: 400
 rounded:
   badge: "2px"
   control: "3px"
@@ -173,6 +181,8 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 
 ## Typography
 
+**Pesi caricati:** JetBrains Mono variabile 300-700; Barlow Condensed solo 700 e 900 (gli altri pesi non sono usati e non sono incorporati).
+
 **Display / Titoli:** Barlow Condensed (con sans-serif)
 **Body / Dati / Label:** JetBrains Mono (con monospace)
 
@@ -181,15 +191,18 @@ Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambr
 ### Hierarchy
 - **Display** (900, 40px, 1): valore KPI delle card dashboard.
 - **Headline** (700, 22px, 0.08em): titolo logo; valori metrica dei nodi (22px, 700).
-- **Title** (700, 17-18px, 0.05em): titolo topbar, nome nodo, titolo modal.
+- **Title** (700, 17px, 0.05em): titolo topbar, nome nodo (Nodi e Cluster), titolo modal, titolo della console.
 - **Section** (700, 13px condensed, 0.1em, maiuscolo): intestazione di sezione con filetto che riempie la riga.
-- **Body** (400, 13px): testo base; i controlli usano 12px.
+- **Body** (400, 13px): testo base; i controlli e le voci di navigazione usano 12px.
 - **Table** (400, 12px): celle; le intestazioni colonna sono label 9px.
 - **Label** (500, 9px, 0.13-0.18em, maiuscolo): etichette card, form, intestazioni di colonna, sezioni nav.
 - **Button** (600, 11px, 0.04em, maiuscolo): pulsanti; le varianti `.sm` usano 10px.
+- **Meta** (400, 10px): sotto-righe e suggerimenti (uptime, core, hint) in `--text3`.
+- **Input touch** (400, 16px): solo con puntatore grosso, così iOS non zooma al focus.
 
 ### Named Rules
-**The Number Is Condensed Rule.** Le metriche grandi sono sempre Barlow Condensed. Gli identificatori (VMID, IP, nodo) restano in mono.
+**The Number Is Condensed Rule.** Le metriche grandi sono sempre Barlow Condensed, con cifre tabulari (`tabular-nums`): i valori non ballano quando si aggiornano. Gli identificatori (VMID, IP, nodo) restano in mono.
+**The Ramp Is Closed Rule.** Le dimensioni ammesse sono quelle dei ruoli sopra (40, 22, 17, 13, 12, 11, 10, 9). Un valore nuovo si aggiunge qui prima di comparire nel CSS.
 **The Small Caps Label Rule.** Ogni etichetta di campo o colonna è 9px, maiuscola e spaziata. Nessuna etichetta in sentence case.
 
 ## Layout
