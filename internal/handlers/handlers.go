@@ -56,7 +56,6 @@ func clusterIdx(r *http.Request) int {
 	return idx
 }
 
-
 func writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
@@ -90,7 +89,6 @@ func bodyMap(r *http.Request) map[string]string {
 	}
 	return m
 }
-
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -176,7 +174,9 @@ func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 502)
 		return
 	}
-	var nodeNames []struct{ Node string `json:"node"` }
+	var nodeNames []struct {
+		Node string `json:"node"`
+	}
 	json.Unmarshal(nodesRaw, &nodeNames)
 	var nodeItems []map[string]interface{}
 	json.Unmarshal(nodesRaw, &nodeItems)
@@ -303,7 +303,9 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 502)
 		return
 	}
-	var nodeList []struct{ Node string `json:"node"` }
+	var nodeList []struct {
+		Node string `json:"node"`
+	}
 	json.Unmarshal(nodes, &nodeList)
 
 	type NodeResult struct {
@@ -603,14 +605,16 @@ func (h *Handler) GetTemplates(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 502)
 		return
 	}
-	var nodeList []struct{ Node string `json:"node"` }
+	var nodeList []struct {
+		Node string `json:"node"`
+	}
 	json.Unmarshal(nodes, &nodeList)
 
 	type Template struct {
-		Node    string          `json:"node"`
-		VMID    int             `json:"vmid"`
-		Name    string          `json:"name"`
-		Config  json.RawMessage `json:"config"`
+		Node   string          `json:"node"`
+		VMID   int             `json:"vmid"`
+		Name   string          `json:"name"`
+		Config json.RawMessage `json:"config"`
 	}
 
 	var templates []Template
@@ -970,7 +974,9 @@ func (h *Handler) ContainerAction(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ContainerSnapshot(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
 	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
-	var body struct{ Name string `json:"name"` }
+	var body struct {
+		Name string `json:"name"`
+	}
 	json.NewDecoder(r.Body).Decode(&body)
 	if body.Name == "" {
 		body.Name = fmt.Sprintf("snap-%d", time.Now().Unix())
@@ -1007,7 +1013,10 @@ func (h *Handler) DeleteContainer(w http.ResponseWriter, r *http.Request) {
 // ── Metrics ───────────────────────────────────────────────────────────────────
 
 // rrdF is a nullable float64 from Proxmox RRD JSON
-type rrdF struct{ v float64; ok bool }
+type rrdF struct {
+	v  float64
+	ok bool
+}
 
 func (f *rrdF) UnmarshalJSON(b []byte) error {
 	if string(b) == "null" {
@@ -1070,9 +1079,9 @@ func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type nodeRRD struct {
-		Time    rrdF `json:"time"`
-		CPU     rrdF `json:"cpu"`
-		MemUsed rrdF `json:"memused"`
+		Time     rrdF `json:"time"`
+		CPU      rrdF `json:"cpu"`
+		MemUsed  rrdF `json:"memused"`
 		MemTotal rrdF `json:"memtotal"`
 	}
 	type bucket struct {
@@ -1338,20 +1347,12 @@ var validUsername = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 var (
 	storagePattern    = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	busPattern        = regexp.MustCompile(`^(scsi|virtio|sata)$`)
-	diskSlotPattern   = regexp.MustCompile(`^(scsi|virtio|sata)([0-9]|[12][0-9]|30)$`)
 	mountPointPattern = regexp.MustCompile(`^/[a-zA-Z0-9_/-]{1,64}$`)
 )
 
-var forbiddenMounts = map[string]bool{
-	"/": true, "/etc": true, "/boot": true, "/usr": true, "/bin": true,
-	"/sbin": true, "/var": true, "/proc": true, "/sys": true, "/dev": true,
-	"/root": true, "/home": true, "/lib": true, "/opt": true,
-}
-
 // nextDiskSlot trova il primo slot libero per il bus specificato, leggendo la config VM già fetchata.
 func nextDiskSlot(cfgMap map[string]interface{}, bus string) (string, error) {
-	limits := map[string]int{"scsi": 30, "virtio": 15, "sata": 5}
-	max, ok := limits[bus]
+	max, ok := diskSlotLimits[bus]
 	if !ok {
 		return "", fmt.Errorf("bus non supportato: %s (usa scsi, virtio o sata)", bus)
 	}
@@ -1457,16 +1458,12 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		sticky = *body.StickyBit
 	}
 
-	if !diskSlotPattern.MatchString(body.Disk) {
-		writeError(w, fmt.Errorf("slot disco non valido"), 400)
+	if err := validateDiskSlot(body.Disk); err != nil {
+		writeError(w, err, 400)
 		return
 	}
-	if !mountPointPattern.MatchString(body.MountPoint) {
-		writeError(w, fmt.Errorf("mount point non valido"), 400)
-		return
-	}
-	if forbiddenMounts[body.MountPoint] {
-		writeError(w, fmt.Errorf("mount point non permesso: %s", body.MountPoint), 400)
+	if err := validateMountPoint(body.MountPoint); err != nil {
+		writeError(w, err, 400)
 		return
 	}
 
@@ -1730,24 +1727,17 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !validUsername.MatchString(body.Username) {
-		writeError(w, fmt.Errorf("username non valido (solo a-z, 0-9, _ -)"), 400)
+		writeError(w, fmt.Errorf("username non valido (solo a-z, 0-9, _ -, inizia con lettera o _, max 32)"), 400)
 		return
 	}
 
-	sshKey := strings.ReplaceAll(strings.ReplaceAll(body.SSHKey, "\n", ""), "\r", "")
-	if sshKey != "" {
-		validKeyPrefixes := []string{"ssh-rsa ", "ssh-ed25519 ", "ecdsa-sha2-nistp256 ", "ecdsa-sha2-nistp384 ", "ecdsa-sha2-nistp521 ", "sk-"}
-		valid := false
-		for _, p := range validKeyPrefixes {
-			if strings.HasPrefix(sshKey, p) {
-				valid = true
-				break
-			}
-		}
-		if !valid {
-			writeError(w, fmt.Errorf("chiave pubblica SSH non valida"), 400)
-			return
-		}
+	// La chiave è validata e poi passata come ARGOMENTO ($2) dello script, mai
+	// interpolata nel testo della shell: una chiave con apici o metacaratteri non
+	// può eseguire comandi nel guest.
+	sshKey, err := normalizeSSHKey(body.SSHKey)
+	if err != nil {
+		writeError(w, err, 400)
+		return
 	}
 
 	c, err := h.getClientFor(clusterIdx(r))
@@ -1756,76 +1746,24 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u := body.Username
-	var script string
-	if sshKey == "" {
-		script = fmt.Sprintf(
-			"useradd -m -s /bin/bash %s 2>/dev/null || true; "+
-				"echo '%s:p4ssw0rd' | chpasswd; "+
-				"usermod -aG sudo %s 2>/dev/null || true; "+
-				"usermod -aG wheel %s 2>/dev/null || true; "+
-				"chage -d 0 %s",
-			u, u, u, u, u,
-		)
-	} else {
-		script = fmt.Sprintf(
-			"useradd -m -s /bin/bash %s 2>/dev/null || true; "+
-				"usermod -aG sudo %s 2>/dev/null || true; "+
-				"usermod -aG wheel %s 2>/dev/null || true; "+
-				"mkdir -p /home/%s/.ssh; "+
-				"echo '%s' >> /home/%s/.ssh/authorized_keys; "+
-				"chmod 700 /home/%s/.ssh; "+
-				"chmod 600 /home/%s/.ssh/authorized_keys; "+
-				"chown -R %s:%s /home/%s/.ssh; "+
-				"echo '%s ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/%s; "+
-				"chmod 440 /etc/sudoers.d/%s",
-			u, u, u, u, sshKey, u, u, u, u, u, u, u, u, u,
-		)
-	}
-
-	execRaw, err := c.AgentExec(node, vmid, []string{"/bin/sh", "-c", script})
+	res, err := runGuestScript(c, node, vmid, addUserScript, []string{body.Username, sshKey}, 30*time.Second)
 	if err != nil {
-		writeError(w, fmt.Errorf("agent exec: %w", err), 502)
-		return
-	}
-	var execResp struct {
-		PID int `json:"pid"`
-	}
-	if err := json.Unmarshal(execRaw, &execResp); err != nil || execResp.PID == 0 {
-		writeError(w, fmt.Errorf("agent exec risposta inattesa: %s", string(execRaw)), 502)
+		writeError(w, err, 502)
 		return
 	}
 
-	deadline := time.Now().Add(30 * time.Second)
-	var output string
-	var exitCode int
-	for time.Now().Before(deadline) {
-		time.Sleep(1 * time.Second)
-		statusRaw, err := c.AgentExecStatus(node, vmid, execResp.PID)
-		if err != nil {
-			continue
-		}
-		var s struct {
-			Exited   int    `json:"exited"`
-			ExitCode int    `json:"exitcode"`
-			OutData  string `json:"out-data"`
-			ErrData  string `json:"err-data"`
-		}
-		if err := json.Unmarshal(statusRaw, &s); err != nil {
-			continue
-		}
-		if s.Exited == 1 {
-			output = s.OutData
-			if s.ErrData != "" {
-				output += s.ErrData
-			}
-			exitCode = s.ExitCode
-			break
-		}
+	// L'utente già esistente non è un errore del server: 409, nessuna modifica fatta.
+	if res.ExitCode == 3 {
+		writeError(w, fmt.Errorf("l'utente %s esiste già nella VM: nessuna modifica effettuata", body.Username), 409)
+		return
 	}
 
-	log.Printf("adduser %s@%s/%d exitcode=%d", u, node, vmid, exitCode)
-	writeJSON(w, map[string]interface{}{"output": output, "exitcode": exitCode})
+	output := res.Out
+	if res.Err != "" {
+		output += res.Err
+	}
+	log.Printf("adduser %s@%s/%d exitcode=%d", body.Username, node, vmid, res.ExitCode)
+	writeJSON(w, map[string]interface{}{"output": output, "exitcode": res.ExitCode})
 }
 
 // ── Cluster management ────────────────────────────────────────────────────────
@@ -2052,10 +1990,10 @@ func (h *Handler) TermproxyCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
-	node   := chi.URLParam(r, "node")
-	vmid   := chi.URLParam(r, "vmid")
+	node := chi.URLParam(r, "node")
+	vmid := chi.URLParam(r, "vmid")
 	ticket := r.URL.Query().Get("ticket")
-	port   := r.URL.Query().Get("port")
+	port := r.URL.Query().Get("port")
 
 	if ticket == "" || port == "" {
 		writeError(w, fmt.Errorf("ticket e port richiesti"), 400)
