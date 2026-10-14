@@ -143,14 +143,14 @@ func TestRunGuestScript(t *testing.T) {
 
 	t.Run("successo e passaggio argomenti", func(t *testing.T) {
 		f := &fakeAgent{exitedAfter: 2, exitCode: 0, out: "OK\n"}
-		res, err := runGuestScript(f, "n", 1, addUserScript, []string{"tosi", "LAKEY"}, time.Second)
+		res, err := runGuestScript(f, "n", 1, addUserScriptSrc, []string{"tosi", "LAKEY"}, time.Second)
 		if err != nil {
 			t.Fatalf("errore inatteso: %v", err)
 		}
 		if res.ExitCode != 0 || res.Out != "OK\n" {
 			t.Errorf("risultato inatteso: %+v", res)
 		}
-		want := []string{"/bin/sh", "-c", addUserScript, "pmgr", "tosi", "LAKEY"}
+		want := []string{"/bin/sh", "-c", addUserScriptSrc, "pmgr", "tosi", "LAKEY"}
 		if fmt.Sprint(f.gotArgs) != fmt.Sprint(want) {
 			t.Errorf("args = %v, atteso %v", f.gotArgs, want)
 		}
@@ -200,4 +200,121 @@ func (fakeAgentZeroPID) AgentExec(string, int, []string) (json.RawMessage, error
 }
 func (fakeAgentZeroPID) AgentExecStatus(string, int, int) (json.RawMessage, error) {
 	return json.Marshal(map[string]int{})
+}
+
+// scriptedAgent risponde a ogni exec con la prossima risposta in coda e registra gli argv.
+type scriptedAgent struct {
+	replies []guestResult
+	execErr error
+	argvs   [][]string
+	next    int
+}
+
+func (s *scriptedAgent) AgentExec(node string, vmid int, args []string) (json.RawMessage, error) {
+	if s.execErr != nil {
+		return nil, s.execErr
+	}
+	s.argvs = append(s.argvs, args)
+	return json.Marshal(map[string]int{"pid": 100 + len(s.argvs)})
+}
+
+func (s *scriptedAgent) AgentExecStatus(node string, vmid, pid int) (json.RawMessage, error) {
+	idx := pid - 101
+	var r guestResult
+	if idx < len(s.replies) {
+		r = s.replies[idx]
+	}
+	return json.Marshal(map[string]interface{}{"exited": 1, "exitcode": r.ExitCode, "out-data": r.Out, "err-data": r.Err})
+}
+
+func TestGuestToolProbeAndRun(t *testing.T) {
+	old := guestPollInterval
+	guestPollInterval = time.Millisecond
+	defer func() { guestPollInterval = old }()
+
+	tool := guestTool{name: "adduser.sh", inline: "INLINE-TEXT"}
+
+	t.Run("helper presente", func(t *testing.T) {
+		a := &scriptedAgent{replies: []guestResult{{Out: "HELPER\n"}, {Out: "OK\n"}}}
+		use, err := tool.probeHelper(a, "n", 1)
+		if err != nil || !use {
+			t.Fatalf("probe: use=%v err=%v, atteso true", use, err)
+		}
+		// il percorso del probe è una costante, passata come argomento $1 (mai nel testo)
+		if got := a.argvs[0][len(a.argvs[0])-1]; got != guestHelperDir+"/adduser.sh" {
+			t.Errorf("probe argomento = %q", got)
+		}
+		if _, err := tool.run(a, "n", 1, use, []string{"tosi", "KEY"}, time.Second); err != nil {
+			t.Fatal(err)
+		}
+		// helper: exec diretto del file con gli argomenti, NESSUNA shell in mezzo
+		want := []string{guestHelperDir + "/adduser.sh", "tosi", "KEY"}
+		if fmt.Sprint(a.argvs[1]) != fmt.Sprint(want) {
+			t.Errorf("argv helper = %v, atteso %v", a.argvs[1], want)
+		}
+	})
+
+	t.Run("helper assente → inline", func(t *testing.T) {
+		a := &scriptedAgent{replies: []guestResult{{Out: "INLINE\n"}, {Out: "OK\n"}}}
+		use, err := tool.probeHelper(a, "n", 1)
+		if err != nil || use {
+			t.Fatalf("probe: use=%v err=%v, atteso false", use, err)
+		}
+		if _, err := tool.run(a, "n", 1, use, []string{"tosi", ""}, time.Second); err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"/bin/sh", "-c", "INLINE-TEXT", "pmgr", "tosi", ""}
+		if fmt.Sprint(a.argvs[1]) != fmt.Sprint(want) {
+			t.Errorf("argv inline = %v, atteso %v", a.argvs[1], want)
+		}
+	})
+
+	t.Run("probe con output inatteso → inline (mai helper per sbaglio)", func(t *testing.T) {
+		for _, out := range []string{"", "helper", "HELPER extra", "xx"} {
+			a := &scriptedAgent{replies: []guestResult{{Out: out}}}
+			if use, err := tool.probeHelper(a, "n", 1); err != nil || use {
+				t.Errorf("out=%q: use=%v err=%v, atteso inline", out, use, err)
+			}
+		}
+	})
+
+	t.Run("errore dell'agent nel probe viene propagato", func(t *testing.T) {
+		a := &scriptedAgent{execErr: errors.New("proxmox 500: QEMU guest agent is in frozen state")}
+		if _, err := tool.probeHelper(a, "n", 1); err == nil || !strings.Contains(err.Error(), "frozen") {
+			t.Errorf("atteso errore frozen, got %v", err)
+		}
+	})
+}
+
+// Gli script embedded sono la sorgente unica di helper e fallback inline: devono
+// esistere, essere script veri e non contenere segnaposto né dati di richiesta.
+func TestEmbeddedGuestScripts(t *testing.T) {
+	for name, src := range map[string]string{"adduser.sh": addUserScriptSrc, "disk.sh": diskScriptSrc} {
+		if !strings.HasPrefix(src, "#!/bin/sh\n") {
+			t.Errorf("%s: manca lo shebang #!/bin/sh", name)
+		}
+		if strings.Contains(src, "TODO") || strings.Contains(src, "FIXME") || strings.Contains(src, "%s\n\"") {
+			t.Errorf("%s: contiene un segnaposto", name)
+		}
+		if !strings.Contains(src, "set -eu") {
+			t.Errorf("%s: manca `set -eu`", name)
+		}
+	}
+	// adduser.sh: nessuna interpolazione di dati nel testo, solo parametri posizionali
+	for _, must := range []string{`U="${1:?`, `KEY="${2:-}"`, "exit 3", "usermod -L"} {
+		if !strings.Contains(addUserScriptSrc, must) {
+			t.Errorf("adduser.sh: manca %q", must)
+		}
+	}
+	// nessuna riga che mandi una variabile della richiesta a una shell/eval
+	for _, bad := range []string{"eval ", "sh -c \"$", "bash -c"} {
+		if strings.Contains(addUserScriptSrc, bad) || strings.Contains(diskScriptSrc, bad) {
+			t.Errorf("script embedded contiene il pattern pericoloso %q", bad)
+		}
+	}
+	for _, cmd := range []string{"find-blank)", "rescan)", "setup)"} {
+		if !strings.Contains(diskScriptSrc, cmd) {
+			t.Errorf("disk.sh: manca il subcommand %q", cmd)
+		}
+	}
 }

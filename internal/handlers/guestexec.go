@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,7 +37,12 @@ var guestPollInterval = time.Second
 // comes from a request is passed as a positional parameter ($1, $2, ...) of `sh -c`,
 // so it is never parsed as shell code. The script text must not contain request data.
 func runGuestScript(c agentExecer, node string, vmid int, script string, args []string, timeout time.Duration) (guestResult, error) {
-	argv := append([]string{"/bin/sh", "-c", script, "pmgr"}, args...)
+	return runGuestArgv(c, node, vmid, append([]string{"/bin/sh", "-c", script, "pmgr"}, args...), timeout)
+}
+
+// runGuestArgv runs argv through the guest agent and waits for it to exit. No shell is
+// involved unless argv[0] is one: arguments are never reinterpreted by the guest.
+func runGuestArgv(c agentExecer, node string, vmid int, argv []string, timeout time.Duration) (guestResult, error) {
 	raw, err := c.AgentExec(node, vmid, argv)
 	if err != nil {
 		return guestResult{}, agentError(err)
@@ -151,43 +157,58 @@ func validateMountPoint(p string) error {
 	return nil
 }
 
-// ── Guest scripts (fixed text: request data only through $1, $2, ...) ───────
+// ── Guest scripts ────────────────────────────────────────────────────────────
+//
+// Single source of truth: guestscripts/*.sh. The same text is used as
+//   - labelled helper installed in the guest (/usr/local/libexec/pmgr/<name>): on SELinux
+//     enforcing guests it runs in virt_qemu_ga_unconfined_t, where useradd/parted/mount
+//     work (the agent's own confined shell cannot run them), or
+//   - inline fallback (`sh -c <text>`) on guests that have no helper (e.g. Debian/Ubuntu).
+// Request data reaches either form only as arguments, never inside script text.
 
-// addUserScript: $1 = username (already validated), $2 = public key or empty.
-// Exit 3 = the user already exists: nothing is changed, so a request can never reset the
-// password, add keys or grant sudo to an existing account (root included).
-// If the password cannot be expired the account is locked: a fixed password must never
-// stay usable.
-const addUserScript = `set -eu
-U="$1"
-KEY="${2:-}"
-if id "$U" >/dev/null 2>&1; then
-    echo "l'utente $U esiste già nella VM: nessuna modifica" >&2
-    exit 3
-fi
-useradd -m -s /bin/bash "$U"
-for g in wheel sudo; do
-    if getent group "$g" >/dev/null 2>&1; then usermod -aG "$g" "$U"; fi
-done
-HOME_DIR=$(getent passwd "$U" | cut -d: -f6)
-if [ -z "$KEY" ]; then
-    printf '%s:%s\n' "$U" "p4ssw0rd" | chpasswd
-    if ! chage -d 0 "$U"; then
-        if usermod -L "$U"; then
-            echo "impossibile forzare il cambio password al primo accesso: account $U bloccato" >&2
-        else
-            echo "ATTENZIONE: impossibile forzare il cambio password e impossibile bloccare l'account $U" >&2
-        fi
-        exit 1
-    fi
-else
-    mkdir -p "$HOME_DIR/.ssh"
-    chmod 700 "$HOME_DIR/.ssh"
-    printf '%s\n' "$KEY" > "$HOME_DIR/.ssh/authorized_keys"
-    chmod 600 "$HOME_DIR/.ssh/authorized_keys"
-    chown -R "$U:$U" "$HOME_DIR/.ssh"
-    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$U" > "/etc/sudoers.d/$U"
-    chmod 440 "/etc/sudoers.d/$U"
-fi
-echo "OK"
-`
+//go:embed guestscripts/adduser.sh
+var addUserScriptSrc string
+
+//go:embed guestscripts/disk.sh
+var diskScriptSrc string
+
+const guestHelperDir = "/usr/local/libexec/pmgr"
+
+// guestTool describes one script: helper file name and the embedded inline fallback.
+type guestTool struct {
+	name   string
+	inline string
+}
+
+var (
+	addUserTool = guestTool{name: "adduser.sh", inline: addUserScriptSrc}
+	diskTool    = guestTool{name: "disk.sh", inline: diskScriptSrc}
+)
+
+func (t guestTool) helperPath() string { return guestHelperDir + "/" + t.name }
+
+// probeHelper asks the guest whether the labelled helper is installed and executable.
+// `[ -x ]` is a shell builtin: it runs even in the confined agent domain, so the probe
+// itself works on any guest. An agent error is returned (the real command would fail too).
+func (t guestTool) probeHelper(c agentExecer, node string, vmid int) (bool, error) {
+	res, err := runGuestScript(c, node, vmid, `[ -x "$1" ] && echo HELPER || echo INLINE`, []string{t.helperPath()}, 15*time.Second)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(res.Out) == "HELPER", nil
+}
+
+// run executes the tool with args using the helper (useHelper) or the inline fallback.
+func (t guestTool) run(c agentExecer, node string, vmid int, useHelper bool, args []string, timeout time.Duration) (guestResult, error) {
+	if useHelper {
+		return runGuestArgv(c, node, vmid, append([]string{t.helperPath()}, args...), timeout)
+	}
+	return runGuestScript(c, node, vmid, t.inline, args, timeout)
+}
+
+func guestMode(useHelper bool) string {
+	if useHelper {
+		return "helper"
+	}
+	return "inline"
+}

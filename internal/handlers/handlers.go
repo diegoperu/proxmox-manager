@@ -1490,73 +1490,46 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var opLog []string
-	runScript := func(script string) (string, error) {
-		execRaw, err := client.AgentExec(node, vmid, []string{"/bin/sh", "-c", script})
-		if err != nil {
-			return "", err
-		}
-		var execResp struct {
-			PID int `json:"pid"`
-		}
-		if err := json.Unmarshal(execRaw, &execResp); err != nil || execResp.PID == 0 {
-			return "", fmt.Errorf("agent exec risposta inattesa: %s", string(execRaw))
-		}
-		deadline := time.Now().Add(30 * time.Second)
-		for time.Now().Before(deadline) {
-			time.Sleep(1 * time.Second)
-			statusRaw, err := client.AgentExecStatus(node, vmid, execResp.PID)
-			if err != nil {
-				continue
-			}
-			var s struct {
-				Exited   int    `json:"exited"`
-				ExitCode int    `json:"exitcode"`
-				OutData  string `json:"out-data"`
-				ErrData  string `json:"err-data"`
-			}
-			if err := json.Unmarshal(statusRaw, &s); err != nil {
-				continue
-			}
-			if s.Exited == 1 {
-				if s.ExitCode != 0 {
-					return s.OutData, fmt.Errorf("exit %d: %s", s.ExitCode, s.ErrData)
-				}
-				return s.OutData, nil
-			}
-		}
-		return "", fmt.Errorf("timeout esecuzione comando guest agent")
-	}
 
-	// Identificazione del nuovo disco per PROPRIETÀ (nessuna partizione, nessun filesystem),
-	// non per diff temporale prima/dopo: su molti setup Proxmox/QEMU (q35+PCIe) il disco
-	// virtio/scsi viene collegato a caldo IMMEDIATAMENTE alla PUT /config, quindi una baseline
-	// "prima" presa a inizio richiesta lo troverebbe già presente e nessun diff lo segnalerebbe
-	// mai come "nuovo" — bug osservato: lsblk manuale mostrava il disco, il diff no.
-	// Un candidato è o un disco vergine (nessuna partizione, nessun filesystem) o un disco
-	// lasciato a metà da un tentativo di setup precedente (una sola partizione ext4, non
-	// montata) — così un retry dopo un errore a metà script trova ancora il disco giusto.
-	// ": ; true" finale: senza set -e, l'exit code dello script è quello dell'ULTIMO test
-	// valutato nel loop (spesso falsy, es. l'ultimo disco esaminato non è candidato) — senza
-	// forzare 0, runScript scarta un output valido come se fosse un errore guest agent.
-	// Candidato (b) accetta anche TYPE vuoto (non solo ext4): copre il caso di un run
-	// interrotto TRA parted e mkfs.ext4 (partizione creata ma mai formattata).
-	findBlank := `for d in $(lsblk -ndo NAME,TYPE | awk '$2=="disk"{print $1}'); do n=$(lsblk -ln "/dev/$d" | wc -l); if [ "$n" = "1" ]; then ! blkid "/dev/$d" >/dev/null 2>&1 && echo "$d"; elif [ "$n" = "2" ]; then p="/dev/${d}1"; t="$(blkid -o value -s TYPE "$p" 2>/dev/null)"; { [ -z "$t" ] || [ "$t" = "ext4" ]; } && ! findmnt -S "$p" >/dev/null 2>&1 && echo "$d"; fi; done; true`
-
-	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
-	out, err := runScript(findBlank)
+	// Helper etichettato (SELinux enforcing) se presente nel guest, altrimenti script inline.
+	// Il probe si fa una volta per richiesta.
+	useHelper, err := diskTool.probeHelper(client, node, vmid)
 	if err != nil {
-		writeErrorLog(w, fmt.Errorf("guest agent non raggiungibile: %w", err), 502, opLog)
+		writeError(w, err, 502)
 		return
 	}
-	candidates := strings.Fields(out)
+	log.Printf("setup-disk %s/%d: esecuzione %s", node, vmid, guestMode(useHelper))
+	opLog = append(opLog, "Esecuzione guest: "+guestMode(useHelper))
+
+	disk := func(timeout time.Duration, args ...string) (guestResult, error) {
+		return diskTool.run(client, node, vmid, useHelper, args, timeout)
+	}
+	// findBlank: dischi candidati (vergini, o lasciati a metà da un tentativo precedente).
+	// Un lsblk che fallisce nel guest è un errore (exit 3), non "nessun disco".
+	findBlank := func() ([]string, error) {
+		res, err := disk(30*time.Second, "find-blank")
+		if err != nil {
+			return nil, err
+		}
+		if res.ExitCode != 0 {
+			return nil, fmt.Errorf("ricerca dischi fallita nel guest (exit %d): %s", res.ExitCode, strings.TrimSpace(res.Err))
+		}
+		return strings.Fields(res.Out), nil
+	}
+
+	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
+	candidates, err := findBlank()
+	if err != nil {
+		writeErrorLog(w, fmt.Errorf("guest agent: %w", err), 502, opLog)
+		return
+	}
 
 	if len(candidates) == 0 {
 		opLog = append(opLog, "Nessun disco vuoto trovato — rescan bus...")
-		runScript(`partprobe 2>/dev/null; for h in /sys/class/scsi_host/host*; do [ -e "$h/scan" ] && echo "- - -" > "$h/scan" 2>/dev/null; done; udevadm settle 2>/dev/null; true`)
+		disk(30*time.Second, "rescan") // best effort: un rescan fallito non è un errore
 		for attempt := 0; attempt < 5 && len(candidates) == 0; attempt++ {
 			time.Sleep(2 * time.Second)
-			out, _ = runScript(findBlank)
-			candidates = strings.Fields(out)
+			candidates, _ = findBlank()
 		}
 	}
 
@@ -1594,7 +1567,7 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		rebootDeadline := time.Now().Add(120 * time.Second)
 		for time.Now().Before(rebootDeadline) {
 			time.Sleep(5 * time.Second)
-			if _, err := runScript(`echo ready`); err == nil {
+			if _, err := runGuestScript(client, node, vmid, `echo ready`, nil, 15*time.Second); err == nil {
 				agentReady = true
 				break
 			}
@@ -1607,8 +1580,7 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		}
 		opLog = append(opLog, "Guest agent di nuovo raggiungibile, nuova ricerca disco...")
 
-		out, _ = runScript(findBlank)
-		candidates = strings.Fields(out)
+		candidates, _ = findBlank()
 		if len(candidates) == 0 {
 			writeErrorLog(w, fmt.Errorf(
 				"disco non rilevato nemmeno dopo il riavvio — verifica la configurazione "+
@@ -1639,66 +1611,18 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	}
 	dev := "/dev/" + newDevice
 
-	scriptTpl := `set -e
-DEV=%s
-if ! [ -b "${DEV}1" ]; then
-    parted -s "$DEV" mklabel gpt
-    parted -s "$DEV" mkpart primary 0%% 100%%
-    partprobe "$DEV" 2>/dev/null || true
-    udevadm settle 2>/dev/null || true
-    sleep 1
-fi
-# Formatta solo se la partizione non ha già un filesystem ext4.
-# NB: si controlla l'OUTPUT del tag TYPE, non l'exit code di blkid: su una
-# partizione GPT creata ma mai formattata blkid esce 0 (stampa PARTLABEL/
-# PARTUUID) pur senza TYPE, quindi un check exit-code salterebbe mkfs.ext4.
-FSTYPE=$(blkid -c /dev/null -o value -s TYPE "${DEV}1" 2>/dev/null || true)
-if [ "$FSTYPE" != ext4 ]; then
-    mkfs.ext4 -F "${DEV}1"
-    udevadm settle 2>/dev/null || true
-fi
-mkdir -p %s
-UUID=""
-for i in 1 2 3 4 5; do
-    UUID=$(blkid -c /dev/null -o value -s UUID "${DEV}1" 2>/dev/null)
-    [ -n "$UUID" ] && break
-    sync
-    udevadm settle 2>/dev/null || true
-    sleep 1
-done
-if [ -z "$UUID" ]; then
-    echo "DIAG whoami=$(whoami) path=$PATH" >&2
-    echo "DIAG blkid_bare=[$(blkid "${DEV}1" 2>&1)]" >&2
-    echo "DIAG blkid_type=[$(blkid -o value -s TYPE "${DEV}1" 2>&1)]" >&2
-    echo "DIAG blkid_uuid_nocache=[$(blkid -c /dev/null -o value -s UUID "${DEV}1" 2>&1)]" >&2
-    echo "DIAG lsblk=[$(lsblk -f "$DEV" 2>&1 | tr '\n' ';')]" >&2
-    echo "DIAG mkfs_path=[$(command -v mkfs.ext4 2>&1)] blkid_path=[$(command -v blkid 2>&1)]" >&2
-    echo "impossibile determinare UUID di ${DEV}1 dopo 5 tentativi" >&2
-    exit 1
-fi
-if ! grep -q "$UUID" /etc/fstab; then
-    echo "UUID=$UUID %s ext4 defaults 0 2" >> /etc/fstab
-fi
-mountpoint -q %s || mount %s
-chmod %s %s
-echo "OK"
-`
-	script := fmt.Sprintf(scriptTpl,
-		dev,
-		body.MountPoint,
-		body.MountPoint,
-		body.MountPoint,
-		body.MountPoint,
-		perm,
-		body.MountPoint,
-	)
-
 	opLog = append(opLog, fmt.Sprintf("Partizionamento GPT + ext4 su %s...", dev))
-	out, err = runScript(script)
+	// 120 s: mkfs.ext4 su un disco grande può superare i 30 s dei comandi brevi.
+	res, err := disk(120*time.Second, "setup", dev, body.MountPoint, perm)
 	if err != nil {
-		writeErrorLog(w, fmt.Errorf("setup disco fallito: %w (output: %s)", err, out), 502, opLog)
+		writeErrorLog(w, fmt.Errorf("setup disco fallito: %w", err), 502, opLog)
 		return
 	}
+	if res.ExitCode != 0 {
+		writeErrorLog(w, fmt.Errorf("setup disco fallito (exit %d): %s", res.ExitCode, strings.TrimSpace(res.Err)), 502, opLog)
+		return
+	}
+	out := res.Out
 	opLog = append(opLog, "Output: "+strings.TrimSpace(out))
 	opLog = append(opLog, fmt.Sprintf("✓ Disco montato su %s (permessi %s)", body.MountPoint, perm))
 
@@ -1746,7 +1670,14 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := runGuestScript(c, node, vmid, addUserScript, []string{body.Username, sshKey}, 30*time.Second)
+	// Helper etichettato se presente nel guest (SELinux enforcing), altrimenti script inline.
+	useHelper, err := addUserTool.probeHelper(c, node, vmid)
+	if err != nil {
+		writeError(w, err, 502)
+		return
+	}
+	log.Printf("adduser %s/%d: esecuzione %s", node, vmid, guestMode(useHelper))
+	res, err := addUserTool.run(c, node, vmid, useHelper, []string{body.Username, sshKey}, 30*time.Second)
 	if err != nil {
 		writeError(w, err, 502)
 		return
