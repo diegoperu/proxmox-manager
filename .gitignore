@@ -9,3 +9,6 @@ proxmox-manager
 
 # Report di test con evidenze della VM (non pubblicare)
 test-reports/
+
+# Report di revisione design (lavoro locale, contengono percorsi della home)
+.impeccable/critique/
