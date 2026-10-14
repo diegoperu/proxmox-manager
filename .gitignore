@@ -6,3 +6,6 @@ proxmox-manager
 /server
 *.db-shm
 *.db-wal
+
+# Report di test con evidenze della VM (non pubblicare)
+test-reports/
