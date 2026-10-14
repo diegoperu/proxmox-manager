@@ -239,6 +239,9 @@ Tutto ciò che gira nel guest (add-user, operazioni disco) ha **una sola sorgent
 - `adduser.sh` esporta `SYSTEMD_NSS_DYNAMIC_BYPASS=1`: senza, `useradd` nel dominio dell'agent attende il timeout D-Bus da 25 s a ogni lookup di un nome inesistente (>2 minuti);
 - modificare uno script significa cambiare **anche** l'helper installato nei template: tenere stabile il contratto degli argomenti.
 
+**Verificato end to end il 2026-10-14** (Rocky 8.10, SELinux `Enforcing`, nessun dominio permissive, binario v0.51.0 → VM di test): add-user ramo password e ramo chiave (login SSH reale + sudo, etichette `ssh_home_t`), 409 su utente esistente, 400 su chiave con apice/comando (nessun effetto nel guest); `setup-disk` su disco vergine (GPT + `mkfs.ext4` + `fstab` per UUID + mount `1777`, ~6 s, nessun riavvio forzato) e su disco lasciato a metà; 409 con più candidati (nessuna modifica). `useradd` risulta eseguito in `virt_qemu_ga_unconfined_t` (audit), 0 AVC `virt_qemu_ga`.
+**Fallback inline su guest enforcing senza helper:** non funziona, per costruzione. Proxmox risponde 500 `guest-exec failed - got timeout` prima che il comando parta (nessun effetto nel guest, agent sano); `agentError` lo traduce in un messaggio che rimanda agli helper. Il fallback inline vale per guest **senza** SELinux enforcing. Non verificato: il fallback su Debian/Ubuntu con questo binario (coperto solo dai test unitari).
+
 ### AddVMUser — aggiunta utente via guest agent exec
 
 `POST /api/nodes/{node}/qemu/{vmid}/adduser` body: `{"username":"nomeutente","ssh_key":"..."}`
