@@ -1,5 +1,5 @@
 #!/bin/sh
-# ProxmoxManager — operazioni disco lato guest via QEMU Guest Agent.
+# ProxmoxManager - operazioni disco lato guest via QEMU Guest Agent.
 #
 # Sorgente unica (`//go:embed` in handlers): usato in due modi, stesso testo.
 #   - helper etichettato: /usr/local/libexec/pmgr/disk.sh <subcommand> [args]
@@ -18,14 +18,14 @@ case "$CMD" in
 
 # find-blank: elenca (uno per riga) i dischi candidati al setup.
 #   Candidato = disco vergine (nessuna partizione, nessun filesystem) OPPURE disco
-#   lasciato a metà da un tentativo precedente (una sola partizione ext4 o non
-#   formattata, non montata) — così un retry dopo un errore ritrova il disco giusto.
-#   Selezione per PROPRIETÀ, non per diff prima/dopo: su q35+PCIe il disco è già
+#   lasciato a meta' da un tentativo precedente (una sola partizione ext4 o non
+#   formattata, non montata) - cosi' un retry dopo un errore ritrova il disco giusto.
+#   Selezione per PROPRIETA', non per diff prima/dopo: su q35+PCIe il disco e' gia'
 #   collegato a caldo alla PUT /config, prima ancora di questa chiamata.
-#   lsblk che fallisce è un ERRORE (exit 3), non "nessun disco".
+#   lsblk che fallisce e' un ERRORE (exit 3), non "nessun disco".
 find-blank)
     LIST=$(lsblk -ndo NAME,TYPE) || { echo "lsblk non riuscito" >&2; exit 3; }
-    # Best effort: un device che sparisce a metà scansione non deve abortire la ricerca.
+    # Best effort: un device che sparisce a meta' scansione non deve abortire la ricerca.
     set +e
     printf '%s\n' "$LIST" | awk '$2=="disk"{print $1}' | while IFS= read -r d; do
         [ -n "$d" ] || continue
@@ -54,7 +54,7 @@ rescan)
 # setup <device> <mount_point> <perm>: partiziona (GPT, 1 partizione 100%), formatta
 #   ext4, crea il mount point, riga fstab per UUID, monta, applica i permessi.
 #   Idempotente: partizione/filesystem/fstab esistenti non vengono rifatti.
-#   device da find-blank, mount_point e perm (1777|0777) già validati dal server.
+#   device da find-blank, mount_point e perm (1777|0777) gia' validati dal server.
 setup)
     DEV="${1:?device mancante}"; MNT="${2:?mount point mancante}"; PERM="${3:?permessi mancanti}"
     case "$DEV" in /dev/*) ;; *) echo "device non valido: $DEV" >&2; exit 2;; esac
@@ -67,7 +67,7 @@ setup)
         sleep 1
     fi
 
-    # Formatta solo se la partizione non ha già ext4. Si controlla l'OUTPUT del tag TYPE,
+    # Formatta solo se la partizione non ha gia' ext4. Si controlla l'OUTPUT del tag TYPE,
     # non l'exit code di blkid: su una partizione GPT creata ma mai formattata blkid esce
     # 0 (stampa PARTLABEL/PARTUUID) pur senza TYPE, quindi un check exit-code salterebbe mkfs.
     FSTYPE=$(blkid -c /dev/null -o value -s TYPE "${DEV}1" 2>/dev/null || true)

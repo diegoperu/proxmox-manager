@@ -338,3 +338,31 @@ func TestAgentErrorMessages(t *testing.T) {
 		}
 	}
 }
+
+// Proxmox tronca il messaggio guest-exec di (byte - caratteri) e l'agent resta bloccato:
+// verificato su Ubuntu 26.04 (1 byte extra passa, 2 o più no). Gli script embedded e
+// ogni argomento verso il guest devono quindi essere ASCII.
+func TestGuestScriptsAreASCII(t *testing.T) {
+	for name, src := range map[string]string{"adduser.sh": addUserScriptSrc, "disk.sh": diskScriptSrc} {
+		if !isASCII(src) {
+			t.Errorf("%s contiene caratteri non ASCII o di controllo: l'esecuzione inline blocca il guest agent", name)
+		}
+	}
+}
+
+func TestRunGuestArgvRejectsNonASCII(t *testing.T) {
+	for _, arg := range []string{"già", "chiave \u2014 commento", "a\x00b", "a\x7fb"} {
+		f := &fakeAgent{exitedAfter: 1}
+		_, err := runGuestArgv(f, "n", 1, []string{"/bin/sh", "-c", "echo ok", "pmgr", arg}, time.Second)
+		if !errors.Is(err, errNonASCIIArg) {
+			t.Errorf("arg %q: atteso errNonASCIIArg, got %v", arg, err)
+		}
+		if f.gotArgs != nil {
+			t.Errorf("arg %q: il comando non doveva essere inviato al guest", arg)
+		}
+	}
+	f := &fakeAgent{exitedAfter: 1}
+	if _, err := runGuestArgv(f, "n", 1, []string{"/bin/sh", "-c", "echo ok\n\t", "pmgr", "tosi"}, time.Second); err != nil {
+		t.Errorf("argomenti ASCII rifiutati: %v", err)
+	}
+}

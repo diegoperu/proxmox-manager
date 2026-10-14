@@ -1,16 +1,16 @@
 #!/bin/sh
-# ProxmoxManager — crea un utente OS dentro una VM via QEMU Guest Agent.
+# ProxmoxManager - crea un utente OS dentro una VM via QEMU Guest Agent.
 #
 # Sorgente unica (`//go:embed` in handlers): usato in due modi, stesso testo.
 #   - helper etichettato: /usr/local/libexec/pmgr/adduser.sh <utente> <chiave>
 #     (su SELinux enforcing gira in virt_qemu_ga_unconfined_t, dominio non confinato)
 #   - fallback inline:     sh -c "<questo testo>" pmgr <utente> <chiave>
-#     (guest senza helper: Debian/Ubuntu, o Rocky non preparato — qui useradd fallisce
-#      sotto SELinux, è il motivo per cui esiste l'helper)
+#     (guest senza helper: Debian/Ubuntu, o Rocky non preparato - qui useradd fallisce
+#      sotto SELinux, e' il motivo per cui esiste l'helper)
 #
 # I valori della richiesta arrivano SOLO come argomenti posizionali ($1, $2): mai
 # interpolati nel testo, quindi una chiave con apici/metacaratteri non esegue comandi.
-# $1 = username (già validato dal server), $2 = chiave pubblica o vuoto.
+# $1 = username (gia' validato dal server), $2 = chiave pubblica o vuoto.
 set -eu
 umask 077
 
@@ -23,10 +23,10 @@ export SYSTEMD_NSS_DYNAMIC_BYPASS=1
 U="${1:?username mancante}"
 KEY="${2:-}"
 
-# Utente già esistente: exit 3, nessuna modifica. Così una richiesta non può resettare
+# Utente gia' esistente: exit 3, nessuna modifica. Cosi' una richiesta non puo' resettare
 # la password, aggiungere chiavi o dare sudo a un account preesistente (root incluso).
 if id "$U" >/dev/null 2>&1; then
-    echo "l'utente $U esiste già nella VM: nessuna modifica" >&2
+    echo "l'utente $U esiste gia' nella VM: nessuna modifica" >&2
     exit 3
 fi
 
@@ -61,9 +61,9 @@ else
     printf '%s\n' "$KEY" > "$HOME_DIR/.ssh/authorized_keys"
     chmod 600 "$HOME_DIR/.ssh/authorized_keys"
     chown "$U:$U" "$HOME_DIR/.ssh/authorized_keys"
-    # Su SELinux la home appena creata può avere l'etichetta sbagliata (user_home_dir_t):
+    # Su SELinux la home appena creata puo' avere l'etichetta sbagliata (user_home_dir_t):
     # senza ssh_home_t sshd rifiuta la chiave. restorecon la corregge; assente il comando
-    # (guest senza SELinux) non è un errore.
+    # (guest senza SELinux) non e' un errore.
     command -v restorecon >/dev/null 2>&1 && restorecon -R "$HOME_DIR/.ssh" || true
     printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$U" > "/etc/sudoers.d/$U"
     chmod 440 "/etc/sudoers.d/$U"

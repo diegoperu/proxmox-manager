@@ -43,6 +43,11 @@ func runGuestScript(c agentExecer, node string, vmid int, script string, args []
 // runGuestArgv runs argv through the guest agent and waits for it to exit. No shell is
 // involved unless argv[0] is one: arguments are never reinterpreted by the guest.
 func runGuestArgv(c agentExecer, node string, vmid int, argv []string, timeout time.Duration) (guestResult, error) {
+	for _, a := range argv {
+		if !isASCII(a) {
+			return guestResult{}, errNonASCIIArg
+		}
+	}
 	raw, err := c.AgentExec(node, vmid, argv)
 	if err != nil {
 		return guestResult{}, agentError(err)
@@ -78,6 +83,21 @@ func runGuestArgv(c agentExecer, node string, vmid int, argv []string, timeout t
 	return guestResult{}, errGuestTimeout
 }
 
+// errNonASCIIArg: Proxmox truncates the guest-exec message by the number of extra UTF-8
+// bytes (verified 2026-10-14 on Ubuntu 26.04: 1 extra byte works, 2 or more make the
+// request time out and leave the agent unresponsive until qemu-guest-agent is restarted).
+// So no argument sent to the guest may contain non-ASCII characters.
+var errNonASCIIArg = errors.New("argomento non ASCII: non puo' essere inviato al guest agent")
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > 0x7e || (s[i] < 0x20 && s[i] != '\n' && s[i] != '\t') {
+			return false
+		}
+	}
+	return true
+}
+
 // agentError turns guest-agent failures into messages an operator can act on.
 // The raw Proxmox message goes to the log only.
 func agentError(err error) error {
@@ -91,9 +111,10 @@ func agentError(err error) error {
 	case strings.Contains(msg, "not running") || strings.Contains(msg, "No QEMU guest agent"):
 		return fmt.Errorf("guest agent non attivo nella VM")
 	case strings.Contains(msg, "guest-exec") && strings.Contains(msg, "got timeout"):
-		// L'agent risponde (il probe è passato) ma il comando non parte: tipico di un guest
-		// con SELinux enforcing senza gli helper etichettati, dove la shell dell'agent è confinata.
-		return fmt.Errorf("il guest agent non è riuscito ad avviare il comando nella VM (timeout): su guest con SELinux enforcing servono gli helper installati in %s (vedi documentazione)", guestHelperDir)
+		// L'agent risponde ai ping ma il comando non parte. Cause note: argomento non ASCII
+		// (bloccato in runGuestArgv, qui non dovrebbe più arrivare) o agent in stato anomalo.
+		log.Printf("guest agent: guest-exec in timeout; se la VM e' RHEL/Rocky con SELinux enforcing servono gli helper in %s", guestHelperDir)
+		return fmt.Errorf("il guest agent non e' riuscito ad avviare il comando nella VM (timeout): riavvia qemu-guest-agent nella VM e riprova; su guest con SELinux enforcing servono anche gli helper in %s (vedi documentazione)", guestHelperDir)
 	}
 	return fmt.Errorf("guest agent non raggiungibile")
 }
