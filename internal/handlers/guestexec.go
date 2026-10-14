@@ -90,6 +90,10 @@ func agentError(err error) error {
 		return fmt.Errorf("guest-exec è disabilitato nella VM (BLACKLIST_RPC di qemu-guest-agent)")
 	case strings.Contains(msg, "not running") || strings.Contains(msg, "No QEMU guest agent"):
 		return fmt.Errorf("guest agent non attivo nella VM")
+	case strings.Contains(msg, "guest-exec") && strings.Contains(msg, "got timeout"):
+		// L'agent risponde (il probe è passato) ma il comando non parte: tipico di un guest
+		// con SELinux enforcing senza gli helper etichettati, dove la shell dell'agent è confinata.
+		return fmt.Errorf("il guest agent non è riuscito ad avviare il comando nella VM (timeout): su guest con SELinux enforcing servono gli helper installati in %s (vedi documentazione)", guestHelperDir)
 	}
 	return fmt.Errorf("guest agent non raggiungibile")
 }

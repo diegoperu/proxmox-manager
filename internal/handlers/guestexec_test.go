@@ -318,3 +318,23 @@ func TestEmbeddedGuestScripts(t *testing.T) {
 		}
 	}
 }
+
+func TestAgentErrorMessages(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"proxmox 500: QEMU guest agent is in frozen state", "frozen"},
+		{"proxmox 500: command is disabled / has been disabled", "disabilitato"},
+		{"proxmox 500: QEMU guest agent is not running", "non attivo"},
+		{`proxmox 500: {"message":"VM 134 qga command 'guest-exec' failed - got timeout\n"}`, "SELinux"},
+		{"dial tcp: connection refused", "non raggiungibile"},
+	}
+	for _, c := range cases {
+		got := agentError(errors.New(c.in)).Error()
+		if !strings.Contains(got, c.want) {
+			t.Errorf("agentError(%q) = %q, atteso che contenga %q", c.in, got, c.want)
+		}
+		// il dettaglio grezzo di Proxmox non deve arrivare all'utente
+		if strings.Contains(got, "proxmox 500") || strings.Contains(got, "qga command") {
+			t.Errorf("agentError(%q) espone il dettaglio interno: %q", c.in, got)
+		}
+	}
+}
