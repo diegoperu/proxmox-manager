@@ -220,77 +220,76 @@ Client methods: `GetVMConfig`, `GetContainerConfig` (aggiunto).
 - Frontend filtra per `f.mountpoint` e usa `f['used-bytes']`/`f['total-bytes']`
 - Lista VM carica fsinfo in background post-render (`loadFsinfo()`, `loadDashFsinfo()`)
 
+### Esecuzione nel guest: helper etichettato o script inline (2026-10-14)
+
+Tutto ciò che gira nel guest (add-user, operazioni disco) ha **una sola sorgente**: `internal/handlers/guestscripts/{adduser.sh,disk.sh}`, incorporata con `//go:embed` (`guestexec.go`). Lo stesso testo viene eseguito in due modi:
+
+- **helper etichettato** `/usr/local/libexec/pmgr/<nome>.sh`, se presente nel guest: `AgentExec(["/usr/local/libexec/pmgr/adduser.sh", user, key])` — exec diretto, nessuna shell;
+- **fallback inline** se manca: `AgentExec(["/bin/sh","-c", <testo>, "pmgr", user, key])`.
+
+`probeHelper` decide una volta per richiesta con `[ -x "$1" ] && echo HELPER || echo INLINE` (builtin di shell: gira anche nel dominio confinato). Output diverso da `HELPER` → inline.
+
+**Perché esiste l'helper (SELinux enforcing, verificato su Rocky 8.10):** la shell di `guest-exec` gira in `virt_qemu_ga_t`, che non può eseguire `useradd`/`usermod`/`lsblk`/`mount`/scrivere `fstab`; il boolean `virt_qemu_ga_run_unconfined` NON basta, perché abilita la transizione a `virt_qemu_ga_unconfined_t` solo per file etichettati `virt_qemu_ga_unconfined_exec_t`. L'helper è etichettato così e gira in un dominio completamente non confinato (`unconfined_domain_type`): nessun modulo SELinux custom. Sui guest senza SELinux (Debian/Ubuntu) basta l'inline.
+
+**Preparazione del guest** (template/cloud-init, vedi `create_cloud_snippet.sh` fuori repo): `BLACKLIST_RPC` senza `guest-exec`/`guest-exec-status` in `/etc/sysconfig/qemu-ga`; `setsebool -P virt_qemu_ga_run_unconfined on`; helper in `/usr/local/libexec/pmgr` (root, 0750); `semanage fcontext -a -t virt_qemu_ga_unconfined_exec_t '/usr/local/libexec/pmgr(/.*)?'` + `restorecon -R`.
+
+**Regole sugli script** (non negoziabili):
+- i dati della richiesta arrivano **solo come argomenti posizionali** (`$1`, `$2`), mai nel testo dello script: niente `fmt.Sprintf` di dati dentro uno script;
+- gli helper girano non confinati: devono restare **specifici e validati** (add-user, disco), mai un trampolino generico tipo `sh -c "$@"`; un nuovo subcommand va aggiunto con la sua validazione;
+- `adduser.sh` esporta `SYSTEMD_NSS_DYNAMIC_BYPASS=1`: senza, `useradd` nel dominio dell'agent attende il timeout D-Bus da 25 s a ogni lookup di un nome inesistente (>2 minuti);
+- modificare uno script significa cambiare **anche** l'helper installato nei template: tenere stabile il contratto degli argomenti.
+
 ### AddVMUser — aggiunta utente via guest agent exec
 
-`POST /api/nodes/{node}/qemu/{vmid}/adduser` body: `{"username":"nomeutente"}`
+`POST /api/nodes/{node}/qemu/{vmid}/adduser` body: `{"username":"nomeutente","ssh_key":"..."}`
 
 Flusso handler `AddVMUser`:
-1. Valida username con regex `^[a-z_][a-z0-9_-]{0,31}$`
-2. Se `ssh_key` presente: valida prefisso (`ssh-rsa`, `ssh-ed25519`, `ecdsa-*`, `sk-`), sanitizza newline
-3. Branch **solo password**: imposta la password fissa `p4ssw0rd`, scaduta al primo login (vedi sotto). **Nessuna generazione casuale**
-4. `AgentExec(node, vmid, ["/bin/sh", "-c", script])` → POST `/agent/exec` con body `command=/bin/sh&command=-c&command=<script>` (repeated keys, **non** `command[N]`)
-5. Estrae PID dalla risposta
-6. Polling `AgentExecStatus(node, vmid, pid)` ogni 1s fino a `exited==1` (timeout 30s)
-7. Risponde `{"output":"...", "exitcode":N}` (nessun campo password nella risposta)
+1. Valida username con regex `^[a-z_][a-z0-9_-]{0,31}$` (400 se non valido)
+2. `normalizeSSHKey`: una sola riga `tipo base64 [commento]`, tipi ssh-rsa/ssh-ed25519/ecdsa-nistp*/sk-*, niente newline, max 16 KB (400 altrimenti). Vuoto = ramo password
+3. `probeHelper` + `addUserTool.run(..., [username, key], 30s)`; agent non raggiungibile/frozen/guest-exec disabilitato → 502 con messaggio tradotto (`agentError`, dettaglio solo nei log)
+4. exit 3 dallo script → **409**: l'utente esiste già, nessuna modifica (una richiesta non può resettare password/chiavi/sudo di un account esistente, root compreso)
+5. Risponde `{"output":"...", "exitcode":N}` (nessun campo password)
 
-**Branch solo password** (SSHKey assente):
-```sh
-useradd -m -s /bin/bash <user> 2>/dev/null || true
-echo '<user>:p4ssw0rd' | chpasswd
-usermod -aG sudo <user> 2>/dev/null || true
-usermod -aG wheel <user> 2>/dev/null || true
-chage -d 0 <user>                              # password scade al primo login
-```
-Password fissa `p4ssw0rd` **voluta** (decisione utente 2026-10-13): scade al primo accesso e l'utente imposta la sua. **Non introdurre password casuali** in questo flusso. Rischio accettato esplicitamente (VM interne, rete fidata/VPN): chi conosce `p4ssw0rd` e accede per primo via SSH con password può impostarla al posto dell'utente legittimo.
-Il frontend (modal add-user) mostra l'hint `Password iniziale: p4ssw0rd` solo quando il campo chiave SSH è vuoto (`#adduser-pwhint`, nascosto su `oninput` della textarea).
-
-**Branch SSH key** (SSHKey presente):
-```sh
-useradd -m -s /bin/bash <user> 2>/dev/null || true
-usermod -aG sudo <user> 2>/dev/null || true
-usermod -aG wheel <user> 2>/dev/null || true
-mkdir -p /home/<user>/.ssh
-echo '<ssh_key>' >> /home/<user>/.ssh/authorized_keys
-chmod 700 /home/<user>/.ssh
-chmod 600 /home/<user>/.ssh/authorized_keys
-chown -R <user>:<user> /home/<user>/.ssh
-echo '<user> ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/<user>
-chmod 440 /etc/sudoers.d/<user>
-```
-Nessuna password impostata; accesso solo via chiave SSH; sudo senza password via file dedicato in `/etc/sudoers.d/`. Comportamento confermato dall'utente il 2026-10-13: questo ramo resta invariato e il frontend nasconde l'hint della password.
+Comportamento di `adduser.sh`:
+- `set -eu`: nessun errore nascosto (niente `2>/dev/null || true`), stderr nel risultato;
+- gruppo admin: `wheel` e/o `sudo`, solo quelli che esistono (`getent group`);
+- **ramo password** (nessuna chiave): password fissa `p4ssw0rd` **voluta** (decisione utente 2026-10-13, rischio accettato: VM interne, rete fidata), `chage -d 0`. Se `chage` fallisce l'account viene **bloccato** (`usermod -L`) ed esce 1: la password fissa non resta mai usabile. **Non introdurre password casuali**. Il frontend mostra l'hint solo con campo chiave vuoto (`#adduser-pwhint`);
+- **ramo chiave**: `~/.ssh` 700, `authorized_keys` 600 con **una sola riga** (`printf >`, idempotente), `restorecon -R` (senza `ssh_home_t` sshd rifiuta la chiave su SELinux), sudoers `NOPASSWD` 440. Nessuna password impostata.
 
 Client methods: `AgentExec`, `AgentExecStatus`.
 ⚠️ Proxmox agent exec vuole repeated `command` keys, **non** `command[0]`/`command[1]`.
 
 ## Aggiunta disco VM (POST /api/nodes/{node}/qemu/{vmid}/adddisk + /setup-disk)
 
-Solo VM QEMU. Setup lato guest via QEMU Guest Agent exec (stesso meccanismo di `AddVMUser`), non Ansible reale.
+Solo VM QEMU. Setup lato guest via QEMU Guest Agent exec con `guestscripts/disk.sh` (helper etichettato o fallback inline, vedi sopra), non Ansible reale. `disk.sh` ha 3 subcommand: `find-blank`, `rescan`, `setup <device> <mount> <perm>`; l'orchestrazione (quale disco, retry, 409, riavvio) resta in Go.
 
 **`POST /nodes/{node}/qemu/{vmid}/adddisk`** — `AddVMDisk`
 ```json
 {"storage": "local-lvm", "size_gb": 50, "bus": "scsi"}
 ```
-Legge config VM, trova primo slot libero per il bus (`nextDiskSlot`, limiti: scsi 0-30, virtio 0-15, sata 0-5), chiama `VMSetConfig` con `<slot>=<storage>:<size_gb>`. Funziona indipendentemente dallo stato power della VM. Risponde `{"disk":"scsi1","storage":"...","size_gb":50}`.
+Legge config VM, trova primo slot libero per il bus (`nextDiskSlot`, limiti in `diskSlotLimits`: scsi 0-30, virtio 0-15, sata 0-5, **condivisi** con la validazione di `setup-disk`), chiama `VMSetConfig` con `<slot>=<storage>:<size_gb>`. Funziona indipendentemente dallo stato power della VM. Risponde `{"disk":"scsi1","storage":"...","size_gb":50}`.
 
 **`POST /nodes/{node}/qemu/{vmid}/setup-disk`** — `SetupVMDisk`
 ```json
 {"disk": "scsi1", "mount_point": "/data", "sticky_bit": true}
 ```
-Richiede VM `running` con guest agent attivo. Filesystem ext4, partizionamento GPT singola partizione 100%. Permessi: `1777` (sticky, default) o `0777` se `sticky_bit:false`. `mountPointPattern` + blocklist `forbiddenMounts` (`/`, `/etc`, `/boot`, `/usr`, `/bin`, `/sbin`, `/var`, `/proc`, `/sys`, `/dev`, `/root`, `/home`, `/lib`, `/opt`) impediscono mount point pericolosi.
+Richiede VM `running` con guest agent attivo. Filesystem ext4, partizionamento GPT singola partizione 100%. Permessi: `1777` (sticky, default) o `0777` se `sticky_bit:false`. `validateMountPoint` (`mountPointPattern` + `path.Clean` + blocco per **prefisso** di `/etc`, `/boot`, `/usr`, `/bin`, `/sbin`, `/lib`, `/lib64`, `/var`, `/proc`, `/sys`, `/dev`, `/root`, `/home`, `/opt`, `/run`, `/tmp`) impedisce mount point pericolosi: `/etc/`, `/etc/ssh`, `/var/log` sono rifiutati (400). `validateDiskSlot` rifiuta slot oltre il limite del bus (`sata6`, `virtio16`).
 
 Rilevamento nuovo device — **per proprietà, non per diff temporale**:
-1. `findBlank` script: tra tutti i `TYPE=disk` di `lsblk`, candidato è o (a) un disco vergine — nessuna partizione figlia (`lsblk -ln /dev/$d | wc -l` == 1) e senza filesystem (`blkid` vuoto) — o (b) un disco con una sola partizione ext4 non montata (`findmnt -S`) — quest'ultimo caso copre il retry dopo un tentativo di setup fallito a metà (partizionato/formattato ma non montato/fstab)
+1. `disk.sh find-blank`: tra tutti i `TYPE=disk` di `lsblk`, candidato è o (a) un disco vergine — nessuna partizione figlia (`lsblk -ln /dev/$d | wc -l` == 1) e senza filesystem (`blkid` vuoto) — o (b) un disco con una sola partizione ext4 non montata (`findmnt -S`) — quest'ultimo caso copre il retry dopo un tentativo di setup fallito a metà (partizionato/formattato ma non montato/fstab)
 2. Se nessun candidato: rescan bus (`partprobe` + `echo "- - -" > /sys/class/scsi_host/host*/scan` + `udevadm settle`) e retry (5 tentativi, 2s apart)
 3. **Fallback**: se ancora nessun candidato, forza un ciclo `VMAction(shutdown, forceStop=1)` + `WaitForTask` + `VMAction(start)` + `WaitForTask`, poi attende il guest agent tornare raggiungibile (poll `echo ready`, timeout 2 minuti), infine ripete `findBlank` — autorizzato esplicitamente, nessuna conferma richiesta
 4. Se `findBlank` trova **più di un candidato**: errore esplicito (409, disambiguazione richiesta all'utente) invece di sceglierne uno a caso — evita di formattare il disco sbagliato
 
 ⚠️ **Perché non un diff prima/dopo `lsblk`** (bug reale osservato e corretto): su Proxmox/QEMU con machine type q35+PCIe il disco può venire collegato a caldo **immediatamente** alla `PUT /config` (prima ancora della chiamata a `setup-disk`). Una baseline "prima" presa a inizio richiesta lo troverebbe già presente, quindi nessun diff lo segnalerebbe mai come "nuovo" — risultato: `lsblk` manuale mostrava il disco (es. `vdb`), ma il diff falliva sempre, anche dopo un vero stop+start. La causa non era il tipo di riavvio (era già corretto: stop+start con `WaitForTask`, non `reboot` ACPI) ma il metodo di identificazione stesso.
 
-Setup: `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` + `udevadm settle` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
+Setup (`disk.sh setup`): `parted mklabel gpt` + `mkpart primary 0% 100%` (idempotente, skip se `blkid` già trova la partizione) → `mkfs.ext4` + `udevadm settle` (idempotente, skip se già formattata) → `mkdir -p <mount>` → riga UUID in `/etc/fstab` (idempotente) → `mount` (idempotente) → `chmod <perm> <mount>`.
 
 ⚠️ **Bug reale corretto**: `UUID=$(blkid -o value -s UUID "${DEV}1")` subito dopo `mkfs.ext4`, senza `udevadm settle`, poteva restituire stringa vuota (race blkid/cache). Con `UUID=""`, `grep -q "$UUID" /etc/fstab` (pattern vuoto) matcha qualunque riga non vuota → il check "già presente" risultava vero per errore, la riga fstab non veniva mai scritta, e il successivo `mount /data` falliva con `can't find in /etc/fstab`. Fix: `udevadm settle` dopo `mkfs.ext4`, probe non cache (`blkid -c /dev/null`), e `exit 1` esplicito se `UUID` risulta vuoto invece di proseguire silenziosamente.
 
 Risponde `{"log":[...righe...], "device":"/dev/sdX", "mount_point":"/data"}`.
+
+⚠️ **Limite noto (da correggere):** `setup-disk` valida `disk` ma **non lo usa** per scegliere il device (sceglie l'unico disco vuoto); se non ne trova forza uno stop+start della VM e risponde 502 "disco non rilevato nemmeno dopo il riavvio", anche quando il disco è già configurato. Un `lsblk` che fallisce nel guest ora è un errore esplicito (exit 3), non "nessun disco".
 
 Client methods riusati: `AgentExec`, `AgentExecStatus`, `VMSetConfig`, `VMAction`. Nessun nuovo metodo client aggiunto.
 
