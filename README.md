@@ -28,7 +28,7 @@ ProxmoxManager is a self-hosted web interface for managing one or more Proxmox V
 
 ## Features
 
-- 🖥 **Dashboard** — cluster KPIs, CPU/RAM history charts (Proxmox RRD), live VM table with disk usage
+- 🖥 **Dashboard** — a one-sentence cluster condition, KPIs with history, per-node 24h min–max bars (Proxmox RRD), recent activity, and the Top 10 VMs/containers by work done in the last 6/12/24 hours
 - 🗂 **VM & LXC management** — start, stop, reboot, shutdown, suspend, resume, reset, snapshot, migrate, delete
 - ⚡ **Batch operations** — multi-node VM/container selector, 7 actions, real-time log output
 - 🚀 **VM provisioning** — clone CloudInit templates, resize disk, configure IP/gateway/DNS/SSH keys via cloud-init
@@ -36,7 +36,9 @@ ProxmoxManager is a self-hosted web interface for managing one or more Proxmox V
 - 🌐 **Multi-cluster** — manage multiple independent Proxmox clusters from a single interface, switch with a dropdown
 - 👤 **Add VM users** — create OS users inside running VMs via QEMU Guest Agent, with optional SSH public key and sudoers setup
 - 🖥 **Serial console** — xterm.js terminal for VMs with `serial0` configured via termproxy WebSocket bridge (requires dedicated credentials — see [Security — Console credentials](#security--console-credentials))
-- 🎨 **Themes** — Dark, Light, Eva-01, Catppuccin Mocha
+- 🎨 **Themes and density** — auto (follows the OS), Night, Light ("Alba"), Eva-01, Catppuccin Mocha; comfortable or compact density
+- ⌨ **Quick search** — `Ctrl`/`⌘` + `K` jumps to any VM, node, page or action; every VM has a shareable link (`#/vm/<node>/<vmid>/<qemu|lxc>`)
+- ☑ **Selection bar** — tick VMs in the VM list and hand them to Batch with the action already chosen
 
 ---
 
@@ -127,6 +129,7 @@ Settings are stored in `config.json` in the binary's working directory. The file
     }
   ],
   "theme": "",
+  "density": "",
   "cache_seconds": 30,
   "db_path": "proxmox.db",
   "listen_addr": ":8080"
@@ -141,7 +144,8 @@ Settings are stored in `config.json` in the binary's working directory. The file
 | `clusters[].url` | — | Proxmox node URL (or cluster VIP) |
 | `clusters[].api_token` | — | Proxmox API token (`USER@REALM!TOKENID=UUID`) |
 | `clusters[].default` | — | `true` = loaded on startup |
-| `theme` | `""` | `""` follow OS, `"dark"`, `"light"`, `"eva01"`, `"catppuccino"` |
+| `theme` | `""` | `""` follow OS, `"dark"`, `"light"`, `"eva01"`, `"catppuccino"` (unknown values are rejected) |
+| `density` | `""` | `""` comfortable, `"compact"` (tighter tables and rows) |
 | `cache_seconds` | `30` | SQLite API cache TTL |
 | `listen_addr` | `:8080` | HTTP listen address |
 
