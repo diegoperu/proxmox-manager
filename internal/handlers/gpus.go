@@ -94,6 +94,7 @@ type GPUUse struct {
 	Kind     string `json:"kind"` // mapping | direct
 	Mapping  string `json:"mapping,omitempty"`
 	Editable bool   `json:"editable"` // mapping-based and not part of a group mapping: the app may remove it
+	Options  string `json:"options"`  // whitelisted options of the hostpci line (pcie, rombar, x-vga), normalised
 }
 
 type GPUCard struct {
@@ -198,7 +199,8 @@ func BuildGPUInventory(nodes []GPUNodeInput, maps MappingSet, now time.Time) GPU
 			seen := map[string]bool{}
 			for _, slot := range slots {
 				val := vm.HostPCI[slot]
-				use := GPUUse{VMID: vm.VMID, Name: clampText(vm.Name, 64), Status: vm.Status, Lock: clampText(vm.Lock, 32), Slot: slot}
+				use := GPUUse{VMID: vm.VMID, Name: clampText(vm.Name, 64), Status: vm.Status, Lock: clampText(vm.Lock, 32), Slot: slot,
+					Options: normalizeHostpciOptions(val)}
 				if k, v, ok := strings.Cut(strings.SplitN(val, ",", 2)[0], "="); ok && k == "mapping" {
 					use.Kind, use.Mapping = "mapping", v
 					es := byNode(v, n.Node)
@@ -329,6 +331,71 @@ type gpuAPI interface {
 
 var _ gpuAPI = (*api.Client)(nil)
 
+// loadGPUNodeVMs reads the config of every QEMU VM of a node (parallel, bounded by sem) and keeps the
+// ones with hostpci entries. `failed` lists what could not be read: callers that must be sure a card is free
+// (the assign path) treat any failure as "cannot verify".
+func loadGPUNodeVMs(c gpuAPI, node string, sem chan struct{}) (vms []GPUVM, failed []string, err error) {
+	vraw, err := c.GetVMs(node)
+	if err != nil {
+		return nil, nil, err
+	}
+	var list []map[string]interface{}
+	if json.Unmarshal(vraw, &list) != nil {
+		return nil, nil, errors.New("elenco VM non valido")
+	}
+	if len(list) > maxGPUVMs {
+		return nil, nil, errors.New("troppe VM sul nodo")
+	}
+	vms = []GPUVM{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, v := range list {
+		vmid, _ := v["vmid"].(float64)
+		if vmid <= 0 || vmid > 999999999 {
+			mu.Lock()
+			failed = append(failed, node+"/?")
+			mu.Unlock()
+			continue
+		}
+		name, _ := v["name"].(string)
+		status, _ := v["status"].(string)
+		wg.Add(1)
+		go func(vmid int, name, status string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			cfgRaw, err := c.GetVMConfig(node, vmid)
+			var cfg map[string]interface{}
+			if err == nil && json.Unmarshal(cfgRaw, &cfg) != nil {
+				err = errors.New("config non valido")
+			}
+			if err != nil {
+				mu.Lock()
+				failed = append(failed, node+"/"+strconv.Itoa(vmid))
+				mu.Unlock()
+				return
+			}
+			hp := map[string]string{}
+			for k, val := range cfg {
+				if s, ok := val.(string); ok && hostpciKey.MatchString(k) {
+					hp[k] = s
+				}
+			}
+			if len(hp) == 0 {
+				return
+			}
+			lock, _ := cfg["lock"].(string)
+			machine, _ := cfg["machine"].(string)
+			mu.Lock()
+			vms = append(vms, GPUVM{VMID: vmid, Name: name, Status: status, Lock: lock, Machine: machine, HostPCI: hp})
+			mu.Unlock()
+		}(int(vmid), name, status)
+	}
+	wg.Wait()
+	sort.Strings(failed)
+	return vms, failed, nil
+}
+
 func fetchGPUInventory(c gpuAPI, now time.Time) (GPUInventory, error) {
 	raw, err := c.GetNodes()
 	if err != nil {
@@ -341,91 +408,35 @@ func fetchGPUInventory(c gpuAPI, now time.Time) (GPUInventory, error) {
 	if json.Unmarshal(raw, &nodes) != nil {
 		return GPUInventory{}, errors.New("elenco nodi non valido")
 	}
-	var maps MappingSet = MappingSet{}
+	maps := MappingSet{}
 	if mraw, err := c.GetPCIMappings(); err == nil {
 		maps = ParsePCIMappingEntries(mraw)
 	}
-	inputs := make([]*GPUNodeInput, 0, len(nodes)) // pointers: goroutines fill VMs while the loop keeps appending
-	var partial []string
-	var mu sync.Mutex
+	inputs := make([]GPUNodeInput, 0, len(nodes))
+	partial := []string{}
 	sem := make(chan struct{}, gpuConfigWorkers)
-	var wg sync.WaitGroup
-	total := 0
 	for _, n := range nodes {
 		if !nodeNamePattern.MatchString(n.Node) {
 			continue
 		}
-		in := &GPUNodeInput{Node: n.Node, Online: n.Status == "online"}
-		if !in.Online {
-			inputs = append(inputs, in)
-			continue
-		}
-		praw, err := c.GetNodePCI(n.Node)
-		if err != nil {
-			partial = append(partial, n.Node)
-			inputs = append(inputs, in)
-			continue
-		}
-		in.PCI = ParsePCIList(praw)
-		vraw, err := c.GetVMs(n.Node)
-		if err != nil {
-			partial = append(partial, n.Node)
-			inputs = append(inputs, in)
-			continue
-		}
-		var list []map[string]interface{}
-		_ = json.Unmarshal(vraw, &list)
-		in.VMs = []GPUVM{}
-		inputs = append(inputs, in)
-		for _, v := range list {
-			vmid, _ := v["vmid"].(float64)
-			if vmid <= 0 || vmid > 999999999 || total >= maxGPUVMs {
-				continue
+		in := GPUNodeInput{Node: n.Node, Online: n.Status == "online"}
+		if in.Online {
+			praw, err := c.GetNodePCI(n.Node)
+			if err == nil {
+				in.PCI = ParsePCIList(praw)
+				var failed []string
+				in.VMs, failed, err = loadGPUNodeVMs(c, n.Node, sem)
+				partial = append(partial, failed...)
 			}
-			total++
-			name, _ := v["name"].(string)
-			status, _ := v["status"].(string)
-			wg.Add(1)
-			go func(in *GPUNodeInput, node string, vmid int, name, status string) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
-				cfgRaw, err := c.GetVMConfig(node, vmid)
-				if err != nil {
-					mu.Lock()
-					partial = append(partial, node+"/"+strconv.Itoa(vmid))
-					mu.Unlock()
-					return
-				}
-				var cfg map[string]interface{}
-				if json.Unmarshal(cfgRaw, &cfg) != nil {
-					return
-				}
-				hp := map[string]string{}
-				for k, val := range cfg {
-					if s, ok := val.(string); ok && hostpciKey.MatchString(k) {
-						hp[k] = s
-					}
-				}
-				if len(hp) == 0 {
-					return
-				}
-				lock, _ := cfg["lock"].(string)
-				machine, _ := cfg["machine"].(string)
-				mu.Lock()
-				in.VMs = append(in.VMs, GPUVM{VMID: vmid, Name: name, Status: status, Lock: lock, Machine: machine, HostPCI: hp})
-				mu.Unlock()
-			}(in, n.Node, int(vmid), name, status)
+			if err != nil {
+				partial = append(partial, n.Node)
+			}
 		}
+		inputs = append(inputs, in)
 	}
-	wg.Wait()
-	plain := make([]GPUNodeInput, 0, len(inputs))
-	for _, in := range inputs {
-		plain = append(plain, *in)
-	}
-	inv := BuildGPUInventory(plain, maps, now)
+	inv := BuildGPUInventory(inputs, maps, now)
 	sort.Strings(partial)
-	inv.Partial = append(inv.Partial, partial...)
+	inv.Partial = partial
 	return inv, nil
 }
 

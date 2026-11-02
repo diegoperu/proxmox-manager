@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Finto Proxmox VE per l'anteprima grafica (solo dati sintetici, solo localhost, sola lettura)."""
-import json, math, os, random, sys, time
+import hashlib, json, math, os, random, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -253,6 +253,7 @@ def route(path):
                 if seg[0] == "qemu" and v["vmid"] % 19 == 0: cfg["hostpci0"] = "0000:02:00"                       # diretta sulla stessa A100 del mapping: doppione
                 if seg[0] == "qemu" and v["vmid"] % 23 == 0: cfg["hostpci0"] = "0000:7a:00"                       # scheda inesistente sul nodo
                 if seg[0] == "qemu" and v["vmid"] % 17 == 0: cfg["hostpci0"] = "0000:03:00.0"                 # NIC, non e' una GPU
+                cfg["digest"] = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:40]  # come Proxmox: cambia se cambia il config
                 return cfg
             if seg[2] == "agent" and seg[3] == "network-get-interfaces":
                 if v["status"] != "running" or v["type"] != "qemu" or v["vmid"] % 14 == 0: return None  # agent muto
