@@ -58,6 +58,7 @@ func main() {
 
 	// API
 	r.Route("/api", func(r chi.Router) {
+		r.Use(apiGuard)
 		r.Get("/config", h.GetConfig)
 		r.Post("/config", h.SaveConfig)
 		r.Post("/config/test", h.TestConnection)

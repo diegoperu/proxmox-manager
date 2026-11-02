@@ -148,6 +148,7 @@ Settings are stored in `config.json` in the binary's working directory. The file
 | `clusters[].default` | — | `true` = loaded on startup |
 | `theme` | `""` | `""` follow OS, `"dark"`, `"light"`, `"eva01"`, `"catppuccino"` (unknown values are rejected) |
 | `density` | `""` | `""` comfortable, `"compact"` (tighter tables and rows) |
+| `allowed_hosts` | `[]` | Optional list of host names accepted in the `Host` header (anti DNS-rebinding), e.g. `["localhost","pmgr.example.org"]`; empty = no restriction |
 | `cache_seconds` | `30` | SQLite API cache TTL |
 | `listen_addr` | `:8080` | HTTP listen address |
 

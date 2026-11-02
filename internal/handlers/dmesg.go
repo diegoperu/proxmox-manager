@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
@@ -25,6 +26,8 @@ const (
 	dmesgMaxBytes   = 512 * 1024 // cap on what is kept from the guest output
 	dmesgMaxLineLen = 2000
 	dmesgDefLines   = 300
+	dmesgDeadline   = 60 * time.Second // tetto complessivo della richiesta (le singole chiamate hanno i loro timeout)
+	dmesgMaxPar     = 4                // letture dmesg contemporanee in tutto il proxy
 )
 
 var (
@@ -33,7 +36,29 @@ var (
 	// Proxmox node names are DNS-style host names.
 	nodeNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$`)
 	ansiPattern     = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
+	dmesgSlots      = make(chan struct{}, dmesgMaxPar)
 )
+
+// dropUnsafeRune: control characters and bidirectional overrides (they can reorder text to spoof what is shown).
+func dropUnsafeRune(r rune) bool {
+	switch {
+	case unicode.IsControl(r):
+		return true
+	case r == 0x061C || r == 0x200E || r == 0x200F || (r >= 0x202A && r <= 0x202E) || (r >= 0x2066 && r <= 0x2069):
+		return true
+	}
+	return false
+}
+
+// cleanText removes unsafe runes and invalid UTF-8 from a short guest-provided string.
+func cleanText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if dropUnsafeRune(r) {
+			return -1
+		}
+		return r
+	}, strings.ToValidUTF8(s, ""))
+}
 
 // validVMTarget validates the node and vmid taken from the URL.
 func validVMTarget(node, vmidStr string) (int, error) {
@@ -69,8 +94,8 @@ func sanitizeDmesg(raw string, maxBytes int) ([]string, bool) {
 		switch {
 		case r == '\n' || r == '\t':
 			b.WriteRune(r)
-		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0):
-			// dropped: control characters
+		case dropUnsafeRune(r):
+			// dropped: control characters and bidi overrides
 		default:
 			b.WriteRune(r)
 		}
@@ -99,8 +124,9 @@ type dmesgResponse struct {
 	Lines          []string `json:"lines"`
 	Count          int      `json:"count"`
 	LinesRequested int      `json:"lines_requested"`
-	Level          string   `json:"level"`
-	Mode           string   `json:"mode"` // helper | inline
+	Level          string   `json:"level"`         // livello richiesto
+	LevelApplied   string   `json:"level_applied"` // livello davvero applicato ("all" se il dmesg del guest non supporta il filtro)
+	Mode           string   `json:"mode"`          // helper | inline
 	Truncated      bool     `json:"truncated"`
 	FetchedAt      int64    `json:"fetched_at"`
 }
@@ -144,21 +170,29 @@ func readDmesg(c dmesgAPI, node string, vmid, lines int, level string) (dmesgRes
 	switch res.ExitCode {
 	case 0:
 	case 3:
-		log.Printf("dmesg %s/%d: non leggibile nel guest (%s): %s", node, vmid, guestMode(useHelper), strings.TrimSpace(res.Err))
+		log.Printf("dmesg %s/%d: non leggibile nel guest (%s): stderr %d byte: %.200q", node, vmid, guestMode(useHelper), len(res.Err), strings.TrimSpace(res.Err))
 		msg := "il guest non permette di leggere il dmesg"
 		if !useHelper {
 			msg += fmt.Sprintf(": se la VM usa SELinux enforcing serve l'helper dmesg.sh in %s (vedi documentazione)", guestHelperDir)
 		}
 		return dmesgResponse{}, http.StatusBadGateway, errors.New(msg)
 	default:
-		log.Printf("dmesg %s/%d: exit %d (%s): %s", node, vmid, res.ExitCode, guestMode(useHelper), strings.TrimSpace(res.Err))
+		log.Printf("dmesg %s/%d: exit %d (%s): stderr %d byte: %.200q", node, vmid, res.ExitCode, guestMode(useHelper), len(res.Err), strings.TrimSpace(res.Err))
 		return dmesgResponse{}, http.StatusBadGateway, fmt.Errorf("lettura del dmesg non riuscita (codice %d)", res.ExitCode)
 	}
 
 	out, truncated := sanitizeDmesg(res.Out, dmesgMaxBytes)
+	if len(out) > lines { // un guest ostile puo' ignorare `tail`: si tengono comunque le ultime `lines` righe
+		out = out[len(out)-lines:]
+		truncated = true
+	}
+	applied := level
+	if strings.Contains(res.Err, "level filter not supported") {
+		applied = "all"
+	}
 	// Only counts and the mode are logged, never the content of the guest's kernel log.
 	log.Printf("dmesg %s/%d: %d righe (%s)", node, vmid, len(out), guestMode(useHelper))
-	return dmesgResponse{Lines: out, Count: len(out), LinesRequested: lines, Level: level,
+	return dmesgResponse{Lines: out, Count: len(out), LinesRequested: lines, Level: level, LevelApplied: applied,
 		Mode: guestMode(useHelper), Truncated: truncated, FetchedAt: time.Now().Unix()}, http.StatusOK, nil
 }
 
@@ -187,6 +221,7 @@ func dmesgRelease(key string) {
 // VMDmesg: POST /api/nodes/{node}/qemu/{vmid}/dmesg  {"lines":300,"level":"all"}
 // POST (not GET) because it runs a command in the guest: no caching, no link-triggered runs.
 func (h *Handler) VMDmesg(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store") // il log va riletto a ogni clic: mai dalla cache
 	node := chi.URLParam(r, "node")
 	vmid, err := validVMTarget(node, chi.URLParam(r, "vmid"))
 	if err != nil {
@@ -209,25 +244,59 @@ func (h *Handler) VMDmesg(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("livello non valido (all o warn)"), http.StatusBadRequest)
 		return
 	}
-	c, err := h.getClientFor(clusterIdx(r))
-	if err != nil {
-		writeError(w, err, http.StatusServiceUnavailable)
-		return
-	}
 	key := fmt.Sprintf("%d|%s|%d", clusterIdx(r), node, vmid)
 	if !dmesgAcquire(key) {
 		writeError(w, errors.New("lettura già in corso per questa VM"), http.StatusTooManyRequests)
 		return
 	}
-	defer dmesgRelease(key)
-
-	resp, status, err := readDmesg(c, node, vmid, body.Lines, body.Level)
-	if err != nil {
-		writeError(w, err, status)
+	// Tetto globale alle letture contemporanee: ognuna tiene occupati il guest agent e la memoria del proxy.
+	select {
+	case dmesgSlots <- struct{}{}:
+	default:
+		dmesgRelease(key)
+		writeError(w, errors.New("troppe letture dmesg in corso: riprova tra poco"), http.StatusTooManyRequests)
 		return
 	}
-	w.Header().Set("Cache-Control", "no-store")
-	writeJSON(w, resp)
+	c, err := h.getClientFor(clusterIdx(r))
+	if err != nil {
+		dmesgRelease(key)
+		<-dmesgSlots
+		writeError(w, err, http.StatusServiceUnavailable)
+		return
+	}
+
+	type outcome struct {
+		resp   dmesgResponse
+		status int
+		err    error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		// La chiave e lo slot si liberano quando il lavoro finisce davvero, anche se la richiesta e' gia' tornata.
+		defer func() { dmesgRelease(key); <-dmesgSlots }()
+		defer func() { // il Recoverer di chi non protegge le goroutine: un panico qui fermerebbe il processo
+			if rec := recover(); rec != nil {
+				log.Printf("dmesg %s/%d: panico: %v", node, vmid, rec)
+				done <- outcome{status: http.StatusInternalServerError, err: errors.New("errore interno")}
+			}
+		}()
+		var o outcome
+		o.resp, o.status, o.err = readDmesg(c, node, vmid, body.Lines, body.Level)
+		done <- o
+	}()
+	timer := time.NewTimer(dmesgDeadline)
+	defer timer.Stop()
+	select {
+	case o := <-done:
+		if o.err != nil {
+			writeError(w, o.err, o.status)
+			return
+		}
+		writeJSON(w, o.resp)
+	case <-timer.C:
+		writeError(w, errors.New("tempo scaduto: la VM non ha risposto in tempo"), http.StatusGatewayTimeout)
+	case <-r.Context().Done(): // il browser ha chiuso la richiesta: niente da scrivere
+	}
 }
 
 // normalizeOSInfo keeps the few string fields of guest-get-osinfo the UI uses.
@@ -243,10 +312,13 @@ func normalizeOSInfo(raw json.RawMessage) map[string]string {
 		"version-id": "version_id", "kernel-release": "kernel_release", "machine": "machine"}
 	for src, dst := range keys {
 		if v, ok := wrapper.Result[src].(string); ok && v != "" {
+			v = cleanText(v)
 			if utf8.RuneCountInString(v) > 100 {
 				v = string([]rune(v)[:100])
 			}
-			out[dst] = strings.ToValidUTF8(v, "")
+			if v != "" {
+				out[dst] = v
+			}
 		}
 	}
 	return out

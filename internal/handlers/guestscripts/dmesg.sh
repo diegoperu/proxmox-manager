@@ -23,14 +23,18 @@ elif dmesg -T >/dev/null 2>&1; then
 else
   tf=""
 fi
-# A level filter the installed dmesg does not know is dropped, not turned into an error.
+# A level filter the installed dmesg does not know is dropped, not turned into an error;
+# the marker on stderr lets the caller tell the operator the log is NOT filtered.
 if [ -n "$lvl" ] && ! dmesg "$lvl" >/dev/null 2>&1; then
   lvl=""
+  echo "level filter not supported" >&2
 fi
 # $tf and $lvl are fixed words chosen above, never request data: no quoting needed.
 out=$(dmesg $tf $lvl 2>&1) && rc=0 || rc=$?
 if [ "$rc" -ne 0 ]; then
-  echo "dmesg not readable (exit $rc): $out" >&2
+  # Only the first line, cut short: the buffer content must not travel in the error channel.
+  first=$(printf '%s\n' "$out" | head -n 1 | cut -c1-200)
+  echo "dmesg not readable (exit $rc): $first" >&2
   exit 3
 fi
 printf '%s\n' "$out" | tail -n "$n"

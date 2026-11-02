@@ -47,5 +47,44 @@ Two features run commands **inside guest VMs** through the QEMU Guest Agent
   first login** (a deliberate project decision, accepted risk for internal
   VMs). If the expiry cannot be forced, the account is locked instead.
 
+## Kernel log (dmesg) and operating system information
+
+A third guest feature reads the **kernel log** of a running Linux VM through the
+same agent mechanism, only when the user asks (nothing is preloaded or cached),
+and the VM's operating system through `guest-get-osinfo`.
+
+- Read-only: the fixed script `guestscripts/dmesg.sh` only reads the ring buffer
+  (a behavioural test checks which flags the guest's `dmesg` can receive; it can
+  never clear it or change the console level). The only request data are two
+  whitelisted values (100/300/1000 lines, level all/warn), passed as positional
+  arguments.
+- The kernel log can contain internal names, addresses and occasionally
+  sensitive messages. It is shown to anyone who can reach the application, like
+  the other guest operations. The server log records counts and the execution
+  mode only, never the content; guest stderr is logged truncated.
+- Hostile-guest limits: output capped (512 KB, 2000 characters per line, only the
+  last N lines kept), control characters, ANSI sequences and bidirectional
+  overrides removed, text rendered with `textContent` only, at most 4 reads at a
+  time in the whole proxy and one per VM, a 60 s overall deadline, and the
+  proxy refuses Proxmox responses over 32 MiB.
+- On SELinux-enforcing guests this needs a third helper, `dmesg.sh`, in
+  `/usr/local/libexec/pmgr/` with the same label as the others.
+
+## Requests from other web pages (CSRF, DNS rebinding)
+
+Because the application has no login, `/api` refuses requests that a browser
+started on behalf of another web page:
+
+- `Sec-Fetch-Site`, when present, must be `same-origin` or `none`;
+- an `Origin` header, when present (any method, WebSocket handshakes included),
+  must match the `Host` the request was sent to (or `X-Forwarded-Host` behind a
+  reverse proxy, which must therefore preserve the host name);
+- `POST`, `PUT`, `DELETE` must send `Content-Type: application/json` (scripts and
+  `curl` need `-H 'Content-Type: application/json'`);
+- optional **`allowed_hosts`** in `config.json` (list of host names, empty by
+  default = no restriction) rejects any other `Host` header, which stops DNS
+  rebinding. Set it to the names users type in the address bar, e.g.
+  `["localhost","127.0.0.1","pmgr.example.org"]`.
+
 ## Reporting vulnerabilities
 Open a GitHub issue marked **[Security]** or contact the maintainer directly.

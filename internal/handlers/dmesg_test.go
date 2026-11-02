@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // fakeDmesgAPI: guest agent scripted by scriptedAgent plus canned status / osinfo answers.
@@ -232,4 +235,118 @@ func TestNormalizeOSInfo(t *testing.T) {
 			t.Errorf("%q -> %v, atteso vuoto", bad, g)
 		}
 	}
+}
+
+func TestReadDmesgCapsLinesAndReportsLevelApplied(t *testing.T) {
+	fastPoll(t)
+	// un guest ostile ignora `tail` e manda molte piu' righe di quelle chieste
+	var b strings.Builder
+	for i := 0; i < 5000; i++ {
+		fmt.Fprintf(&b, "riga %d\n", i)
+	}
+	f := newFake(guestResult{Out: "INLINE\n"}, guestResult{Out: b.String(), Err: "level filter not supported\n"})
+	resp, status, err := readDmesg(f, "n", 150, 100, "warn")
+	if err != nil || status != http.StatusOK {
+		t.Fatalf("status=%d err=%v", status, err)
+	}
+	if resp.Count != 100 || len(resp.Lines) != 100 || resp.Lines[99] != "riga 4999" || !resp.Truncated {
+		t.Errorf("tetto righe non applicato: count=%d ultima=%q truncated=%v", resp.Count, resp.Lines[len(resp.Lines)-1], resp.Truncated)
+	}
+	if resp.Level != "warn" || resp.LevelApplied != "all" {
+		t.Errorf("livello richiesto/applicato = %q/%q, atteso warn/all", resp.Level, resp.LevelApplied)
+	}
+	ok := newFake(guestResult{Out: "INLINE\n"}, guestResult{Out: "x\n"})
+	r2, _, _ := readDmesg(ok, "n", 150, 100, "warn")
+	if r2.LevelApplied != "warn" {
+		t.Errorf("senza marcatore il livello applicato deve restare warn, got %q", r2.LevelApplied)
+	}
+}
+
+func TestSanitizeAndOSInfoDropBidiOverrides(t *testing.T) {
+	got, _ := sanitizeDmesg("ok \u202Eevil\u202C \u2066x\u2069\n", 1<<20)
+	if len(got) != 1 || strings.ContainsAny(got[0], "\u202E\u202C\u2066\u2069") {
+		t.Errorf("bidi non rimossi: %q", got)
+	}
+	o := normalizeOSInfo(json.RawMessage("{\"result\":{\"name\":\"Roc\u202Eky\\u0007 Linux\",\"id\":\"\\u0000\"}}"))
+	if o["name"] != "Rocky Linux" {
+		t.Errorf("name = %q", o["name"])
+	}
+	if _, ok := o["id"]; ok {
+		t.Errorf("un valore fatto solo di caratteri di controllo non deve comparire: %v", o)
+	}
+}
+
+// ---- handler HTTP (validazione, 429, intestazioni) attraverso il router chi ----
+
+func dmesgRouter() http.Handler {
+	r := chi.NewRouter()
+	r.Post("/api/nodes/{node}/qemu/{vmid}/dmesg", (&Handler{}).VMDmesg)
+	return r
+}
+
+func callDmesg(t *testing.T, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	dmesgRouter().ServeHTTP(rec, req)
+	return rec
+}
+
+func TestVMDmesgHandlerRejectsBadInput(t *testing.T) {
+	good := "/api/nodes/pve1/qemu/150/dmesg"
+	cases := map[string]struct{ path, body string }{
+		"righe fuori whitelist":   {good, `{"lines":50,"level":"all"}`},
+		"righe float":             {good, `{"lines":300.5,"level":"all"}`},
+		"righe stringa":           {good, `{"lines":"300","level":"all"}`},
+		"livello non valido":      {good, `{"lines":300,"level":"err"}`},
+		"livello con shell":       {good, `{"lines":300,"level":"all; rm -rf /"}`},
+		"json rotto":              {good, `{`},
+		"corpo vuoto":             {good, ``},
+		"corpo oltre 1 KB":        {good, `{"lines":300,"level":"all","pad":"` + strings.Repeat("a", 2048) + `"}`},
+		"nodo con %2f":            {"/api/nodes/a%2fb/qemu/150/dmesg", `{"lines":300,"level":"all"}`},
+		"nodo con punto iniziale": {"/api/nodes/.hidden/qemu/150/dmesg", `{"lines":300,"level":"all"}`},
+		"vmid non numerico":       {"/api/nodes/pve1/qemu/abc/dmesg", `{"lines":300,"level":"all"}`},
+		"vmid troppo piccolo":     {"/api/nodes/pve1/qemu/5/dmesg", `{"lines":300,"level":"all"}`},
+	}
+	for name, c := range cases {
+		rec := callDmesg(t, c.path, c.body)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status %d, atteso 400 (corpo %q)", name, rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" {
+			t.Errorf("%s: manca Cache-Control: no-store", name)
+		}
+	}
+}
+
+func TestVMDmesgHandlerRefusesSecondReadOnSameVM(t *testing.T) {
+	if !dmesgAcquire("0|pve1|151") {
+		t.Fatal("acquisizione di prova rifiutata")
+	}
+	defer dmesgRelease("0|pve1|151")
+	rec := callDmesg(t, "/api/nodes/pve1/qemu/151/dmesg", `{"lines":300,"level":"all"}`)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("status %d, atteso 429", rec.Code)
+	}
+}
+
+func TestVMDmesgHandlerGlobalSlotsLimit(t *testing.T) {
+	for i := 0; i < dmesgMaxPar; i++ {
+		dmesgSlots <- struct{}{}
+	}
+	defer func() {
+		for i := 0; i < dmesgMaxPar; i++ {
+			<-dmesgSlots
+		}
+	}()
+	rec := callDmesg(t, "/api/nodes/pve1/qemu/152/dmesg", `{"lines":300,"level":"all"}`)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("status %d, atteso 429 a slot esauriti", rec.Code)
+	}
+	// la chiave per-VM non deve restare occupata dopo il rifiuto
+	if !dmesgAcquire("0|pve1|152") {
+		t.Error("la chiave della VM e' rimasta bloccata dopo il rifiuto per slot esauriti")
+	}
+	dmesgRelease("0|pve1|152")
 }

@@ -23,6 +23,8 @@ type Config struct {
 	CacheSeconds int             `json:"cache_seconds"`
 	DBPath       string          `json:"db_path"`
 	ListenAddr   string          `json:"listen_addr"`
+	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
+	AllowedHosts []string `json:"allowed_hosts"`
 }
 
 var (
@@ -161,4 +163,11 @@ func GetDefaultCluster() (ClusterConfig, error) {
 	}
 	log.Printf("warning: nessun cluster con default=true, usando Clusters[0]")
 	return current.Clusters[0], nil
+}
+
+// AllowedHosts returns a copy of the configured Host allowlist (empty = no restriction).
+func AllowedHosts() []string {
+	mu.RLock()
+	defer mu.RUnlock()
+	return append([]string(nil), current.AllowedHosts...)
 }
