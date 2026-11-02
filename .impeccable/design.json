@@ -252,7 +252,7 @@
       "name": "Top Row Trend",
       "kind": "custom",
       "refersTo": "card",
-      "description": "Riga della Top 10: andamento CPU come previsione oraria (curva 0-100%, soglia 85% tratteggiata, punto sul picco) con glifo e parola di condizione.",
+      "description": "Riga della Top 10: andamento CPU come previsione oraria (curva 0-100%, soglia 85% tratteggiata, punto sul picco) con glifo e parola di condizione basata su carico sostenuto.",
       "html": "<div class=\"ds-top\"><svg viewBox=\"0 0 200 36\" preserveAspectRatio=\"none\" class=\"ds-tsvg\"><line class=\"ds-thr\" x1=\"0\" x2=\"200\" y1=\"6.4\" y2=\"6.4\"/><polygon class=\"ds-ta\" points=\"0,22 40,18 80,20 120,12 160,14 200,10 200,34 0,34\"/><polyline class=\"ds-tl\" points=\"0,22 40,18 80,20 120,12 160,14 200,10\"/></svg><i class=\"ds-pk\"></i><span class=\"ds-tc\">Variabile</span></div>",
       "css": ".ds-top{position:relative;display:flex;align-items:center;gap:14px;width:340px;margin:12px}.ds-tsvg{width:200px;height:38px}.ds-thr{stroke:rgba(131,148,176,.55);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}.ds-ta{fill:rgba(242,169,59,.10);stroke:none}.ds-tl{fill:none;stroke:#f2a93b;stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}.ds-pk{position:absolute;left:196px;top:11px;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#e9eef7;box-shadow:0 0 0 2px #13213a}.ds-tc{font:500 13px Inter,system-ui,sans-serif;color:#f2a93b}"
     }

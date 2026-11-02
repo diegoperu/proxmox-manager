@@ -10,10 +10,10 @@ NOW = int(time.time())
 GB = 1024 ** 3
 
 NODES = {
-    "pve1": dict(maxmem=64 * GB, cores=32, status="online", mem=0.58, cpu=0.31, disk=0.46),
-    "pve2": dict(maxmem=128 * GB, cores=48, status="online", mem=0.63, cpu=0.44, disk=0.52),
-    "pve3": dict(maxmem=64 * GB, cores=32, status="online", mem=0.92, cpu=0.37, disk=0.71),
-    "pve4": dict(maxmem=64 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
+    "datacloud-node-1": dict(maxmem=64 * GB, cores=32, status="online", mem=0.58, cpu=0.31, disk=0.46),
+    "datacloud-node-2": dict(maxmem=128 * GB, cores=48, status="online", mem=0.63, cpu=0.44, disk=0.52),
+    "datacloud-node-3": dict(maxmem=64 * GB, cores=32, status="online", mem=0.92, cpu=0.37, disk=0.71),
+    "datacloud-node-4": dict(maxmem=64 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
 }
 NAMES = ["web-lab", "db-test", "ci-runner", "gitea", "nextcloud", "grafana", "prometheus", "mail-relay",
          "dns-int", "vpn-gw", "backup-srv", "k8s-ctl", "k8s-w1", "k8s-w2", "jupyter", "gpu-train",
@@ -22,7 +22,7 @@ NAMES = ["web-lab", "db-test", "ci-runner", "gitea", "nextcloud", "grafana", "pr
 VMS = []
 vmid = 100
 for node in NODES:
-    n = {"pve1": 12, "pve2": 14, "pve3": 12, "pve4": 6}[node]
+    n = {"datacloud-node-1": 12, "datacloud-node-2": 14, "datacloud-node-3": 12, "datacloud-node-4": 6}[node]
     for i in range(n):
         vmid += 1 if rnd.random() < .8 else 7
         typ = "lxc" if rnd.random() < .22 else "qemu"
@@ -36,8 +36,8 @@ for node in NODES:
                         maxdisk=rnd.choice([20, 32, 50, 100, 200]) * GB, template=0,
                         ip=f"10.75.4.{(vmid % 200) + 10}"))
 # un caso di prova: la VM 151 e' ferma su pve3
-VMS[40].update(vmid=151, name="web-lab-01", node="pve3", status="stopped", mem=0, cpu=0, type="qemu")
-VMS.append(dict(type="qemu", node="pve1", vmid=9000, name="rocky-9-template", status="stopped", maxmem=4 * GB,
+VMS[40].update(vmid=151, name="web-lab-01", node="datacloud-node-3", status="stopped", mem=0, cpu=0, type="qemu")
+VMS.append(dict(type="qemu", node="datacloud-node-1", vmid=9000, name="rocky-9-template", status="stopped", maxmem=4 * GB,
                 mem=0, cpu=0, maxdisk=20 * GB, template=1, ip=""))
 seen = set()
 for v in VMS:  # VMID univoci: la VM di prova 151 non deve avere omonimi
@@ -63,8 +63,8 @@ def rrd(node, tf):
         t = NOW - (pts - i) * 900
         wave = math.sin(i / 9.0 + len(node))
         cpu = max(.02, min(.98, base["cpu"] + .18 * wave + seed.uniform(-.06, .06)))
-        up = 1 if (node == "pve3" and i > 70) else 0
-        mem = min(.99, base["mem"] - (.22 if node == "pve3" else .06) + .05 * wave + (i - 70) * .012 * up + seed.uniform(-.01, .01))
+        up = 1 if (node == "datacloud-node-3" and i > 70) else 0
+        mem = min(.99, base["mem"] - (.22 if node == "datacloud-node-3" else .06) + .05 * wave + (i - 70) * .012 * up + seed.uniform(-.01, .01))
         out.append(dict(time=t, cpu=round(cpu, 4), memused=int(base["maxmem"] * mem), memtotal=base["maxmem"],
                         netin=seed.uniform(1e5, 9e6), netout=seed.uniform(1e5, 6e6),
                         loadavg=round(cpu * 4, 2), iowait=round(seed.uniform(0, .05), 4),
@@ -88,9 +88,9 @@ def resources():
 
 def tasks():
     out = []
-    spec = [("qmigrate", "pve1", 140, "diego@pve", None, 90), ("vzdump", "pve3", 151, "root@pam", "ERROR: storage 'nas01' non raggiungibile", 3000),
-            ("qmclone", "pve1", 213, "diego@pve", "OK", 5400), ("qmsnapshot", "pve2", 118, "diego@pve", "OK", 7200),
-            ("qmstart", "pve3", 118, "diego@pve", "OK", 9000), ("qmresize", "pve2", 207, "diego@pve", "OK", 80000)]
+    spec = [("qmigrate", "datacloud-node-1", 140, "diego@pve", None, 90), ("vzdump", "datacloud-node-3", 151, "root@pam", "ERROR: storage 'nas01' non raggiungibile", 3000),
+            ("qmclone", "datacloud-node-1", 213, "diego@pve", "OK", 5400), ("qmsnapshot", "datacloud-node-2", 118, "diego@pve", "OK", 7200),
+            ("qmstart", "datacloud-node-3", 118, "diego@pve", "OK", 9000), ("qmresize", "datacloud-node-2", 207, "diego@pve", "OK", 80000)]
     for i, (t, n, vid, user, st, ago) in enumerate(spec):
         s = NOW - ago
         e = None if st is None else s + 40
