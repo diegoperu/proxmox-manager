@@ -696,7 +696,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.73.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.74.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2070,6 +2070,103 @@ const Ceph={
     norebalance:'il riequilibrio e\' sospeso', noscrub:'i controlli di integrita\' sono sospesi',
     'nodeep-scrub':'i controlli profondi sono sospesi', pause:'letture e scritture sono sospese',
   },
+  // Traduzione dei controlli di salute: codice -> frase italiana costruita dal conteggio `n`. Il testo originale di Ceph
+  // resta nel tooltip e, per i codici non in tabella, e' quello mostrato. Un codice nuovo si aggiunge qui (e in ceph_test se serve).
+  CHECK_IT:(()=>{
+    const pl=(n,one,many)=>n===1?`1 ${one}`:`${n} ${many}`;
+    return{
+      OSD_DOWN:n=>pl(n,'OSD giù','OSD giù'),
+      OSD_HOST_DOWN:n=>pl(n,'nodo con tutti gli OSD giù','nodi con tutti gli OSD giù'),
+      OSD_ROOT_DOWN:n=>pl(n,'radice CRUSH con tutti gli OSD giù','radici CRUSH con tutti gli OSD giù'),
+      OSD_NEARFULL:n=>pl(n,'OSD quasi pieno','OSD quasi pieni'),
+      OSD_BACKFILLFULL:n=>pl(n,'OSD troppo pieno per il riempimento (backfill)','OSD troppo pieni per il riempimento (backfill)'),
+      OSD_FULL:n=>pl(n,'OSD pieno','OSD pieni'),
+      OSD_OUT_OF_ORDER_FULL:()=>'Soglie di riempimento degli OSD incoerenti',
+      OSD_FLAGS:n=>pl(n,'OSD con un flag attivo','OSD con flag attivi'),
+      OSD_SCRUB_ERRORS:n=>pl(n,'errore di scrub (controllo di integrità)','errori di scrub (controllo di integrità)'),
+      OSD_TOO_MANY_REPAIRS:()=>'Troppe riparazioni di letture su un OSD',
+      OSD_NO_DOWN_OUT_INTERVAL:()=>'mon_osd_down_out_interval è 0: gli OSD fermi non vengono mai esclusi',
+      OSD_UPGRADE_FINISHED:()=>'Aggiornamento completato: valutare require-osd-release',
+      OSDMAP_FLAGS:(n,c)=>'Flag del cluster attivi: '+String(c.message||'').replace(/\s*flag\(s\) set\s*$/,''),
+      OLD_CRUSH_TUNABLES:()=>'Parametri CRUSH obsoleti',
+      OLD_CRUSH_STRAW_CALC_VERSION:()=>'Versione di calcolo CRUSH straw obsoleta',
+      POOL_FULL:n=>pl(n,'pool pieno','pool pieni'),
+      POOL_BACKFILLFULL:n=>pl(n,'pool troppo pieno per il riempimento','pool troppo pieni per il riempimento'),
+      POOL_NEARFULL:n=>pl(n,'pool quasi pieno','pool quasi pieni'),
+      POOL_APP_NOT_ENABLED:n=>pl(n,'pool senza applicazione abilitata','pool senza applicazione abilitata'),
+      POOL_TOO_FEW_PGS:n=>pl(n,'pool con pochi PG','pool con pochi PG'),
+      POOL_TOO_MANY_PGS:n=>pl(n,'pool con troppi PG','pool con troppi PG'),
+      POOL_TARGET_SIZE_BYTES_OVERCOMMITTED:()=>'Dimensione prevista dei pool oltre la capacità',
+      POOL_TARGET_SIZE_RATIO_OVERCOMMITTED:()=>'Rapporto previsto dei pool oltre la capacità',
+      POOL_NO_REDUNDANCY:n=>pl(n,'pool senza ridondanza','pool senza ridondanza'),
+      TOO_FEW_PGS:()=>'Pochi PG per OSD',
+      TOO_MANY_PGS:()=>'Troppi PG per OSD',
+      MANY_OBJECTS_PER_PG:n=>pl(n,'pool con troppi oggetti per PG','pool con troppi oggetti per PG'),
+      PG_AVAILABILITY:()=>'Disponibilità dei dati ridotta: alcuni PG non sono attivi',
+      PG_DEGRADED:()=>'Ridondanza dei dati ridotta: oggetti degradati',
+      PG_RECOVERY_FULL:()=>'Recupero impossibile: spazio insufficiente',
+      PG_BACKFILL_FULL:()=>'Riempimento impossibile: spazio insufficiente',
+      PG_DAMAGED:()=>'Dati danneggiati: errori di scrub sui PG',
+      PG_NOT_SCRUBBED:n=>pl(n,'PG senza scrub recente','PG senza scrub recente'),
+      PG_NOT_DEEP_SCRUBBED:n=>pl(n,'PG senza deep scrub recente','PG senza deep scrub recente'),
+      PG_SLOW_SNAP_TRIMMING:()=>'Eliminazione degli snapshot lenta',
+      OBJECT_MISPLACED:()=>'Oggetti fuori posto (riequilibrio in corso)',
+      OBJECT_UNFOUND:()=>'Oggetti non trovati',
+      SLOW_OPS:n=>pl(n,'operazione lenta (bloccata da oltre 30 s)','operazioni lente (bloccate da oltre 30 s)'),
+      BLUESTORE_SLOW_OP_ALERT:n=>pl(n,'OSD con operazioni lente in BlueStore','OSD con operazioni lente in BlueStore'),
+      BLUESTORE_NO_COMPRESSION:n=>pl(n,'OSD senza compressione disponibile','OSD senza compressione disponibile'),
+      BLUESTORE_SPURIOUS_READ_ERRORS:n=>pl(n,'OSD con errori di lettura spuri','OSD con errori di lettura spuri'),
+      BLUESTORE_DISK_SIZE_MISMATCH:n=>pl(n,'OSD con dimensione del disco incoerente','OSD con dimensione del disco incoerente'),
+      BLUESTORE_LEGACY_STATFS:n=>pl(n,'OSD con statistiche BlueStore obsolete','OSD con statistiche BlueStore obsolete'),
+      BLUESTORE_NO_PER_POOL_OMAP:n=>pl(n,'OSD senza omap per pool','OSD senza omap per pool'),
+      MON_DOWN:n=>pl(n,'monitor fuori quorum','monitor fuori quorum'),
+      MON_CLOCK_SKEW:()=>'Orologi dei monitor non sincronizzati',
+      MON_DISK_LOW:()=>'Poco spazio su disco nei monitor',
+      MON_DISK_CRIT:()=>'Spazio su disco dei monitor quasi esaurito',
+      MON_DISK_BIG:()=>'Database di un monitor troppo grande',
+      MON_MSGR2_NOT_ENABLED:()=>'msgr2 non abilitato sui monitor',
+      MON_NETSPLIT:()=>'Partizione di rete tra i monitor',
+      MGR_DOWN:()=>'Nessun manager attivo',
+      MGR_MODULE_ERROR:()=>'Un modulo del manager è in errore',
+      MGR_MODULE_DEPENDENCY:()=>'Dipendenza mancante in un modulo del manager',
+      FS_DEGRADED:()=>'Filesystem degradato',
+      FS_WITH_FAILED_MDS:()=>'Filesystem con un MDS in errore',
+      MDS_INSUFFICIENT_STANDBY:()=>'MDS di riserva insufficienti',
+      MDS_SLOW_REQUEST:()=>'Richieste lente sul server dei metadati (MDS)',
+      MDS_TRIM:()=>'Il giornale dei metadati (MDS) non viene ridotto',
+      RECENT_CRASH:n=>pl(n,'crash recente di un demone Ceph','crash recenti di demoni Ceph'),
+      DEVICE_HEALTH:n=>pl(n,'dispositivo con guasto previsto','dispositivi con guasto previsto'),
+      DEVICE_HEALTH_IN_USE:()=>'Dispositivi con guasto previsto ancora in uso',
+      DEVICE_HEALTH_TOOMANY:()=>'Troppi dispositivi con guasto previsto',
+      LARGE_OMAP_OBJECTS:n=>pl(n,'oggetto omap molto grande','oggetti omap molto grandi'),
+      TELEMETRY_CHANGED:()=>'La telemetria richiede una nuova autorizzazione',
+      AUTH_INSECURE_CLIENT_KEY_TYPE:n=>pl(n,'entità client con tipo di chiave non sicuro','entità client con tipo di chiave non sicuro'),
+      AUTH_INSECURE_KEYS_ALLOWED:()=>'I monitor accettano tipi di chiave non sicuri per l\'autenticazione',
+      AUTH_INSECURE_KEYS_CREATABLE:()=>'I monitor permettono di creare chiavi di tipo non sicuro',
+    };
+  })(),
+  // Righe di dettaglio ricorrenti (nome dell'OSD, del pool, dell'entita' restano quelli di Ceph).
+  DETAIL_IT:[
+    [/^(osd\.\d+) \(root=[^)]*?host=([^,)]+)[^)]*\) is down$/,(m)=>`${m[1]} (nodo ${m[2]}) è giù`],
+    [/^\s*(osd\.\d+) observed slow operation indications in BlueStore$/,(m)=>`${m[1]} ha rilevato operazioni lente in BlueStore`],
+    [/^entity (\S+) using insecure key type: (\S+)$/,(m)=>`l'entità ${m[1]} usa un tipo di chiave non sicuro: ${m[2]}`],
+    [/^insecure cipher (\S+) allowed for auth$/,(m)=>`cifrario non sicuro ${m[1]} consentito per l'autenticazione`],
+    [/^application not enabled on pool '(.+)'$/,(m)=>`applicazione non abilitata sul pool '${m[1]}'`],
+    [/^(osd\.\d+) is full$/,(m)=>`${m[1]} è pieno`],
+    [/^(osd\.\d+) is near full$/,(m)=>`${m[1]} è quasi pieno`],
+    [/^pool '?(\S+?)'? is (full|near full)$/,(m)=>`il pool '${m[1]}' è ${m[2]==='full'?'pieno':'quasi pieno'}`],
+    [/^mon\.(\S+) clock skew (\S+) > max (\S+)/,(m)=>`mon.${m[1]}: scarto dell'orologio ${m[2]} oltre il massimo ${m[3]}`],
+  ],
+  // Messaggio italiano di un check; `orig` e' il testo di Ceph (da mostrare nel tooltip se diverso).
+  checkText(c){
+    const orig=String(c.message||''), f=Object.prototype.hasOwnProperty.call(Ceph.CHECK_IT,c.code)?Ceph.CHECK_IT[c.code]:null;
+    let text=orig; if(f){try{text=f(c.count>0?c.count:1,c)||orig;}catch(e){text=orig;}}
+    return{text,orig};
+  },
+  detailText(line){
+    for(const [re,fn] of Ceph.DETAIL_IT){const m=re.exec(line);if(m)return fn(m);}
+    return line;
+  },
   isAvail(){return Ceph.availBy[ClusterMgr.current]===true;},
   syncNav(){const b=document.querySelector('.ni[data-page="ceph"]');if(b)b.hidden=!Ceph.isAvail();},
   note(o,idx){
@@ -2121,7 +2218,7 @@ const Ceph={
     const st=Ceph.stateOf(o);
     if(!st){host.hidden=true;host.innerHTML='';return;}
     const subs=st.parts.map(p=>p.t);
-    const live=st.checks.slice(0,2).map(c=>c.message); if(st.checks.length>2)live.push(`+${st.checks.length-2} avvisi`);
+    const live=st.checks.slice(0,2).map(c=>Ceph.checkText(c).text); if(st.checks.length>2)live.push(`+${st.checks.length-2} avvisi`);
     const sub=[`${o.osd_counts.up}/${o.osd_counts.total} OSD`,...subs,...(st.level==='ok'||subs.length?[]:live)].join(' · ');
     const word=st.level==='bad'?'Attenzione':st.level==='warn'?'Quasi sereno':'Sereno';
     const cls=st.cap>=95?'crit2':st.cap>=85?'warn2':'ok2';
@@ -2182,7 +2279,7 @@ const Ceph={
     const lead=[];
     if(st.downN){const names=(o.osds||[]).filter(x=>x.status==='down').map(x=>`${x.name} (${x.host})`);lead.push(`<span class="${st.level==='bad'?'bad':'wrn'}">${esc(st.downN===1?'1 OSD giù':st.downN+' OSD giù')}${names.length&&names.length<=3?': '+esc(names.join(', ')):''}</span>`);}
     for(const p of st.parts.filter(p=>!/OSD/.test(p.t)))lead.push(p.k==='info'?esc(p.t):`<span class="${p.k==='bad'?'bad':'wrn'}">${esc(p.t)}</span>`);
-    if(!lead.length&&st.checks.length)lead.push(`<span class="wrn">${esc(st.checks[0].message)}</span>`);
+    if(!lead.length&&st.checks.length)lead.push(`<span class="wrn">${esc(Ceph.checkText(st.checks[0]).text)}</span>`);
     const sub=lead.length?lead.join(' · '):`Nessuna anomalia · capacità ${Math.round(st.cap)}%`;
     cond.innerHTML=`
       <svg class="cond-ico ${st.level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[st.level]}</svg>
@@ -2239,8 +2336,9 @@ const Ceph={
     const cs=o.checks||[];
     const rows=cs.length?cs.map(c=>{
       const sev=c.muted?'m':c.severity==='HEALTH_ERR'?'e':'w', word=c.muted?'Silenziato':c.severity==='HEALTH_ERR'?'Errore':'Avviso';
-      const det=(c.detail||[]).slice(0,3).map(esc).join(' · ')+((c.detail||[]).length>3?` · +${c.detail.length-3}`:'');
-      return`<div class="calert${c.muted?' muted':''}"><span class="sev ${sev}">${word}</span><span class="ccode">${esc(c.code)}</span><div class="cmsg">${esc(c.message)}${det?`<small>${det}</small>`:''}</div></div>`;
+      const det=(c.detail||[]).slice(0,3).map(l=>esc(Ceph.detailText(l))).join(' · ')+((c.detail||[]).length>3?` · +${c.detail.length-3}`:'');
+      const tx=Ceph.checkText(c), tip=tx.text!==tx.orig?` title="${esc('Testo originale di Ceph: '+tx.orig)}"`:'';
+      return`<div class="calert${c.muted?' muted':''}"><span class="sev ${sev}">${word}</span><span class="ccode">${esc(c.code)}</span><div class="cmsg"><span${tip}>${esc(tx.text)}</span>${det?`<small>${det}</small>`:''}</div></div>`;
     }).join(''):`<div class="calert"><span class="st ok">Nessun avviso</span><span></span><div class="cmsg">Ceph non segnala problemi.</div></div>`;
     return`<h2 class="sec" style="margin-top:22px">Avvisi meteo <small>controlli di salute di Ceph · ${cs.length}</small></h2><div class="panel calerts">${rows}</div>`;
   },
