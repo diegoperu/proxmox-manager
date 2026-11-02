@@ -697,7 +697,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.77.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.78.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -786,7 +786,7 @@ html.catppuccino{
           <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('qemu')">QEMU</button>
           <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('lxc')">LXC</button>
         </div>
-        <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome, VMID o IP" placeholder="Cerca nome, VMID, IP" oninput="VMs.filter()" style="width:220px"></div>
+        <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome, VMID o IP" placeholder="Cerca nome, VMID, IP, GPU, GPU" oninput="VMs.filter()" style="width:220px"></div>
         <div id="vm-node-sel-wrap" style="position:relative">
           <button class="inp" onclick="VMs.toggleNodePicker()" id="vm-node-btn" aria-haspopup="true" aria-label="Filtra per nodi" style="cursor:pointer;min-width:130px;text-align:left">Tutti i nodi</button>
           <div id="vm-node-picker" style="display:none;position:absolute;top:100%;left:0;z-index:50;min-width:190px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;box-shadow:var(--shadow-pop);margin-top:4px;padding:6px 0">
@@ -800,6 +800,9 @@ html.catppuccino{
         <select class="inp" id="vstatus" aria-label="Filtra per stato" onchange="VMs.filter()">
           <option value="">Tutti gli stati</option><option value="running">In esecuzione</option>
           <option value="stopped">Ferme</option><option value="paused">In pausa</option>
+        </select>
+        <select class="inp" id="vgpu" aria-label="Filtra per scheda video" onchange="VMs.filter()">
+          <option value="">Con e senza GPU</option><option value="1">Solo con GPU</option><option value="0">Senza GPU</option>
         </select>
         <button class="btn bg2 sm" onclick="VMs.load()" aria-label="Aggiorna la lista"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
         <span class="sp"></span><span class="tb-sum" id="vm-sum" aria-live="polite"></span>
@@ -2833,12 +2836,15 @@ const VMs=(()=>{
 
   function doFilter(){
     const search=document.getElementById('vsearch').value.toLowerCase();
-    const status=document.getElementById('vstatus').value;
+    const status=document.getElementById('vstatus').value, gpuF=document.getElementById('vgpu').value;
+    const hasGpu=v=>Array.isArray(v.gpus)&&v.gpus.length>0;
     filtered=all.filter(v=>{
       if(currentTab!=='all'&&v.type!==currentTab)return false;
       if(!selectedNodes.has(v.node))return false;
       if(status&&v.status!==status)return false;
-      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search))return false;
+      if(gpuF==='1'&&!hasGpu(v))return false;
+      if(gpuF==='0'&&hasGpu(v))return false;
+      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search)&&!(hasGpu(v)&&v.gpus.some(g=>String(g&&g.name||'').toLowerCase().includes(search))))return false;
       return true;
     });
     sortedData=[...filtered];
@@ -3046,6 +3052,7 @@ const VMs=(()=>{
             <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
             ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
+            ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')}</dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
