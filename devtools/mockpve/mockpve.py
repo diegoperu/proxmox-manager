@@ -2,7 +2,7 @@
 """Finto Proxmox VE per l'anteprima grafica (solo dati sintetici, solo localhost, sola lettura)."""
 import json, math, random, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 18006
 rnd = random.Random(42)
@@ -15,6 +15,34 @@ NODES = {
     "datacloud-node-3": dict(maxmem=64 * GB, cores=32, status="online", mem=0.92, cpu=0.37, disk=0.71),
     "datacloud-node-4": dict(maxmem=64 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
 }
+OSES = [
+    {"id": "ubuntu", "name": "Ubuntu", "pretty-name": "Ubuntu 24.04.1 LTS", "version": "24.04.1 LTS (Noble Numbat)", "version-id": "24.04", "kernel-release": "6.8.0-45-generic", "machine": "x86_64"},
+    {"id": "rocky", "name": "Rocky Linux", "pretty-name": "Rocky Linux 8.10 (Green Obsidian)", "version": "8.10 (Green Obsidian)", "version-id": "8.10", "kernel-release": "4.18.0-553.el8_10.x86_64", "machine": "x86_64"},
+    {"id": "debian", "name": "Debian GNU/Linux", "pretty-name": "Debian GNU/Linux 12 (bookworm)", "version": "12 (bookworm)", "version-id": "12", "kernel-release": "6.1.0-25-amd64", "machine": "x86_64"},
+    {"id": "mswindows", "name": "Microsoft Windows", "pretty-name": "Microsoft Windows Server 2022 Standard", "version": "Server 2022", "version-id": "10.0", "kernel-release": "20348", "machine": "x86_64"},
+]
+EXEC = {}  # pid -> risultato finto (solo per l'anteprima: nessun comando viene eseguito)
+
+
+def fake_dmesg(lines, level):
+    rnd2 = random.Random(7)
+    out = []
+    for i in range(1500):
+        t = time.strftime("%Y-%m-%dT%H:%M:%S+0000", time.gmtime(NOW - 86400 + i * 57))
+        kind = rnd2.random()
+        if kind < 0.03:
+            out.append((f"{t} EXT4-fs error (device vda1): ext4_find_entry:1455: inode #{rnd2.randint(100,9999)}: comm cron: reading directory lblock 0", "err"))
+        elif kind < 0.08:
+            out.append((f"{t} nf_conntrack: table full, dropping packet (warning {i})", "warn"))
+        elif kind < 0.5:
+            out.append((f"{t} audit: type=1400 audit({NOW - 86400 + i * 57}.123:{i}): avc: denied {{ read }} for pid={rnd2.randint(100,9999)}", "info"))
+        else:
+            out.append((f"{t} systemd[1]: Started Session {i} of User root.", "info"))
+    if level == "warn":
+        out = [x for x in out if x[1] != "info"]
+    return "\n".join(x[0] for x in out[-lines:]) + "\n"
+
+
 NAMES = ["web-lab", "db-test", "ci-runner", "gitea", "nextcloud", "grafana", "prometheus", "mail-relay",
          "dns-int", "vpn-gw", "backup-srv", "k8s-ctl", "k8s-w1", "k8s-w2", "jupyter", "gpu-train",
          "wiki", "monitor", "proxy", "ldap", "redis-cache", "minio", "registry", "build-arm"]
@@ -143,6 +171,9 @@ def route(path):
                 if val: cfg[key] = val
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
                 return cfg
+            if seg[2] == "agent" and seg[3] == "get-osinfo":
+                if v["status"] != "running" or v["type"] != "qemu": return None
+                return dict(result=OSES[v["vmid"] % len(OSES)])
             if seg[2] == "agent": return dict(result=[dict(mountpoint="/", **{"used-bytes": v["disk"], "total-bytes": v["maxdisk"]}, type="ext4", name="vda1")])
             if seg[2] == "rrddata":
                 pts = rrd(node, "day")
@@ -161,6 +192,13 @@ class H(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if not path.startswith("/api2/json"):
             return self.send_error(404)
+        if path.endswith("/agent/exec-status"):
+            pid = int(parse_qs(urlparse(self.path).query).get("pid", ["0"])[0])
+            code, out = EXEC.get(pid, (0, ""))
+            body = json.dumps({"data": {"exited": 1, "exitcode": code, "out-data": out}}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
         data = route(path[len("/api2/json"):])
         if data is None:
             return self.send_error(404)
@@ -168,7 +206,24 @@ class H(BaseHTTPRequestHandler):
         self.send_response(200); self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
-    def do_POST(self): self.send_error(405, "anteprima in sola lettura")
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if path.endswith("/agent/exec"):  # l'unica "scrittura" accettata: esecuzione finta, nessun effetto
+            n = int(self.headers.get("Content-Length", "0") or 0)
+            cmd = parse_qs(self.rfile.read(min(n, 65536)).decode()).get("command", [])
+            pid = 1000 + len(EXEC)
+            if any("-x" in c and "HELPER" in c for c in cmd):
+                EXEC[pid] = (0, "INLINE\n")
+            elif "pmgr" in cmd and len(cmd) >= 6:
+                a_lines, a_level = int(cmd[-2]), cmd[-1]
+                EXEC[pid] = (0, fake_dmesg(a_lines, a_level))
+            else:
+                EXEC[pid] = (0, "")
+            body = json.dumps({"data": {"pid": pid}}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
+        self.send_error(405, "anteprima in sola lettura")
     do_PUT = do_DELETE = do_POST
 
 

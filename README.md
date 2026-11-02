@@ -38,6 +38,8 @@ ProxmoxManager is a self-hosted web interface for managing one or more Proxmox V
 - 🖥 **Serial console** — xterm.js terminal for VMs with `serial0` configured via termproxy WebSocket bridge (requires dedicated credentials — see [Security — Console credentials](#security--console-credentials))
 - 🎨 **Themes and density** — auto (follows the OS), Night, Light ("Alba"), Eva-01, Catppuccin Mocha; comfortable or compact density
 - ⌨ **Quick search** — `Ctrl`/`⌘` + `K` jumps to any VM, node, page or action; every VM has a shareable link (`#/vm/<node>/<vmid>/<qemu|lxc>`)
+- 🧾 **Kernel log (dmesg)** — read on demand from a running Linux VM through the guest agent (last 100/300/1000 lines, errors-and-warnings filter, search, copy, download); needs the labelled `dmesg.sh` helper on SELinux-enforcing guests
+- 🧩 **Operating system column** — name and version from the guest agent (e.g. Ubuntu 24.04, Rocky 8.10), with the Proxmox OS type as fallback
 - ☑ **Selection bar** — tick VMs in the VM list and hand them to Batch with the action already chosen
 
 ---

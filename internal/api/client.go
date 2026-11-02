@@ -324,6 +324,10 @@ func (c *Client) AgentExec(node string, vmid int, args []string) (json.RawMessag
 	return c.Post(fmt.Sprintf("/nodes/%s/qemu/%d/agent/exec", node, vmid), v)
 }
 
+func (c *Client) GetVMOSInfo(node string, vmid int) (json.RawMessage, error) {
+	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/get-osinfo", node, vmid))
+}
+
 func (c *Client) AgentExecStatus(node string, vmid, pid int) (json.RawMessage, error) {
 	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/exec-status?pid=%d", node, vmid, pid))
 }

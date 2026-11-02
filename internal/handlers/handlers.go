@@ -364,6 +364,9 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 							}
 							_, hasSerial := config["serial0"]
 							vms[j]["has_serial"] = hasSerial
+							if ot, ok := config["ostype"].(string); ok {
+								vms[j]["ostype"] = ot
+							}
 
 							// Il campo `mem` della lista /nodes/{node}/qemu è l'RSS del
 							// processo KVM lato host (≈ maxmem appena il guest tocca tutte
@@ -408,6 +411,9 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 							var config map[string]interface{}
 							if json.Unmarshal(cfg, &config) != nil {
 								return
+							}
+							if ot, ok := config["ostype"].(string); ok {
+								lxcs[j]["ostype"] = ot
 							}
 							// net0: "name=eth0,bridge=vmbr0,ip=10.x.x.x/24,gw=..."
 							if net0, ok := config["net0"].(string); ok {

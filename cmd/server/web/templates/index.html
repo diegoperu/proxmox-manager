@@ -271,7 +271,7 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .act-empty{padding:14px 0;color:var(--text3);border-top:1px solid var(--border)}
 @media(max-width:1180px){.dash{display:flex;flex-direction:column;align-items:stretch;gap:0}.dash-main{display:contents}.dash>*,.dash-main>*,.dash-vms{min-width:0;max-width:100%}.dash-side{position:static;order:1;margin-bottom:26px}.dash-vms{order:2}}
 @media(max-width:650px){
-  #page-vms table th:nth-child(2),#page-vms table td:nth-child(2),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(6),#page-vms table td:nth-child(6),#page-vms table th:nth-child(8),#page-vms table td:nth-child(8),#page-vms table th:nth-child(10),#page-vms table td:nth-child(10),#page-vms table th:nth-child(11),#page-vms table td:nth-child(11),
+  #page-vms table th:nth-child(2),#page-vms table td:nth-child(2),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(6),#page-vms table td:nth-child(6),#page-vms table th:nth-child(7),#page-vms table td:nth-child(7),#page-vms table th:nth-child(9),#page-vms table td:nth-child(9),#page-vms table th:nth-child(11),#page-vms table td:nth-child(11),#page-vms table th:nth-child(12),#page-vms table td:nth-child(12),
   #page-batch table th:nth-child(2),#page-batch table td:nth-child(2),#page-batch table th:nth-child(5),#page-batch table td:nth-child(5),#page-batch table th:nth-child(6),#page-batch table td:nth-child(6){display:none}
 }
 @media(max-width:700px){
@@ -422,6 +422,19 @@ td.ck,th.ck{width:36px;padding-right:0}
 @media(min-width:701px) and (max-width:1320px){.nrow{grid-template-columns:minmax(112px,150px) 116px minmax(90px,1fr) minmax(90px,1fr)}.nrow .vdots{grid-column:1/-1}}
 @media(max-width:650px){.toptbl th .cw{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.toptbl th:nth-child(7),.toptbl td:nth-child(7){width:44px}.toptbl th:nth-child(4),.toptbl td:nth-child(4){width:64px}.toptbl .tsp{width:30%}}
 @media(max-width:650px){.toptbl th:nth-child(5),.toptbl td:nth-child(5),.toptbl th:nth-child(6),.toptbl td:nth-child(6),.tcond .cw{display:none}.toptbl .tsp{min-width:90px;width:30%}.toptbl .tid .nsub{white-space:normal}.toptbl th{white-space:normal}.tnum span{display:none}.toptbl td,.toptbl th{padding-left:8px;padding-right:8px}.toptbl .rk{padding-left:12px}}
+/* ══ LOG DEL KERNEL (dmesg) nel pannello VM e nella vista larga ══ */
+.dm-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dm-meta{font-size:12px;color:var(--text3);margin:10px 0 8px;min-height:18px}
+.dm-meta.err{color:var(--red)}
+.dm-meta .btn{margin-left:8px}
+.dm-log{font-family:var(--mono);font-size:12px;line-height:1.55;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 0;max-height:300px;overflow:auto;white-space:pre;color:var(--text2)}
+.dm-ln{display:flex;gap:10px;padding:0 12px}
+.dm-ln:hover{background:var(--hover)}
+.dm-tag{display:inline-block;width:34px;flex-shrink:0;font-size:11px;font-weight:600}
+.dm-ln.e{color:var(--red)}.dm-ln.w{color:var(--warn)}
+.ov.dmw .modal{width:min(1500px,96vw);max-width:none;height:88vh;max-height:none;display:flex;flex-direction:column;padding:18px 20px}
+.ov.dmw .dm-log{flex:1;max-height:none;min-height:0}
+.ov.dmw .dm-q{width:220px}
 @media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.g2,.g4{grid-template-columns:1fr}}
 
@@ -593,7 +606,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.63.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.65.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -701,13 +714,14 @@ html.catppuccino{
           <th class="s" onclick="VMs.sort('name')">Nome</th>
           <th class="s" onclick="VMs.sort('node')">Nodo</th>
           <th class="s" onclick="VMs.sort('ip')">IP</th>
+          <th class="s" onclick="VMs.sort('os')">Sistema</th>
           <th class="s" onclick="VMs.sort('status')">Stato</th>
           <th class="s" onclick="VMs.sort('cpu')">CPU %</th>
           <th class="s" onclick="VMs.sort('mem')">RAM</th>
           <th class="s" onclick="VMs.sort('disk')">Disco</th>
           <th>Azioni</th>
         </tr></thead>
-        <tbody id="vmtbody"><tr><td colspan="11" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
+        <tbody id="vmtbody"><tr><td colspan="12" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
       </table></div>
       <div class="selbar" id="selbar" role="region" aria-label="Azioni sulla selezione" hidden>
         <span class="sb-n" id="sb-n" aria-live="polite"></span>
@@ -1040,6 +1054,15 @@ html.catppuccino{
   <div class="sh-b" id="movB"></div>
 </div></div>
 
+<!-- DMESG: VISTA LARGA -->
+<div class="ov dmw" id="mdm"><div class="modal">
+  <div class="sh-h" style="padding:0 0 12px;border-bottom:0">
+    <div><h2 class="mt" id="mdmT">dmesg</h2><small id="mdmS"></small></div>
+    <button type="button" class="btn bg2 sm sh-x" onclick="closeModal('mdm')">Chiudi</button>
+  </div>
+  <div id="dm-wide" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>
+</div></div>
+
 <!-- RICERCA RAPIDA -->
 <div class="ov pal" id="mpal"><div class="modal">
   <div class="mt sr">Ricerca rapida</div>
@@ -1219,7 +1242,7 @@ function openModal(id){
 }
 function closeModal(id){
   const el=document.getElementById(id); if(el)el.classList.remove('open');
-  if(id==='mov'&&location.hash.startsWith('#/vm/'))Route.replace('#/'+App.cur);
+  if(id==='mov'){Dmesg.reset();if(location.hash.startsWith('#/vm/'))Route.replace('#/'+App.cur);}
   const i=_modalStack.findIndex(m=>m.id===id); if(i<0)return;
   const [m]=_modalStack.splice(i,1); _syncModals();
   if(m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
@@ -1361,6 +1384,20 @@ function nodeState(o){
   if(o.cpu>=Dashboard.CRIT)return{cls:'warn',word:'CPU alta'};
   if(o.disk>=Dashboard.CRIT)return{cls:'warn',word:'Disco quasi pieno'};
   return{cls:'ok',word:'Operativo'};
+}
+// Sistema operativo: dall'agent (nome + versione) se risponde, altrimenti dal tipo OS configurato in Proxmox.
+const OS_NAMES={'Red Hat Enterprise Linux':'RHEL','Rocky Linux':'Rocky','AlmaLinux':'AlmaLinux','Debian GNU/Linux':'Debian','CentOS Linux':'CentOS','CentOS Stream':'CentOS Stream','Oracle Linux Server':'Oracle Linux','Fedora Linux':'Fedora'};
+const OSTYPES={l26:'Linux',l24:'Linux 2.4',win11:'Windows 11',win10:'Windows 10',win8:'Windows 8',win7:'Windows 7',wvista:'Windows Vista',wxp:'Windows XP',w2k:'Windows 2000',w2k3:'Windows Server 2003',w2k8:'Windows Server 2008',w2k12:'Windows Server 2012',w2k16:'Windows Server 2016',w2k19:'Windows Server 2019',w2k22:'Windows Server 2022',w2k25:'Windows Server 2025',solaris:'Solaris',other:'Altro',archlinux:'Arch Linux',nixos:'NixOS',opensuse:'openSUSE'};
+function osFromType(t){if(!t)return'';return OSTYPES[t]||(t.charAt(0).toUpperCase()+t.slice(1));}
+function osLabel(o){
+  if(!o||!(o.name||o.pretty_name))return'';
+  if(o.id==='mswindows')return String(o.pretty_name||o.name).replace(/^Microsoft\s+/,'');
+  const n=OS_NAMES[o.name]||String(o.name||o.pretty_name).replace(/\s+(GNU\/)?Linux(\s+Server)?$/,'');
+  return(n+' '+(o.version_id||'')).trim();
+}
+function osCell(v){
+  const agent=v.osSrc==='agent';
+  return `<span class="${agent?'':'td'}" title="${agent?'Rilevato dal guest agent':'Dal tipo OS configurato in Proxmox: versione non rilevata (VM spenta, container o agent non raggiungibile)'}">${esc(v.os||'—')}</span>`;
 }
 function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
 function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:1px">${p}%</div>`;}
@@ -1655,6 +1692,134 @@ const App={
     // quiet: lo stato è già nel pallino; un cluster offline non deve produrre un toast ogni 30s
     try{await api('/nodes',{quiet:true});dot.className='ok';lbl.textContent='Connesso';lbl.title='';}
     catch(e){dot.className='err';lbl.textContent='Non connesso';lbl.title=e.message;}
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// DMESG: log del kernel della VM, letto dal guest agent solo quando lo chiedi (nessun precaricamento).
+// Due viste sullo stesso stato: sezione nel pannello VM ("i") e finestra larga ("w").
+// Il testo del guest entra nel DOM solo con textContent.
+// ════════════════════════════════════════════════════════════════════════════
+const Dmesg={
+  ctx:null, lines:300, level:'all', data:null, q:'', err:'', loading:false, seq:0,
+  ERR:/\b(error|errors|fail(ed|ure|ures)?|fatal|panic|oops|bug:|call trace|segfault|critical|i\/o error|out of memory|oom-killer|killed process|corrupt(ed|ion)?)\b/i,
+  WARN:/\b(warn(ing)?|deprecated|time(d)? ?out|retry|retrying|unable|invalid|tainted|throttl)/i,
+  classify(t){return Dmesg.ERR.test(t)?'e':Dmesg.WARN.test(t)?'w':'';},
+
+  // Nuova VM nel pannello: si riparte da zero (righe e livello scelti restano come preferenza).
+  setup(ctx){Dmesg.seq++;Dmesg.ctx=ctx;Dmesg.data=null;Dmesg.q='';Dmesg.err='';Dmesg.loading=false;Dmesg.mount('dm-inline','i');},
+  reset(){Dmesg.seq++;Dmesg.ctx=null;Dmesg.data=null;Dmesg.loading=false;},
+
+  ctl(p,wide){
+    const lv=(v,l)=>`<button type="button" data-v="${v}" class="${Dmesg.level===v?'on':''}" aria-pressed="${Dmesg.level===v}" onclick="Dmesg.setLevel('${v}')">${l}</button>`;
+    return `<div class="dm-bar">
+      <button type="button" class="btn ba sm" id="dm-${p}-go" onclick="Dmesg.load()">Leggi dmesg</button>
+      <label class="sr" for="dm-${p}-n">Numero di righe</label>
+      <select class="inp sm" id="dm-${p}-n" onchange="Dmesg.setLines(+this.value)">${[100,300,1000].map(n=>`<option value="${n}"${Dmesg.lines===n?' selected':''}>${n} righe</option>`).join('')}</select>
+      <div class="seg" role="group" aria-label="Livello">${lv('all','Tutto')}${lv('warn','Avvisi ed errori')}</div>
+      ${wide?`<div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp sm dm-q" id="dm-${p}-q" type="text" placeholder="Cerca nel log" aria-label="Cerca nel log" autocomplete="off" oninput="Dmesg.setQuery(this.value)" value="${esc(Dmesg.q)}"></div>
+        <button type="button" class="btn bg2 sm" onclick="Dmesg.copy()">Copia</button>
+        <button type="button" class="btn bg2 sm" onclick="Dmesg.download()">Scarica .txt</button>`
+        :`<button type="button" class="btn bg2 sm" id="dm-${p}-x" onclick="Dmesg.expand()" hidden>Espandi</button>`}
+    </div>
+    <div class="dm-meta" id="dm-${p}-meta" aria-live="polite"></div>
+    <div class="dm-log" id="dm-${p}-log" role="log" tabindex="0" aria-label="Log del kernel" hidden></div>`;
+  },
+  mount(hostId,p){
+    const host=document.getElementById(hostId); if(!host)return;
+    const c=Dmesg.ctx;
+    if(!c||c.why){host.innerHTML=`<div class="hint" style="margin-top:0">${esc(c?c.why:'')}</div>`;return;}
+    host.innerHTML=Dmesg.ctl(p,p==='w');
+    Dmesg.paint();
+  },
+
+  setLines(n){if([100,300,1000].includes(n)){Dmesg.lines=n;Dmesg.syncCtl();if(Dmesg.data)Dmesg.load();}},
+  setLevel(v){if(v==='all'||v==='warn'){Dmesg.level=v;Dmesg.syncCtl();if(Dmesg.data)Dmesg.load();}},
+  setQuery(q){Dmesg.q=q;Dmesg.paint();},
+  syncCtl(){
+    for(const p of ['i','w']){
+      const n=document.getElementById(`dm-${p}-n`); if(n)n.value=String(Dmesg.lines);
+      document.querySelectorAll(`#dm-${p}-go ~ .seg button`).forEach(b=>{const on=b.dataset.v===Dmesg.level;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+    }
+  },
+
+  async load(){
+    const c=Dmesg.ctx; if(!c||c.why||Dmesg.loading)return;
+    const my=++Dmesg.seq;
+    Dmesg.loading=true; Dmesg.err=''; Dmesg.paint();
+    try{
+      const d=await api(`/nodes/${encodeURIComponent(c.node)}/qemu/${encodeURIComponent(c.vmid)}/dmesg`,{method:'POST',body:JSON.stringify({lines:Dmesg.lines,level:Dmesg.level}),quiet:true});
+      if(my===Dmesg.seq)Dmesg.data=d;
+    }catch(e){if(my===Dmesg.seq)Dmesg.err=e.message;}
+    if(my===Dmesg.seq){Dmesg.loading=false;Dmesg.paint();}
+  },
+
+  visible(){
+    const d=Dmesg.data; if(!d)return[];
+    const q=Dmesg.q.trim().toLowerCase();
+    return q?d.lines.filter(t=>t.toLowerCase().includes(q)):d.lines;
+  },
+  paint(){
+    for(const p of ['i','w']){
+      const go=document.getElementById(`dm-${p}-go`), meta=document.getElementById(`dm-${p}-meta`), log=document.getElementById(`dm-${p}-log`), x=document.getElementById(`dm-${p}-x`);
+      if(!go||!meta||!log)continue;
+      go.disabled=Dmesg.loading; go.textContent=Dmesg.loading?'Lettura in corso…':Dmesg.data?'Aggiorna':'Leggi dmesg';
+      meta.className='dm-meta'; meta.replaceChildren();
+      if(Dmesg.loading){meta.textContent='Lettura del log dalla VM…';}
+      else if(Dmesg.err){
+        meta.classList.add('err'); meta.append(document.createTextNode(Dmesg.err));
+        const b=document.createElement('button'); b.type='button'; b.className='btn bg2 sm'; b.textContent='Riprova'; b.onclick=()=>Dmesg.load(); meta.append(b);
+      }
+      else if(Dmesg.data){
+        const d=Dmesg.data, vis=Dmesg.visible(), q=Dmesg.q.trim();
+        const t=new Date(d.fetched_at*1000).toLocaleTimeString('it-IT');
+        meta.textContent=`Letto alle ${t} · ${d.count} ${d.count===1?'riga':'righe'}${q?` · ${vis.length} con "${q}"`:''} · ${d.level==='warn'?'solo avvisi ed errori':'tutto'}${d.truncated?' · troncato: il log era più lungo':''} · esecuzione ${d.mode==='helper'?'con helper':'inline'}`;
+      }
+      log.hidden=!Dmesg.data; if(x)x.hidden=!Dmesg.data;
+      if(Dmesg.data){
+        log.replaceChildren();
+        const frag=document.createDocumentFragment();
+        for(const t of Dmesg.visible()){
+          const k=Dmesg.classify(t), row=document.createElement('div'), tag=document.createElement('span');
+          row.className='dm-ln'+(k?' '+k:''); tag.className='dm-tag'; tag.textContent=k==='e'?'ERR':k==='w'?'WARN':'';
+          row.append(tag,document.createTextNode(t)); frag.append(row);
+        }
+        log.append(frag);
+        if(!Dmesg.visible().length){const e=document.createElement('div');e.className='dm-ln';e.textContent=Dmesg.q?'Nessuna riga corrisponde alla ricerca.':'Il log del kernel è vuoto.';log.append(e);}
+        else log.scrollTop=log.scrollHeight; // le righe piu' recenti sono in fondo
+      }
+    }
+  },
+
+  // Vista larga: stesso stato (log gia' letto, righe, livello), con ricerca, copia e download.
+  expand(){
+    const c=Dmesg.ctx; if(!c)return;
+    document.getElementById('mdmT').textContent=`dmesg — ${c.name}`;
+    document.getElementById('mdmS').textContent=`QEMU · ${c.vmid} · ${c.node}`;
+    document.getElementById('dm-wide').innerHTML=Dmesg.ctl('w',true);
+    openModal('mdm'); Dmesg.paint();
+    setTimeout(()=>document.getElementById('dm-w-log')?.focus(),0);
+  },
+  text(){return Dmesg.visible().join('\n')+'\n';},
+  async copy(){
+    if(!Dmesg.data)return;
+    const txt=Dmesg.text();
+    try{
+      if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(txt);
+      else{ // contesto non sicuro (http su rete interna): ripiego
+        const ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;opacity:0'; document.body.append(ta); ta.select();
+        const ok=document.execCommand('copy'); ta.remove(); if(!ok)throw new Error('copia non riuscita');
+      }
+      toast('Log copiato negli appunti','ok');
+    }catch(e){toast('Copia non riuscita: seleziona il testo e copialo a mano','err');}
+  },
+  download(){
+    if(!Dmesg.data||!Dmesg.ctx)return;
+    const pad=n=>String(n).padStart(2,'0'), d=new Date(Dmesg.data.fetched_at*1000);
+    const name=String(Dmesg.ctx.name).replace(/[^A-Za-z0-9._-]/g,'_').slice(0,60)||'vm';
+    const file=`dmesg-${name}-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.txt`;
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([Dmesg.text()],{type:'text/plain;charset=utf-8'})); a.download=file;
+    document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   }
 };
 
@@ -2216,7 +2381,7 @@ const VMs=(()=>{
       <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
       <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td>
-      <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td>${sbadge(v.status)}</td>
+      <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
       <td id="${esc(`dk-${v.node}-${v.vmid}`)}">${diskCell}</td>
@@ -2228,7 +2393,7 @@ const VMs=(()=>{
              ${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bg2 sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">Console</button>`:''}`
           :`<button class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
       </div></td>
-    </tr>`;}).join('')||'<tr><td colspan="11" class="empty">Nessuna VM con questi filtri</td></tr>';
+    </tr>`;}).join('')||'<tr><td colspan="12" class="empty">Nessuna VM con questi filtri</td></tr>';
     updateBar();
   }
 
@@ -2241,6 +2406,20 @@ const VMs=(()=>{
     document.getElementById('sb-h').textContent=hidden?`${hidden} non ${hidden===1?'visibile':'visibili'} con i filtri attuali`:'';
     const cb=document.getElementById('vca'), shown=sortedData.filter(v=>picked.has(keyOf(v))).length;
     cb.checked=sortedData.length>0&&shown===sortedData.length; cb.indeterminate=shown>0&&shown<sortedData.length;
+  }
+
+  // Versione del sistema dal guest agent (solo VM QEMU in esecuzione), con cache di 10 minuti:
+  // il sistema operativo cambia di rado. Le altre righe restano sul tipo OS di Proxmox.
+  async function loadOsinfo(){
+    const running=all.filter(v=>v.type==='qemu'&&v.status==='running');
+    await pool(running,6,async v=>{
+      const o=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/osinfo`,600000).catch(()=>null);
+      const lab=osLabel(o);
+      if(!lab)return;
+      v.os=lab; v.osSrc='agent'; v.osid=o.id||'';
+      const el=document.getElementById(`os-${v.node}-${v.vmid}`);
+      if(el)el.innerHTML=osCell(v);
+    });
   }
 
   async function loadFsinfo(){
@@ -2281,7 +2460,7 @@ const VMs=(()=>{
     async load(){
       let data;
       try{data=await api('/vms',{quiet:true});}
-      catch(e){document.getElementById('vmtbody').innerHTML=errRow(11,e.message,'VMs.load()');return;}
+      catch(e){document.getElementById('vmtbody').innerHTML=errRow(12,e.message,'VMs.load()');return;}
       all=[];
       if(Array.isArray(data)){
         for(const nd of data){
@@ -2289,6 +2468,7 @@ const VMs=(()=>{
           for(const v of (nd.lxcs||[])) all.push({...v,type:'lxc',node:nd.node});
         }
       }
+      for(const v of all){v.os=osFromType(v.ostype);v.osSrc='cfg';}
       picked=new Set([...picked].filter(k=>all.some(v=>keyOf(v)===k)));
       // initialize node selection with all nodes
       const ns=allNodes();
@@ -2298,6 +2478,7 @@ const VMs=(()=>{
       renderNodePicker();
       doFilter();
       loadFsinfo();
+      loadOsinfo();
     },
     toggleNodePicker(){
       const p=document.getElementById('vm-node-picker');
@@ -2339,10 +2520,11 @@ const VMs=(()=>{
       Route.replace(`#/vm/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${kind}`);
       openModal('mov');
       try{
-        const [r, fsinfo] = await Promise.all([
+        const [r, fsinfo, osinfo] = await Promise.all([
           // tollerante: per gli LXC questo endpoint QEMU può fallire, il pannello resta usabile con le azioni
           api(`/nodes/${node}/qemu/${vmid}/status`,{quiet:true}).catch(()=>null),
-          kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([])
+          kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([]),
+          kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/osinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({})
         ]);
         const n=js(node), id=js(vmid), t=js(kind);
         const s=r?.status||{},snaps=r?.snapshots||[];
@@ -2373,6 +2555,7 @@ const VMs=(()=>{
             <dt>CPU</dt><dd>${esc(s.cpus||'—')} core</dd>
             <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
             ${v0?.ip?`<dt>IP</dt><dd class="tm">${esc(v0.ip)}</dd>`:''}
+            ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
@@ -2388,10 +2571,16 @@ const VMs=(()=>{
             <button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>
             ${canConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">Console</button>`:''}
           </div>`:''}
+          <h3>Log del kernel</h3>
+          <div id="dm-inline"></div>
           ${canForce?`<div class="sh-danger">
             <p>Lo stop forzato interrompe subito la VM senza spegnere il sistema operativo: i dati non salvati si perdono.</p>
             <button class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
           </div>`:''}`;
+        Dmesg.setup({node,vmid:String(vmid),name:s.name||v0?.name||`VM ${vmid}`,
+          why:kind==='lxc'?'Non disponibile per i container LXC: Proxmox non offre un modo per leggere il log del kernel di un container.'
+            :st!=='running'?'La VM è ferma: avviala per leggere il suo dmesg.'
+            :osinfo.id==='mswindows'?'Non disponibile per le VM Windows.':''});
       }catch(e){document.getElementById('movB').innerHTML=errBox(e.message,`VMs.detail(${js(node)},${js(vmid)},${js(type)})`);}
     },
     snapshot(node,vmid){
