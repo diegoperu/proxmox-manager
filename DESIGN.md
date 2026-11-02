@@ -158,7 +158,7 @@ Il mondo e' un cielo blu profondo con schede un gradino piu' chiare e filetti az
 - Stato = colore + forma della linea (piena ok, tratteggiata offline/in corso, spessa 3px errore) + parola.
 - Inter per l'interfaccia con cifre tabellari, JetBrains Mono solo per identificatori, IP, log.
 - Raggi 8-16px, filetti a 1px, un solo colore di marca per tema.
-- Vetro smerigliato in quattro punti soltanto; niente ombre sulle schede a riposo.
+- Vetro smerigliato in cinque punti soltanto; niente ombre sulle schede a riposo.
 - Cinque temi con nome fisso: auto (segue il sistema), dark, light, eva01, catppuccino - stessa struttura, palette diverse.
 
 ## Colors
@@ -210,20 +210,20 @@ Cielo notturno con un solo accento azzurro; verde, ambra e rosso sono riservati 
 
 ## Layout
 
-Desktop-first, griglia body a due colonne: rail 212px + contenuto, riga topbar 52px; il contenuto scorre da solo (`overflow:hidden` sul body). Dashboard: colonna principale fluida + centro attivita' 320px sticky a destra (gap 28px); sotto 1180px il centro attivita' passa sopra la tabella VM in colonna unica. Padding contenuto 20px 28px.
+Desktop-first, griglia body a due colonne: rail 212px + contenuto, riga topbar 52px; il contenuto scorre da solo (`overflow:hidden` sul body). Dashboard: colonna principale fluida + centro attivita' 320px sticky a destra (gap 28px); sotto 1180px il centro attivita' passa in colonna unica tra il pannello nodi e la Top 10. Padding contenuto 20px 28px.
 
 Ritmo: padding scheda 16px, gap 14px, celle 9px/12px, righe nodo min 62px. La densita' compatta (`html.compact`, da Impostazioni, in config.json) porta 12px, 10px, 5px/10px e 46px senza cambiare proporzioni.
 
-Responsive: sotto 850px la rail diventa cassetto (pulsante menu in topbar, scrim, vetro 20px); sotto 700px KPI a 2 colonne e righe nodo a due colonne; sotto 650px niente crumb/badge, toast a tutta larghezza, ricerca ridotta a icona, colonne secondarie della tabella VM nascoste. `pointer:coarse`: bersagli 44px e campi 16px (non verificato su dispositivo touch).
+Responsive: sotto 850px la rail diventa cassetto (pulsante menu in topbar, scrim, vetro 20px); sotto 700px KPI a 2 colonne e righe nodo a due colonne; sotto 650px niente crumb/badge, toast a tutta larghezza, ricerca ridotta a icona, colonne secondarie della lista VM e della Top 10 nascoste (restano nome, stato o andamento, CPU media; la condizione diventa solo glifo). `pointer:coarse`: bersagli 44px e campi 16px (non verificato su dispositivo touch).
 
 ## Elevation & Depth
 
 Tonale e piatto: la profondita' viene da gradini di superficie (bg, bg2, bg3, bg4) e filetti 1px, non da ombre. Le schede e le tabelle non hanno ombra. Un'unica ombra esiste, `--shadow-pop` (`0 24px 60px -12px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.3)`), per modal, pannello laterale, ricerca rapida e toast.
 
-Il vetro smerigliato (backdrop-filter) e' ammesso in quattro punti: intestazione sticky delle tabelle (blur 10px), toast (14px), scrim dei modal (6px), cassetto mobile (20px). La barra superiore usa solo un velo traslucido (55% di bg2) senza blur.
+Il vetro smerigliato (backdrop-filter) e' ammesso in cinque punti, tutti dove una superficie ne copre un'altra: intestazione sticky delle tabelle (blur 10px), toast (14px), barra di selezione delle VM (14px), scrim dei modal (6px), cassetto mobile (20px). La barra superiore usa solo un velo traslucido (55% di bg2) senza blur.
 
 ### Named Rules
-**The Four Glass Rule.** Vetro solo su intestazione tabella sticky, toast, scrim modal, cassetto mobile. Una scheda in vetro e' un errore.
+**The Five Glass Rule.** Vetro solo su intestazione tabella sticky, toast, barra di selezione, scrim modal, cassetto mobile: sempre superfici che si sovrappongono ad altro contenuto. Una scheda in vetro e' un errore.
 **The Flat At Rest Rule.** A riposo nessuna ombra; l'ombra pop appartiene alle sole superfici sovrapposte.
 
 ## Shapes
@@ -255,6 +255,15 @@ Rail con gruppi in 12px/600 muted (Operazioni, Analisi), voci 32px con icona 16p
 ### Riga nodo (firma)
 Griglia: nome + sottotitolo, stato (`.st`), pista CPU, pista RAM, punti VM. La pista mostra l'intervallo min-max 24h come capsula (accento; ambra o rossa oltre soglia), una tacca tratteggiata verticale all'85% e un punto "adesso" da 12px con bordo del colore della scheda che scorre al nuovo valore (0.6s, `--ease`, disattivato con reduced-motion). Nodo offline: riga al 62%, pista sostituita da una linea tratteggiata. I punti VM hanno diametro 6-14px su cinque gradini per RAM, verdi se attive, vuoti con bordo se spente.
 
+### Top 10 VM & Container (andamento come previsione oraria)
+Una riga per VM in un pannello a filetti, ordinate per lavoro svolto (CPU media x core assegnati) nella finestra scelta con il controllo segmentato 6/12/24 h. Colonne: posizione, nome (apre il pannello VM) con sotto IP in mono, nodo e tipo; **andamento**, **CPU media** (15px/600, sotto "≈ n core su N"), **picco**, **RAM** (barra), **condizione**. L'andamento e' una curva su asse fisso 0-100% con area tinta al 10-14% sotto la linea, soglia critica 85% tratteggiata e un punto bianco sul picco (nessun asse o etichetta: si legge come la previsione oraria di un'app meteo). Colore e glifo della curva seguono la condizione, con le stesse icone della frase in testa: **sereno** (verde, sole) picco < 65% e media < 50%; **variabile** (ambra, sole con nuvola) picco >= 65% o media >= 50%; **temporale** (rosso, nuvola con fulmine) picco >= 85%. Come per ogni stato, la parola accompagna il glifo (su mobile resta solo il glifo con nome accessibile). Titolo "Top 10 VM & Container" con sottotitolo "per lavoro svolto nelle ultime N ore" e pulsante "Tutte le VM".
+
+### Barra di selezione (lista VM)
+Barra sticky in basso al centro dell'area contenuto, raggio 14px, vetro e ombra pop: conteggio, avviso se ci sono VM selezionate nascoste dai filtri, poi Start, Shutdown, Reboot, "Altre azioni in Batch" e Deseleziona. Non esegue nulla: apre Batch con VM e azione preselezionate, dove restano conferma e log. Su mobile occupa tutta la larghezza.
+
+### Pagine secondarie
+Componenti condivisi: barra strumenti (`.toolbar`) con campo di ricerca con icona, controllo segmentato (`.seg`), riepilogo a destra; pannello (`.panel`, titolo 15px/600); scheda nodo (`.nc`) con tre misuratori CPU/RAM/Disco nella stessa lingua della riga nodo; tessere tema con anteprima dei colori; elenco a definizioni (`.dl`); stato vuoto (`.empty`). Lo stato del nodo ha una sola definizione (`nodeState`) per Panoramica, Nodi e Cluster.
+
 ### Centro attivita'
 Elenco a filetti: ogni task ha una linea di stato (verde piena = riuscito, accento tratteggiata = in corso, rossa da 3px = errore), titolo, dettaglio (rosso per errori) e orario tabellare.
 
@@ -281,7 +290,7 @@ Raggio 6px, 11px/600, velo del colore al 12-15% con bordo al 32%: verde (attivo)
 - **Don't** fare una griglia di schede KPI affiancate a un grafico ad area come primo schermo.
 - **Don't** indicare lo stato con il solo colore.
 - **Don't** usare bordi colorati sul lato sinistro di schede, righe o avvisi.
-- **Don't** applicare il vetro a schede o pannelli fuori dai quattro punti ammessi.
+- **Don't** applicare il vetro a schede o pannelli fuori dai cinque punti ammessi.
 - **Don't** introdurre dimensioni di testo fuori scala o usare l'11px fuori dai badge.
 - **Don't** aggiungere ombre alle schede a riposo.
 - **Don't** usare il marchio (azzurro) per significare salute o errore.
@@ -289,7 +298,6 @@ Raggio 6px, 11px/600, velo del colore al 12-15% con bordo al 32%: verde (attivo)
 
 ## Non canonizzato
 
-- Barra flottante delle azioni di massa: non costruita, non e' una regola del sistema.
 - Alias legacy `--amber*` e `--cond` (= Inter): residui di compatibilita', non da usare in codice nuovo.
 - Righe pre-esistenti con stili inline non ricondotti ai token non sono state riparate.
 - Non verificato dal codice: indicazione "dato vecchio" a mezza altezza e "spento barrato" (nessuna regola CSS trovata); transizioni di pagina con View Transitions (nessun uso trovato nel file).

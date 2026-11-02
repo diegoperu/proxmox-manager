@@ -247,6 +247,14 @@
       "description": "Stato = linea + parola: piena ok, tratteggiata offline.",
       "html": "<span class=\"ds-s ds-sok\">Online</span> <span class=\"ds-s ds-soff\">Offline</span>",
       "css": ".ds-s{display:inline-flex;align-items:center;gap:7px;font:500 12px Inter,system-ui,sans-serif}.ds-s::before{content:'';width:14px;border-top:2px solid currentColor}.ds-sok{color:#34c27a}.ds-soff{color:#ff6b6b}.ds-soff::before{border-top-style:dashed}"
+    },
+    {
+      "name": "Top Row Trend",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Riga della Top 10: andamento CPU come previsione oraria (curva 0-100%, soglia 85% tratteggiata, punto sul picco) con glifo e parola di condizione.",
+      "html": "<div class=\"ds-top\"><svg viewBox=\"0 0 200 36\" preserveAspectRatio=\"none\" class=\"ds-tsvg\"><line class=\"ds-thr\" x1=\"0\" x2=\"200\" y1=\"6.4\" y2=\"6.4\"/><polygon class=\"ds-ta\" points=\"0,22 40,18 80,20 120,12 160,14 200,10 200,34 0,34\"/><polyline class=\"ds-tl\" points=\"0,22 40,18 80,20 120,12 160,14 200,10\"/></svg><i class=\"ds-pk\"></i><span class=\"ds-tc\">Variabile</span></div>",
+      "css": ".ds-top{position:relative;display:flex;align-items:center;gap:14px;width:340px;margin:12px}.ds-tsvg{width:200px;height:38px}.ds-thr{stroke:rgba(131,148,176,.55);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}.ds-ta{fill:rgba(242,169,59,.10);stroke:none}.ds-tl{fill:none;stroke:#f2a93b;stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}.ds-pk{position:absolute;left:196px;top:11px;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#e9eef7;box-shadow:0 0 0 2px #13213a}.ds-tc{font:500 13px Inter,system-ui,sans-serif;color:#f2a93b}"
     }
   ],
   "narrative": {
@@ -257,7 +265,7 @@
       "Stato = colore + forma della linea (piena ok, tratteggiata offline/in corso, spessa 3px errore) + parola.",
       "Inter per l'interfaccia con cifre tabellari, JetBrains Mono solo per identificatori, IP, log.",
       "Raggi 8-16px, filetti a 1px, un solo colore di marca per tema.",
-      "Vetro smerigliato in quattro punti soltanto; niente ombre sulle schede a riposo.",
+      "Vetro smerigliato in cinque punti soltanto; niente ombre sulle schede a riposo.",
       "Cinque temi con nome fisso: auto (segue il sistema), dark, light, eva01, catppuccino - stessa struttura, palette diverse."
     ],
     "rules": [
@@ -287,8 +295,8 @@
         "section": "typography"
       },
       {
-        "name": "The Four Glass Rule",
-        "body": "Vetro solo su intestazione tabella sticky, toast, scrim modal, cassetto mobile. Una scheda in vetro e' un errore.",
+        "name": "The Five Glass Rule",
+        "body": "Vetro solo su intestazione tabella sticky, toast, barra di selezione, scrim modal, cassetto mobile: sempre superfici che si sovrappongono ad altro contenuto. Una scheda in vetro e' un errore.",
         "section": "elevation"
       },
       {
@@ -309,7 +317,7 @@
       "**Don't** fare una griglia di schede KPI affiancate a un grafico ad area come primo schermo.",
       "**Don't** indicare lo stato con il solo colore.",
       "**Don't** usare bordi colorati sul lato sinistro di schede, righe o avvisi.",
-      "**Don't** applicare il vetro a schede o pannelli fuori dai quattro punti ammessi.",
+      "**Don't** applicare il vetro a schede o pannelli fuori dai cinque punti ammessi.",
       "**Don't** introdurre dimensioni di testo fuori scala o usare l'11px fuori dai badge.",
       "**Don't** aggiungere ombre alle schede a riposo.",
       "**Don't** usare il marchio (azzurro) per significare salute o errore.",
