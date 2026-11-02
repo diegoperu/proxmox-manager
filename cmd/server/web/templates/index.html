@@ -114,6 +114,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--hover)}
 .br{background:var(--green-dim);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent)}
 .bs{background:var(--red-dim);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 32%,transparent)}
 .bp{background:var(--blue-dim);color:var(--blue);border:1px solid color-mix(in srgb,var(--blue) 32%,transparent)}
+.badge.gpu{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent);margin-left:6px;vertical-align:middle}
 .bq{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 32%,transparent)}
 .bl{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 32%,transparent)}
 .bn{background:var(--accent-dim);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 32%,transparent)}
@@ -696,7 +697,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.75.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.78.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -785,7 +786,7 @@ html.catppuccino{
           <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('qemu')">QEMU</button>
           <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('lxc')">LXC</button>
         </div>
-        <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome, VMID o IP" placeholder="Cerca nome, VMID, IP" oninput="VMs.filter()" style="width:220px"></div>
+        <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome, VMID o IP" placeholder="Cerca nome, VMID, IP, GPU, GPU" oninput="VMs.filter()" style="width:220px"></div>
         <div id="vm-node-sel-wrap" style="position:relative">
           <button class="inp" onclick="VMs.toggleNodePicker()" id="vm-node-btn" aria-haspopup="true" aria-label="Filtra per nodi" style="cursor:pointer;min-width:130px;text-align:left">Tutti i nodi</button>
           <div id="vm-node-picker" style="display:none;position:absolute;top:100%;left:0;z-index:50;min-width:190px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;box-shadow:var(--shadow-pop);margin-top:4px;padding:6px 0">
@@ -799,6 +800,9 @@ html.catppuccino{
         <select class="inp" id="vstatus" aria-label="Filtra per stato" onchange="VMs.filter()">
           <option value="">Tutti gli stati</option><option value="running">In esecuzione</option>
           <option value="stopped">Ferme</option><option value="paused">In pausa</option>
+        </select>
+        <select class="inp" id="vgpu" aria-label="Filtra per scheda video" onchange="VMs.filter()">
+          <option value="">Con e senza GPU</option><option value="1">Solo con GPU</option><option value="0">Senza GPU</option>
         </select>
         <button class="btn bg2 sm" onclick="VMs.load()" aria-label="Aggiorna la lista"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
         <span class="sp"></span><span class="tb-sum" id="vm-sum" aria-live="polite"></span>
@@ -1507,6 +1511,12 @@ function ipCell(v){
 function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
 function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:1px">${p}%</div>`;}
 function sbadge(s){const m={running:'br',stopped:'bs',paused:'bp'};return `<span class="badge ${m[s]||'bs'}">${esc(s||'?')}</span>`;}
+// Scheda video (PCI passthrough): badge accanto al nome, il modello nel tooltip e per i lettori di schermo.
+function gpuBadge(v){
+  const g=Array.isArray(v.gpus)?v.gpus:[]; if(!g.length)return'';
+  const names=g.map(x=>x&&x.name?String(x.name):'Scheda video').join(', ');
+  return` <span class="badge gpu" role="img" title="${esc(names)}" aria-label="${esc('Scheda video collegata: '+names)}">GPU${g.length>1?' ×'+g.length:''}</span>`;
+}
 function tbadge(t){if(t==='qemu')return`<span class="badge bq">QEMU</span>`;if(t==='lxc')return`<span class="badge bl">LXC</span>`;if(t==='node')return`<span class="badge bn">NODE</span>`;if(t==='tmpl')return`<span class="badge bt">TPL</span>`;return`<span class="badge">${esc(t)}</span>`;}
 function nodeCell(v){const b=v.cluster_label&&v.cluster_label!==ClusterMgr.currentLabel()?`<span class="badge bn" style="font-size:11px;margin-right:4px">${esc(v.cluster_label)}</span>`:'';return`${b}<span class="td">${esc(v.node)}</span>`;}
 // Stesso criterio di GetTemplates lato backend: flag template=1 o nome che contiene "template".
@@ -2826,18 +2836,21 @@ const VMs=(()=>{
 
   function doFilter(){
     const search=document.getElementById('vsearch').value.toLowerCase();
-    const status=document.getElementById('vstatus').value;
+    const status=document.getElementById('vstatus').value, gpuF=document.getElementById('vgpu').value;
+    const hasGpu=v=>Array.isArray(v.gpus)&&v.gpus.length>0;
     filtered=all.filter(v=>{
       if(currentTab!=='all'&&v.type!==currentTab)return false;
       if(!selectedNodes.has(v.node))return false;
       if(status&&v.status!==status)return false;
-      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search))return false;
+      if(gpuF==='1'&&!hasGpu(v))return false;
+      if(gpuF==='0'&&hasGpu(v))return false;
+      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search)&&!(hasGpu(v)&&v.gpus.some(g=>String(g&&g.name||'').toLowerCase().includes(search))))return false;
       return true;
     });
     sortedData=[...filtered];
     renderRows(sortedData);
-    const run=filtered.filter(v=>v.status==='running').length;
-    document.getElementById('vm-sum').textContent=`${filtered.length} ${filtered.length===1?'risorsa':'risorse'} · ${run} in esecuzione · ${filtered.length-run} ${filtered.length-run===1?'ferma':'ferme'}`;
+    const run=filtered.filter(v=>v.status==='running').length, gpuN=filtered.filter(v=>Array.isArray(v.gpus)&&v.gpus.length).length;
+    document.getElementById('vm-sum').textContent=`${filtered.length} ${filtered.length===1?'risorsa':'risorse'} · ${run} in esecuzione · ${filtered.length-run} ${filtered.length-run===1?'ferma':'ferme'}`+(gpuN?` · ${gpuN} con GPU`:'');
   }
 
   function renderRows(data){
@@ -2849,7 +2862,7 @@ const VMs=(()=>{
       return `<tr>
       <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
-      <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td>
+      <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button>${gpuBadge(v)}</td>
       <td>${nodeCell(v)}</td><td class="tm" id="${esc(`ip-${v.node}-${v.vmid}`)}">${ipCell(v)}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
@@ -3039,6 +3052,7 @@ const VMs=(()=>{
             <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
             ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
+            ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')}</dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
