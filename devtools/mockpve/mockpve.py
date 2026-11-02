@@ -196,7 +196,7 @@ def ceph_route(rest):
                 for n, f in (("datacloud-ssd", 1.0), ("datacloud-hdd", .6), (".mgr", .01))]
     if rest in ("mon", "mgr", "mds"):
         if rest == "mds": return []
-        return [dict(name=n, host=n, state="running" if rest == "mon" or i == 0 else "standby", quorum=1, rank=i, ceph_version_short="20.2.4") for i, n in enumerate(CEPH_NODES[:3])]
+        return [dict(name=n, host=n, state="running" if rest == "mon" else ("active" if i == 0 else "standby"), quorum=1, rank=i, ceph_version_short="20.2.4") for i, n in enumerate(CEPH_NODES[:3])]
     return None
 
 
