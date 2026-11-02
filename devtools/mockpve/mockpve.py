@@ -208,6 +208,7 @@ def route(path):
         return [dict(type="cluster", name="polimi-deib", nodes=4, quorate=1, version=7)] + \
                [dict(type="node", name=n, online=1 if b["status"] == "online" else 0, id=f"node/{n}") for n, b in NODES.items()]
     if p.startswith("/cluster/ceph/"): return ceph_route(p[len("/cluster/ceph/"):])
+    if p == "/cluster/mapping/pci": return [dict(id="gpu-a100", map=[f"node={n},path=0000:02:00,id=10de:20f1" for n in NODES])]
     if p == "/cluster/tasks": return tasks()
     if p == "/cluster/nextid": return "214"
     if p == "/nodes":
@@ -225,6 +226,11 @@ def route(path):
             return dict(cpu=b["cpu"], memory=dict(used=int(b["maxmem"] * b["mem"]), total=b["maxmem"]), uptime=86400 * 12,
                         loadavg=["1.2", "1.1", "0.9"], pveversion="pve-manager/8.2.4", kversion="Linux 6.8.8-2-pve",
                         cpuinfo=dict(cpus=b["cores"], model="AMD EPYC 7313"))
+        if rest == "hardware/pci":
+            return [dict(id="0000:01:00.0", **{"class": "0x030000"}, vendor_name="NVIDIA Corporation", device_name="GA102 [GeForce RTX 3090]"),
+                    dict(id="0000:01:00.1", **{"class": "0x040300"}, vendor_name="NVIDIA Corporation", device_name="GA102 High Definition Audio"),
+                    dict(id="0000:02:00.0", **{"class": "0x030200"}, vendor_name="NVIDIA Corporation", device_name="A100 PCIe 80GB"),
+                    dict(id="0000:03:00.0", **{"class": "0x020000"}, vendor_name="Intel Corporation", device_name="Ethernet X710")]
         if rest == "qemu": return [x for x in VMS if x["node"] == node and x["type"] == "qemu"]
         if rest == "lxc": return [x for x in VMS if x["node"] == node and x["type"] == "lxc"]
         if rest == "storage":
@@ -242,6 +248,9 @@ def route(path):
                 cfg = {"name": v["name"], "cores": 2, "memory": v["maxmem"] // (1024 * 1024)}
                 if val: cfg[key] = val
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
+                if seg[0] == "qemu" and v["vmid"] % 11 == 0: cfg["hostpci0"] = "0000:01:00,pcie=1,x-vga=1"  # GPU diretta
+                if seg[0] == "qemu" and v["vmid"] % 13 == 0: cfg["hostpci0"] = "mapping=gpu-a100,pcie=1"      # GPU da mapping
+                if seg[0] == "qemu" and v["vmid"] % 17 == 0: cfg["hostpci0"] = "0000:03:00.0"                 # NIC, non e' una GPU
                 return cfg
             if seg[2] == "agent" and seg[3] == "network-get-interfaces":
                 if v["status"] != "running" or v["type"] != "qemu" or v["vmid"] % 14 == 0: return None  # agent muto

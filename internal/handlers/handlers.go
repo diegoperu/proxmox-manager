@@ -329,6 +329,11 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 		VMs  []map[string]interface{} `json:"vms"`
 		LXCs []map[string]interface{} `json:"lxcs"`
 	}
+	// Resource mappings are cluster-wide: one call, only when some VM can use them.
+	var mapsRaw json.RawMessage
+	if raw, err := client.GetPCIMappings(); err == nil {
+		mapsRaw = raw
+	}
 	results := make([]NodeResult, len(nodeList))
 	var wg sync.WaitGroup
 	for i, n := range nodeList {
@@ -337,6 +342,15 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			results[i].Node = n.Node
+			// PCI table and mappings: best effort (a token without the permission just shows no GPU badge).
+			var pciTab PCITable
+			var mapTab MappingTable
+			if raw, err := client.GetNodePCI(n.Node); err == nil {
+				pciTab = ParsePCIList(raw)
+			}
+			if mapsRaw != nil {
+				mapTab = ParsePCIMappings(mapsRaw, n.Node)
+			}
 			if raw, err := client.GetVMs(n.Node); err == nil {
 				var vms []map[string]interface{}
 				if json.Unmarshal(raw, &vms) == nil {
@@ -362,6 +376,7 @@ func (h *Handler) GetAllVMs(w http.ResponseWriter, r *http.Request) {
 									vms[j]["ip"] = ip
 								}
 							}
+							vms[j]["gpus"] = VMGPUs(config, pciTab, mapTab)
 							_, hasSerial := config["serial0"]
 							vms[j]["has_serial"] = hasSerial
 							if ot, ok := config["ostype"].(string); ok {

@@ -335,6 +335,13 @@ func (c *Client) GetVMOSInfo(node string, vmid int) (json.RawMessage, error) {
 	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/get-osinfo", node, vmid))
 }
 
+// ── PCI passthrough (read only) ─────────────────────────────────────────────
+
+func (c *Client) GetNodePCI(node string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/hardware/pci")
+}
+func (c *Client) GetPCIMappings() (json.RawMessage, error) { return c.Get("/cluster/mapping/pci") }
+
 // ── Ceph (read only) ────────────────────────────────────────────────────────
 
 func (c *Client) GetCephStatus() (json.RawMessage, error) { return c.Get("/cluster/ceph/status") }

@@ -114,6 +114,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--hover)}
 .br{background:var(--green-dim);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent)}
 .bs{background:var(--red-dim);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 32%,transparent)}
 .bp{background:var(--blue-dim);color:var(--blue);border:1px solid color-mix(in srgb,var(--blue) 32%,transparent)}
+.badge.gpu{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent);margin-left:6px;vertical-align:middle}
 .bq{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 32%,transparent)}
 .bl{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 32%,transparent)}
 .bn{background:var(--accent-dim);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 32%,transparent)}
@@ -696,7 +697,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.75.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.77.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1507,6 +1508,12 @@ function ipCell(v){
 function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
 function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:1px">${p}%</div>`;}
 function sbadge(s){const m={running:'br',stopped:'bs',paused:'bp'};return `<span class="badge ${m[s]||'bs'}">${esc(s||'?')}</span>`;}
+// Scheda video (PCI passthrough): badge accanto al nome, il modello nel tooltip e per i lettori di schermo.
+function gpuBadge(v){
+  const g=Array.isArray(v.gpus)?v.gpus:[]; if(!g.length)return'';
+  const names=g.map(x=>x&&x.name?String(x.name):'Scheda video').join(', ');
+  return` <span class="badge gpu" role="img" title="${esc(names)}" aria-label="${esc('Scheda video collegata: '+names)}">GPU${g.length>1?' ×'+g.length:''}</span>`;
+}
 function tbadge(t){if(t==='qemu')return`<span class="badge bq">QEMU</span>`;if(t==='lxc')return`<span class="badge bl">LXC</span>`;if(t==='node')return`<span class="badge bn">NODE</span>`;if(t==='tmpl')return`<span class="badge bt">TPL</span>`;return`<span class="badge">${esc(t)}</span>`;}
 function nodeCell(v){const b=v.cluster_label&&v.cluster_label!==ClusterMgr.currentLabel()?`<span class="badge bn" style="font-size:11px;margin-right:4px">${esc(v.cluster_label)}</span>`:'';return`${b}<span class="td">${esc(v.node)}</span>`;}
 // Stesso criterio di GetTemplates lato backend: flag template=1 o nome che contiene "template".
@@ -2836,8 +2843,8 @@ const VMs=(()=>{
     });
     sortedData=[...filtered];
     renderRows(sortedData);
-    const run=filtered.filter(v=>v.status==='running').length;
-    document.getElementById('vm-sum').textContent=`${filtered.length} ${filtered.length===1?'risorsa':'risorse'} · ${run} in esecuzione · ${filtered.length-run} ${filtered.length-run===1?'ferma':'ferme'}`;
+    const run=filtered.filter(v=>v.status==='running').length, gpuN=filtered.filter(v=>Array.isArray(v.gpus)&&v.gpus.length).length;
+    document.getElementById('vm-sum').textContent=`${filtered.length} ${filtered.length===1?'risorsa':'risorse'} · ${run} in esecuzione · ${filtered.length-run} ${filtered.length-run===1?'ferma':'ferme'}`+(gpuN?` · ${gpuN} con GPU`:'');
   }
 
   function renderRows(data){
@@ -2849,7 +2856,7 @@ const VMs=(()=>{
       return `<tr>
       <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
-      <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td>
+      <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button>${gpuBadge(v)}</td>
       <td>${nodeCell(v)}</td><td class="tm" id="${esc(`ip-${v.node}-${v.vmid}`)}">${ipCell(v)}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
