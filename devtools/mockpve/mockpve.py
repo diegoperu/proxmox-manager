@@ -19,6 +19,7 @@ OSES = [
     {"id": "ubuntu", "name": "Ubuntu", "pretty-name": "Ubuntu 24.04.1 LTS", "version": "24.04.1 LTS (Noble Numbat)", "version-id": "24.04", "kernel-release": "6.8.0-45-generic", "machine": "x86_64"},
     {"id": "rocky", "name": "Rocky Linux", "pretty-name": "Rocky Linux 8.10 (Green Obsidian)", "version": "8.10 (Green Obsidian)", "version-id": "8.10", "kernel-release": "4.18.0-553.el8_10.x86_64", "machine": "x86_64"},
     {"id": "debian", "name": "Debian GNU/Linux", "pretty-name": "Debian GNU/Linux 12 (bookworm)", "version": "12 (bookworm)", "version-id": "12", "kernel-release": "6.1.0-25-amd64", "machine": "x86_64"},
+    {"id": "rhel", "name": "Red Hat Enterprise Linux", "pretty-name": "Red Hat Enterprise Linux 8.10 (Ootpa)", "version": "8.10 (Ootpa)", "version-id": "8.10", "kernel-release": "4.18.0-553.el8_10.x86_64", "machine": "x86_64"},
     {"id": "mswindows", "name": "Microsoft Windows", "pretty-name": "Microsoft Windows Server 2022 Standard", "version": "Server 2022", "version-id": "10.0", "kernel-release": "20348", "machine": "x86_64"},
 ]
 EXEC = {}  # pid -> risultato finto (solo per l'anteprima: nessun comando viene eseguito)
@@ -67,6 +68,8 @@ for node in NODES:
 VMS[40].update(vmid=151, name="web-lab-01", node="datacloud-node-3", status="stopped", mem=0, cpu=0, type="qemu")
 VMS.append(dict(type="qemu", node="datacloud-node-1", vmid=9000, name="rocky-9-template", status="stopped", maxmem=4 * GB,
                 mem=0, cpu=0, maxdisk=20 * GB, template=1, ip=""))
+for v in VMS:
+    if v["vmid"] % 7 == 0: v["ip"] = ""  # DHCP: nessun IP in Proxmox
 seen = set()
 for v in VMS:  # VMID univoci: la VM di prova 151 non deve avere omonimi
     while v["vmid"] in seen:
@@ -171,6 +174,12 @@ def route(path):
                 if val: cfg[key] = val
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
                 return cfg
+            if seg[2] == "agent" and seg[3] == "network-get-interfaces":
+                if v["status"] != "running" or v["type"] != "qemu" or v["vmid"] % 14 == 0: return None  # agent muto
+                return dict(result=[
+                    {"name": "lo", "ip-addresses": [{"ip-address": "127.0.0.1", "ip-address-type": "ipv4", "prefix": 8}]},
+                    {"name": "docker0", "ip-addresses": [{"ip-address": "172.17.0.1", "ip-address-type": "ipv4", "prefix": 16}]},
+                    {"name": "ens18", "ip-addresses": [{"ip-address": "10.99.%d.5" % (v["vmid"] % 250), "ip-address-type": "ipv4", "prefix": 24}]}])
             if seg[2] == "agent" and seg[3] == "get-osinfo":
                 if v["status"] != "running" or v["type"] != "qemu": return None
                 return dict(result=OSES[v["vmid"] % len(OSES)])

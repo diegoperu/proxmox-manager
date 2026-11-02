@@ -350,3 +350,59 @@ func TestVMDmesgHandlerGlobalSlotsLimit(t *testing.T) {
 	}
 	dmesgRelease("0|pve1|152")
 }
+
+func TestNormalizeNetInfo(t *testing.T) {
+	raw := json.RawMessage(`{"result":[
+	 {"name":"lo","ip-addresses":[{"ip-address":"127.0.0.1","ip-address-type":"ipv4"},{"ip-address":"::1","ip-address-type":"ipv6"}]},
+	 {"name":"docker0","ip-addresses":[{"ip-address":"172.17.0.1","ip-address-type":"ipv4"}]},
+	 {"name":"ens18","ip-addresses":[{"ip-address":"10.75.4.133","ip-address-type":"ipv4","prefix":24},{"ip-address":"fe80::1","ip-address-type":"ipv6"},{"ip-address":"2001:db8::5","ip-address-type":"ipv6"},{"ip-address":"169.254.3.3","ip-address-type":"ipv4"}]},
+	 {"name":"ens19","ip-addresses":[{"ip-address":"192.168.9.7","ip-address-type":"ipv4"}]}
+	]}`)
+	got := normalizeNetInfo(raw)
+	if got.PrimaryIPv4 != "10.75.4.133" {
+		t.Errorf("primario = %q, atteso il primo IPv4 di un'interfaccia non virtuale", got.PrimaryIPv4)
+	}
+	names := []string{}
+	for _, i := range got.Interfaces {
+		names = append(names, i.Name)
+	}
+	if fmt.Sprint(names) != "[docker0 ens18 ens19]" { // lo non ha indirizzi utili
+		t.Errorf("interfacce = %v", names)
+	}
+	if v6 := got.Interfaces[1].IPv6; len(v6) != 1 || v6[0] != "2001:db8::5" {
+		t.Errorf("IPv6 = %v (link-local da escludere)", v6)
+	}
+	if v4 := got.Interfaces[1].IPv4; len(v4) != 1 {
+		t.Errorf("IPv4 = %v (169.254.x.x da escludere)", v4)
+	}
+}
+
+func TestNormalizeNetInfoHostileInput(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteString(`{"result":[`)
+	for i := 0; i < 100; i++ { // troppe interfacce
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		fmt.Fprintf(&sb, `{"name":"e%d","ip-addresses":[{"ip-address":"10.0.%d.1"}]}`, i, i)
+	}
+	sb.WriteString(`,{"name":"` + strings.Repeat("n", 500) + `\u202e\u0007x","ip-addresses":[{"ip-address":"10.9.9.9"}]}`)
+	sb.WriteString(`,{"name":"junk","ip-addresses":[{"ip-address":"not an ip"},{"ip-address":"<script>"},{"ip-address":"999.1.1.1"},{"ip-address":""}]}]}`)
+	got := normalizeNetInfo(json.RawMessage(sb.String()))
+	if len(got.Interfaces) != netMaxIfaces {
+		t.Errorf("interfacce = %d, tetto %d", len(got.Interfaces), netMaxIfaces)
+	}
+	for _, i := range got.Interfaces {
+		if len([]rune(i.Name)) > netMaxNameLen || strings.ContainsAny(i.Name, "\u202e\u0007") {
+			t.Errorf("nome non ripulito: %q", i.Name)
+		}
+	}
+	for _, bad := range []string{`not json`, `{}`, `{"result":null}`, `{"result":[{"name":"x","ip-addresses":[{"ip-address":5}]}]}`} {
+		if g := normalizeNetInfo(json.RawMessage(bad)); len(g.Interfaces) != 0 || g.PrimaryIPv4 != "" {
+			t.Errorf("%q -> %+v, atteso vuoto", bad, g)
+		}
+	}
+	if g := normalizeNetInfo(json.RawMessage(`{"result":[{"name":"docker0","ip-addresses":[{"ip-address":"172.17.0.1"}]}]}`)); g.PrimaryIPv4 != "" {
+		t.Errorf("solo interfacce virtuali: nessun primario atteso, got %q", g.PrimaryIPv4)
+	}
+}

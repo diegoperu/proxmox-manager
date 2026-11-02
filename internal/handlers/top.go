@@ -268,8 +268,19 @@ func buildTop(client *api.Client, hours int) (topResponse, error) {
 	return topResponse{WindowHours: hours, Generated: now.Unix(), Items: items}, nil
 }
 
-// vmIPFromConfig legge l'IP statico da ipconfig0 (QEMU) o net0 (LXC); stringa vuota se assente o DHCP.
-func vmIPFromConfig(client *api.Client, typ, node string, vmid int) string {
+// vmIPSource is the part of the Proxmox client the address lookup needs.
+type vmIPSource interface {
+	GetVMConfig(node string, vmid int) (json.RawMessage, error)
+	GetContainerConfig(node string, vmid int) (json.RawMessage, error)
+	GetVMNetworkInterfaces(node string, vmid int) (json.RawMessage, error)
+}
+
+// topAgentIPWait bounds the guest-agent fallback: a mute agent must not slow the whole ranking down.
+const topAgentIPWait = 5 * time.Second
+
+// vmIPFromConfig reads the static address from ipconfig0 (QEMU) or net0 (LXC). For a QEMU VM with
+// no address there (DHCP, manual setup) it asks the guest agent. Empty string if nothing is known.
+func vmIPFromConfig(client vmIPSource, typ, node string, vmid int) string {
 	var raw json.RawMessage
 	var err error
 	key := "ipconfig0"
@@ -287,5 +298,22 @@ func vmIPFromConfig(client *api.Client, typ, node string, vmid int) string {
 		return ""
 	}
 	s, _ := cfg[key].(string)
-	return extractVMIP(s)
+	if ip := extractVMIP(s); ip != "" || typ != "qemu" {
+		return ip
+	}
+	res := make(chan string, 1)
+	go func() {
+		raw, err := client.GetVMNetworkInterfaces(node, vmid)
+		if err != nil {
+			res <- ""
+			return
+		}
+		res <- normalizeNetInfo(raw).PrimaryIPv4
+	}()
+	select {
+	case ip := <-res:
+		return ip
+	case <-time.After(topAgentIPWait):
+		return ""
+	}
 }

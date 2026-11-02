@@ -18,3 +18,6 @@ test-reports/
 .impeccable/questions/
 .impeccable/review/
 .impeccable/surfaces/
+
+# Script locale per installare l'helper dmesg nelle VM (stampa gli IP delle VM)
+/install-dmesg-helper.sh

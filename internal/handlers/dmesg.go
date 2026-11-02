@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -343,4 +344,98 @@ func (h *Handler) GetVMOSInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, normalizeOSInfo(data))
+}
+
+// ── Network addresses reported by the guest agent ─────────────────────────────
+// Used when a VM has no static address in its Proxmox cloud-init config (DHCP, manual setup).
+
+type netIface struct {
+	Name string   `json:"name"`
+	IPv4 []string `json:"ipv4"`
+	IPv6 []string `json:"ipv6"`
+}
+
+type netInfo struct {
+	Interfaces  []netIface `json:"interfaces"`
+	PrimaryIPv4 string     `json:"primary_ipv4"`
+}
+
+const (
+	netMaxIfaces  = 32
+	netMaxAddrs   = 16
+	netMaxNameLen = 32
+)
+
+// virtualIfacePattern: interfaces created by containers, bridges and tunnels, never "the" address of a VM.
+var virtualIfacePattern = regexp.MustCompile(`^(lo|docker|veth|br-|virbr|cni|flannel|cali|tun|tap|kube|vxlan|podman|cilium|lxc|weave)`)
+
+// normalizeNetInfo keeps interface names and valid addresses from guest-network-get-interfaces.
+// Loopback and link-local addresses are dropped; the primary address is the first IPv4 of a
+// non-virtual interface. Everything is bounded: the data comes from the guest.
+func normalizeNetInfo(raw json.RawMessage) netInfo {
+	out := netInfo{Interfaces: []netIface{}}
+	var wrapper struct {
+		Result []struct {
+			Name string `json:"name"`
+			IPs  []struct {
+				Addr string `json:"ip-address"`
+				Type string `json:"ip-address-type"`
+			} `json:"ip-addresses"`
+		} `json:"result"`
+	}
+	if json.Unmarshal(raw, &wrapper) != nil {
+		return out
+	}
+	for _, it := range wrapper.Result {
+		if len(out.Interfaces) >= netMaxIfaces {
+			break
+		}
+		name := cleanText(it.Name)
+		if utf8.RuneCountInString(name) > netMaxNameLen {
+			name = string([]rune(name)[:netMaxNameLen])
+		}
+		ni := netIface{Name: name, IPv4: []string{}, IPv6: []string{}}
+		for _, a := range it.IPs {
+			ip := net.ParseIP(strings.TrimSpace(a.Addr))
+			if ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+				continue
+			}
+			if v4 := ip.To4(); v4 != nil {
+				if len(ni.IPv4) < netMaxAddrs {
+					ni.IPv4 = append(ni.IPv4, v4.String())
+				}
+			} else if len(ni.IPv6) < netMaxAddrs {
+				ni.IPv6 = append(ni.IPv6, ip.String())
+			}
+		}
+		if len(ni.IPv4)+len(ni.IPv6) == 0 {
+			continue
+		}
+		out.Interfaces = append(out.Interfaces, ni)
+		if out.PrimaryIPv4 == "" && len(ni.IPv4) > 0 && !virtualIfacePattern.MatchString(strings.ToLower(name)) {
+			out.PrimaryIPv4 = ni.IPv4[0]
+		}
+	}
+	return out
+}
+
+// GetVMNetInfo: GET /api/nodes/{node}/qemu/{vmid}/netinfo -> addresses from the guest agent, empty if it does not answer.
+func (h *Handler) GetVMNetInfo(w http.ResponseWriter, r *http.Request) {
+	node := chi.URLParam(r, "node")
+	vmid, err := validVMTarget(node, chi.URLParam(r, "vmid"))
+	if err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	client, err := h.getClientFor(clusterIdx(r))
+	if err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	data, err := client.GetVMNetworkInterfaces(node, vmid)
+	if err != nil { // stopped VM or no agent
+		writeJSON(w, netInfo{Interfaces: []netIface{}})
+		return
+	}
+	writeJSON(w, normalizeNetInfo(data))
 }
