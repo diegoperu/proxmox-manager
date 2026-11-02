@@ -335,6 +335,26 @@ func (c *Client) GetVMOSInfo(node string, vmid int) (json.RawMessage, error) {
 	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/get-osinfo", node, vmid))
 }
 
+// ── Ceph (read only) ────────────────────────────────────────────────────────
+
+func (c *Client) GetCephStatus() (json.RawMessage, error) { return c.Get("/cluster/ceph/status") }
+func (c *Client) GetCephFlags() (json.RawMessage, error)  { return c.Get("/cluster/ceph/flags") }
+func (c *Client) GetCephOSD(node string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/ceph/osd")
+}
+func (c *Client) GetCephPools(node string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/ceph/pool")
+}
+
+// GetCephServices lists mon, mgr or mds daemons (kind is validated by the caller's constant arguments).
+func (c *Client) GetCephServices(node, kind string) (json.RawMessage, error) {
+	switch kind {
+	case "mon", "mgr", "mds":
+		return c.Get("/nodes/" + node + "/ceph/" + kind)
+	}
+	return nil, fmt.Errorf("tipo di servizio Ceph non valido")
+}
+
 func (c *Client) GetVMNetworkInterfaces(node string, vmid int) (json.RawMessage, error) {
 	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/network-get-interfaces", node, vmid))
 }

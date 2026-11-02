@@ -116,3 +116,44 @@ Domande a cui rispondere prima di scrivere codice per il redesign grafico/UX.
 **Domanda**: La guardia su `/api` blocca CSRF e richieste da altre origini senza configurazione. Il controllo sull'intestazione `Host` (contro il DNS rebinding) e' pero' opzionale (`allowed_hosts` in config.json, vuoto = spento) perche' dipende dai nomi con cui raggiungete il servizio. Vuoi attivarlo sul servizio vero? Servono i nomi che si digitano nel browser (es. localhost, il nome del server).
 **Suggerimento**: si', con i nomi che usate davvero.
 **Risposta utente**:
+
+## Pagina Ceph e riepilogo nella dashboard (branch `feat/ceph`)
+
+Stato verificato (2026-11-02, sola lettura): il cluster CALCOLO ha 2 storage `rbd` (Ceph); HOSTING no.
+
+### D15 — Solo lettura o anche azioni
+**Stato**: RISPOSTA
+**Bloccante**: sì
+**Domanda**: La pagina Ceph mostra soltanto lo stato, oppure deve anche permettere azioni (flag `noout`/`norebalance`, mettere un OSD out/in, riavviare un OSD)?
+**Perché conta**: le azioni cambiano lo stato del cluster di storage, richiedono privilegi piu' alti sul token e conferme tipo reboot nodo; la sola lettura e' molto piu' sicura.
+**Opzioni**: A) solo lettura B) lettura + flag di manutenzione C) lettura + azioni sugli OSD
+**Suggerimento**: A ora; le azioni, se servono, in una fase separata con conferma scritta.
+**Risposta utente**: 2026-11-02 — solo lettura (A).
+
+### D16 — Presenza nel menu
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: La voce "Ceph" compare nel menu solo per i cluster che hanno Ceph (verifica automatica, nascosta per HOSTING) oppure sempre?
+**Suggerimento**: solo dove Ceph e' presente; la dashboard mostra il riepilogo Ceph solo in quel caso.
+**Risposta utente**: 2026-11-02 — come suggerito: voce e riquadro solo dove Ceph e' presente.
+
+### D17 — Storico e aggiornamento
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: L'API Proxmox da' i valori istantanei di I/O e recupero, non uno storico. Va bene aggiornare ogni 5 secondi con la pagina aperta e tenere in memoria del browser gli ultimi 10 minuti (nessun salvataggio, niente cache sul disco)? Con la pagina chiusa non si accumula storia.
+**Suggerimento**: si'.
+**Risposta utente**: 2026-11-02 — come suggerito: ogni 5 s con pagina aperta, 10 minuti in memoria del browser.
+
+### D18 — Regole della "perturbazione"
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Come entra Ceph nel calcolo generale? Proposta: HEALTH_ERR = perturbazione (attenzione, rosso); HEALTH_WARN = quasi sereno (ambra); capacita' >= 85% (nearfull) ambra, >= 95% (full) rosso; OSD down o recupero in corso entrano come voci nella frase sotto il titolo. Le soglie 85/90/95 sono quelle predefinite di Ceph (Proxmox non le espone).
+**Suggerimento**: la proposta cosi' com'e'.
+**Risposta utente**: 2026-11-02 — come suggerito.
+
+### D19 — Dati di prova
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Per sviluppare aggiungo a `mockpve` uno stato Ceph finto con piu' casi (sano, avviso, errore, recupero in corso, OSD fermi); poi verifico in sola lettura sul cluster CALCOLO. Il token di CALCOLO deve avere il privilegio `Sys.Audit` sui nodi: se manca la pagina mostrera' "permessi insufficienti". Va bene?
+**Suggerimento**: si'.
+**Risposta utente**: 2026-11-02 — si'.

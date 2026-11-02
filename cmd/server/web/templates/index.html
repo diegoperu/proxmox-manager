@@ -269,6 +269,93 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .task small.e{color:var(--red)}
 .task time{color:var(--text3);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .act-empty{padding:14px 0;color:var(--text3);border-top:1px solid var(--border)}
+/* ── Ceph: osservatorio meteo (pagina) + riquadro in panoramica ── */
+.ni[hidden]{display:none}
+.ceph-top{display:flex;align-items:flex-start;gap:0;border-bottom:1px solid var(--border);padding-bottom:18px}
+.ceph-top .cond{flex:1;min-width:0;border-bottom:0;padding-bottom:0}
+.ceph-upd{margin-left:auto;font-size:12px;color:var(--text3);display:flex;gap:8px;align-items:center;white-space:nowrap;padding-left:16px}
+.ceph-upd i{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+.ceph-upd.stale{color:var(--warn)}.ceph-upd.stale i{background:var(--warn)}
+.ceph-inst{display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1fr);gap:14px;margin:18px 0 6px}
+.ceph-inst .panel{margin:0}
+.inst-h{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--text3);font-weight:500}
+.inst-h em{font-style:normal;color:var(--text2)}
+.rain{display:flex;gap:18px;margin-top:12px}
+.tube{position:relative;flex:0 0 44px;width:44px;height:170px;border:1px solid var(--border2);border-radius:10px 10px 14px 14px;background:var(--bg3);overflow:hidden}
+.tube i{position:absolute;left:0;right:0;bottom:0;background:var(--accent);opacity:.7}
+.tube i.w{background:var(--warn)}.tube i.r{background:var(--red)}
+.tube i::after{content:'';position:absolute;left:0;right:0;top:0;border-top:2px solid var(--text)}
+.tick{position:absolute;left:0;right:0;border-top:1px dashed var(--text3)}
+.tick.w{border-color:var(--warn)}.tick.r{border-color:var(--red)}
+.rain-v{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0}
+.big{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.big small{font-size:13px;font-weight:500;color:var(--text3);letter-spacing:0}
+.big.w{color:var(--warn)}.big.r{color:var(--red)}
+.cnote{font-size:12px;color:var(--text3)}
+.cnote .w{color:var(--warn)}.cnote .r{color:var(--red)}
+.wind{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-top:10px}
+.wind .k{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:7px}
+.wind .k::before{content:'';width:14px;border-top:2px solid currentColor}
+.wind .k.rd{color:var(--accent)}.wind .k.wr{color:var(--purple)}
+.wind b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums}
+.wind small{font-size:12px;color:var(--text3)}
+.wchart{display:block;margin-top:12px;height:64px;width:100%}
+.wchart .cw-r{fill:none;stroke:var(--accent);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.wchart .cw-w{fill:none;stroke:var(--purple);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.ftrack{position:relative;height:28px;margin:10px 0 8px}
+.ftrack .fb{position:absolute;left:0;right:0;top:14px;border-top:2px dashed var(--border2)}
+.ftrack .fd{position:absolute;left:0;top:13px;border-top:3px solid var(--accent)}
+.ftrack .tri{position:absolute;top:1px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--accent);margin-left:-6px}
+.ftrack .fh{position:absolute;top:6px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--text);border:4px solid var(--bg2)}
+.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.fgrid b{display:block;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.fgrid span{font-size:12px;color:var(--text3)}
+.calerts{padding:0}
+.calert{display:grid;grid-template-columns:90px 240px minmax(0,1fr);gap:16px;align-items:baseline;padding:12px var(--card-pad);border-top:1px solid var(--border)}
+.calert:first-child{border-top:0}
+.sev{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;white-space:nowrap}
+.sev::before{content:'';width:14px;border-top:2px solid currentColor}
+.sev.w{color:var(--warn)}.sev.e{color:var(--red)}.sev.e::before{border-top-width:4px}.sev.m{color:var(--text3)}.sev.m::before{border-top-style:dotted}
+.ccode{font-family:var(--mono);font-size:12px;color:var(--text2);overflow-wrap:anywhere}
+.cmsg{color:var(--text)}.cmsg small{display:block;color:var(--text3);font-size:12px;overflow-wrap:anywhere}
+.calert.muted .cmsg{color:var(--text3)}
+.stations{padding:4px 0}
+.srow{display:grid;grid-template-columns:minmax(120px,170px) minmax(0,1fr);gap:16px;align-items:center;padding:10px var(--card-pad);border-top:1px solid var(--border)}
+.srow:first-child{border-top:0}
+.srow .sn{font-weight:600;overflow-wrap:anywhere}.srow .sn small{display:block;font-weight:400;font-size:12px;color:var(--text3)}
+.otiles{display:flex;flex-wrap:wrap;gap:6px}
+.osd{position:relative;width:30px;height:40px;border:1px solid var(--border2);border-radius:6px;background:var(--bg3);overflow:hidden}
+.osd i{position:absolute;left:0;right:0;bottom:0;background:var(--accent);opacity:.7}
+.osd i.w{background:var(--warn)}.osd i.r{background:var(--red)}
+.osd span{position:absolute;left:0;right:0;top:2px;text-align:center;font:600 11px var(--mono);color:var(--text)}
+.osd.dn{border:1.5px dashed var(--red);background:transparent}.osd.dn span{color:var(--red)}.osd.dn i{opacity:.2}
+.osd.ot{border-style:dotted;background:transparent}.osd.ot i{display:none}
+.olegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--text3);margin:0 0 8px}
+.olegend span{display:inline-flex;gap:6px;align-items:center}
+.olegend .osd{width:12px;height:16px;border-radius:3px}
+.pgbar{display:flex;height:16px;border-radius:8px;overflow:hidden;gap:2px;background:var(--bg3)}
+.pgbar i{display:block;min-width:4px}
+.pgbar .ok{background:var(--green)}.pgbar .w{background:var(--warn)}.pgbar .r{background:var(--red)}.pgbar .n{background:var(--accent)}
+.pglab{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:10px;font-size:12px;color:var(--text2)}
+.pglab b{color:var(--text);font-variant-numeric:tabular-nums}
+.pglab span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;background:var(--accent)}
+.pglab .ok::before{background:var(--green)}.pglab .w::before{background:var(--warn)}.pglab .r::before{background:var(--red)}
+.ctwo{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
+.ctwo .panel{margin:0}
+.csvc{display:grid;gap:10px}
+.csvc>div{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.flag{display:inline-block;padding:2px 10px;border-radius:20px;border:1px solid var(--border2);font:500 12px var(--mono);color:var(--text2);margin:0 6px 6px 0}
+.cstrip{display:flex;align-items:center;gap:16px;width:100%;margin:0 0 22px;padding:12px var(--card-pad);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.cstrip:hover{background:var(--hover)}
+.cstrip[hidden]{display:none}
+.cstrip .cs-ico{width:32px;height:32px;flex-shrink:0;color:var(--text2)}
+.cstrip .cs-ico.ok{color:var(--green)}.cstrip .cs-ico.warn{color:var(--warn)}.cstrip .cs-ico.bad{color:var(--red)}
+.cstrip .cs-t{display:block;font-size:15px;font-weight:600}.cstrip .cs-s{display:block;font-size:12px;color:var(--text3);overflow-wrap:anywhere}
+.cstrip .cs-m{margin-left:auto;flex:0 0 160px}
+.cstrip .cs-m .bw{margin-top:4px}
+.cstrip .cs-m b{font-size:12px;font-weight:500;color:var(--text2)}
+@media(max-width:1180px){.ceph-inst{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ceph-inst>:first-child{grid-column:1/-1}.ctwo{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.ceph-inst{grid-template-columns:minmax(0,1fr)}.calert{grid-template-columns:minmax(0,1fr);gap:4px}.srow{grid-template-columns:minmax(0,1fr)}.ceph-top{flex-direction:column}.ceph-upd{padding:8px 0 0;margin-left:0}.cstrip{flex-wrap:wrap}.cstrip .cs-m{flex:1 1 100%;margin-left:0}.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1180px){.dash{display:flex;flex-direction:column;align-items:stretch;gap:0}.dash-main{display:contents}.dash>*,.dash-main>*,.dash-vms{min-width:0;max-width:100%}.dash-side{position:static;order:1;margin-bottom:26px}.dash-vms{order:2}}
 @media(max-width:650px){
   #page-vms table th:nth-child(2),#page-vms table td:nth-child(2),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(6),#page-vms table td:nth-child(6),#page-vms table th:nth-child(7),#page-vms table td:nth-child(7),#page-vms table th:nth-child(9),#page-vms table td:nth-child(9),#page-vms table th:nth-child(11),#page-vms table td:nth-child(11),#page-vms table th:nth-child(12),#page-vms table td:nth-child(12),
@@ -587,6 +674,9 @@ html.catppuccino{
     <button type="button" class="ni" data-page="vms">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>VM &amp; Container
     </button>
+    <button type="button" class="ni" data-page="ceph" hidden>
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Ceph
+    </button>
     <div class="nav-sec">Operazioni</div>
     <button type="button" class="ni" data-page="provision">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
@@ -606,7 +696,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.69.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.75.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -620,6 +710,7 @@ html.catppuccino{
         <div class="dash-main">
           <div class="cond" id="dash-cond" aria-live="polite"><div class="ldc" style="padding:12px 0"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Connessione...</div></div>
           <div class="kstrip" id="dash-kpis"></div>
+          <button type="button" class="cstrip" id="dash-ceph" hidden onclick="App.nav('ceph')"></button>
           <h2 class="sec">Nodi <small>ultime 24 ore · la barra va dal minimo al massimo, il punto bianco è il valore attuale, il tratto tratteggiato è la soglia critica (85%). Un pallino per VM: pieno = in esecuzione, vuoto = ferma, diametro = RAM</small></h2>
           <div class="npanel" id="dash-nodes"></div>
           <div class="dash-vms">
@@ -641,6 +732,12 @@ html.catppuccino{
           <button type="button" class="btn ba mt16" onclick="App.nav('provision')">Nuova VM</button>
         </section>
       </div>
+    </div>
+
+    <!-- ██ CEPH ██ -->
+    <div class="page" id="page-ceph">
+      <div class="ceph-top"><div class="cond" id="ceph-cond" aria-live="polite"></div><div class="ceph-upd" id="ceph-upd"></div></div>
+      <div id="ceph-body"></div>
     </div>
 
     <!-- ██ NODES ██ -->
@@ -1644,7 +1741,7 @@ const ClusterMgr={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',reports:'Report',settings:'Impostazioni'};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',reports:'Report',settings:'Impostazioni'};
 // Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
@@ -1674,6 +1771,7 @@ const App={
     document.querySelectorAll('.ni').forEach(el=>{const on=el.dataset.page===p;el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+p));
     document.getElementById('ptitle').textContent=PMETA[p]||p;
+    if(p!=='ceph')Ceph.stop();
     App.cur=p; if(!opts.silent)Route.push('#/'+p);
     App.refresh();
   },
@@ -1692,6 +1790,8 @@ const App={
     if(p==='provision') Provision.load();
     if(p==='batch')     Batch.load();
     if(p==='cluster')   Cluster.load();
+    if(p==='ceph')      Ceph.load();
+    else                Ceph.probe();
     if(p==='settings')  Settings.load();
   },
   async checkConn(){
@@ -1880,9 +1980,9 @@ const Palette={
   },
   base(){
     const KW={dashboard:'home panoramica stato salute',nodes:'nodi server host hardware',vms:'virtual machine container lxc qemu kvm',
-      provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',
+      provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',ceph:'ceph storage osd pool rbd salute capacita meteo',
       reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
-    const items=Object.entries(PMETA).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
+    const items=Object.entries(PMETA).filter(([k])=>k!=='ceph'||Ceph.isAvail()).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
     items.push({group:'Azioni',label:'Aggiorna i dati',sub:'',run:()=>App.refresh()});
     for(const c of ClusterMgr.clusters.filter(c=>c.idx!==ClusterMgr.current)){
       items.push({group:'Azioni',label:`Passa al cluster ${c.label}`,sub:'',run:()=>{document.getElementById('cluster-select').value=c.idx;ClusterMgr.switchTo(c.idx);}});
@@ -1952,6 +2052,362 @@ const Palette={
 // ════════════════════════════════════════════════════════════════════════════
 // DASHBOARD — "Bollettino": una frase di condizione, i numeri sotto, i nodi come barre min–max 24h
 // ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// CEPH: osservatorio meteo. Sola lettura. La pagina esiste solo nei cluster dove Ceph risponde.
+// `/api/ceph/summary` alimenta la panoramica, `/api/ceph` la pagina (aggiornata ogni 5 s con la pagina aperta;
+// la curva dell'I/O tiene 10 minuti in memoria del browser, nessun localStorage). Ogni testo esterno passa da esc().
+// ════════════════════════════════════════════════════════════════════════════
+const Ceph={
+  POLL_MS:5000, HIST_MS:10*60*1000,
+  last:{},          // ultimo riepilogo per indice cluster (panoramica)
+  availBy:{},       // true/false per indice cluster, assente = non ancora noto
+  hist:{},          // per cluster: campioni di I/O {t,r,w,ro,wo}
+  data:null, seq:0, timer:null, lastOk:0, failed:false,
+  FLAG_HELP:{
+    noout:'gli OSD fermi non vengono esclusi: i dati non si ricostruiscono altrove (manutenzione in corso?)',
+    noup:'gli OSD non possono avviarsi', nodown:'gli OSD non vengono segnati come fermi',
+    norecover:'il recupero dei dati e\' sospeso', nobackfill:'il riempimento dei nuovi OSD e\' sospeso',
+    norebalance:'il riequilibrio e\' sospeso', noscrub:'i controlli di integrita\' sono sospesi',
+    'nodeep-scrub':'i controlli profondi sono sospesi', pause:'letture e scritture sono sospese',
+  },
+  // Traduzione dei controlli di salute: codice -> frase italiana costruita dal conteggio `n`. Il testo originale di Ceph
+  // resta nel tooltip e, per i codici non in tabella, e' quello mostrato. Un codice nuovo si aggiunge qui (e in ceph_test se serve).
+  CHECK_IT:(()=>{
+    const pl=(n,one,many)=>n===1?`1 ${one}`:`${n} ${many}`;
+    return{
+      OSD_DOWN:n=>pl(n,'OSD giù','OSD giù'),
+      OSD_HOST_DOWN:n=>pl(n,'nodo con tutti gli OSD giù','nodi con tutti gli OSD giù'),
+      OSD_ROOT_DOWN:n=>pl(n,'radice CRUSH con tutti gli OSD giù','radici CRUSH con tutti gli OSD giù'),
+      OSD_NEARFULL:n=>pl(n,'OSD quasi pieno','OSD quasi pieni'),
+      OSD_BACKFILLFULL:n=>pl(n,'OSD troppo pieno per il riempimento (backfill)','OSD troppo pieni per il riempimento (backfill)'),
+      OSD_FULL:n=>pl(n,'OSD pieno','OSD pieni'),
+      OSD_OUT_OF_ORDER_FULL:()=>'Soglie di riempimento degli OSD incoerenti',
+      OSD_FLAGS:n=>pl(n,'OSD con un flag attivo','OSD con flag attivi'),
+      OSD_SCRUB_ERRORS:n=>pl(n,'errore di scrub (controllo di integrità)','errori di scrub (controllo di integrità)'),
+      OSD_TOO_MANY_REPAIRS:()=>'Troppe riparazioni di letture su un OSD',
+      OSD_NO_DOWN_OUT_INTERVAL:()=>'mon_osd_down_out_interval è 0: gli OSD fermi non vengono mai esclusi',
+      OSD_UPGRADE_FINISHED:()=>'Aggiornamento completato: valutare require-osd-release',
+      OSDMAP_FLAGS:(n,c)=>'Flag del cluster attivi: '+String(c.message||'').replace(/\s*flag\(s\) set\s*$/,''),
+      OLD_CRUSH_TUNABLES:()=>'Parametri CRUSH obsoleti',
+      OLD_CRUSH_STRAW_CALC_VERSION:()=>'Versione di calcolo CRUSH straw obsoleta',
+      POOL_FULL:n=>pl(n,'pool pieno','pool pieni'),
+      POOL_BACKFILLFULL:n=>pl(n,'pool troppo pieno per il riempimento','pool troppo pieni per il riempimento'),
+      POOL_NEARFULL:n=>pl(n,'pool quasi pieno','pool quasi pieni'),
+      POOL_APP_NOT_ENABLED:n=>pl(n,'pool senza applicazione abilitata','pool senza applicazione abilitata'),
+      POOL_TOO_FEW_PGS:n=>pl(n,'pool con pochi PG','pool con pochi PG'),
+      POOL_TOO_MANY_PGS:n=>pl(n,'pool con troppi PG','pool con troppi PG'),
+      POOL_TARGET_SIZE_BYTES_OVERCOMMITTED:()=>'Dimensione prevista dei pool oltre la capacità',
+      POOL_TARGET_SIZE_RATIO_OVERCOMMITTED:()=>'Rapporto previsto dei pool oltre la capacità',
+      POOL_NO_REDUNDANCY:n=>pl(n,'pool senza ridondanza','pool senza ridondanza'),
+      TOO_FEW_PGS:()=>'Pochi PG per OSD',
+      TOO_MANY_PGS:()=>'Troppi PG per OSD',
+      MANY_OBJECTS_PER_PG:n=>pl(n,'pool con troppi oggetti per PG','pool con troppi oggetti per PG'),
+      PG_AVAILABILITY:()=>'Disponibilità dei dati ridotta: alcuni PG non sono attivi',
+      PG_DEGRADED:()=>'Ridondanza dei dati ridotta: oggetti degradati',
+      PG_RECOVERY_FULL:()=>'Recupero impossibile: spazio insufficiente',
+      PG_BACKFILL_FULL:()=>'Riempimento impossibile: spazio insufficiente',
+      PG_DAMAGED:()=>'Dati danneggiati: errori di scrub sui PG',
+      PG_NOT_SCRUBBED:n=>pl(n,'PG senza scrub recente','PG senza scrub recente'),
+      PG_NOT_DEEP_SCRUBBED:n=>pl(n,'PG senza deep scrub recente','PG senza deep scrub recente'),
+      PG_SLOW_SNAP_TRIMMING:()=>'Eliminazione degli snapshot lenta',
+      OBJECT_MISPLACED:()=>'Oggetti fuori posto (riequilibrio in corso)',
+      OBJECT_UNFOUND:()=>'Oggetti non trovati',
+      SLOW_OPS:n=>pl(n,'operazione lenta (bloccata da oltre 30 s)','operazioni lente (bloccate da oltre 30 s)'),
+      BLUESTORE_SLOW_OP_ALERT:n=>pl(n,'OSD con operazioni lente in BlueStore','OSD con operazioni lente in BlueStore'),
+      BLUESTORE_NO_COMPRESSION:n=>pl(n,'OSD senza compressione disponibile','OSD senza compressione disponibile'),
+      BLUESTORE_SPURIOUS_READ_ERRORS:n=>pl(n,'OSD con errori di lettura spuri','OSD con errori di lettura spuri'),
+      BLUESTORE_DISK_SIZE_MISMATCH:n=>pl(n,'OSD con dimensione del disco incoerente','OSD con dimensione del disco incoerente'),
+      BLUESTORE_LEGACY_STATFS:n=>pl(n,'OSD con statistiche BlueStore obsolete','OSD con statistiche BlueStore obsolete'),
+      BLUESTORE_NO_PER_POOL_OMAP:n=>pl(n,'OSD senza omap per pool','OSD senza omap per pool'),
+      MON_DOWN:n=>pl(n,'monitor fuori quorum','monitor fuori quorum'),
+      MON_CLOCK_SKEW:()=>'Orologi dei monitor non sincronizzati',
+      MON_DISK_LOW:()=>'Poco spazio su disco nei monitor',
+      MON_DISK_CRIT:()=>'Spazio su disco dei monitor quasi esaurito',
+      MON_DISK_BIG:()=>'Database di un monitor troppo grande',
+      MON_MSGR2_NOT_ENABLED:()=>'msgr2 non abilitato sui monitor',
+      MON_NETSPLIT:()=>'Partizione di rete tra i monitor',
+      MGR_DOWN:()=>'Nessun manager attivo',
+      MGR_MODULE_ERROR:()=>'Un modulo del manager è in errore',
+      MGR_MODULE_DEPENDENCY:()=>'Dipendenza mancante in un modulo del manager',
+      FS_DEGRADED:()=>'Filesystem degradato',
+      FS_WITH_FAILED_MDS:()=>'Filesystem con un MDS in errore',
+      MDS_INSUFFICIENT_STANDBY:()=>'MDS di riserva insufficienti',
+      MDS_SLOW_REQUEST:()=>'Richieste lente sul server dei metadati (MDS)',
+      MDS_TRIM:()=>'Il giornale dei metadati (MDS) non viene ridotto',
+      RECENT_CRASH:n=>pl(n,'crash recente di un demone Ceph','crash recenti di demoni Ceph'),
+      DEVICE_HEALTH:n=>pl(n,'dispositivo con guasto previsto','dispositivi con guasto previsto'),
+      DEVICE_HEALTH_IN_USE:()=>'Dispositivi con guasto previsto ancora in uso',
+      DEVICE_HEALTH_TOOMANY:()=>'Troppi dispositivi con guasto previsto',
+      LARGE_OMAP_OBJECTS:n=>pl(n,'oggetto omap molto grande','oggetti omap molto grandi'),
+      TELEMETRY_CHANGED:()=>'La telemetria richiede una nuova autorizzazione',
+      AUTH_INSECURE_CLIENT_KEY_TYPE:n=>pl(n,'entità client con tipo di chiave non sicuro','entità client con tipo di chiave non sicuro'),
+      AUTH_INSECURE_KEYS_ALLOWED:()=>'I monitor accettano tipi di chiave non sicuri per l\'autenticazione',
+      AUTH_INSECURE_KEYS_CREATABLE:()=>'I monitor permettono di creare chiavi di tipo non sicuro',
+    };
+  })(),
+  // Righe di dettaglio ricorrenti (nome dell'OSD, del pool, dell'entita' restano quelli di Ceph).
+  DETAIL_IT:[
+    [/^(osd\.\d+) \(root=[^)]*?host=([^,)]+)[^)]*\) is down$/,(m)=>`${m[1]} (nodo ${m[2]}) è giù`],
+    [/^\s*(osd\.\d+) observed slow operation indications in BlueStore$/,(m)=>`${m[1]} ha rilevato operazioni lente in BlueStore`],
+    [/^entity (\S+) using insecure key type: (\S+)$/,(m)=>`l'entità ${m[1]} usa un tipo di chiave non sicuro: ${m[2]}`],
+    [/^insecure cipher (\S+) allowed for auth$/,(m)=>`cifrario non sicuro ${m[1]} consentito per l'autenticazione`],
+    [/^application not enabled on pool '(.+)'$/,(m)=>`applicazione non abilitata sul pool '${m[1]}'`],
+    [/^(osd\.\d+) is full$/,(m)=>`${m[1]} è pieno`],
+    [/^(osd\.\d+) is near full$/,(m)=>`${m[1]} è quasi pieno`],
+    [/^pool '?(\S+?)'? is (full|near full)$/,(m)=>`il pool '${m[1]}' è ${m[2]==='full'?'pieno':'quasi pieno'}`],
+    [/^mon\.(\S+) clock skew (\S+) > max (\S+)/,(m)=>`mon.${m[1]}: scarto dell'orologio ${m[2]} oltre il massimo ${m[3]}`],
+  ],
+  // Messaggio italiano di un check; `orig` e' il testo di Ceph (da mostrare nel tooltip se diverso).
+  checkText(c){
+    const orig=String(c.message||''), f=Object.prototype.hasOwnProperty.call(Ceph.CHECK_IT,c.code)?Ceph.CHECK_IT[c.code]:null;
+    let text=orig; if(f){try{text=f(c.count>0?c.count:1,c)||orig;}catch(e){text=orig;}}
+    return{text,orig};
+  },
+  detailText(line){
+    for(const [re,fn] of Ceph.DETAIL_IT){const m=re.exec(line);if(m)return fn(m);}
+    return line;
+  },
+  isAvail(){return Ceph.availBy[ClusterMgr.current]===true;},
+  syncNav(){const b=document.querySelector('.ni[data-page="ceph"]');if(b)b.hidden=!Ceph.isAvail();},
+  note(o,idx){
+    if(idx===undefined)idx=ClusterMgr.current;
+    Ceph.availBy[idx]=!!(o&&o.available);
+    Ceph.last[idx]=o&&o.available?o:null;
+    Ceph.syncNav();
+  },
+  // Riepilogo per la panoramica; null se il cluster non risponde. Non genera toast.
+  async summary(){
+    const idx=ClusterMgr.current;
+    try{const o=await api('/ceph/summary',{quiet:true,timeoutMs:8000});Ceph.note(o,idx);return o&&o.available?o:null;}
+    catch(e){return Ceph.last[idx]||null;}
+  },
+  // Disponibilita' da conoscere anche fuori dalla panoramica (voce di menu).
+  async probe(){if(Ceph.availBy[ClusterMgr.current]===undefined)await Ceph.summary();Ceph.syncNav();},
+
+  // Unica definizione della condizione: la usano pagina, riquadro e frase generale della panoramica.
+  // Livelli: HEALTH_ERR o capacita' >= 95% = bad; HEALTH_WARN, capacita' >= 85% o salute ignota = warn.
+  stateOf(o){
+    if(!o||!o.available)return null;
+    let level='ok'; const bump=l=>{if(l==='bad'||level==='ok')level=l;};
+    const th=o.thresholds||{nearfull:85,full:95}, cap=o.capacity.percent;
+    const downN=Math.max(0,o.osd_counts.total-o.osd_counts.up);
+    const parts=[]; let short='';
+    if(o.health==='HEALTH_ERR'){bump('bad');short='Ceph in errore';}
+    else if(o.health==='HEALTH_WARN'){bump('warn');short='Ceph con avvisi';}
+    else if(o.health!=='HEALTH_OK'){bump('warn');short='stato di Ceph sconosciuto';}
+    if(cap>=th.full){bump('bad');short='Ceph quasi pieno';parts.push({k:'bad',t:`capacità al ${Math.round(cap)}%`});}
+    else if(cap>=th.nearfull){bump('warn');parts.push({k:'warn',t:`capacità al ${Math.round(cap)}%`});}
+    if(downN>0)parts.push({k:'warn',t:`${downN} OSD giù`});
+    if(o.recovery&&o.recovery.active){const p=o.recovery.progress_pct;parts.push({k:'info',t:p==null?'recupero dei dati in corso':`recupero dei dati ${Math.round(p)}%`});}
+    const live=(o.checks||[]).filter(c=>!c.muted);
+    return{level,short,parts,checks:live,downN,cap};
+  },
+
+  // Titolo di condizione, nello stesso lessico della panoramica.
+  title(st,o){
+    const n=`${o.osd_counts.up} OSD su ${o.osd_counts.total} attivi`;
+    return st.level==='bad'?`Attenzione · ${n}`:st.level==='warn'?`Quasi sereno · ${n}`:`Sereno · ${n}`;
+  },
+  hhmmss(ts){return new Date(ts*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},
+  rate(b){return fmtB(b)+'/s';},
+  iops(n){return n>=1000?(n/1000).toFixed(1)+' k':String(Math.round(n));},
+  lvl(p,th){th=th||{nearfull:85,full:95};return p>=th.full?'r':p>=th.nearfull?'w':'';},
+
+  // ── riquadro in panoramica ──
+  paintCard(o){
+    const host=document.getElementById('dash-ceph'); if(!host)return;
+    const st=Ceph.stateOf(o);
+    if(!st){host.hidden=true;host.innerHTML='';return;}
+    const subs=st.parts.map(p=>p.t);
+    const live=st.checks.slice(0,2).map(c=>Ceph.checkText(c).text); if(st.checks.length>2)live.push(`+${st.checks.length-2} avvisi`);
+    const sub=[`${o.osd_counts.up}/${o.osd_counts.total} OSD`,...subs,...(st.level==='ok'||subs.length?[]:live)].join(' · ');
+    const word=st.level==='bad'?'Attenzione':st.level==='warn'?'Quasi sereno':'Sereno';
+    const cls={r:'crit2',w:'warn2'}[Ceph.lvl(st.cap,o.thresholds)]||'ok2';
+    host.hidden=false;
+    host.innerHTML=`
+      <svg class="cs-ico ${st.level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[st.level]}</svg>
+      <span style="min-width:0"><span class="cs-t">Ceph · ${word}</span><span class="cs-s">${esc(sub)}</span></span>
+      <span class="cs-m"><b>Capacità ${Math.round(st.cap)}%</b><div class="bw"><div class="bf2 ${cls}" style="width:${Math.min(100,st.cap)}%"></div></div></span>`;
+    host.setAttribute('aria-label',`Ceph: ${word}. ${sub}. Apri il dettaglio`);
+  },
+
+  // ── pagina ──
+  stop(){clearTimeout(Ceph.timer);Ceph.timer=null;Ceph.seq++;},
+  async load(){
+    Ceph.stop();
+    const seq=Ceph.seq, idx=ClusterMgr.current, body=document.getElementById('ceph-body');
+    if(!Ceph.data||Ceph.dataIdx!==idx){Ceph.data=null;Ceph.put(document.getElementById('ceph-cond'),'');body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura di Ceph…</div>';}
+    await Ceph.tick(seq,idx);
+  },
+  async tick(seq,idx){
+    if(seq!==Ceph.seq)return;
+    if(!document.hidden){
+      try{
+        const o=await api('/ceph',{quiet:true,timeoutMs:9000});
+        if(seq!==Ceph.seq)return;
+        Ceph.note(o,idx); Ceph.dataIdx=idx; Ceph.data=o; Ceph.lastOk=Date.now(); Ceph.failed=false;
+        if(o.available)Ceph.sample(idx,o);
+        Ceph.paint();
+      }catch(e){
+        if(seq!==Ceph.seq)return;
+        Ceph.failed=true;
+        if(!Ceph.data)document.getElementById('ceph-body').innerHTML=errBox(e.message,'Ceph.load()');
+        else Ceph.paintStamp();
+      }
+    }
+    if(seq===Ceph.seq&&App.cur==='ceph')Ceph.timer=setTimeout(()=>Ceph.tick(seq,idx),Ceph.POLL_MS);
+  },
+  sample(idx,o){
+    const h=Ceph.hist[idx]||(Ceph.hist[idx]=[]), now=Date.now();
+    h.push({t:now,r:o.io.read_bytes_sec,w:o.io.write_bytes_sec});
+    while(h.length&&now-h[0].t>Ceph.HIST_MS)h.shift();
+  },
+  paintStamp(){
+    const el=document.getElementById('ceph-upd'); if(!el)return;
+    const old=Ceph.failed;
+    el.className='ceph-upd'+(old?' stale':'');
+    el.innerHTML=old?`<i></i>non raggiungibile · dati delle ${esc(Ceph.hhmmss(Ceph.lastOk/1000))}`:`<i></i>aggiornato ${esc(Ceph.hhmmss(Ceph.lastOk/1000))} · ogni 5 s`;
+  },
+  // Scrive solo se il contenuto e' cambiato: ogni 5 s cambia l'I/O, ma avvisi, tessere e tabelle restano
+  // fermi (niente perdita di selezione o tooltip) e la condizione (aria-live) si annuncia solo quando cambia davvero.
+  put(el,html){if(el._h!==html){el._h=html;el.innerHTML=html;}},
+  section(k){
+    const body=document.getElementById('ceph-body');
+    if(!body.querySelector('[data-cs]'))body.innerHTML=['inst','alerts','stations','pgs','pools','partial'].map(x=>`<div data-cs="${x}"></div>`).join('');
+    return body.querySelector(`[data-cs="${k}"]`);
+  },
+  paint(){
+    const o=Ceph.data, cond=document.getElementById('ceph-cond'), body=document.getElementById('ceph-body');
+    if(!o||!o.available){
+      Ceph.put(cond,'');
+      const why=o&&o.reason==='forbidden'?'Il token non ha il permesso di leggere lo stato di Ceph (serve Sys.Audit).':'Questo cluster non ha Ceph.';
+      body.innerHTML=`<div class="panel"><div class="empty">${esc(why)}<div style="margin-top:12px"><button type="button" class="btn bg2 sm" onclick="App.nav('dashboard')">Torna alla panoramica</button></div></div></div>`;
+      return;
+    }
+    const st=Ceph.stateOf(o);
+    const lead=[];
+    if(st.downN){const names=(o.osds||[]).filter(x=>x.status==='down').map(x=>`${x.name} (${x.host})`);lead.push(`<span class="${st.level==='bad'?'bad':'wrn'}">${esc(st.downN===1?'1 OSD giù':st.downN+' OSD giù')}${names.length&&names.length<=3?': '+esc(names.join(', ')):''}</span>`);}
+    for(const p of st.parts.filter(p=>!/OSD/.test(p.t)))lead.push(p.k==='info'?esc(p.t):`<span class="${p.k==='bad'?'bad':'wrn'}">${esc(p.t)}</span>`);
+    if(!lead.length&&st.checks.length)lead.push(`<span class="wrn">${esc(Ceph.checkText(st.checks[0]).text)}</span>`);
+    const sub=lead.length?lead.join(' · '):`Nessuna anomalia · capacità ${Math.round(st.cap)}%`;
+    Ceph.put(cond,`
+      <svg class="cond-ico ${st.level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[st.level]}</svg>
+      <div><h2>${esc(Ceph.title(st,o))}</h2><p>${sub}</p></div>`);
+    Ceph.put(Ceph.section('inst'),Ceph.instruments(o,st));
+    Ceph.put(Ceph.section('alerts'),Ceph.alerts(o));
+    Ceph.put(Ceph.section('stations'),Ceph.stations(o));
+    Ceph.put(Ceph.section('pgs'),Ceph.pgs(o));
+    Ceph.put(Ceph.section('pools'),Ceph.poolsAndServices(o));
+    Ceph.put(Ceph.section('partial'),o.partial&&o.partial.length?`<p class="cnote" style="margin-top:12px">Non è stato possibile leggere: ${esc(o.partial.join(', '))}.</p>`:'');
+    Ceph.paintStamp();
+  },
+
+  instruments(o,st){
+    const th=o.thresholds||{nearfull:85,backfillfull:90,full:95}, cap=o.capacity, L=Ceph.lvl(cap.percent,th);
+    const tick=(v,c)=>`<div class="tick ${c}" style="bottom:${v}%"></div>`;
+    const rain=`<div class="panel"><div class="panel-b">
+      <div class="inst-h">Capacità <em>pluviometro</em></div>
+      <div class="rain">
+        <div class="tube" role="img" aria-label="Capacità usata ${Math.round(cap.percent)}%"><i class="${L}" style="height:${Math.min(100,cap.percent)}%"></i>${tick(th.nearfull,'w')}${tick(th.backfillfull,'w')}${tick(th.full,'r')}</div>
+        <div class="rain-v"><div class="big ${L}">${Math.round(cap.percent)}<small>%</small></div>
+          <div class="cnote">${esc(fmtB(cap.used))} usati</div><div class="cnote">su ${esc(fmtB(cap.total))}</div><div class="cnote">${esc(fmtB(cap.avail))} liberi</div></div>
+      </div>
+      <p class="cnote" style="margin-top:10px">tacche: <span class="w">${th.nearfull}% quasi pieno</span> · ${th.backfillfull}% riequilibrio · <span class="r">${th.full}% pieno</span>. Spazio grezzo, repliche comprese.</p>
+    </div></div>`;
+
+    const h=Ceph.hist[ClusterMgr.current]||[];
+    const mx=Math.max(1,...h.map(p=>Math.max(p.r,p.w)));
+    const now=Date.now(), span=Math.max(30000,h.length?now-h[0].t:0);
+    const pts=k=>h.map(p=>`${((p.t-(now-span))/span*300).toFixed(1)},${(58-p[k]/mx*52).toFixed(1)}`).join(' ');
+    const wind=`<div class="panel"><div class="panel-b">
+      <div class="inst-h">I/O del cluster <em>anemometro · ultimi 10 min</em></div>
+      <div class="wind"><div><span class="k rd">Lettura</span><b>${esc(Ceph.rate(o.io.read_bytes_sec))}</b><small>${esc(Ceph.iops(o.io.read_ops_sec))} IOPS</small></div>
+      <div><span class="k wr">Scrittura</span><b>${esc(Ceph.rate(o.io.write_bytes_sec))}</b><small>${esc(Ceph.iops(o.io.write_ops_sec))} IOPS</small></div></div>
+      ${h.length>1?`<svg class="wchart" viewBox="0 0 300 60" preserveAspectRatio="none" role="img" aria-label="Andamento di lettura e scrittura negli ultimi minuti, massimo ${esc(Ceph.rate(mx))}"><polyline class="cw-r" points="${pts('r')}"/><polyline class="cw-w" points="${pts('w')}"/></svg>`:'<p class="cnote" style="margin-top:12px">La curva si compone a ogni aggiornamento.</p>'}
+    </div></div>`;
+
+    const r=o.recovery, pct=r.progress_pct;
+    let front;
+    if(!r.active){
+      front=`<div class="panel"><div class="panel-b"><div class="inst-h">Recupero dati <em>fronte</em></div>
+        <div class="big" style="margin-top:12px">Nessuno</div><p class="cnote">Tutti i dati sono al loro posto${o.pgs.total?` · ${esc(Ceph.cleanPGs(o))} PG su ${o.pgs.total} puliti`:''}.</p></div></div>`;
+    }else{
+      const done=pct==null?0:Math.min(100,Math.max(0,pct)), tris=Math.floor(done/6);
+      const eta=r.eta_seconds==null?'stima non disponibile':r.eta_seconds>172800?'fine stimata: oltre 2 giorni':`fine stimata ${Dashboard.hhmm(Date.now()/1000+r.eta_seconds)}`;
+      front=`<div class="panel"><div class="panel-b"><div class="inst-h">Recupero dati <em>fronte in movimento</em></div>
+        <div class="big" style="margin-top:8px">${pct==null?'In corso':Math.round(done)+'<small>% completato</small>'}</div>
+        <div class="ftrack" role="img" aria-label="${pct==null?'Recupero in corso':'Recupero completato al '+Math.round(done)+'%'}"><div class="fb"></div>${pct==null?'':`<div class="fd" style="width:${done}%"></div>${Array.from({length:tris},(_,i)=>`<div class="tri" style="left:${(i*6+3)}%"></div>`).join('')}<div class="fh" style="left:${done}%"></div>`}</div>
+        <div class="cnote">${esc(eta)}</div>
+        <div class="fgrid"><div><b>${esc(Ceph.rate(r.recovering_bytes_sec))}</b><span>recupero</span></div><div><b>${(r.degraded_ratio*100).toFixed(1)}%</b><span>oggetti degradati</span></div><div><b>${(r.misplaced_ratio*100).toFixed(1)}%</b><span>fuori posto</span></div><div><b>${r.backfill_pgs}</b><span>PG in backfill</span></div></div>
+      </div></div>`;
+    }
+    return`<div class="ceph-inst">${rain}${wind}${front}</div>`;
+  },
+  cleanPGs(o){return o.pgs.states.filter(s=>/^active\+clean/.test(s.state)).reduce((a,s)=>a+s.count,0);},
+
+  alerts(o){
+    const cs=o.checks||[];
+    const rows=cs.length?cs.map(c=>{
+      const sev=c.muted?'m':c.severity==='HEALTH_ERR'?'e':'w', word=c.muted?'Silenziato':c.severity==='HEALTH_ERR'?'Errore':'Avviso';
+      const det=(c.detail||[]).slice(0,3).map(l=>esc(Ceph.detailText(l))).join(' · ')+((c.detail||[]).length>3?` · +${c.detail.length-3}`:'');
+      const tx=Ceph.checkText(c), tip=tx.text!==tx.orig?` title="${esc('Testo originale di Ceph: '+tx.orig)}"`:'';
+      return`<div class="calert${c.muted?' muted':''}"><span class="sev ${sev}">${word}</span><span class="ccode">${esc(c.code)}</span><div class="cmsg"><span${tip}>${esc(tx.text)}</span>${det?`<small>${det}</small>`:''}</div></div>`;
+    }).join(''):`<div class="calert"><span class="st ok">Nessun avviso</span><span></span><div class="cmsg">Ceph non segnala problemi.</div></div>`;
+    return`<h2 class="sec" style="margin-top:22px">Avvisi meteo <small>controlli di salute di Ceph · ${cs.length}</small></h2><div class="panel calerts">${rows}</div>`;
+  },
+
+  stations(o){
+    const osds=o.osds||[]; if(!osds.length)return'';
+    const hosts=[]; const by={};
+    for(const x of osds){if(!by[x.host]){by[x.host]=[];hosts.push(x.host);}by[x.host].push(x);}
+    const tile=x=>{
+      const cls=x.status==='down'?'dn':!x.in?'ot':'', fill=x.percent>=85?'r':x.percent>=75?'w':'';
+      const word=x.status==='down'?'giù':!x.in?'fuori dal cluster':'attivo';
+      const t=`${x.name} · ${x.class||'?'} · ${Math.round(x.percent)}% usato · ${word}`;
+      return`<div class="osd ${cls}" role="img" aria-label="${esc(t)}" title="${esc(t)}"><i class="${fill}" style="height:${Math.min(100,Math.max(0,x.percent))}%"></i><span>${esc(x.id)}</span></div>`;
+    };
+    const rows=hosts.map(h=>{const l=by[h], up=l.filter(x=>x.status==='up').length;
+      return`<div class="srow"><div class="sn">${esc(h)}<small>${up}/${l.length} OSD attivi</small></div><div class="otiles">${l.map(tile).join('')}</div></div>`;}).join('');
+    return`<h2 class="sec" style="margin-top:22px">Stazioni OSD <small>un nodo per riga, una tessera per OSD: il riempimento è lo spazio usato</small></h2>
+      <div class="olegend"><span><span class="osd"><i style="height:60%"></i></span>attivo</span><span><span class="osd dn"></span>giù</span><span><span class="osd ot"></span>fuori dal cluster</span><span>riempimento: normale &lt; 75%, ambra &lt; 85%, rosso oltre</span></div>
+      <div class="panel stations">${rows}</div>`;
+  },
+
+  pgClass(s){
+    if(/^active\+clean/.test(s))return'ok';
+    if(/down|incomplete|stale|inactive|unknown|peering/.test(s))return'r';
+    if(/degraded|undersized/.test(s))return'w';
+    return'n';
+  },
+  pgs(o){
+    const st=o.pgs.states||[], tot=o.pgs.total||st.reduce((a,s)=>a+s.count,0); if(!tot)return'';
+    return`<h2 class="sec" style="margin-top:22px">Pressione dei PG <small>${tot} placement group</small></h2>
+      <div class="pgbar" role="img" aria-label="${esc(st.map(s=>s.count+' '+s.state).join(', '))}">${st.map(s=>`<i class="${Ceph.pgClass(s.state)}" style="width:${s.count/tot*100}%"></i>`).join('')}</div>
+      <div class="pglab">${st.map(s=>`<span class="${Ceph.pgClass(s.state)}"><b>${s.count}</b> ${esc(s.state)}</span>`).join('')}</div>`;
+  },
+
+  poolsAndServices(o){
+    const th=o.thresholds||{nearfull:85,full:95};
+    const pools=(o.pools||[]).map(p=>{const c=p.percent>=th.full?'crit2':p.percent>=th.nearfull?'warn2':'';
+      return`<tr><td><b>${esc(p.name)}</b></td><td>${p.size} / ${p.min_size}</td><td>${p.pg_num}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="bw" style="width:110px"><div class="bf2 ${c}" style="width:${Math.min(100,p.percent)}%"></div></div>${p.percent}%</div></td><td>${esc(fmtB(p.used))}</td></tr>`;}).join('');
+    const mons=o.mons||[], mgrs=o.mgrs||[], mdss=o.mdss||[];
+    const q=o.mon_quorum, qOk=q.total&&q.in===q.total;
+    const mgrAct=mgrs.filter(m=>m.state==='active').length;
+    const mdsAct=mdss.filter(m=>/active/.test(m.state)).length;
+    const flags=(o.flags||[]).map(f=>`<span class="flag">${esc(f.name)}</span>`).join('');
+    const help=(o.flags||[]).map(f=>`<p class="cnote"><b>${esc(f.name)}</b>: ${esc(Object.prototype.hasOwnProperty.call(Ceph.FLAG_HELP,f.name)?Ceph.FLAG_HELP[f.name]:f.description)}</p>`).join('');
+    return`<div class="ctwo" style="margin-top:22px">
+      <div><h2 class="sec">Pool <small>${(o.pools||[]).length} · % di spazio usato nel pool</small></h2>
+        <div class="panel"><div class="tw"><table><thead><tr><th>Pool</th><th>Repliche / minime</th><th>PG</th><th>Usato</th><th>Dati</th></tr></thead><tbody>${pools||'<tr><td colspan="5" class="empty">Nessun pool</td></tr>'}</tbody></table></div></div></div>
+      <div><h2 class="sec">Servizi e flag</h2><div class="panel"><div class="panel-b csvc">
+        <div><span>Monitor (MON)</span><span class="st ${qOk?'ok':'warn'}">${q.in} su ${q.total} in quorum</span></div>
+        <div><span>Manager (MGR)</span><span class="st ${mgrAct?'ok':'off'}">${mgrAct} attivo${mgrs.length>mgrAct?` · ${mgrs.length-mgrAct} di riserva`:''}</span></div>
+        <div><span>Metadata (MDS)</span>${mdss.length?`<span class="st ${mdsAct?'ok':'warn'}">${mdsAct} attivo${mdss.length>mdsAct?` · ${mdss.length-mdsAct} di riserva`:''}</span>`:'<span class="cnote">non presenti</span>'}</div>
+        <div><span>Flag attivi</span><span>${flags||'<span class="cnote">nessuno</span>'}</span></div>${help}
+      </div></div></div></div>`;
+  },
+};
+
 const Dashboard={
   CRIT:85,                                   // % oltre cui un valore è critico (stessa soglia di bar())
   WARN:65,                                   // % oltre cui un valore chiede attenzione
@@ -1967,6 +2423,7 @@ const Dashboard={
 
   async load(){
     const seq=++Dashboard._seq;
+    const cephP=Ceph.summary();
     let d;
     try{d=await api('/dashboard',{quiet:true});}
     catch(e){
@@ -1993,10 +2450,12 @@ const Dashboard={
       api('/metrics?timeframe=day',{quiet:true}).catch(()=>null),
       api('/tasks',{quiet:true}).catch(()=>null),
       Dashboard.loadRanges(stats),
+      cephP,
     ]);
     if(seq!==Dashboard._seq)return;
     const list=Array.isArray(tasks)?tasks:null;
     Dashboard.paintCondition(stats,list||[]);
+    Ceph.paintCard(Ceph.last[ClusterMgr.current]||null);
     Dashboard.paintKpis(stats,live,Array.isArray(metrics)?metrics:null,list);
     Dashboard.paintNodes(stats);
     Dashboard.paintTasks(list);
@@ -2060,13 +2519,15 @@ const Dashboard={
       if(s.cpu>=Dashboard.CRIT)hot.push({s,what:'CPU',val:s.cpu,since:s.cpuSince});
     }
     const failed=Dashboard.failedTasks(tasks);
-    const level=down.length?'bad':(hot.length||failed.length)?'warn':'ok';
+    const cst=Ceph.stateOf(Ceph.last[ClusterMgr.current]||null);
+    const level=(down.length||(cst&&cst.level==='bad'))?'bad':(hot.length||failed.length||(cst&&cst.level==='warn'))?'warn':'ok';
     const nodesTxt=total===1?'1 nodo operativo':`${on} nodi operativi`;
-    const title=level==='bad'?`Attenzione · ${on} su ${total} nodi operativi`:level==='warn'?`Quasi sereno · ${nodesTxt}`:`Sereno · ${nodesTxt}`;
+    const title=level==='bad'?(down.length?`Attenzione · ${on} su ${total} nodi operativi`:`Attenzione · ${cst.short}`):level==='warn'?`Quasi sereno · ${nodesTxt}`:`Sereno · ${nodesTxt}`;
     const parts=[];
     if(down.length)parts.push(`<span class="bad">${esc(down.map(s=>s.name).join(', '))} ${down.length===1?'non risponde':'non rispondono'}</span>`);
     for(const h of hot)parts.push(`<span class="wrn">${esc(h.s.name)}: ${h.what} al ${h.val}%${h.since?' da '+esc(Dashboard.hhmm(h.since)):''}</span>`);
     if(failed.length)parts.push(`<span class="wrn">${failed.length} ${Dashboard.plural(failed.length,'task fallito','task falliti')} nelle ultime 24 h</span>`);
+    if(cst&&cst.level!=='ok')parts.push(`<span class="${cst.level==='bad'?'bad':'wrn'}">${esc(cst.short)}${cst.downN?` · ${cst.downN} OSD giù`:''}</span>`);
     const run=stats.reduce((a,s)=>a+s.running,0);
     const sub=parts.length?parts.join(' · '):`Nessuna anomalia nelle ultime 24 ore · ${run} VM in esecuzione`;
     document.getElementById('dash-cond').innerHTML=`

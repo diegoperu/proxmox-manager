@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Finto Proxmox VE per l'anteprima grafica (solo dati sintetici, solo localhost, sola lettura)."""
-import json, math, random, sys, time
+import json, math, os, random, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -133,6 +133,73 @@ def tasks():
     return out
 
 
+# ── Ceph finto: CEPH_SCENARIO = healthy | warn | error | recovery | down (default recovery); "none" = nessun Ceph ──
+SCEN = os.environ.get("CEPH_SCENARIO", "recovery")
+CEPH_NODES = ["datacloud-node-%d" % i for i in range(1, 7)]
+
+
+def ceph_osds():
+    r = random.Random(7)
+    out, oid = [], 0
+    for n in CEPH_NODES:
+        for _ in range(6):
+            st = "up"
+            if SCEN in ("down", "recovery", "error") and n == CEPH_NODES[4] and oid in (24, 25): st = "down"
+            used = r.uniform(.55, .88) * 7680873725952
+            out.append(dict(id=str(oid), name="osd.%d" % oid, type="osd", leaf=1, host=n, status=st, **{"in": 0 if st == "down" and SCEN == "error" else 1},
+                            device_class="ssd", percent_used=used / 7680873725952 * 100, bytes_used=int(used), total_space=7680873725952,
+                            pgs=34, apply_latency_ms=1))
+            oid += 1
+    return out
+
+
+def ceph_status():
+    osds = ceph_osds()
+    down = sum(1 for o in osds if o["status"] == "down")
+    total = 3.36e14
+    used = total * (.97 if SCEN == "error" else .78)
+    health, checks = "HEALTH_OK", {}
+    if SCEN in ("warn", "down", "recovery"):
+        health = "HEALTH_WARN"
+        checks["POOL_APP_NOT_ENABLED"] = dict(severity="HEALTH_WARN", muted=False, summary=dict(message="1 pool(s) do not have an application enabled", count=1), detail=[dict(message="application not enabled on pool 'test'")])
+    if down:
+        health = "HEALTH_ERR" if SCEN == "error" else "HEALTH_WARN"
+        checks["OSD_DOWN"] = dict(severity="HEALTH_WARN", muted=False, summary=dict(message="%d osds down" % down, count=down), detail=[dict(message="osd.%s (root=default,host=%s) is down" % (o["id"], o["host"])) for o in osds if o["status"] == "down"])
+    if SCEN == "error":
+        health = "HEALTH_ERR"
+        checks["OSD_FULL"] = dict(severity="HEALTH_ERR", muted=False, summary=dict(message="1 full osd(s)", count=1), detail=[])
+    states = [dict(state_name="active+clean", count=257)]
+    pm = dict(bytes_total=total, bytes_used=used, bytes_avail=total - used, data_bytes=used / 3, num_pgs=257, num_objects=12888875, num_pools=3,
+              read_bytes_sec=4.1e7 * (1 + .3 * math.sin(time.time() / 7)), write_bytes_sec=3.0e7, read_op_per_sec=1218, write_op_per_sec=310)
+    ev = {}
+    if SCEN == "recovery":
+        states = [dict(state_name="active+clean", count=200), dict(state_name="active+undersized+degraded", count=30), dict(state_name="active+remapped+backfill_wait", count=22), dict(state_name="active+recovering", count=5)]
+        pm.update(degraded_objects=900000, degraded_ratio=.07, misplaced_objects=400000, misplaced_ratio=.03, recovering_objects_per_sec=2500, recovering_bytes_per_sec=8.5e8)
+        ev = {"a": dict(message="Rebalancing after osd.30 marked out", progress=.63)}
+    pm["pgs_by_state"] = states
+    return dict(health=dict(status=health, checks=checks), osdmap=dict(num_osds=len(osds), num_up_osds=len(osds) - down, num_in_osds=len(osds) - (down if SCEN == "error" else 0)),
+                pgmap=pm, quorum_names=CEPH_NODES[:3], monmap=dict(mons=[dict(name=n) for n in CEPH_NODES[:3]]), progress_events=ev)
+
+
+def ceph_route(rest):
+    """rest = path dopo /cluster/ceph o /nodes/{n}/ceph; None = 404"""
+    if SCEN == "none": return "ERR500"
+    if rest == "status": return ceph_status()
+    if rest == "flags":
+        return [dict(name="noout", value=1 if SCEN in ("down", "recovery") else 0, description="OSDs will not be automatically marked out"), dict(name="noup", value=0, description="OSDs are not allowed to start")]
+    if rest == "osd":
+        hosts = {}
+        for o in ceph_osds(): hosts.setdefault(o["host"], []).append(o)
+        return dict(flags="sortbitwise", root=dict(type="root", name="default", children=[dict(type="host", name=h, children=v) for h, v in hosts.items()]))
+    if rest == "pool":
+        return [dict(pool_name=n, type="replicated", size=3, min_size=2, pg_num=128, bytes_used=int(2e13 * f), percent_used=f * .4, crush_rule_name="replicated_ssd", application_metadata=dict(rbd={}), pg_autoscale_mode="on")
+                for n, f in (("datacloud-ssd", 1.0), ("datacloud-hdd", .6), (".mgr", .01))]
+    if rest in ("mon", "mgr", "mds"):
+        if rest == "mds": return []
+        return [dict(name=n, host=n, state="running" if rest == "mon" else ("active" if i == 0 else "standby"), quorum=1, rank=i, ceph_version_short="20.2.4") for i, n in enumerate(CEPH_NODES[:3])]
+    return None
+
+
 def route(path):
     p = path.rstrip("/")
     segs = p.split("/")
@@ -140,6 +207,7 @@ def route(path):
     if p == "/cluster/status":
         return [dict(type="cluster", name="polimi-deib", nodes=4, quorate=1, version=7)] + \
                [dict(type="node", name=n, online=1 if b["status"] == "online" else 0, id=f"node/{n}") for n, b in NODES.items()]
+    if p.startswith("/cluster/ceph/"): return ceph_route(p[len("/cluster/ceph/"):])
     if p == "/cluster/tasks": return tasks()
     if p == "/cluster/nextid": return "214"
     if p == "/nodes":
@@ -150,6 +218,7 @@ def route(path):
         node = segs[2]
         if node not in NODES: return None
         rest = "/".join(segs[3:])
+        if rest.startswith("ceph/"): return ceph_route(rest[len("ceph/"):])
         b = NODES[node]
         if rest == "rrddata": return rrd(node, "day")
         if rest == "status":
@@ -209,6 +278,11 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
             return
         data = route(path[len("/api2/json"):])
+        if data == "ERR500":  # cluster senza Ceph, come HOSTING
+            body = json.dumps({"data": None, "message": "binary not installed: /usr/bin/ceph-mon\n"}).encode()
+            self.send_response(500); self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
         if data is None:
             return self.send_error(404)
         body = json.dumps({"data": data}).encode()
