@@ -149,7 +149,7 @@ components:
 
 **Creative North Star: "Il Bollettino"**
 
-Il cluster e' letto come un bollettino meteo notturno. Una frase di condizione ("Quasi sereno - 3 nodi su 4 operativi", titolo 30px con icona 48px) sta sopra i numeri e non li sostituisce; sotto, una striscia di quattro KPI con storia recente e una tabella di nodi dove ogni riga mostra l'escursione min-max di CPU e RAM nelle ultime 24h con un punto "adesso". Il sistema rifiuta la griglia di schede KPI piu' grafico ad area che ogni console cloud ripete.
+Il cluster e' letto come un bollettino meteo notturno. Una frase di condizione ("Quasi sereno - 3 nodi su 4 operativi", titolo 30px con icona 48px) sta sopra i numeri e non li sostituisce; sotto, una striscia di quattro KPI con storia recente e una tabella di nodi dove ogni riga mostra l'escursione min-max di CPU e RAM nelle ultime 24h con un punto "adesso"; in fondo la Top 10 delle VM che hanno lavorato di piu', ciascuna con il proprio andamento come una previsione oraria. Il sistema rifiuta la griglia di schede KPI piu' grafico ad area che ogni console cloud ripete.
 
 Il mondo e' un cielo blu profondo con schede un gradino piu' chiare e filetti azzurri a bassa opacita'; il tema chiaro e' la stessa struttura in "alba" lattiginosa. La densita' e' da sala operativa, non da vetrina: due densita' (comoda, compatta) sulle stesse proporzioni, nessun effetto che faccia aspettare. Lo stato non e' mai solo colore: colore + forma della linea + parola.
 
