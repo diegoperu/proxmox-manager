@@ -108,6 +108,7 @@ func main() {
 
 		r.Get("/metrics", h.GetMetrics)
 		r.Get("/report", h.GetReportData)
+		r.Get("/top", h.GetTopVMs)
 	})
 
 	log.Printf("ProxmoxManager → http://localhost%s", cfg.ListenAddr)
@@ -141,18 +142,22 @@ func staticHandler() http.Handler {
 	})
 }
 
-// validThemes mirrors the html.<theme> classes in index.html. The empty theme means
-// "follow the OS" and adds no class.
-var validThemes = map[string]bool{"dark": true, "light": true, "eva01": true, "catppuccino": true}
-
-// injectTheme puts the saved theme on <html> so the first paint already uses it
-// (no localStorage: the preference lives in config.json). Only whitelisted values
-// are ever written into the page.
-func injectTheme(page []byte, theme string) []byte {
-	if !validThemes[theme] {
+// injectRootClasses puts the saved theme and density on <html> so the first paint
+// already uses them (no localStorage: the preferences live in config.json). Only
+// values accepted by config.ValidTheme / config.ValidDensity are ever written into
+// the page; an empty value adds no class (theme: follow the OS, density: comfortable).
+func injectRootClasses(page []byte, theme, density string) []byte {
+	var classes []string
+	if theme != "" && config.ValidTheme(theme) {
+		classes = append(classes, theme)
+	}
+	if density != "" && config.ValidDensity(density) {
+		classes = append(classes, density)
+	}
+	if len(classes) == 0 {
 		return page
 	}
-	return bytes.Replace(page, []byte(`<html lang="it">`), []byte(`<html lang="it" class="`+theme+`">`), 1)
+	return bytes.Replace(page, []byte(`<html lang="it">`), []byte(`<html lang="it" class="`+strings.Join(classes, " ")+`">`), 1)
 }
 
 func serveIndex(w http.ResponseWriter, r *http.Request) {
@@ -161,9 +166,10 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 500)
 		return
 	}
-	b = injectTheme(b, config.Get().Theme)
+	cfg := config.Get()
+	b = injectRootClasses(b, cfg.Theme, cfg.Density)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "no-cache") // the page varies with the saved theme
+	w.Header().Set("Cache-Control", "no-cache") // the page varies with the saved theme and density
 	w.Write(b)
 }

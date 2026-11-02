@@ -4,208 +4,431 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PROXMOX MANAGER</title>
+<link rel="preload" href="/static/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/barlow-condensed-latin-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/static/fonts/barlow-condensed-latin-900.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/xterm-5.3.0.css">
 <style>
 /* Font in locale (subset latin: include le lettere accentate italiane). Vedi web/static/THIRD_PARTY.md */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url(/static/fonts/inter-latin-var.woff2) format('woff2')}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:300 700;font-display:swap;src:url(/static/fonts/jetbrains-mono-latin-var.woff2) format('woff2')}
-@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-700.woff2) format('woff2')}
-@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:900;font-display:swap;src:url(/static/fonts/barlow-condensed-latin-900.woff2) format('woff2')}
-:root{
-  --bg:#0a0b0d;--bg2:#111318;--bg3:#181c23;--bg4:#1e2330;
-  --border:#2a3040;--border2:#3a4558;
-  --amber:#f59e0b;--amber2:#fbbf24;
-  --amber-dim:rgba(245,158,11,.12);--amber-glow:rgba(245,158,11,.06);
-  --red:#f05050;--red-dim:rgba(239,68,68,.15);
-  --green:#22c55e;--green-dim:rgba(34,197,94,.15);
-  --blue:#478af7;--blue-dim:rgba(59,130,246,.15);
-  --cyan:#06b6d4;--purple:#ad5ff7;
-  --text:#e2e8f0;--text2:#94a3b8;--text3:#76869d;
-  --mono:'JetBrains Mono',monospace;--cond:'Barlow Condensed',sans-serif;
-  --warn:var(--amber); /* attenzione: segue il marchio, tranne dove il marchio si confonde con "ok" (eva01) */
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;display:flex;height:100vh;height:100dvh;overflow:hidden}
 
-/* ── SIDEBAR ── */
-#sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;height:100dvh}
-.logo{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
-.logo-t{font-family:var(--cond);font-size:22px;font-weight:900;letter-spacing:.08em;color:var(--amber)}
-.logo-s{font-size:9px;color:var(--text3);letter-spacing:.2em;text-transform:uppercase;margin-top:3px}
-.conn-bar{padding:8px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;font-size:10px;color:var(--text3)}
-#cdot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
-#cdot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
-#cdot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
-.nav{flex:1;overflow-y:auto;padding:6px 0}
-.nav-sec{padding:11px 16px 3px;font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase}
-.ni{display:flex;align-items:center;gap:9px;width:100%;padding:8px 16px;color:var(--text2);cursor:pointer;font-family:inherit;text-align:left;font-size:12px;font-weight:500;background:transparent;border:0;border-left:2px solid transparent;transition:all .13s;user-select:none}
-.ni:hover{color:var(--text);background:rgba(255,255,255,.03)}
-.ni.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
-.ni svg{width:14px;height:14px;flex-shrink:0;opacity:.7}.ni.active svg{opacity:1}
-.sb-bottom{padding:10px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--text3)}
+/* ══ TOKEN ══ Direzione "Bollettino": cielo notturno (default), alba (chiaro), eva01 e catppuccino come palette.
+   --accent è il colore di marca (selezione, azione primaria). I nomi --amber* restano come alias: JS (tk('--amber')) e markup li usano ancora. */
+:root{
+  --bg:#0b1424;--bg2:#13213a;--bg3:#182a48;--bg4:#213a60;
+  --border:rgba(160,190,240,.16);--border2:rgba(160,190,240,.30);
+  --accent:#7fb2ff;--accent2:#a6c8ff;
+  --accent-dim:rgba(127,178,255,.14);--accent-glow:rgba(127,178,255,.08);
+  --accent-fill:#7fb2ff;--accent2-fill:#a6c8ff;--on-accent:#06142b;--on-danger:#1a0505;
+  --amber:var(--accent);--amber2:var(--accent2);--amber-dim:var(--accent-dim);--amber-glow:var(--accent-glow);
+  --red:#ff6b6b;--red-dim:rgba(255,107,107,.15);
+  --green:#34c27a;--green-dim:rgba(52,194,122,.15);
+  --blue:#a3a1ff;--blue-dim:rgba(163,161,255,.15);
+  --cyan:#4fd1e0;--purple:#c58bff;
+  --warn:#f2a93b;
+  --text:#e9eef7;--text2:#a9b6cc;--text3:#8394b0;
+  --sky-glow:#1d3560;--hover:rgba(255,255,255,.045);--scrim:rgba(4,9,18,.62);
+  --shadow-pop:0 24px 60px -12px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.3);
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;--cond:var(--sans);
+  --r-card:14px;--r-ctl:8px;--r-badge:6px;--r-modal:16px;
+  --card-pad:16px;--cell-y:9px;--cell-x:12px;--row-h:62px;--gap:14px;
+  --rail:212px;--topbar:52px;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  color-scheme:dark;
+}
+/* Densità compatta: stesse proporzioni, meno aria (tabelle e batch). Si imposta in Impostazioni → Aspetto. */
+html.compact{--card-pad:12px;--cell-y:5px;--cell-x:10px;--row-h:46px;--gap:10px}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scrollbar-color:var(--border2) transparent}
+::selection{background:var(--accent-dim);color:var(--text)}
+input,textarea,select{caret-color:var(--accent)}
+body{background:linear-gradient(180deg,var(--sky-glow) 0,var(--bg) 380px) var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.45;font-optical-sizing:auto;-webkit-font-smoothing:antialiased;
+  display:grid;grid-template-rows:var(--topbar) minmax(0,1fr);grid-template-columns:var(--rail) minmax(0,1fr);height:100vh;height:100dvh;overflow:hidden}
+
+/* ── BARRA SUPERIORE ── */
+.topbar{grid-column:1/-1;grid-row:1;height:var(--topbar);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;background:color-mix(in srgb,var(--bg2) 55%,transparent)}
+.brand{font-size:14px;font-weight:700;letter-spacing:-.01em;width:calc(var(--rail) - 20px);flex-shrink:0;white-space:nowrap}
+.brand span{color:var(--accent)}
+.crumb{display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;flex:1;font-size:13px;color:var(--text3)}
+.crumb .sepc{opacity:.6}
+#crumb-cluster{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.top-title{font-size:15px;font-weight:600;letter-spacing:-.005em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-badge{display:none}
+.conn{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);padding:0 4px;white-space:nowrap}
+#cdot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+#cdot.ok{background:var(--green)}
+#cdot.err{background:var(--red)}
+
+/* ── MENU LATERALE ── */
+#sidebar{grid-column:1;grid-row:2;min-height:0;border-right:1px solid var(--border);display:flex;flex-direction:column}
+.nav{flex:1;overflow-y:auto;padding:12px 10px 8px}
+.nav-sec{padding:16px 10px 6px;font-size:12px;font-weight:600;color:var(--text3)}
+.nav-sec:first-child{padding-top:4px}
+.ni{display:flex;align-items:center;gap:10px;width:100%;height:32px;padding:0 10px;color:var(--text2);cursor:pointer;font-family:inherit;text-align:left;font-size:13px;font-weight:500;background:transparent;border:0;border-radius:var(--r-ctl);transition:background .12s,color .12s;user-select:none}
+.ni:hover{color:var(--text);background:var(--hover)}
+.ni.active{color:var(--accent);background:var(--accent-dim)}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.75}.ni.active svg{opacity:1}
+.sb-bottom{padding:10px 20px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)}
+.sb-bottom #clk{font-variant-numeric:tabular-nums}
 .sb-bottom #ver{margin-top:2px;font-variant-numeric:tabular-nums}
 
-/* ── MAIN ── */
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:10px;background:var(--bg2);flex-shrink:0}
-.top-title{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.05em;flex:1}
-.top-badge{font-size:9px;padding:2px 8px;border-radius:2px;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,.3);letter-spacing:.1em;text-transform:uppercase}
-#content{flex:1;overflow-y:auto;padding:20px 22px}
+/* ── CONTENUTO ── */
+#main{grid-column:2;grid-row:2;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+#content{flex:1;overflow-y:auto;padding:20px 28px 28px}
 
-/* ── PAGE ── */
+/* ── PAGINA ── */
 .page{display:none}.page.active{display:block}
 
-/* ── GRID ── */
-.g{display:grid;gap:14px}
+/* ── GRIGLIA ── */
+.g{display:grid;gap:var(--gap)}
 .g4{grid-template-columns:repeat(4,1fr)}
 .g2{grid-template-columns:repeat(2,1fr)}
 
 /* ── CARD ── */
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px;position:relative;overflow:hidden}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent)}
-.card-t{font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;margin-bottom:8px}
-.card-v{font-family:var(--cond);font-size:40px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
-.card-v.a{color:var(--amber)}.card-v.w{color:var(--warn)}.card-v.g{color:var(--green)}.card-v.r{color:var(--red)}
-.card-s{font-size:10px;color:var(--text3);margin-top:5px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--card-pad);position:relative;overflow:hidden}
+.card-t{font-size:12px;font-weight:500;color:var(--text3);margin-bottom:6px}
+.card-v{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.card-v.a{color:var(--accent)}.card-v.w{color:var(--warn)}.card-v.g{color:var(--green)}.card-v.r{color:var(--red)}
+.card-s{font-size:12px;color:var(--text3);margin-top:4px}
 
-/* ── SEC TITLE ── */
-.sec{font-family:var(--cond);font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+/* ── TITOLO DI SEZIONE ── */
+.sec{font-size:15px;font-weight:600;letter-spacing:-.005em;color:var(--text);margin-bottom:10px;display:flex;align-items:baseline;gap:10px}
+.sec small{font-size:12px;font-weight:400;color:var(--text3)}
 
-/* ── TABLE ── */
-.tw{overflow-x:auto;border-radius:4px;border:1px solid var(--border)}
-table{width:100%;border-collapse:collapse;font-size:12px}
-thead{background:var(--bg3);position:sticky;top:0;z-index:5}
-th{padding:7px 11px;text-align:left;font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;font-weight:500;user-select:none}
-th.s{cursor:pointer}th.s:hover{color:var(--amber)}
-th.s.asc::after{content:' ↑';color:var(--amber)}th.s.desc::after{content:' ↓';color:var(--amber)}
-td{padding:7px 11px;border-bottom:1px solid rgba(42,48,64,.45);color:var(--text2);white-space:nowrap}
-tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.018)}
+/* ── TABELLA ── */
+.tw{overflow-x:auto;border-radius:var(--r-card);border:1px solid var(--border);background:var(--bg2)}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+thead{background:color-mix(in srgb,var(--bg3) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+th{padding:var(--cell-y) var(--cell-x);text-align:left;font-size:12px;font-weight:500;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;user-select:none}
+th.s{cursor:pointer}th.s:hover{color:var(--text)}
+th.s.asc::after,th.s.desc::after{content:'';display:inline-block;margin-left:6px;border:4px solid transparent;vertical-align:1px}
+th.s.asc::after{border-bottom-color:var(--accent);border-top-width:0}th.s.desc::after{border-top-color:var(--accent);border-bottom-width:0}
+td{padding:var(--cell-y) var(--cell-x);border-bottom:1px solid color-mix(in srgb,var(--border) 70%,transparent);color:var(--text2);white-space:nowrap}
+tr:last-child td{border-bottom:none}tr:hover td{background:var(--hover)}
 .tn{color:var(--text);font-weight:500}
-.nm{display:block;max-width:34ch;overflow:hidden;text-overflow:ellipsis}.tm{font-family:var(--mono);font-size:11px}
+.nm{display:block;max-width:34ch;overflow:hidden;text-overflow:ellipsis}.tm{font-family:var(--mono);font-size:12px}
 
-/* ── BADGE ── */
-.badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:2px;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
-.br{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.bs{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.bp{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
-.bq{background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
-.bl{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
-.bn{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
-.bo{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.bf{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}
-.bt{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}
+/* ── BADGE ── lo stato è sempre colore + parola ── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--r-badge);font-size:11px;font-weight:600}
+.br{background:var(--green-dim);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent)}
+.bs{background:var(--red-dim);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 32%,transparent)}
+.bp{background:var(--blue-dim);color:var(--blue);border:1px solid color-mix(in srgb,var(--blue) 32%,transparent)}
+.bq{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 32%,transparent)}
+.bl{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 32%,transparent)}
+.bn{background:var(--accent-dim);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 32%,transparent)}
+.bo{background:var(--green-dim);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent)}
+.bf{background:var(--red-dim);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 32%,transparent)}
+.bt{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 32%,transparent)}
 
-/* ── BAR ── */
-.bw{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
-.bf2{height:100%;border-radius:2px;transition:width .35s;background:var(--amber)}
+/* ── BARRE DI UTILIZZO ── */
+.bw{height:5px;background:var(--bg4);border-radius:8px;overflow:hidden}
+.bf2{height:100%;border-radius:8px;transition:width .35s var(--ease);background:var(--accent)}
 .ok2{background:var(--green)}.warn2{background:var(--warn)}.crit2{background:var(--red)}
 
-/* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:3px;border:none;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .13s;text-transform:uppercase;white-space:nowrap}
-.ba{background:var(--amber-fill,var(--amber));color:#000}.ba:hover{background:var(--amber2-fill,var(--amber2))}
-.bg2{background:transparent;color:var(--text2);border:1px solid var(--border2)}.bg2:hover{border-color:var(--amber);color:var(--amber)}
-.bd{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3)}.bd:hover{background:rgba(239,68,68,.25)}
-.bsuc{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}.bsuc:hover{background:rgba(34,197,94,.25)}
-.bpurp{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.3)}.bpurp:hover{background:rgba(168,85,247,.2)}
-.bx{background:var(--red);color:#000;border:1px solid var(--red)}.bx:hover{filter:brightness(1.12)}
-.sm{padding:3px 9px;font-size:10px;min-height:24px}.btn:disabled{opacity:.35;cursor:not-allowed}
+/* ── PULSANTI ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 14px;border-radius:var(--r-ctl);border:1px solid transparent;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s,color .12s,filter .12s;white-space:nowrap}
+.ba{background:var(--accent-fill);color:var(--on-accent)}.ba:hover{background:var(--accent2-fill)}
+.bg2{background:transparent;color:var(--text2);border-color:var(--border2)}.bg2:hover{border-color:var(--accent);color:var(--accent)}
+/* Azioni distruttive: a contorno finché non hanno hover o focus, mai accanto al primario senza spazio */
+.bd{background:transparent;color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}.bd:hover,.bd:focus-visible{background:var(--red-dim);border-color:var(--red)}
+.bsuc{background:var(--green-dim);color:var(--green);border-color:color-mix(in srgb,var(--green) 32%,transparent)}.bsuc:hover{background:color-mix(in srgb,var(--green) 26%,transparent)}
+.bpurp{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border-color:color-mix(in srgb,var(--purple) 32%,transparent)}.bpurp:hover{background:color-mix(in srgb,var(--purple) 22%,transparent)}
+.bx{background:var(--red);color:var(--on-danger);border-color:var(--red)}.bx:hover{filter:brightness(1.1)}
+.sm{height:26px;padding:0 10px;font-size:12px;min-height:24px}.btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* ── INPUT ── */
-.inp{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:3px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .13s}
-.inp:focus{border-color:var(--amber)}select.inp{cursor:pointer}.inp.w{width:100%}
+/* ── CAMPI ── */
+.inp{background:var(--bg3);border:1px solid var(--border);color:var(--text);height:32px;padding:0 10px;border-radius:var(--r-ctl);font-family:var(--sans);font-size:12px;outline:none;transition:border-color .12s,background .12s}
+textarea.inp{height:auto;padding:8px 10px;line-height:1.5}
+.inp:focus{border-color:var(--accent)}select.inp{cursor:pointer}.inp.w{width:100%}
+.inp::placeholder{color:var(--text3)}
+.inp.sm{height:26px}
 
 /* ── FORM ── */
-.fr{margin-bottom:12px}.fl{display:block;font-size:9px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+.fr{margin-bottom:12px}.fl{display:block;font-size:12px;font-weight:500;color:var(--text3);margin-bottom:5px}
 
-/* ── CHART ── */
-.cc{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
-.ct{font-size:9px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;margin-bottom:10px}
+/* ── GRAFICI ── */
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--card-pad)}
+.ct{font-size:12px;font-weight:500;color:var(--text3);margin-bottom:10px}
 
-/* ── TABS ── */
-.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:14px}
-.tab{padding:7px 16px;cursor:pointer;font-family:inherit;background:transparent;border:0;font-size:11px;font-weight:500;color:var(--text3);border-bottom:2px solid transparent;transition:all .13s;text-transform:uppercase;letter-spacing:.05em}
-.tab:hover{color:var(--text2)}.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+/* ── TAB ── */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tab{padding:8px 14px;cursor:pointer;font-family:inherit;background:transparent;border:0;font-size:13px;font-weight:500;color:var(--text3);border-bottom:2px solid transparent;transition:color .12s}
+.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-/* ── NODE CARD ── */
-.nd{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px}
+/* ── SCHEDA NODO ── */
+.nd{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--card-pad)}
 .nd-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
-.nd-name{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.05em}
-button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;text-align:left}
+.nd-name{font-size:15px;font-weight:600;letter-spacing:-.005em}
+button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;text-align:left;font-family:inherit}
 .mg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.mb2{background:var(--bg3);border-radius:3px;padding:9px 11px}
-.ml{font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;margin-bottom:5px}
-.mv{font-family:var(--cond);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.mb2{background:var(--bg3);border-radius:10px;padding:10px 12px}
+.ml{font-size:12px;font-weight:500;color:var(--text3);margin-bottom:4px}
+.mv{font-size:20px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
 
-/* ── MULTI NODE SELECT ── */
-.node-sel-item{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;font-size:12px;transition:background .1s}
-.node-sel-item:hover{background:rgba(255,255,255,.04)}
-.node-sel-item input{accent-color:var(--amber);cursor:pointer}
+/* ── SELEZIONE MULTI-NODO ── */
+.node-sel-item{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:12px;transition:background .1s}
+.node-sel-item:hover{background:var(--hover)}
+.node-sel-item input{accent-color:var(--accent);cursor:pointer}
 .node-sel-item label{cursor:pointer;flex:1}
 
 /* ── MODAL ── */
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .18s}
+.ov{position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .16s}
 .ov.open{opacity:1;pointer-events:all}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:5px;padding:22px;min-width:min(360px,calc(100vw - 24px));max-width:min(620px,calc(100vw - 24px));max-height:90vh;max-height:90dvh;overflow-y:auto;transform:translateY(8px);transition:transform .18s}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-modal);box-shadow:var(--shadow-pop);padding:22px;min-width:min(360px,calc(100vw - 24px));max-width:min(620px,calc(100vw - 24px));max-height:90vh;max-height:90dvh;overflow-y:auto;transform:translateY(8px);transition:transform .2s var(--ease)}
 .ov.open .modal{transform:translateY(0)}
-.mt{font-family:var(--cond);font-size:17px;font-weight:700;letter-spacing:.07em;margin-bottom:14px}
-.mf{margin-top:18px;display:flex;gap:7px;justify-content:flex-end}
+.mt{font-size:17px;font-weight:600;letter-spacing:-.01em;margin-bottom:14px}
+.mf{margin-top:20px;display:flex;gap:8px;justify-content:flex-end}
 
 /* ── TOAST ── */
-#toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:7px;z-index:2000}
-.toast{background:var(--bg3);border:1px solid var(--border2);padding:9px 14px;border-radius:4px;font-size:11px;max-width:340px;animation:si .18s ease;display:flex;align-items:center;gap:7px}
-.toast{cursor:pointer}
-.toast.ok{border-left:3px solid var(--green)}.toast.err{border-left:3px solid var(--red)}.toast.info{border-left:3px solid var(--amber)}
+#toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:2000}
+.toast{background:color-mix(in srgb,var(--bg3) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border2);box-shadow:var(--shadow-pop);padding:10px 14px;border-radius:12px;font-size:12px;max-width:360px;animation:si .2s var(--ease);display:flex;align-items:center;gap:9px;cursor:pointer}
+.toast::before{content:'';width:14px;height:0;border-top:2px solid var(--accent);flex-shrink:0}
+.toast.ok::before{border-top-color:var(--green)}.toast.err::before{border-top-color:var(--red);border-top-width:3px}.toast.info::before{border-top-color:var(--accent)}
 @keyframes si{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
 
-/* ── PROVISION LOG ── */
-.plog{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:11px;font-size:11px;font-family:var(--mono);color:var(--text2);min-height:80px;max-height:260px;overflow-y:auto;line-height:1.8}
+/* ── LOG DI OPERAZIONE ── */
+.plog{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;font-family:var(--mono);color:var(--text2);min-height:80px;max-height:260px;overflow-y:auto;line-height:1.8}
 
-/* ── CONFIRM ── */
+/* ── CONFERMA ── */
 .cf-line{margin-bottom:6px}
 .cf-cons{color:var(--text);margin:8px 0 10px}
-.cf-list{background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:6px 10px;max-height:180px;overflow-y:auto;font-size:11px;line-height:1.7;list-style:none}
+.cf-list{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:6px 10px;max-height:180px;overflow-y:auto;font-size:12px;line-height:1.7;list-style:none}
 .cf-type{margin-top:12px}
 .errrow{padding:16px;text-align:center;color:var(--red)}
 .errrow .btn{margin-left:10px}
 
-/* ── UTIL ── */
+/* ── UTILITÀ ── */
 .flex{display:flex}.fc{flex-direction:column}.fw{flex-wrap:wrap}
 .g8{gap:8px}.g12{gap:12px}.g16{gap:16px}
 .mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb14{margin-bottom:14px}.mb16{margin-bottom:16px}.mt12{margin-top:12px}.mt16{margin-top:16px}
 .ac{align-items:center}
-.ta{color:var(--amber)}.twn{color:var(--warn)}.tr{color:var(--red)}.tg{color:var(--green)}.td{color:var(--text3)}
+.ta{color:var(--accent)}.twn{color:var(--warn)}.tr{color:var(--red)}.tg{color:var(--green)}.td{color:var(--text3)}
 .wf{width:100%}
-.ldc{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--text3);gap:10px;font-size:11px}
-.spin{position:relative;display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--amber);border-radius:50%;animation:sp .55s linear infinite}
+.ldc{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--text3);gap:10px;font-size:12px}
+.spin{position:relative;display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:sp .55s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .sep{height:1px;background:var(--border);margin:12px 0}
-.hint{font-size:10px;color:var(--text3);margin-top:4px}
+.hint{font-size:12px;color:var(--text3);margin-top:4px}
+
+/* ══ BOLLETTINO (dashboard) ══ */
+.dash{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start}
+.dash-main{min-width:0}
+.cond{display:flex;align-items:center;gap:20px;padding-bottom:18px;border-bottom:1px solid var(--border)}
+.cond-ico{width:48px;height:48px;flex-shrink:0;color:var(--text2)}
+.cond-ico.ok{color:var(--green)}.cond-ico.warn{color:var(--warn)}.cond-ico.bad{color:var(--red)}
+.cond h2{font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.12}
+.cond p{color:var(--text2);font-size:14px;margin-top:4px}
+.cond .bad{color:var(--red);font-weight:600}.cond .wrn{color:var(--warn);font-weight:600}
+.kstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:16px 0 22px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden}
+.kcell{padding:var(--card-pad);border-left:1px solid var(--border);min-width:0}
+.kcell:first-child{border-left:0}
+.kcell .kl{font-size:12px;font-weight:500;color:var(--text3)}
+.kcell .kv{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:2px 0 4px}
+.kcell .kv small{font-size:13px;font-weight:500;color:var(--text3);letter-spacing:0}
+.kcell .kv.w{color:var(--warn)}.kcell .kv.r{color:var(--red)}
+.kcell svg{display:block;width:100%;height:28px}
+.kcell .ks{font-size:12px;color:var(--text3)}
+.spark{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.spark.w{stroke:var(--warn)}
+.sparkbar{fill:var(--accent);opacity:.7}.sparkbar.e{fill:var(--red);opacity:1}
+.npanel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden;margin-bottom:26px}
+.nrow{display:grid;grid-template-columns:112px 116px minmax(110px,1fr) minmax(110px,1fr) minmax(140px,230px);align-items:center;gap:18px;min-height:var(--row-h);padding:var(--cell-y) 18px;border-top:1px solid var(--border)}
+.nrow:first-child{border-top:0}
+.nrow .nn{font-size:14px;font-weight:600;background:none;border:0;color:var(--text);padding:0;cursor:pointer;text-align:left;font-family:inherit;display:block}
+.nrow .nn:hover{color:var(--accent)}
+.nrow .nsub{display:block;color:var(--text3);font-weight:400;font-size:12px;margin-top:1px}
+.st{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:500;white-space:nowrap}
+.st::before{content:'';width:14px;height:0;border-top:2px solid currentColor;flex-shrink:0}
+.st.ok{color:var(--green)}.st.warn{color:var(--warn)}.st.off{color:var(--red)}.st.off::before{border-top-style:dashed}
+.rb{font-size:12px;color:var(--text3)}
+.rl{display:flex;justify-content:space-between;margin-bottom:7px}
+.rl b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.track{position:relative;height:6px;border-radius:8px;background:var(--bg4)}
+.track::after{content:'';position:absolute;left:85%;top:-3px;height:12px;border-left:1px dashed color-mix(in srgb,var(--text3) 55%,transparent)}
+.range{position:absolute;top:0;height:6px;border-radius:8px;background:var(--accent);min-width:4px;transition:left .6s var(--ease),width .6s var(--ease)}
+.range.w{background:var(--warn)}.range.r{background:var(--red)}
+.now{position:absolute;top:-3px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--text);border:3px solid var(--bg2);box-sizing:border-box;transition:left .6s var(--ease)}
+.nrow.off{opacity:.62}
+.nrow.off .track{background:none}
+.nrow.off .track::before{content:'';position:absolute;left:0;right:0;top:2px;border-top:2px dashed var(--border2)}
+.nrow.off .track::after{display:none}
+.vdots{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.vd{display:inline-block;border-radius:50%;background:var(--green);flex-shrink:0}
+.vd.s1{width:6px;height:6px}.vd.s2{width:8px;height:8px}.vd.s3{width:10px;height:10px}.vd.s4{width:12px;height:12px}.vd.s5{width:14px;height:14px}
+.vd.x{background:transparent;border:1.5px solid var(--text3)}
+.dash-side{position:sticky;top:0;min-width:0}
+.act-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+.act-h h2{font-size:15px;font-weight:600}.act-h span{font-size:12px;color:var(--text3)}
+.task{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;padding:11px 0;border-top:1px solid var(--border);align-items:start}
+.task .sl{margin-top:9px;width:14px;height:0;border-top:2px solid var(--green)}
+.task .sl.run{border-top-color:var(--accent);border-top-style:dashed}
+.task .sl.err{border-top-color:var(--red);border-top-width:3px}
+.task b{display:block;font-weight:500;color:var(--text)}
+.task small{display:block;color:var(--text3);font-size:12px;overflow-wrap:anywhere}
+.task small.e{color:var(--red)}
+.task time{color:var(--text3);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.act-empty{padding:14px 0;color:var(--text3);border-top:1px solid var(--border)}
+@media(max-width:1180px){.dash{display:flex;flex-direction:column;align-items:stretch;gap:0}.dash-main{display:contents}.dash>*,.dash-main>*,.dash-vms{min-width:0;max-width:100%}.dash-side{position:static;order:1;margin-bottom:26px}.dash-vms{order:2}}
+@media(max-width:650px){
+  #page-vms table th:nth-child(2),#page-vms table td:nth-child(2),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(6),#page-vms table td:nth-child(6),#page-vms table th:nth-child(8),#page-vms table td:nth-child(8),#page-vms table th:nth-child(10),#page-vms table td:nth-child(10),#page-vms table th:nth-child(11),#page-vms table td:nth-child(11),
+  #page-batch table th:nth-child(2),#page-batch table td:nth-child(2),#page-batch table th:nth-child(5),#page-batch table td:nth-child(5),#page-batch table th:nth-child(6),#page-batch table td:nth-child(6){display:none}
+}
+@media(max-width:700px){
+  .cond h2{font-size:22px}.cond-ico{width:36px;height:36px}
+  .kstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.kcell:nth-child(3){border-left:0}.kcell:nth-child(n+3){border-top:1px solid var(--border)}
+  .nrow{grid-template-columns:minmax(0,1fr) auto;gap:10px 14px}.nrow .rb,.nrow .vdots{grid-column:1/-1}
+}
+
+/* ══ PANNELLO LATERALE (dettaglio VM) ══ */
+.ov.sheet{justify-content:flex-end;align-items:stretch}
+.ov.sheet .modal{width:min(460px,100vw);max-width:100vw;min-width:0;height:100%;max-height:none;border-radius:var(--r-modal) 0 0 var(--r-modal);border-right:0;padding:0;display:flex;flex-direction:column;transform:translateX(28px);transition:transform .24s var(--ease)}
+.ov.sheet.open .modal{transform:none}
+.sh-h{display:flex;align-items:flex-start;gap:12px;padding:20px 22px 14px;border-bottom:1px solid var(--border)}
+.sh-h .mt{margin:0;overflow-wrap:anywhere}
+.sh-h small{display:block;color:var(--text3);font-size:12px;margin-top:2px}
+.sh-x{margin-left:auto;flex-shrink:0}
+.ic{width:14px;height:14px;flex-shrink:0}
+#vm-node-btn::after{content:'';display:inline-block;margin-left:8px;border:4px solid transparent;border-top-color:currentColor;border-bottom-width:0;vertical-align:2px}
+.sh-b{flex:1;overflow-y:auto;padding:18px 22px 24px}
+.sh-b h3{font-size:12px;font-weight:600;color:var(--text3);margin:20px 0 8px}
+.dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 18px;font-size:12px;margin-top:14px}
+.dl dt{color:var(--text3)}.dl dd{color:var(--text);margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.sh-act{display:flex;flex-wrap:wrap;gap:8px}
+.sh-danger{margin-top:32px;padding-top:18px;border-top:1px solid var(--border)}
+.sh-danger p{font-size:12px;color:var(--text3);margin-bottom:10px}
+.nm-btn{background:none;border:0;padding:0;color:inherit;font:inherit;font-weight:500;cursor:pointer;text-align:left}
+.nm-btn:hover .nm{color:var(--accent)}
+
+/* ══ RICERCA RAPIDA (⌘K) ══ */
+.pal-btn{display:inline-flex;align-items:center;gap:10px;height:32px;min-width:240px;padding:0 10px;border-radius:var(--r-ctl);border:1px solid var(--border);background:var(--bg3);color:var(--text3);font:inherit;font-size:12px;cursor:pointer}
+.pal-btn:hover{border-color:var(--accent);color:var(--text)}
+.pal-btn kbd,.pal-foot kbd{margin-left:auto;font:11px var(--sans);border:1px solid var(--border2);border-radius:5px;padding:1px 6px;color:var(--text2)}
+.pal-foot kbd{margin:0 4px 0 0}
+.ov.pal{align-items:flex-start;padding-top:14vh}
+.ov.pal .modal{width:min(640px,calc(100vw - 24px));max-width:none;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
+.pal-in{border:0;border-bottom:1px solid var(--border);border-radius:0;height:52px;padding:0 18px;font-size:15px;background:transparent}
+.pal-in:focus{border-color:var(--border)}
+.pal-list{overflow-y:auto;padding:6px}
+.pal-grp{font-size:12px;font-weight:600;color:var(--text3);padding:10px 12px 4px}
+.pal-o{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--r-ctl);cursor:pointer;color:var(--text2)}
+.pal-o[aria-selected=true]{background:var(--accent-dim);color:var(--text)}
+.pal-o .pl{font-weight:500;color:var(--text)}.pal-o .ps{font-size:12px;color:var(--text3);margin-left:auto;white-space:nowrap}
+.pal-empty{padding:18px 14px;color:var(--text3)}
+.pal-foot{padding:9px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--text3)}
+
+/* ══ AVANZAMENTO PROVISIONING ══ */
+.pv-steps{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.pv-step{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);color:var(--text3);font:inherit;font-size:12px;font-weight:500;cursor:pointer}
+.pv-step::before{content:'';width:12px;height:0;border-top:2px dashed currentColor}
+.pv-step.done{color:var(--green);border-color:color-mix(in srgb,var(--green) 35%,transparent)}.pv-step.done::before{border-top-style:solid}
+.pv-step.cur{color:var(--accent);border-color:var(--accent)}
+@media(prefers-reduced-motion:reduce){.ov.sheet .modal{transform:none;transition:none}}
+@media(max-width:650px){.pal-btn{min-width:0;padding:0 10px}.pal-btn span,.pal-btn kbd{display:none}.ov.pal{padding-top:8vh}}
+
+/* ══ PAGINE: componenti condivisi (toolbar, controllo segmentato, pannelli, schede nodo, impostazioni) ══ */
+[hidden]{display:none!important}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.toolbar .sp{flex:1}
+.tb-sum{font-size:12px;color:var(--text3);white-space:nowrap}
+.sfield{position:relative;display:inline-flex;align-items:center}
+.sfield svg{position:absolute;left:10px;width:14px;height:14px;color:var(--text3);pointer-events:none}
+.sfield .inp{padding-left:32px}
+.seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)}
+.seg .tab,.seg button{height:26px;padding:0 12px;border:0;border-bottom:0;border-radius:8px;background:transparent;color:var(--text3);font:inherit;font-size:12px;font-weight:500;cursor:pointer;margin:0}
+.seg .tab:hover,.seg button:hover{color:var(--text)}
+.seg .tab.active,.seg button.on{background:var(--bg2);color:var(--text);box-shadow:0 0 0 1px var(--border2)}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);margin-bottom:16px;overflow:hidden}
+.panel-h{display:flex;align-items:baseline;gap:10px;padding:14px var(--card-pad) 0}
+.panel-h h2{font-size:15px;font-weight:600;letter-spacing:-.005em}
+.panel-h small{font-size:12px;color:var(--text3)}
+.panel-b{padding:12px var(--card-pad) var(--card-pad)}
+.panel>.tw{border:0;border-radius:0;border-top:1px solid var(--border);margin-top:12px}
+.empty{padding:28px var(--card-pad);color:var(--text3);text-align:center}
+.nc{display:block;text-align:left;color:inherit;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--card-pad);cursor:pointer;transition:border-color .12s}
+.nc:hover{border-color:var(--border2)}.nc.sel{border-color:var(--accent)}
+.nc.off{opacity:.68}
+.nc-h{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.nc-n{font-size:15px;font-weight:600;background:none;border:0;color:var(--text);padding:0;font-family:inherit;cursor:pointer}
+.nc-s{flex-basis:100%;font-size:12px;color:var(--text3);margin-top:-8px}
+.nc-m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.nc-chk{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0}
+.nc .rb{min-width:0}
+.rb .track .range{left:0}
+.ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--gap);margin-bottom:20px}
+.cl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--border)}
+.cl-row:first-child{border-top:0}
+.cl-row strong{font-size:14px;font-weight:600}
+.cl-row .cl-u{color:var(--text3);font-size:12px;overflow-wrap:anywhere}
+.cl-row .cl-a{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px}
+.tile{display:block;text-align:left;font:inherit;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;cursor:pointer}
+.tile:hover{border-color:var(--border2)}
+.tile[aria-pressed=true]{border-color:var(--accent);background:var(--accent-dim)}
+.tile .sw{display:flex;height:44px;border-radius:8px;overflow:hidden;margin-bottom:8px;border:1px solid var(--border)}
+.tile .sw i{flex:1}
+.tile b{display:block;font-weight:600;font-size:13px}
+.tile span{font-size:12px;color:var(--text3)}
+.set{max-width:780px}
+.sel-sum{font-size:12px;color:var(--text2);margin:10px 0 14px}
+.sel-sum b{color:var(--text);font-variant-numeric:tabular-nums}
+@media(max-width:650px){.ngrid{grid-template-columns:minmax(0,1fr)}.nc-m{grid-template-columns:1fr;gap:12px}.toolbar .sp{display:none}}
+
+/* ══ BARRA DI SELEZIONE (lista VM) ══ */
+.selbar{position:sticky;bottom:16px;z-index:20;width:max-content;max-width:calc(100% - 8px);margin:16px auto 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px 10px 16px;border-radius:14px;border:1px solid var(--border2);background:color-mix(in srgb,var(--bg3) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(--shadow-pop)}
+.selbar .sb-n{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.selbar .sb-h{font-size:12px;color:var(--warn)}
+.selbar .sb-sep{width:1px;align-self:stretch;background:var(--border)}
+.chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+td.ck,th.ck{width:36px;padding-right:0}
+@media(max-width:650px){.selbar{width:auto;margin:12px 0 0;bottom:max(12px,env(safe-area-inset-bottom))}}
+@media(prefers-reduced-motion:no-preference){.selbar:not([hidden]){animation:sbin .18s var(--ease)}@keyframes sbin{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}}
+/* ══ TOP 10 (dashboard): andamento come una previsione oraria ══ */
+.sec-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.sec-row .sec{margin:0;flex:1;min-width:220px;flex-wrap:wrap}
+.toptbl{width:100%}
+.toptbl td{vertical-align:middle}
+.toptbl .rk{width:30px;color:var(--text3);font-variant-numeric:tabular-nums;padding-right:0}
+.toptbl .tid .nsub{display:block;color:var(--text3);font-size:12px;margin-top:1px;white-space:nowrap}
+.toptbl .tsp{width:32%;min-width:150px}
+.spw{position:relative;height:38px}
+.spw svg{width:100%;height:100%;display:block}
+.sparkarea{fill:var(--accent-dim);stroke:none}
+.sparkarea.w{fill:color-mix(in srgb,var(--warn) 10%,transparent)}.sparkarea.r{fill:color-mix(in srgb,var(--red) 10%,transparent)}
+.spark.r{stroke:var(--red)}
+.thr{stroke:color-mix(in srgb,var(--text3) 55%,transparent);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.spw .pk{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg2)}
+.tnum b{display:block;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
+.tnum span{font-size:12px;color:var(--text3);white-space:nowrap}
+.tcond{display:inline-flex;align-items:center;gap:8px;font-weight:500;white-space:nowrap}
+.tcond svg{width:24px;height:24px;flex-shrink:0}
+.tcond.ok{color:var(--green)}.tcond.warn{color:var(--warn)}.tcond.bad{color:var(--red)}
+@media(max-width:650px){.toptbl th:nth-child(5),.toptbl td:nth-child(5),.toptbl th:nth-child(6),.toptbl td:nth-child(6),.tcond .cw{display:none}.toptbl .tsp{min-width:90px;width:30%}.toptbl .tid .nsub{white-space:normal}.toptbl th{white-space:normal}.tnum span{display:none}.toptbl td,.toptbl th{padding-left:8px;padding-right:8px}.toptbl .rk{padding-left:12px}}
 @media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.g2,.g4{grid-template-columns:1fr}}
 
-/* ── ADATTAMENTO ── desktop-first: sotto 850px la sidebar diventa un menu a scomparsa */
+/* ── ADATTAMENTO ── desktop-first: sotto 850px il menu diventa un cassetto */
 .menu-btn{display:none}.sb-scrim{display:none}
-#page-batch.active{display:flex!important;flex-direction:column;height:calc(100vh - 110px);height:calc(100dvh - 110px)}
+#page-batch.active{display:flex!important;flex-direction:column;height:calc(100vh - 130px);height:calc(100dvh - 130px)}
 .batch-side{width:260px;min-width:240px;gap:12px}
 @media(max-width:850px){
+  body{grid-template-columns:minmax(0,1fr)}
+  #main{grid-column:1}
   .menu-btn{display:inline-flex}
-  #sidebar{position:fixed;top:0;bottom:0;left:0;width:min(280px,85vw);min-width:0;z-index:900;padding-left:env(safe-area-inset-left);
-    transform:translateX(-100%);visibility:hidden;transition:transform .2s,visibility 0s .2s}
+  .brand{width:auto;flex-shrink:0}
+  #sidebar{position:fixed;top:var(--topbar);bottom:0;left:0;width:min(280px,85vw);z-index:900;padding-left:env(safe-area-inset-left);background:color-mix(in srgb,var(--bg2) 88%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    transform:translateX(-100%);visibility:hidden;transition:transform .22s var(--ease),visibility 0s .22s}
   #sidebar.open{transform:none;visibility:visible;transition-delay:0s}
-  #sidebar.open + .sb-scrim{display:block;position:fixed;inset:0;z-index:899;background:rgba(0,0,0,.5)}
-  /* Batch: colonne impilate, la pagina scorre */
+  #sidebar.open + .sb-scrim{display:block;position:fixed;inset:var(--topbar) 0 0 0;z-index:899;background:var(--scrim)}
   #page-batch.active{height:auto}
   .batch-cols{flex-direction:column}
   .batch-side{width:auto;min-width:0}
   .batch-cols .tw{max-height:55vh}
 }
 @media(max-width:650px){
-  .top-badge{display:none}
+  .conn span,.top-badge,#crumb-cluster,#crumb-sep,.rl-lbl,.brand span{display:none!important}
   .topbar{padding:0 12px}
-  #content{padding:14px max(12px,env(safe-area-inset-right)) 14px max(12px,env(safe-area-inset-left))}
+  #content{padding:14px max(14px,env(safe-area-inset-right)) 18px max(14px,env(safe-area-inset-left))}
   #toasts{left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom))}
   .toast{max-width:none}
 }
@@ -218,110 +441,120 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
   input[type=checkbox]{width:22px;height:22px}
   .node-sel-item{padding:11px 12px}
 }
-@media(prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
 /* ── SKIP LINK / TESTO SOLO PER LETTORI DI SCHERMO ── */
-.skip{position:fixed;left:8px;top:-56px;z-index:3000;padding:8px 14px;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:3px;font-size:12px;text-decoration:none;transition:top .12s}
+.skip{position:fixed;left:8px;top:-56px;z-index:3000;padding:8px 14px;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:var(--r-ctl);font-size:12px;text-decoration:none;transition:top .12s}
 .skip:focus{top:8px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 #content:focus-visible{outline:none}
 
 /* ── FOCUS ── */
-:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ni:focus-visible,.tab:focus-visible,th.s:focus-visible{outline-offset:-2px}
 .modal:focus-visible{outline:none}
-.inp:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.inp:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* ── MOVIMENTO RIDOTTO ── mantiene lo stato (toast che compare, caricamento in corso) senza movimento */
 @media(prefers-reduced-motion:reduce){
+  #sidebar{transition:none}
   .toast{animation:none}
   .modal,.ov.open .modal{transform:none;transition:none}
-  .bf2{transition:none}
+  .bf2,.range,.now{transition:none}
   .spin{animation:none;width:auto;height:auto;border:0;border-radius:0}
-  .spin::before{content:'…';color:var(--amber);font-weight:700}
+  .spin::before{content:'…';color:var(--accent);font-weight:700}
 }
 
-/* ── LIGHT THEME ── */
+/* ══ TEMA CHIARO ("alba") ══ */
 html.light{
-  --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;--bg4:#e2e8f0;
-  --border:#e2e8f0;--border2:#cbd5e1;
-  --text:#0f172a;--text2:#334155;--text3:#617087;
-  --amber:#996206;--green:#167f3d;--red:#d41212;--blue:#0b62f0;--cyan:#047a8f;--purple:#9530f5;
-  --amber-fill:#f59e0b;--amber2-fill:#fbbf24;
-  --amber-dim:rgba(245,158,11,.15);--amber-glow:rgba(245,158,11,.08);
-  --red-dim:rgba(239,68,68,.12);--green-dim:rgba(34,197,94,.12);--blue-dim:rgba(59,130,246,.12);
+  --bg:#eef2f8;--bg2:#ffffff;--bg3:#f3f6fb;--bg4:#e3e9f3;
+  --border:rgba(13,27,51,.12);--border2:rgba(13,27,51,.22);
+  --accent:#1d5fd1;--accent2:#174ca8;--accent-dim:rgba(29,95,209,.10);--accent-glow:rgba(29,95,209,.06);
+  --accent-fill:#2d6cdf;--accent2-fill:#2459b8;--on-accent:#ffffff;--on-danger:#ffffff;
+  --green:#0e7436;--red:#b92222;--blue:#5b50e0;--cyan:#05697b;--purple:#8a35d8;--warn:#9a5600;
+  --red-dim:rgba(185,34,34,.10);--green-dim:rgba(14,116,54,.10);--blue-dim:rgba(91,80,224,.10);
+  --text:#0d1b33;--text2:#3a4a66;--text3:#53637f;
+  --sky-glow:#dbe7fb;--hover:rgba(13,27,51,.04);--scrim:rgba(13,27,51,.4);
+  --shadow-pop:0 24px 60px -12px rgba(13,27,51,.28),0 2px 10px rgba(13,27,51,.12);
+  color-scheme:light;
 }
 @media(prefers-color-scheme:light){html:not(.dark):not(.eva01):not(.catppuccino){
-  --bg:#f8fafc;--bg2:#ffffff;--bg3:#f1f5f9;--bg4:#e2e8f0;
-  --border:#e2e8f0;--border2:#cbd5e1;
-  --text:#0f172a;--text2:#334155;--text3:#617087;
-  --amber:#996206;--green:#167f3d;--red:#d41212;--blue:#0b62f0;--cyan:#047a8f;--purple:#9530f5;
-  --amber-fill:#f59e0b;--amber2-fill:#fbbf24;
-  --amber-dim:rgba(245,158,11,.15);--amber-glow:rgba(245,158,11,.08);
-  --red-dim:rgba(239,68,68,.12);--green-dim:rgba(34,197,94,.12);--blue-dim:rgba(59,130,246,.12);
+  --bg:#eef2f8;--bg2:#ffffff;--bg3:#f3f6fb;--bg4:#e3e9f3;
+  --border:rgba(13,27,51,.12);--border2:rgba(13,27,51,.22);
+  --accent:#1d5fd1;--accent2:#174ca8;--accent-dim:rgba(29,95,209,.10);--accent-glow:rgba(29,95,209,.06);
+  --accent-fill:#2d6cdf;--accent2-fill:#2459b8;--on-accent:#ffffff;--on-danger:#ffffff;
+  --green:#0e7436;--red:#b92222;--blue:#5b50e0;--cyan:#05697b;--purple:#8a35d8;--warn:#9a5600;
+  --red-dim:rgba(185,34,34,.10);--green-dim:rgba(14,116,54,.10);--blue-dim:rgba(91,80,224,.10);
+  --text:#0d1b33;--text2:#3a4a66;--text3:#53637f;
+  --sky-glow:#dbe7fb;--hover:rgba(13,27,51,.04);--scrim:rgba(13,27,51,.4);
+  --shadow-pop:0 24px 60px -12px rgba(13,27,51,.28),0 2px 10px rgba(13,27,51,.12);
+  color-scheme:light;
 }}
-html.light tr:hover td{background:rgba(0,0,0,.03)!important}
-html.light .ni:hover{background:rgba(0,0,0,.04)!important}
-html.light .node-sel-item:hover{background:rgba(0,0,0,.04)!important}
-html.light .ov{background:rgba(0,0,0,.45)!important}
-@media(prefers-color-scheme:light){
-  html:not(.dark):not(.eva01):not(.catppuccino) tr:hover td{background:rgba(0,0,0,.03)!important}
-  html:not(.dark):not(.eva01):not(.catppuccino) .ni:hover{background:rgba(0,0,0,.04)!important}
-  html:not(.dark):not(.eva01):not(.catppuccino) .node-sel-item:hover{background:rgba(0,0,0,.04)!important}
-  html:not(.dark):not(.eva01):not(.catppuccino) .ov{background:rgba(0,0,0,.45)!important}
-}
 
-/* ── EVA 01 THEME ── */
+/* ══ EVA 01 ══ stessa struttura, palette viola/lime */
 html.eva01{
   --bg:#0d0617;--bg2:#1a0f2e;--bg3:#261540;--bg4:#311d52;
-  --border:#4a2d7a;--border2:#6b3fa8;
-  --amber:#7cc443;--amber2:#95d45a;
-  --amber-dim:rgba(124,196,67,.15);--amber-glow:rgba(124,196,67,.08);
+  --border:rgba(160,110,230,.30);--border2:rgba(160,110,230,.50);
+  --accent:#7cc443;--accent2:#95d45a;--accent-dim:rgba(124,196,67,.15);--accent-glow:rgba(124,196,67,.08);
+  --accent-fill:#7cc443;--accent2-fill:#95d45a;--on-accent:#0d1a05;
   --red:#f15757;--red-dim:rgba(239,68,68,.15);
   --green:#4ade80;--green-dim:rgba(74,222,128,.15);
   --blue:#c084fc;--blue-dim:rgba(192,132,252,.15);
-  --cyan:#2dd4bf;--purple:#d946ef;
+  --cyan:#2dd4bf;--purple:#e270f6;
   --warn:#ffa24a;
   --text:#f0e6ff;--text2:#c4a0e0;--text3:#9779bb;
+  --sky-glow:#2a1650;
 }
 
-/* ── CATPPUCCIN MOCHA THEME ── */
+/* ══ CATPPUCCIN MOCHA ══ */
 html.catppuccino{
   --bg:#1e1e2e;--bg2:#181825;--bg3:#313244;--bg4:#45475a;
-  --border:#45475a;--border2:#585b70;
-  --amber:#fab387;--amber2:#f9c29c;
-  --amber-dim:rgba(250,179,135,.15);--amber-glow:rgba(250,179,135,.08);
+  --border:rgba(166,173,200,.20);--border2:rgba(166,173,200,.36);
+  --accent:#fab387;--accent2:#f9c29c;--accent-dim:rgba(250,179,135,.15);--accent-glow:rgba(250,179,135,.08);
+  --accent-fill:#fab387;--accent2-fill:#f9c29c;--on-accent:#1e1e2e;
   --red:#f38ba8;--red-dim:rgba(243,139,168,.15);
   --green:#a6e3a1;--green-dim:rgba(166,227,161,.15);
   --blue:#89b4fa;--blue-dim:rgba(137,180,250,.15);
   --cyan:#89dceb;--purple:#cba6f7;
+  --warn:#f9e2af;
   --text:#cdd6f4;--text2:#a6adc8;--text3:#979cb4;
+  --sky-glow:#2a2a44;
 }
 
-/* ── BATCH NODE CHIPS ── */
-.node-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .13s;white-space:nowrap}
-.node-chip:hover{border-color:var(--amber);color:var(--amber)}
-.node-chip.active{background:var(--amber-dim);border-color:var(--amber);color:var(--amber);font-weight:600}
+/* ── CHIP NODO (batch) ── */
+.node-chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--sans);font-size:12px;cursor:pointer;transition:all .12s;white-space:nowrap}
+.node-chip:hover{border-color:var(--accent);color:var(--accent)}
+.node-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
 </style>
 </head>
 <body>
 <a class="skip" id="skip-link" href="#content" onclick="event.preventDefault();document.getElementById('content').focus()">Vai al contenuto</a>
 
-<!-- SIDEBAR -->
+<!-- BARRA SUPERIORE -->
+<header class="topbar" id="topbar">
+  <button type="button" class="btn bg2 sm menu-btn" id="menu-btn" aria-label="Apri menu" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  <div class="brand">Proxmox<span>Manager</span></div>
+  <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)" style="display:none;min-width:120px"></select>
+  <nav class="crumb" aria-label="Posizione">
+    <span id="crumb-cluster"></span><span class="sepc" id="crumb-sep" aria-hidden="true">›</span>
+    <h1 class="top-title" id="ptitle">Panoramica</h1>
+  </nav>
+  <button type="button" class="pal-btn" id="pal-btn" onclick="Palette.open()" aria-haspopup="dialog" aria-label="Cerca VM, nodi, pagine e azioni"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Cerca…</span><kbd id="pal-kbd">Ctrl K</kbd></button>
+  <div class="conn" role="status"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
+  <button class="btn bg2 sm" onclick="App.refresh()" aria-label="Aggiorna i dati"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg><span class="rl-lbl">Aggiorna</span></button>
+</header>
+
+<!-- MENU LATERALE -->
 <aside id="sidebar" aria-label="Menu">
-  <div class="logo"><div class="logo-t">PROXMOX</div><div class="logo-s">Cluster Manager</div></div>
-  <div class="conn-bar"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
   <nav class="nav" aria-label="Navigazione principale">
-    <div class="nav-sec">Overview</div>
     <button type="button" class="ni active" data-page="dashboard" aria-current="page">
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Panoramica
     </button>
     <div class="nav-sec">Risorse</div>
     <button type="button" class="ni" data-page="nodes">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>Nodi
     </button>
     <button type="button" class="ni" data-page="vms">
-      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>VM & Container
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>VM &amp; Container
     </button>
     <div class="nav-sec">Operazioni</div>
     <button type="button" class="ni" data-page="provision">
@@ -333,122 +566,118 @@ html.catppuccino{
     <button type="button" class="ni" data-page="cluster">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Cluster
     </button>
-    <div class="nav-sec">Analytics</div>
+    <div class="nav-sec">Analisi</div>
     <button type="button" class="ni" data-page="reports">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
     </button>
-    <div class="nav-sec">Config</div>
+    <div class="nav-sec">Configurazione</div>
     <button type="button" class="ni" data-page="settings">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.55.0 · 2026-10-14</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.61.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
-<!-- MAIN -->
+<!-- CONTENUTO -->
 <div id="main">
-  <header class="topbar">
-    <button type="button" class="btn bg2 sm menu-btn" id="menu-btn" aria-label="Apri menu" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-    <h1 class="top-title" id="ptitle">DASHBOARD</h1>
-    <div class="top-badge" id="pbadge">OVERVIEW</div>
-    <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)"
-      style="font-size:10px;padding:3px 8px;min-width:100px;display:none"></select>
-    <button class="btn bg2 sm" onclick="App.refresh()">↻ Aggiorna</button>
-  </header>
-  <main id="content" tabindex="-1">
+<main id="content" tabindex="-1">
 
     <!-- ██ DASHBOARD ██ -->
     <div class="page active" id="page-dashboard">
-      <div class="g g4 mb16" id="dash-kpis"><div class="ldc" style="grid-column:1/-1"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Connessione...</div></div>
-      <div class="g g2 mb16">
-        <div class="cc"><div class="ct">CPU cluster — ultime 6h</div><canvas id="cCpu" height="150"></canvas></div>
-        <div class="cc"><div class="ct">RAM cluster — ultime 6h</div><canvas id="cMem" height="150"></canvas></div>
+      <div class="dash">
+        <div class="dash-main">
+          <div class="cond" id="dash-cond" aria-live="polite"><div class="ldc" style="padding:12px 0"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Connessione...</div></div>
+          <div class="kstrip" id="dash-kpis"></div>
+          <h2 class="sec">Nodi <small>ultime 24 ore · la barra va dal minimo al massimo, il punto bianco è il valore attuale, il tratto tratteggiato è la soglia critica (85%). Un pallino per VM: pieno = in esecuzione, vuoto = ferma, diametro = RAM</small></h2>
+          <div class="npanel" id="dash-nodes"></div>
+          <div class="dash-vms">
+            <div class="sec-row">
+              <h2 class="sec" id="top-title">Top 10 VM &amp; Container <small id="top-sub"></small></h2>
+              <div class="seg" id="top-win" role="group" aria-label="Finestra di tempo">
+                <button type="button" data-h="6" class="on" aria-pressed="true" onclick="Dashboard.setTopHours(6)">6 h</button>
+                <button type="button" data-h="12" aria-pressed="false" onclick="Dashboard.setTopHours(12)">12 h</button>
+                <button type="button" data-h="24" aria-pressed="false" onclick="Dashboard.setTopHours(24)">24 h</button>
+              </div>
+              <button type="button" class="btn bg2 sm" onclick="App.nav('vms')">Tutte le VM</button>
+            </div>
+            <div class="panel" id="dash-top"><div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo della classifica…</div></div>
+          </div>
+        </div>
+        <section class="dash-side" aria-labelledby="act-title">
+          <div class="act-h"><h2 id="act-title">Attività</h2><span>in corso e recenti</span></div>
+          <div id="dash-tasks"><div class="act-empty">Caricamento…</div></div>
+          <button type="button" class="btn ba mt16" onclick="App.nav('provision')">Nuova VM</button>
+        </section>
       </div>
-      <h2 class="sec">VM & Container</h2>
-      <div class="tw"><table id="dtbl">
-        <thead><tr>
-          <th class="s" onclick="DashTbl.sort('type')">Tipo</th>
-          <th class="s" onclick="DashTbl.sort('vmid')">VMID</th>
-          <th class="s" onclick="DashTbl.sort('name')">Nome</th>
-          <th class="s" onclick="DashTbl.sort('node')">Nodo</th>
-          <th class="s" onclick="DashTbl.sort('status')">Stato</th>
-          <th class="s" onclick="DashTbl.sort('cpu')">CPU %</th>
-          <th class="s" onclick="DashTbl.sort('mem')">RAM %</th>
-          <th class="s" onclick="DashTbl.sort('disk')">Disco %</th>
-        </tr></thead>
-        <tbody id="dtbody"><tr><td colspan="8" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
-      </table></div>
     </div>
 
     <!-- ██ NODES ██ -->
     <div class="page" id="page-nodes">
-      <div class="flex g12 mb14 ac fw">
+      <div class="toolbar">
         <select class="inp" id="nfsel" aria-label="Filtra per nodo" onchange="Nodes.filter()"><option value="">Tutti i nodi</option></select>
         <select class="inp" id="ntfsel" aria-label="Periodo del grafico" onchange="Nodes.loadRRD()">
           <option value="hour">Ultima ora</option><option value="day">Ultimo giorno</option>
           <option value="week">Ultima settimana</option><option value="month">Ultimo mese</option>
         </select>
-        <button class="btn bg2 sm" onclick="Nodes.load()">↻</button>
+        <span class="sp"></span>
+        <button class="btn bg2 sm" onclick="Nodes.load()" aria-label="Aggiorna i nodi"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
       </div>
-      <div class="g g2 mb16" id="ngrid"><div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></div></div>
-      <h2 class="sec">VM per nodo selezionato</h2>
-      <div class="tw"><table>
-        <thead><tr>
-          <th class="s" onclick="NodeVMs.sort('type')">Tipo</th>
-          <th class="s" onclick="NodeVMs.sort('vmid')">VMID</th>
-          <th class="s" onclick="NodeVMs.sort('name')">Nome</th>
-          <th class="s" onclick="NodeVMs.sort('status')">Stato</th>
-          <th class="s" onclick="NodeVMs.sort('cpu')">CPU %</th>
-          <th class="s" onclick="NodeVMs.sort('mem')">RAM %</th>
-          <th class="s" onclick="NodeVMs.sort('disk')">Disco</th>
-          <th>Net In</th><th>Net Out</th>
-        </tr></thead>
-        <tbody id="nvtbody"><tr><td colspan="9" style="padding:18px;text-align:center;color:var(--text3)">Seleziona un nodo</td></tr></tbody>
-      </table></div>
-      <div class="mt16 g g2">
-        <div class="cc"><div class="ct" id="ncpuT">CPU nodo</div><canvas id="cNcpu" height="150"></canvas></div>
-        <div class="cc"><div class="ct" id="nmemT">RAM nodo</div><canvas id="cNmem" height="150"></canvas></div>
+      <div class="ngrid" id="ngrid"><div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></div></div>
+      <div class="panel" id="nsel-empty"><div class="empty">Scegli un nodo per vedere le sue VM e il suo andamento.</div></div>
+      <div id="nsel-area" hidden>
+        <div class="panel">
+          <div class="panel-h"><h2 id="nsel-title">VM sul nodo</h2></div>
+          <div class="tw"><table>
+            <thead><tr>
+              <th class="s" onclick="NodeVMs.sort('type')">Tipo</th>
+              <th class="s" onclick="NodeVMs.sort('vmid')">VMID</th>
+              <th class="s" onclick="NodeVMs.sort('name')">Nome</th>
+              <th class="s" onclick="NodeVMs.sort('status')">Stato</th>
+              <th class="s" onclick="NodeVMs.sort('cpu')">CPU %</th>
+              <th class="s" onclick="NodeVMs.sort('mem')">RAM %</th>
+              <th class="s" onclick="NodeVMs.sort('disk')">Disco</th>
+              <th>Net In</th><th>Net Out</th>
+            </tr></thead>
+            <tbody id="nvtbody"><tr><td colspan="9" class="empty">Seleziona un nodo</td></tr></tbody>
+          </table></div>
+        </div>
+        <div class="g g2">
+          <div class="cc"><div class="ct" id="ncpuT">CPU nodo</div><canvas id="cNcpu" height="150"></canvas></div>
+          <div class="cc"><div class="ct" id="nmemT">RAM nodo</div><canvas id="cNmem" height="150"></canvas></div>
+        </div>
       </div>
     </div>
 
     <!-- ██ VMs ██ -->
     <div class="page" id="page-vms">
-      <div class="tabs" role="tablist" aria-label="Tipo di risorsa">
-        <button type="button" class="tab active" role="tab" aria-selected="true" onclick="VMs.tab('all')">Tutte</button>
-        <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('qemu')">QEMU/KVM</button>
-        <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('lxc')">LXC</button>
-      </div>
-      <div class="flex g12 mb14 ac fw">
-        <div>
-          <div class="fl">Filtra per</div>
-          <input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome o VMID" placeholder="Nome / VMID..." oninput="VMs.filter()" style="width:170px">
+      <div class="toolbar">
+        <div class="seg" role="tablist" aria-label="Tipo di risorsa">
+          <button type="button" class="tab active" role="tab" aria-selected="true" onclick="VMs.tab('all')">Tutte</button>
+          <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('qemu')">QEMU</button>
+          <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="VMs.tab('lxc')">LXC</button>
         </div>
-        <!-- MULTI NODE SELECTOR -->
-        <div>
-          <div class="fl">Nodi</div>
-          <div id="vm-node-sel-wrap" style="position:relative">
-            <button class="inp" onclick="VMs.toggleNodePicker()" id="vm-node-btn" style="cursor:pointer;min-width:130px;text-align:left;width:100%">Tutti i nodi ▾</button>
-            <div id="vm-node-picker" style="display:none;position:absolute;top:100%;left:0;z-index:50;min-width:180px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;margin-top:3px;padding:6px 0">
-              <div class="flex g6" style="padding:4px 8px">
-                <button class="btn bg2 sm" onclick="VMs.nodeAll()">Tutti</button>
-                <button class="btn bg2 sm" onclick="VMs.nodeNone()">Nessuno</button>
-              </div>
-              <div id="vm-node-list"></div>
+        <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="text" id="vsearch" aria-label="Cerca VM per nome, VMID o IP" placeholder="Cerca nome, VMID, IP" oninput="VMs.filter()" style="width:220px"></div>
+        <div id="vm-node-sel-wrap" style="position:relative">
+          <button class="inp" onclick="VMs.toggleNodePicker()" id="vm-node-btn" aria-haspopup="true" aria-label="Filtra per nodi" style="cursor:pointer;min-width:130px;text-align:left">Tutti i nodi</button>
+          <div id="vm-node-picker" style="display:none;position:absolute;top:100%;left:0;z-index:50;min-width:190px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;box-shadow:var(--shadow-pop);margin-top:4px;padding:6px 0">
+            <div class="flex g8" style="padding:4px 8px">
+              <button class="btn bg2 sm" onclick="VMs.nodeAll()">Tutti</button>
+              <button class="btn bg2 sm" onclick="VMs.nodeNone()">Nessuno</button>
             </div>
+            <div id="vm-node-list"></div>
           </div>
         </div>
-        <div>
-          <div class="fl">Stato</div>
-          <select class="inp" id="vstatus" aria-label="Filtra per stato" onchange="VMs.filter()">
-            <option value="">Tutti</option><option value="running">Running</option>
-            <option value="stopped">Stopped</option><option value="paused">Paused</option>
-          </select>
-        </div>
-        <div style="margin-top:18px"><button class="btn bg2 sm" onclick="VMs.load()">↻</button></div>
+        <select class="inp" id="vstatus" aria-label="Filtra per stato" onchange="VMs.filter()">
+          <option value="">Tutti gli stati</option><option value="running">In esecuzione</option>
+          <option value="stopped">Ferme</option><option value="paused">In pausa</option>
+        </select>
+        <button class="btn bg2 sm" onclick="VMs.load()" aria-label="Aggiorna la lista"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
+        <span class="sp"></span><span class="tb-sum" id="vm-sum" aria-live="polite"></span>
       </div>
       <div class="tw"><table>
         <thead><tr>
+          <th class="ck"><input type="checkbox" class="chk" id="vca" aria-label="Seleziona tutte le VM visibili" onchange="VMs.pickAll(this)"></th>
           <th class="s" onclick="VMs.sort('type')">Tipo</th>
           <th class="s" onclick="VMs.sort('vmid')">VMID</th>
           <th class="s" onclick="VMs.sort('name')">Nome</th>
@@ -460,12 +689,28 @@ html.catppuccino{
           <th class="s" onclick="VMs.sort('disk')">Disco</th>
           <th>Azioni</th>
         </tr></thead>
-        <tbody id="vmtbody"><tr><td colspan="10" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
+        <tbody id="vmtbody"><tr><td colspan="11" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
       </table></div>
+      <div class="selbar" id="selbar" role="region" aria-label="Azioni sulla selezione" hidden>
+        <span class="sb-n" id="sb-n" aria-live="polite"></span>
+        <span class="sb-h" id="sb-h"></span>
+        <span class="sb-sep" aria-hidden="true"></span>
+        <button type="button" class="btn bsuc sm" onclick="VMs.toBatch('start')">Start</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('shutdown')">Shutdown</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('reboot')">Reboot</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('')">Altre azioni in Batch</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.clearPick()">Deseleziona</button>
+      </div>
     </div>
 
     <!-- ██ PROVISION ██ -->
     <div class="page" id="page-provision">
+      <div class="pv-steps" id="pv-steps" aria-label="Avanzamento">
+        <button type="button" class="pv-step" data-s="1" onclick="Provision.goto(1)">1 · Template</button>
+        <button type="button" class="pv-step" data-s="2" onclick="Provision.goto(2)">2 · VM</button>
+        <button type="button" class="pv-step" data-s="3" onclick="Provision.goto(3)">3 · Rete</button>
+        <button type="button" class="pv-step" data-s="4" onclick="Provision.goto(4)">4 · Esegui</button>
+      </div>
       <div class="g g2 g16">
         <!-- LEFT: template + config -->
         <div>
@@ -478,7 +723,7 @@ html.catppuccino{
                 <option value="">— Seleziona template —</option>
               </select>
             </div>
-            <div id="tpl-info" style="display:none;font-size:11px;color:var(--text2);background:var(--bg3);border-radius:3px;padding:10px;line-height:1.9"></div>
+            <div id="tpl-info" style="display:none;font-size:11px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:10px;line-height:1.9"></div>
           </div>
 
           <h2 class="sec">2. Configurazione VM</h2>
@@ -560,7 +805,7 @@ html.catppuccino{
             <div id="pv-summary" style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.9">
               <span class="td">Configura i parametri e clicca Provisiona.</span>
             </div>
-            <button class="btn ba wf mb12" onclick="Provision.run()" id="pv-btn">▶ Provisiona VM</button>
+            <button class="btn ba wf mb12" onclick="Provision.run()" id="pv-btn">Provisiona VM</button>
             <h2 class="sec">Log provisioning</h2>
             <div class="plog" id="pv-log"><span class="td">In attesa...</span></div>
           </div>
@@ -573,7 +818,7 @@ html.catppuccino{
       <!-- Node chip row -->
       <div class="card" style="padding:8px 12px;flex-shrink:0;margin-bottom:10px">
         <div class="flex ac g8 fw">
-          <span style="font-size:9px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase;flex-shrink:0">Nodi:</span>
+          <span style="font-size:12px;font-weight:500;color:var(--text3);flex-shrink:0">Nodi</span>
           <div id="batch-node-chips" class="flex" style="gap:5px;flex-wrap:wrap;flex:1"></div>
           <button class="btn bg2 sm" onclick="Batch.nodeAll()">Tutti</button>
           <button class="btn bg2 sm" onclick="Batch.nodeNone()">Nessuno</button>
@@ -583,13 +828,13 @@ html.catppuccino{
       <div class="flex g16 batch-cols" style="flex:1;min-height:0">
         <!-- Left: VM list -->
         <div class="flex fc" style="flex:1;min-width:0;gap:8px">
-          <h2 class="sec" style="margin-bottom:0">1. Selezione VM</h2>
+          <h2 class="sec" style="margin-bottom:0">Seleziona le VM</h2>
           <div class="flex g8 ac fw" style="flex-shrink:0">
             <input class="inp" id="bsearch" aria-label="Cerca per nome, IP o VMID" type="text" placeholder="Cerca nome, IP, VMID…" style="flex:2;min-width:160px" oninput="Batch.filterBy()">
             <select class="inp" id="btype" aria-label="Filtra per tipo" style="flex:1;min-width:100px"><option value="">Tutti i tipi</option><option value="qemu">QEMU</option><option value="lxc">LXC</option></select>
             <select class="inp" id="bstatus" aria-label="Filtra per stato" style="flex:1;min-width:130px"><option value="">Tutti gli stati</option><option value="running">Running</option><option value="stopped">Stopped</option></select>
             <label class="flex ac" style="gap:5px;font-size:11px;color:var(--text2);cursor:pointer"><input type="checkbox" id="btpl" onchange="Batch.filterBy()" style="accent-color:var(--amber)">Mostra template</label>
-            <button class="btn bg2 sm" onclick="Batch.selAll()">✓ Tutti</button>
+            <button class="btn bg2 sm" onclick="Batch.selAll()">Tutti</button>
             <button class="btn bg2 sm" onclick="Batch.selNone()">Deseleziona</button>
           </div>
           <div class="tw" style="flex:1;overflow-y:auto;min-height:0"><table>
@@ -607,23 +852,23 @@ html.catppuccino{
         </div>
         <!-- Right: operation + log -->
         <div class="flex fc batch-side">
-          <h2 class="sec" style="margin-bottom:0">2. Operazione</h2>
+          <h2 class="sec" style="margin-bottom:0">Operazione</h2>
           <div class="card" style="flex-shrink:0">
             <div class="fr">
               <label class="fl" for="baction">Azione</label>
-              <select class="inp w" id="baction">
+              <select class="inp w" id="baction" onchange="batchActionChanged()">
                 <optgroup label="Ciclo vita">
-                  <option value="start">▶ Start</option>
-                  <option value="stop">■ Stop (forzato)</option>
-                  <option value="shutdown">◼ Shutdown (graceful)</option>
-                  <option value="reboot">↺ Reboot</option>
-                  <option value="suspend">⏸ Suspend</option>
-                  <option value="resume">⏵ Resume</option>
-                  <option value="reset">⟳ Reset (hard)</option>
+                  <option value="start">Start</option>
+                  <option value="stop">Stop (forzato)</option>
+                  <option value="shutdown">Shutdown (graceful)</option>
+                  <option value="reboot">Reboot</option>
+                  <option value="suspend">Suspend</option>
+                  <option value="resume">Resume</option>
+                  <option value="reset">Reset (hard)</option>
                 </optgroup>
               </select>
             </div>
-            <div id="binfo" class="td mb12" style="font-size:11px">Nessuna VM selezionata</div>
+            <div id="binfo" class="sel-sum">Nessuna VM selezionata</div>
             <button class="btn ba wf" id="brun" onclick="Batch.run()">Esegui operazione batch</button>
           </div>
           <h2 class="sec" style="margin-bottom:0">Log</h2>
@@ -634,68 +879,73 @@ html.catppuccino{
 
     <!-- ██ CLUSTER ██ -->
     <div class="page" id="page-cluster">
-      <div class="g g2 g16">
+      <div class="g g2 g16" style="align-items:start">
         <div>
-          <h2 class="sec">Nodi cluster</h2>
-          <div class="flex g8 mb10">
+          <div class="toolbar">
             <button class="btn bg2 sm" onclick="Cluster.selAll()">Seleziona tutti</button>
             <button class="btn bg2 sm" onclick="Cluster.selNone()">Deseleziona</button>
-            <button class="btn bg2 sm" onclick="Cluster.load()">↻</button>
+            <span class="sp"></span>
+            <button class="btn bg2 sm" onclick="Cluster.load()" aria-label="Aggiorna i nodi del cluster"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
           </div>
           <div id="cnlist"></div>
         </div>
         <div>
-          <h2 class="sec">Operazione nodi selezionati</h2>
-          <div class="card mb14">
-            <div class="fr">
-              <label class="fl" for="ccmd">Comando</label>
-              <select class="inp w" id="ccmd">
-                <option value="reboot">↺ Riavvia nodo</option>
-                <option value="shutdown">◼ Spegni nodo</option>
-              </select>
+          <div class="panel">
+            <div class="panel-h"><h2>Operazione sui nodi selezionati</h2></div>
+            <div class="panel-b">
+              <div class="fr">
+                <label class="fl" for="ccmd">Comando</label>
+                <select class="inp w" id="ccmd">
+                  <option value="reboot">Riavvia nodo</option>
+                  <option value="shutdown">Spegni nodo</option>
+                </select>
+              </div>
+              <div id="csinfo" class="sel-sum">Nessun nodo selezionato</div>
+              <div class="sh-danger" style="margin-top:8px">
+                <p>Riavvio e spegnimento fermano le VM dei nodi scelti. Prima di eseguire ti viene chiesto di confermare scrivendo il nome del nodo.</p>
+                <button class="btn bd" id="crun" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
+              </div>
             </div>
-            <div id="csinfo" class="td mb12" style="font-size:11px">Nessun nodo selezionato</div>
-            <button class="btn bd wf" id="crun" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
           </div>
-          <h2 class="sec">Dettaglio nodo</h2>
-          <div id="cdetail" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:14px;min-height:100px">
-            <span class="td">Clicca su un nodo</span>
+          <div class="panel">
+            <div class="panel-h"><h2>Dettaglio nodo</h2></div>
+            <div class="panel-b" id="cdetail"><span class="td">Clicca su un nodo per vederne i dettagli.</span></div>
           </div>
-          <div class="mt12">
-            <div class="cc"><div class="ct" id="cnchT">Utilizzo nodo</div><canvas id="cCN" height="170"></canvas></div>
-          </div>
+          <div class="cc"><div class="ct" id="cnchT">Utilizzo nodo</div><canvas id="cCN" height="170"></canvas></div>
         </div>
       </div>
     </div>
 
     <!-- ██ REPORTS ██ -->
     <div class="page" id="page-reports">
-      <div class="card mb14">
-        <div class="flex g12 ac fw">
-          <div><label class="fl" for="rtf">Periodo</label>
-            <select class="inp" id="rtf">
-              <option value="hour">Ultima ora</option>
-              <option value="day" selected>Ultimo giorno</option>
-              <option value="week">Ultima settimana</option>
-              <option value="month">Ultimo mese</option>
-              <option value="year">Ultimo anno</option>
-            </select></div>
-          <div><label class="fl" for="rtype">Tipo</label>
-            <select class="inp" id="rtype">
-              <option value="all">Tutte</option><option value="qemu">QEMU</option>
-              <option value="lxc">LXC</option>
-            </select></div>
-          <div><label class="fl" for="rnode">Nodo</label><select class="inp" id="rnode"><option value="">Tutti</option></select></div>
-          <div style="margin-top:18px"><button class="btn ba" onclick="Reports.load()">Genera</button></div>
-          <div style="margin-top:18px"><button class="btn bg2" onclick="Reports.xlsx()">⬇ Excel</button></div>
-        </div>
+      <div class="toolbar">
+        <label class="sr" for="rtf">Periodo</label>
+        <select class="inp" id="rtf">
+          <option value="hour">Ultima ora</option>
+          <option value="day" selected>Ultimo giorno</option>
+          <option value="week">Ultima settimana</option>
+          <option value="month">Ultimo mese</option>
+          <option value="year">Ultimo anno</option>
+        </select>
+        <label class="sr" for="rtype">Tipo</label>
+        <select class="inp" id="rtype">
+          <option value="all">Tutte le risorse</option><option value="qemu">QEMU</option><option value="lxc">LXC</option>
+        </select>
+        <label class="sr" for="rnode">Nodo</label>
+        <select class="inp" id="rnode"><option value="">Tutti i nodi</option></select>
+        <button class="btn ba" onclick="Reports.load()">Genera report</button>
+        <span class="sp"></span>
+        <button class="btn bg2" onclick="Reports.xlsx()"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>Esporta Excel</button>
+      </div>
+      <div class="panel" id="rep-empty"><div class="empty">Imposta periodo, tipo e nodo, poi premi «Genera report»: vedrai medie, picchi e andamento di ogni risorsa.</div></div>
+      <div class="kstrip" id="rep-sum" hidden></div>
+      <div id="rep-body" hidden>
+      <div class="g g2 mb14">
+        <div class="cc"><div class="ct">CPU per risorsa: media e picco</div><canvas id="rcpu" height="190"></canvas></div>
+        <div class="cc"><div class="ct">RAM media per risorsa</div><canvas id="rmem" height="190"></canvas></div>
       </div>
       <div class="g g2 mb14">
-        <div class="cc"><div class="ct">CPU avg per risorsa</div><canvas id="rcpu" height="190"></canvas></div>
-        <div class="cc"><div class="ct">RAM avg per risorsa</div><canvas id="rmem" height="190"></canvas></div>
-      </div>
-      <div class="g g2 mb14">
-        <div class="cc"><div class="ct">Net In nel tempo</div><canvas id="rnet" height="190"></canvas></div>
+        <div class="cc"><div class="ct">Traffico in ingresso nel tempo</div><canvas id="rnet" height="190"></canvas></div>
       </div>
       <h2 class="sec">Dati tabellari</h2>
       <div class="tw"><table>
@@ -709,43 +959,52 @@ html.catppuccino{
           <th class="s" onclick="RepTbl.sort('avgNetIn')">Net In avg</th>
           <th class="s" onclick="RepTbl.sort('avgNetOut')">Net Out avg</th>
         </tr></thead>
-        <tbody id="rtbody"><tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text3)">Genera un report</td></tr></tbody>
+        <tbody id="rtbody"></tbody>
       </table></div>
+      </div>
     </div>
 
     <!-- ██ SETTINGS ██ -->
     <div class="page" id="page-settings">
-      <div class="g g2">
-        <div class="card">
-          <h2 class="sec">Cluster Proxmox</h2>
-          <div style="margin-bottom:10px">
-            <button class="btn ba sm" onclick="ClusterMgr.showAdd()">+ Aggiungi cluster</button>
+      <div class="set">
+        <div class="panel">
+          <div class="panel-h"><h2>Cluster Proxmox</h2><span class="sp" style="flex:1"></span><button class="btn ba sm" onclick="ClusterMgr.showAdd()">Aggiungi cluster</button></div>
+          <div class="panel-b">
+            <div id="cluster-form" style="display:none"></div>
+            <div id="cluster-list"></div>
+            <div id="ctres" style="margin-top:8px;font-size:12px"></div>
           </div>
-          <div id="cluster-form" style="display:none"></div>
-          <div id="cluster-list"></div>
-          <div id="ctres" style="margin-top:8px;font-size:11px"></div>
         </div>
-        <div class="card">
-          <h2 class="sec">Aspetto</h2>
-          <div class="fr">
-            <label class="fl" for="ctheme">Tema</label>
-            <select class="inp w" id="ctheme" onchange="Settings.applyTheme(this.value)">
-              <option value="">Segui sistema operativo</option>
-              <option value="dark">Scuro</option>
-              <option value="light">Chiaro</option>
-              <option value="eva01">Eva 01</option>
-              <option value="catppuccino">Catppuccin</option>
-            </select>
+        <div class="panel">
+          <div class="panel-h"><h2>Aspetto</h2></div>
+          <div class="panel-b">
+            <input type="hidden" id="ctheme" value=""><input type="hidden" id="cdensity" value="">
+            <div class="fl" id="lbl-theme">Tema</div>
+            <div class="tiles" id="theme-tiles" role="group" aria-labelledby="lbl-theme">
+              <button type="button" class="tile" data-v="" onclick="Settings.pickTheme('')"><span class="sw"><i style="background:#0b1424"></i><i style="background:#7fb2ff"></i><i style="background:#eef2f8"></i><i style="background:#1d5fd1"></i></span><b>Automatico</b><span>segue il sistema</span></button>
+              <button type="button" class="tile" data-v="dark" onclick="Settings.pickTheme('dark')"><span class="sw"><i style="background:#0b1424"></i><i style="background:#13213a"></i><i style="background:#7fb2ff"></i><i style="background:#e9eef7"></i></span><b>Notte</b><span>cielo notturno</span></button>
+              <button type="button" class="tile" data-v="light" onclick="Settings.pickTheme('light')"><span class="sw"><i style="background:#eef2f8"></i><i style="background:#ffffff"></i><i style="background:#1d5fd1"></i><i style="background:#0d1b33"></i></span><b>Alba</b><span>chiaro</span></button>
+              <button type="button" class="tile" data-v="eva01" onclick="Settings.pickTheme('eva01')"><span class="sw"><i style="background:#0d0617"></i><i style="background:#261540"></i><i style="background:#7cc443"></i><i style="background:#f0e6ff"></i></span><b>Eva 01</b><span>viola e lime</span></button>
+              <button type="button" class="tile" data-v="catppuccino" onclick="Settings.pickTheme('catppuccino')"><span class="sw"><i style="background:#1e1e2e"></i><i style="background:#313244"></i><i style="background:#fab387"></i><i style="background:#cdd6f4"></i></span><b>Catppuccin</b><span>Mocha</span></button>
+            </div>
+            <div class="fl" id="lbl-dens" style="margin-top:18px">Densità</div>
+            <div class="seg" id="dens-seg" role="group" aria-labelledby="lbl-dens">
+              <button type="button" data-v="" onclick="Settings.pickDensity('')">Comoda</button>
+              <button type="button" data-v="compact" onclick="Settings.pickDensity('compact')">Compatta</button>
+            </div>
+            <div class="hint">La compatta riduce spaziature e altezza delle righe: più VM visibili nelle tabelle. Le scelte si vedono subito; premi Salva per tenerle.</div>
+            <div style="margin-top:16px"><button class="btn ba" onclick="Settings.saveAppearance()">Salva aspetto</button></div>
           </div>
-          <button class="btn ba" onclick="Settings.saveTheme()">Salva tema</button>
         </div>
-        <div class="card">
-          <h2 class="sec">Architettura</h2>
-          <div style="font-size:12px;color:var(--text2);line-height:2.1">
-            <div>🖥 Browser → <span class="ta">localhost:8080</span></div>
-            <div>⚙ Go server → <span class="ta">Proxmox API</span></div>
-            <div class="sep"></div>
-            <div class="td" style="font-size:11px;line-height:1.8">Nessun CORS · TLS self-signed accettato<br>Dati storici via Proxmox RRD (hour/day/week/month/year)</div>
+        <div class="panel">
+          <div class="panel-h"><h2>Informazioni</h2></div>
+          <div class="panel-b">
+            <dl class="dl">
+              <dt>Percorso</dt><dd>Browser → proxy Go → API Proxmox (HTTPS)</dd>
+              <dt>Accesso</dt><dd>API token, custodito solo lato server</dd>
+              <dt>Storico</dt><dd>RRD nativo di Proxmox (ora, giorno, settimana, mese, anno)</dd>
+              <dt>Certificati</dt><dd>self-signed accettati, vedi SECURITY.md</dd>
+            </dl>
           </div>
         </div>
       </div>
@@ -755,10 +1014,20 @@ html.catppuccino{
 </div>
 
 <!-- MODAL VM DETAIL -->
-<div class="ov" id="mov"><div class="modal">
-  <div class="mt" id="movT">VM Detail</div>
-  <div id="movB"></div>
-  <div class="mf"><button class="btn bg2" onclick="closeModal('mov')">Chiudi</button></div>
+<div class="ov sheet" id="mov"><div class="modal">
+  <div class="sh-h">
+    <div><h2 class="mt" id="movT">VM</h2><small id="movS"></small></div>
+    <button type="button" class="btn bg2 sm sh-x" onclick="closeModal('mov')">Chiudi</button>
+  </div>
+  <div class="sh-b" id="movB"></div>
+</div></div>
+
+<!-- RICERCA RAPIDA -->
+<div class="ov pal" id="mpal"><div class="modal">
+  <div class="mt sr">Ricerca rapida</div>
+  <input class="inp pal-in" id="pal-q" type="text" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Cerca VM, nodi, pagine e azioni" autocomplete="off" spellcheck="false" placeholder="Cerca VM, nodi, pagine, azioni…">
+  <div class="pal-list" id="pal-list" role="listbox" aria-label="Risultati"></div>
+  <div class="pal-foot"><kbd>↑</kbd><kbd>↓</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>Esc</kbd> chiudi</div>
 </div></div>
 
 <!-- MODAL DISCO -->
@@ -793,7 +1062,7 @@ html.catppuccino{
     <label class="fl" for="disk-slot">Disco da configurare</label>
     <div class="flex g8">
       <select class="inp w" id="disk-slot"></select>
-      <button class="btn bg2 sm" onclick="DiskMgr.refreshSlots()">↻</button>
+      <button class="btn bg2 sm" onclick="DiskMgr.refreshSlots()" aria-label="Aggiorna gli slot disco"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
     </div>
   </div>
   <div class="g g2 g8 mb12">
@@ -809,7 +1078,7 @@ html.catppuccino{
       </div>
     </div>
   </div>
-  <button class="btn bpurp wf mb12" id="disk-setup-btn" onclick="DiskMgr.setupDisk()">⚙ Configura disco</button>
+  <button class="btn bpurp wf mb12" id="disk-setup-btn" onclick="DiskMgr.setupDisk()">Configura disco</button>
   <div class="hint mb12">Partiziona e formatta il disco scelto (i dati presenti vengono cancellati). Se il disco non viene rilevato, la VM viene spenta e riaccesa: fino a 2 minuti.</div>
 
   <h2 class="sec">Log</h2>
@@ -903,9 +1172,9 @@ function toast(msg,type='info'){
   if(now-(_toastSeen.get(key)||0)<5000) return;
   _toastSeen.set(key,now);
   const d=document.createElement('div'); d.className=`toast ${type}`; d.title='Clic per chiudere';
-  const icon=document.createElement('span'); icon.textContent=type==='ok'?'✓':type==='err'?'✗':'ℹ';
+  const pre=document.createElement('span'); pre.className='sr'; pre.textContent=type==='ok'?'Riuscito: ':type==='err'?'Errore: ':'Info: ';
   const body=document.createElement('span'); body.textContent=text;
-  d.append(icon,body);
+  d.append(pre,body);
   d.addEventListener('click',()=>d.remove());
   document.getElementById('toasts').appendChild(d);
   setTimeout(()=>d.remove(),type==='err'?8000:4500);
@@ -917,7 +1186,7 @@ const _modalStack=[];
 function _syncModals(){
   const top=_modalStack.length?_modalStack[_modalStack.length-1].id:null;
   document.querySelectorAll('.ov').forEach(o=>{o.inert=(o.id!==top);});
-  for(const id of ['sidebar','main','skip-link']){const el=document.getElementById(id);if(el)el.inert=_modalStack.length>0;}
+  for(const id of ['topbar','sidebar','main','skip-link']){const el=document.getElementById(id);if(el)el.inert=_modalStack.length>0;}
 }
 function openModal(id){
   const el=document.getElementById(id); if(!el)return;
@@ -932,6 +1201,7 @@ function openModal(id){
 }
 function closeModal(id){
   const el=document.getElementById(id); if(el)el.classList.remove('open');
+  if(id==='mov'&&location.hash.startsWith('#/vm/'))Route.replace('#/'+App.cur);
   const i=_modalStack.findIndex(m=>m.id===id); if(i<0)return;
   const [m]=_modalStack.splice(i,1); _syncModals();
   if(m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
@@ -939,10 +1209,10 @@ function closeModal(id){
 
 // Riga di errore con "Riprova" per tabelle che non hanno caricato. retry = codice JS statico.
 function errRow(colspan,msg,retry){
-  return `<tr><td colspan="${colspan}" class="errrow">✗ Caricamento non riuscito: ${esc(msg)}<button class="btn bg2 sm" onclick="${retry}">Riprova</button></td></tr>`;
+  return `<tr><td colspan="${colspan}" class="errrow">Caricamento non riuscito: ${esc(msg)}<button class="btn bg2 sm" onclick="${retry}">Riprova</button></td></tr>`;
 }
 function errBox(msg,retry){
-  return `<div class="errrow">✗ Caricamento non riuscito: ${esc(msg)}<button class="btn bg2 sm" onclick="${retry}">Riprova</button></div>`;
+  return `<div class="errrow">Caricamento non riuscito: ${esc(msg)}<button class="btn bg2 sm" onclick="${retry}">Riprova</button></div>`;
 }
 
 // Conferma a livelli.
@@ -1056,11 +1326,29 @@ document.addEventListener('click',e=>{
 
 // Formatting
 function fmtB(b){if(!b)return'0 B';const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return b.toFixed(1)+' '+u[i];}
+// Misuratore in stile dashboard: etichetta e valore sopra, barra con soglia a 85% (stessi colori di stato).
+function meter(label,val,off){
+  const v=Math.min(100,Math.max(0,Math.round(val||0))), c=v>=85?' r':v>=Dashboard.WARN?' w':'';
+  return `<div class="rb"><div class="rl"><span>${esc(label)}</span><b>${off?'—':v+'%'}</b></div><div class="track" role="img" aria-label="${esc(label)}: ${off?'non disponibile':v+'%'}">${off?'':`<div class="range${c}" style="width:${v}%"></div><div class="now" style="left:${v}%"></div>`}</div></div>`;
+}
+// Il bottone di esecuzione segue la gravita' dell'azione scelta (rosso pieno solo per le azioni "danger").
+function batchActionChanged(){
+  const a=VM_ACTIONS[document.getElementById('baction').value], b=document.getElementById('brun');
+  b.classList.toggle('bx',!!a&&a.level==='danger'); b.classList.toggle('ba',!(a&&a.level==='danger'));
+}
+// Stato di un nodo: una sola definizione per Panoramica, Nodi e Cluster (colore + parola non devono mai divergere).
+function nodeState(o){
+  if(!o.online)return{cls:'off',word:'Non risponde'};
+  if(o.mem>=Dashboard.CRIT)return{cls:'warn',word:'RAM alta'};
+  if(o.cpu>=Dashboard.CRIT)return{cls:'warn',word:'CPU alta'};
+  if(o.disk>=Dashboard.CRIT)return{cls:'warn',word:'Disco quasi pieno'};
+  return{cls:'ok',word:'Operativo'};
+}
 function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
-function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:9px;color:var(--text3);margin-top:1px">${p}%</div>`;}
+function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:1px">${p}%</div>`;}
 function sbadge(s){const m={running:'br',stopped:'bs',paused:'bp'};return `<span class="badge ${m[s]||'bs'}">${esc(s||'?')}</span>`;}
 function tbadge(t){if(t==='qemu')return`<span class="badge bq">QEMU</span>`;if(t==='lxc')return`<span class="badge bl">LXC</span>`;if(t==='node')return`<span class="badge bn">NODE</span>`;if(t==='tmpl')return`<span class="badge bt">TPL</span>`;return`<span class="badge">${esc(t)}</span>`;}
-function nodeCell(v){const b=v.cluster_label&&v.cluster_label!==ClusterMgr.currentLabel()?`<span class="badge bn" style="font-size:9px;margin-right:4px">${esc(v.cluster_label)}</span>`:'';return`${b}<span class="td">${esc(v.node)}</span>`;}
+function nodeCell(v){const b=v.cluster_label&&v.cluster_label!==ClusterMgr.currentLabel()?`<span class="badge bn" style="font-size:11px;margin-right:4px">${esc(v.cluster_label)}</span>`:'';return`${b}<span class="td">${esc(v.node)}</span>`;}
 // Stesso criterio di GetTemplates lato backend: flag template=1 o nome che contiene "template".
 function isTemplate(v){return v.template===1||v.template==='1'||/template/i.test(v.name||'');}
 // Riga di log testuale (mai HTML) in un contenitore .plog
@@ -1099,7 +1387,7 @@ async function mkChart(id,cfg){
   const c=document.getElementById(id); if(!c)return;
   _ch[id]=new Chart(c,cfg); describeChart(id,_ch[id]); return _ch[id];
 }
-const CD={responsive:true,animation:{duration:window.matchMedia('(prefers-reduced-motion:reduce)').matches?0:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'JetBrains Mono',size:10}}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:9}},beginAtZero:true}}};
+const CD={responsive:true,animation:{duration:window.matchMedia('(prefers-reduced-motion:reduce)').matches?0:350},plugins:{legend:{labels:{color:'#94a3b8',font:{family:'Inter',size:11},usePointStyle:true,boxWidth:8,boxHeight:8}}},scales:{x:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:10},maxTicksLimit:8}},y:{grid:{color:'#2a3040'},ticks:{color:'#64748b',font:{size:10}},beginAtZero:true}}};
 // Colori dai token del tema attivo: le serie dei grafici non hanno copie letterali.
 function tk(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 function tka(name,a){const h=tk(name).replace('#','');const n=h.length===3?h.replace(/./g,'$&$&'):h;return `rgba(${parseInt(n.slice(0,2),16)},${parseInt(n.slice(2,4),16)},${parseInt(n.slice(4,6),16)},${a})`;}
@@ -1191,32 +1479,28 @@ const ClusterMgr={
     if(!list)return;
     if(!this.clusters.length){list.innerHTML='<div class="td" style="font-size:12px;padding:8px 0">Nessun cluster configurato</div>';return;}
     list.innerHTML=this.clusters.map((c,i)=>`
-      <div style="border:1px solid var(--border);border-radius:4px;padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="color:${c.default?'var(--amber)':'var(--text3)'}">${c.default?'★':'☆'}</span>
-          <strong style="font-size:13px">${esc(c.label)}</strong>
-          <span class="td" style="font-size:11px;flex:1">${esc(c.url)}</span>
-          <span class="td" style="font-size:10px;font-family:var(--mono)">${esc(c.api_token_hint)}</span>
-        </div>
-        <div style="display:flex;gap:6px">
+      <div class="cl-row">
+        <strong>${esc(c.label)}</strong>${c.default?'<span class="badge bn">Predefinito</span>':''}
+        <span class="cl-u">${esc(c.url)}</span><span class="cl-u tm">${esc(c.api_token_hint)}</span>
+        <div class="cl-a">
           <button class="btn bg2 sm" onclick="ClusterMgr.testCluster(${i})">Test</button>
           <button class="btn bg2 sm" onclick="ClusterMgr.showEdit(${i})">Modifica</button>
-          ${!c.default?`<button class="btn bg2 sm" onclick="ClusterMgr.setDefault(${i})">Default</button>`:''}
+          ${!c.default?`<button class="btn bg2 sm" onclick="ClusterMgr.setDefault(${i})">Imposta predefinito</button>`:''}
           ${this.clusters.length>1?`<button class="btn bd sm" onclick="ClusterMgr.deleteCluster(${i})">Elimina</button>`:''}
         </div>
       </div>`).join('');
   },
   _form(idx){
     const c=idx>=0?this.clusters[idx]:null;
-    return`<div style="border:1px solid var(--amber-dim);border-radius:4px;padding:12px;margin-bottom:10px">
+    return`<div style="border:1px solid var(--amber-dim);border-radius:10px;padding:12px;margin-bottom:10px">
       <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-label">Label</label><input class="inp w" id="cf-label" type="text" value="${esc(c?c.label:'')}" placeholder="Prod"></div>
       <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-url">URL Proxmox</label><input class="inp w" id="cf-url" type="text" value="${esc(c?c.url:'')}" placeholder="https://10.0.0.1:8006"></div>
       <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-token">API Token${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-token" type="text" value="" placeholder="${esc(c?c.api_token_hint:'root@pam!id=...')}"></div>
       <div style="margin:10px 0 8px;padding-top:10px;border-top:1px solid var(--border)">
-        <div class="fl" style="color:var(--text2);letter-spacing:.1em;margin-bottom:4px">CONSOLE SERIALE <span class="td" style="font-size:9px;font-weight:400">— opzionale</span></div>
-        <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Richiesto per la funzione Console. Proxmox non accetta API token per WebSocket.${c&&c.has_console_credentials?' <span style="color:var(--green)">✓ Credenziali configurate</span>':''} ${idx>=0?' Lascia vuoti per mantenere, svuota username per rimuovere.':''}</div>
+        <div class="fl" style="color:var(--text2);margin-bottom:4px">Console seriale <span class="td" style="font-size:11px;font-weight:400">— opzionale</span></div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Richiesto per la funzione Console. Proxmox non accetta API token per WebSocket.${c&&c.has_console_credentials?' <span style="color:var(--green)">Credenziali configurate</span>':''} ${idx>=0?' Lascia vuoti per mantenere, svuota username per rimuovere.':''}</div>
       </div>
-      <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-user">Username <span class="td" style="font-size:9px">(es. root@pam)</span></label><input class="inp w" id="cf-user" type="text" placeholder="root@pam"></div>
+      <div class="fr" style="margin-bottom:8px"><label class="fl" for="cf-user">Username <span class="td" style="font-size:11px">(es. root@pam)</span></label><input class="inp w" id="cf-user" type="text" placeholder="root@pam"></div>
       <div class="fr" style="margin-bottom:10px"><label class="fl" for="cf-pwd">Password${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-pwd" type="password" placeholder="••••••••"></div>
       <div class="fr" style="margin-bottom:10px"><label class="fl" for="cf-default">Default</label><input type="checkbox" id="cf-default" ${c&&c.default?'checked':''}></div>
       <div style="display:flex;gap:6px">
@@ -1285,10 +1569,10 @@ const ClusterMgr={
     if(res)res.innerHTML='<span class="td">Test...</span>';
     try{
       await fetch(`/api/clusters/${idx}/test`,{method:'POST',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
-      if(res)res.innerHTML='<span class="tg">✓ Connessione OK</span>';
+      if(res)res.innerHTML='<span class="tg">Connessione OK</span>';
       toast(`${this.clusters[idx]?.label||'Cluster'}: OK`,'ok');
     }catch(e){
-      if(res)res.innerHTML=`<span class="tr">✗ ${esc(e.message)}</span>`;
+      if(res)res.innerHTML=`<span class="tr">${esc(e.message)}</span>`;
       toast(`Test fallito: ${e.message}`,'err');
     }
   }
@@ -1297,21 +1581,47 @@ const ClusterMgr={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:['DASHBOARD','OVERVIEW'],nodes:['NODI','MONITORAGGIO'],vms:['VM & CONTAINER','GESTIONE'],provision:['NUOVA VM','PROVISIONING'],batch:['BATCH','OPERAZIONI'],cluster:['CLUSTER','GESTIONE NODI'],reports:['REPORT','ANALYTICS'],settings:['IMPOSTAZIONI','CONFIG']};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',reports:'Report',settings:'Impostazioni'};
+// Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
+// Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
+const Route={
+  parse(h){
+    const m=/^#\/([a-z]+)$/.exec(h||'');
+    if(m&&Object.prototype.hasOwnProperty.call(PMETA,m[1]))return{page:m[1]};
+    const v=/^#\/vm\/([A-Za-z0-9._-]{1,64})\/(\d{1,9})\/(qemu|lxc)$/.exec(h||'');
+    return v?{page:'vms',vm:{node:v[1],vmid:v[2],type:v[3]}}:null;
+  },
+  push(h){if(location.hash!==h)history.pushState(null,'',h);},
+  replace(h){if(location.hash!==h)history.replaceState(null,'',h);},
+  apply(){
+    const r=Route.parse(location.hash)||{page:'dashboard'};
+    if(r.vm){App.nav('vms',{silent:true});VMs.detail(r.vm.node,r.vm.vmid,r.vm.type);return;}
+    if(document.getElementById('mov').classList.contains('open'))closeModal('mov');
+    App.nav(r.page,{silent:true}); Route.replace('#/'+r.page);
+  }
+};
+window.addEventListener('popstate',()=>Route.apply());
 const App={
   cur:'dashboard',
   init(){
     document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
-    ClusterMgr.load().then(()=>{Settings.load();App.nav('dashboard');App.checkConn();setInterval(App.checkConn,30000);});
+    ClusterMgr.load().then(()=>{Settings.load();Route.apply();App.checkConn();setInterval(App.checkConn,30000);});
   },
-  nav(p){
+  nav(p,opts={}){
     document.querySelectorAll('.ni').forEach(el=>{const on=el.dataset.page===p;el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+p));
-    const[t,b]=PMETA[p]||[p.toUpperCase(),''];
-    document.getElementById('ptitle').textContent=t; document.getElementById('pbadge').textContent=b;
-    App.cur=p; App.refresh();
+    document.getElementById('ptitle').textContent=PMETA[p]||p;
+    App.cur=p; if(!opts.silent)Route.push('#/'+p);
+    App.refresh();
+  },
+  // Briciole: il cluster compare solo se c'è un solo cluster (con più cluster lo mostra già il selettore).
+  crumb(){
+    const one=ClusterMgr.clusters.length<=1;
+    document.getElementById('crumb-cluster').textContent=one?(ClusterMgr.currentLabel()||''):'';
+    document.getElementById('crumb-sep').style.display=one&&ClusterMgr.currentLabel()?'':'none';
   },
   refresh(){
+    App.crumb();
     const p=App.cur;
     if(p==='dashboard') Dashboard.load();
     if(p==='nodes')     Nodes.load();
@@ -1331,113 +1641,425 @@ const App={
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// DASHBOARD TABLE SORTER
+// RICERCA RAPIDA (Ctrl/⌘ K): pagine, azioni, nodi e VM. Tutto il testo entra nel DOM con textContent.
 // ════════════════════════════════════════════════════════════════════════════
-let _dashVMs=[];
-const DashTbl=(()=>{
-  const S=mkSorter('dtbody','dtbl');
-  let data=[];
-  return {
-    // Ordine iniziale: prima le VM in esecuzione, i template in fondo, poi per VMID. Le intestazioni ordinano come prima.
-    setData(d){
-      const rank=v=>(isTemplate(v)?2:v.status==='running'?0:1);
-      data=[...d].sort((a,b)=>rank(a)-rank(b)||(a.vmid||0)-(b.vmid||0));
-      DashTbl.renderWith(data);
-    },
-    sort(k){DashTbl.renderWith(S.sort(data,k));},
-    renderWith(d){
-      document.getElementById('dtbody').innerHTML=d.map(v=>{
-        const diskCell=v.type==='qemu'
-          ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:10px">···</span>')
-          :bar(pct(v.disk,v.maxdisk));
-        return `<tr>
-        <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid||'-')}</td>
-        <td class="tn"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></td><td>${nodeCell(v)}</td>
-        <td>${sbadge(v.status)}</td>
-        <td>${v.cpu?(v.cpu*100).toFixed(1)+'%':'—'}</td>
-        <td id="${esc(`dmem-${v.node}-${v.vmid}`)}">${bar(pct(v.mem,v.maxmem))}</td>
-        <td id="${esc(`ddk-${v.node}-${v.vmid}`)}">${diskCell}</td>
-      </tr>`;}).join('')||'<tr><td colspan="8" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
+const Palette={
+  sel:0, shown:[], data:null, loading:false, failed:false,
+  isOpen(){return document.getElementById('mpal').classList.contains('open');},
+  init(){
+    const mac=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'');
+    document.getElementById('pal-kbd').textContent=mac?'⌘ K':'Ctrl K';
+    const q=document.getElementById('pal-q');
+    q.addEventListener('input',()=>{Palette.sel=0;Palette.render();});
+    q.addEventListener('keydown',e=>{
+      if(e.key==='ArrowDown'){e.preventDefault();Palette.move(1);}
+      else if(e.key==='ArrowUp'){e.preventDefault();Palette.move(-1);}
+      else if(e.key==='Enter'){e.preventDefault();Palette.run(Palette.sel);}
+    });
+    // clic sullo sfondo chiude il pannello laterale e la ricerca
+    document.querySelectorAll('.ov.sheet,.ov.pal').forEach(o=>o.addEventListener('mousedown',e=>{if(e.target===o)closeModal(o.id);}));
+    document.addEventListener('keydown',e=>{
+      if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey&&e.key.toLowerCase()==='k'){
+        e.preventDefault();
+        if(Palette.isOpen())closeModal('mpal'); else Palette.open();
+      }
+    });
+  },
+  open(){
+    // non si sovrappone a conferme o altri dialoghi aperti
+    if(_modalStack.length&&!Palette.isOpen())return;
+    const q=document.getElementById('pal-q'); q.value=''; Palette.sel=0;
+    openModal('mpal'); Palette.render(); Palette.load(); q.focus();
+  },
+  async load(){
+    if(Palette.loading)return;
+    Palette.loading=true; Palette.failed=false;
+    try{
+      const list=await apiCached('/vms',60000);
+      const nodes=[],vms=[];
+      for(const nd of (Array.isArray(list)?list:[])){
+        nodes.push(nd.node);
+        for(const v of nd.vms||[])vms.push({...v,type:'qemu',node:nd.node});
+        for(const v of nd.lxcs||[])vms.push({...v,type:'lxc',node:nd.node});
+      }
+      Palette.data={nodes,vms:vms.filter(v=>!isTemplate(v))};
+    }catch(e){Palette.failed=true;Palette.data={nodes:[],vms:[]};}
+    Palette.loading=false;
+    if(Palette.isOpen())Palette.render();
+  },
+  base(){
+    const KW={dashboard:'home panoramica stato salute',nodes:'nodi server host hardware',vms:'virtual machine container lxc qemu kvm',
+      provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',
+      reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
+    const items=Object.entries(PMETA).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
+    items.push({group:'Azioni',label:'Aggiorna i dati',sub:'',run:()=>App.refresh()});
+    for(const c of ClusterMgr.clusters.filter(c=>c.idx!==ClusterMgr.current)){
+      items.push({group:'Azioni',label:`Passa al cluster ${c.label}`,sub:'',run:()=>{document.getElementById('cluster-select').value=c.idx;ClusterMgr.switchTo(c.idx);}});
     }
-  };
-})();
-
-// /cluster/resources riporta mem = RSS del processo KVM lato host (tende a ~100%
-// appena il guest tocca tutte le pagine). status/current corregge con free_mem
-// dal balloon/guest-agent → uso reale. Patch progressiva della cella RAM%.
-async function loadDashMem(vms){
-  const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
-  await pool(running,6,async v=>{
-    // in caso di errore resta il valore da cluster/resources
-    const r=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/status`).catch(()=>null);
-    const s=r?.status;
-    if(!s||!s.maxmem)return;
-    v.mem=s.mem; v.maxmem=s.maxmem;
-    const el=document.getElementById(`dmem-${v.node}-${v.vmid}`);
-    if(el)el.innerHTML=bar(pct(s.mem,s.maxmem));
-  });
-}
-
-async function loadDashFsinfo(vms){
-  const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
-  await pool(running,6,async v=>{
-    // VM senza guest agent → cella "—" con tooltip, nessun toast
-    let fs=[], fsErr='';
-    try{fs=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`);}catch(e){fsErr=e.message;}
-    const el=document.getElementById(`ddk-${v.node}-${v.vmid}`);
-    if(el&&fsErr) el.title=`Guest agent non disponibile: ${fsErr}`;
-    if(Array.isArray(fs)&&fs.length){
-      const root=fs.find(f=>f.mountpoint==='/')||fs[0];
-      if(root){
-        const used=root['used-bytes']||0,total=root['total-bytes']||root['disk-size']||0;
-        v.diskPct=total?Math.round(used/total*100):null;
-        if(el)el.innerHTML=v.diskPct!=null?bar(v.diskPct):'—';
-        return;
+    return items;
+  },
+  items(q){
+    const toks=q.toLowerCase().split(/\s+/).filter(Boolean);
+    const d=Palette.data||{nodes:[],vms:[]};
+    const nodes=d.nodes.map(n=>({group:'Nodi',label:n,sub:'',run:()=>Dashboard.openNode(n)}));
+    const vms=d.vms.map(v=>({group:'VM e container',label:v.name||`VM ${v.vmid}`,sub:`${v.vmid} · ${v.ip||'senza IP'} · ${v.node}`,vm:v,
+      run:()=>VMs.detail(v.node,v.vmid,v.type)}));
+    const all=[...Palette.base(),...nodes,...vms];
+    if(!toks.length)return all.filter(i=>i.group==='Pagine'||i.group==='Azioni');
+    const hit=all.filter(i=>{const h=(i.label+' '+i.sub+' '+(i.kw||'')+' '+(i.vm?i.vm.type:'')).toLowerCase();return toks.every(t=>h.includes(t));});
+    const order=['Pagine','Azioni','Nodi','VM e container'];
+    hit.sort((a,b)=>(a.label.toLowerCase().startsWith(toks[0])?0:1)-(b.label.toLowerCase().startsWith(toks[0])?0:1)||order.indexOf(a.group)-order.indexOf(b.group));
+    return hit.slice(0,40);
+  },
+  render(){
+    const list=document.getElementById('pal-list'), q=document.getElementById('pal-q').value;
+    const items=Palette.items(q);
+    // raggruppa mantenendo l'ordine di ricerca: l'indice selezionabile segue l'ordine visivo
+    const groups=[]; for(const it of items){let g=groups.find(x=>x.name===it.group);if(!g){g={name:it.group,items:[]};groups.push(g);}g.items.push(it);}
+    Palette.shown=groups.flatMap(g=>g.items);
+    if(Palette.sel>=Palette.shown.length)Palette.sel=0;
+    list.replaceChildren();
+    let i=0;
+    for(const g of groups){
+      const h=document.createElement('div'); h.className='pal-grp'; h.setAttribute('role','presentation'); h.textContent=g.name; list.append(h);
+      for(const it of g.items){
+        const idx=i++, o=document.createElement('div');
+        o.className='pal-o'; o.id=`pal-o-${idx}`; o.setAttribute('role','option'); o.setAttribute('aria-selected',idx===Palette.sel?'true':'false');
+        if(it.vm){
+          const dot=document.createElement('i'); const run=it.vm.status==='running';
+          dot.className='vd s2'+(run?'':' x'); dot.title=run?'in esecuzione':(it.vm.status||'ferma'); o.append(dot);
+        }
+        const l=document.createElement('span'); l.className='pl'; l.textContent=it.label; o.append(l);
+        if(it.sub){const s=document.createElement('span'); s.className='ps'; s.textContent=it.sub; o.append(s);}
+        o.addEventListener('click',()=>Palette.run(idx));
+        o.addEventListener('mousemove',()=>{if(Palette.sel!==idx)Palette.select(idx);});
+        list.append(o);
       }
     }
-    v.diskPct=null;
-    if(el)el.innerHTML='—';
-  });
-}
+    if(!Palette.shown.length){const e=document.createElement('div');e.className='pal-empty';e.textContent=Palette.loading?'Caricamento di VM e nodi…':'Nessun risultato.';list.append(e);}
+    else if(Palette.loading&&q){const e=document.createElement('div');e.className='pal-empty';e.textContent='Caricamento di VM e nodi…';list.append(e);}
+    if(Palette.failed){const e=document.createElement('div');e.className='pal-empty';e.textContent='VM e nodi non caricati: restano disponibili pagine e azioni.';list.append(e);}
+    document.getElementById('pal-q').setAttribute('aria-activedescendant',Palette.shown.length?`pal-o-${Palette.sel}`:'');
+  },
+  select(idx){
+    Palette.sel=idx;
+    document.querySelectorAll('#pal-list .pal-o').forEach((o,i)=>o.setAttribute('aria-selected',i===idx?'true':'false'));
+    document.getElementById('pal-q').setAttribute('aria-activedescendant',`pal-o-${idx}`);
+    document.getElementById(`pal-o-${idx}`)?.scrollIntoView({block:'nearest'});
+  },
+  move(d){
+    const n=Palette.shown.length; if(!n)return;
+    Palette.select((Palette.sel+d+n)%n);
+  },
+  run(idx){
+    const it=Palette.shown[idx]; if(!it)return;
+    closeModal('mpal');
+    it.run();
+  }
+};
 
 // ════════════════════════════════════════════════════════════════════════════
-// DASHBOARD
+// DASHBOARD — "Bollettino": una frase di condizione, i numeri sotto, i nodi come barre min–max 24h
 // ════════════════════════════════════════════════════════════════════════════
 const Dashboard={
+  CRIT:85,                                   // % oltre cui un valore è critico (stessa soglia di bar())
+  WARN:65,                                   // % oltre cui un valore chiede attenzione
+  DAY_S:24*3600,
+  // Glifi meteo (viewBox 48): stessa serie per la condizione della panoramica e per le righe della Top 10.
+  ICONS:{
+      ok:'<circle cx="24" cy="24" r="8"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11.3 11.3l3.5 3.5M33.2 33.2l3.5 3.5M11.3 36.7l3.5-3.5M33.2 14.8l3.5-3.5"/>',
+      warn:'<circle cx="17" cy="17" r="6"/><path d="M17 4v3M5 17h3M8.5 8.5l2 2M25.5 8.5l-2 2"/><path d="M16 40h19a7 7 0 0 0 .6-14 10 10 0 0 0-19.2 2.5A6 6 0 0 0 16 40z"/>',
+      bad:'<path d="M14 32h20a7 7 0 0 0 .6-14 10 10 0 0 0-19.2 2.5A6 6 0 0 0 14 32z"/><path d="M25 33l-5 8h7l-4 7"/>'
+    },
+  topHours:6, _topSeq:0,
+  _seq:0,                                    // scarta le risposte di un caricamento superato da uno più recente
+
   async load(){
+    const seq=++Dashboard._seq;
     let d;
     try{d=await api('/dashboard',{quiet:true});}
     catch(e){
+      if(seq!==Dashboard._seq)return;
+      document.getElementById('dash-cond').innerHTML='';
+      document.getElementById('dash-nodes').innerHTML='';
       document.getElementById('dash-kpis').innerHTML=`<div style="grid-column:1/-1">${errBox(e.message+' — verifica il cluster in Impostazioni','Dashboard.load()')}</div>`;
-      document.getElementById('dtbody').innerHTML=errRow(8,e.message,'Dashboard.load()');
+      document.getElementById('dash-top').innerHTML='';
+      document.getElementById('dash-tasks').innerHTML='';
       return;
     }
+    if(seq!==Dashboard._seq)return;
     const res=d.resources||[];
-    const vms=res.filter(r=>r.type==='qemu'||r.type==='lxc');
-    const nodes=res.filter(r=>r.type==='node');
-    const running=vms.filter(v=>v.status==='running').length;
-    const cpuA=nodes.length?(nodes.reduce((s,n)=>s+(n.cpu||0),0)/nodes.length*100).toFixed(1):0;
-    const memA=nodes.length?(nodes.reduce((s,n)=>s+pct(n.mem,n.maxmem),0)/nodes.length).toFixed(1):0;
-    const tDisk=nodes.reduce((s,n)=>s+(n.maxdisk||0),0), uDisk=nodes.reduce((s,n)=>s+(n.disk||0),0);
-    document.getElementById('dash-kpis').innerHTML=`
-      <div class="card"><div class="card-t">VM Totali</div><div class="card-v a">${vms.length}</div><div class="card-s">QEMU:${vms.filter(v=>v.type==='qemu').length} · LXC:${vms.filter(v=>v.type==='lxc').length}</div></div>
-      <div class="card"><div class="card-t">Running</div><div class="card-v g">${running}</div><div class="card-s">Ferme: ${vms.length-running}</div></div>
-      <div class="card"><div class="card-t">CPU avg</div><div class="card-v ${cpuA>80?'r':cpuA>60?'w':''}">${cpuA}%</div><div class="card-s">${nodes.length} nodi</div></div>
-      <div class="card"><div class="card-t">RAM avg / Storage</div><div class="card-v ${memA>80?'r':memA>60?'w':''}">${memA}%</div><div class="card-s">${fmtB(uDisk)} / ${fmtB(tDisk)}</div></div>`;
-    DashTbl.setData(vms);
-    loadDashMem(vms);
-    loadDashFsinfo(vms);
-    Dashboard.charts();
+    const vms=res.filter(r=>(r.type==='qemu'||r.type==='lxc'));
+    const nodes=res.filter(r=>r.type==='node').sort((a,b)=>String(a.node).localeCompare(String(b.node),undefined,{numeric:true,sensitivity:'base'}));
+    const live=vms.filter(v=>!isTemplate(v));
+    // Prima passata con i soli dati istantanei, poi si completa con RRD e task senza bloccare la tabella.
+    const stats=Dashboard.nodeStats(nodes,live);
+    Dashboard.paintCondition(stats,[]);
+    Dashboard.paintKpis(stats,live,null,null);
+    Dashboard.paintNodes(stats);
+    Dashboard.loadTop();
+    const [metrics,tasks]=await Promise.all([
+      api('/metrics?timeframe=day',{quiet:true}).catch(()=>null),
+      api('/tasks',{quiet:true}).catch(()=>null),
+      Dashboard.loadRanges(stats),
+    ]);
+    if(seq!==Dashboard._seq)return;
+    const list=Array.isArray(tasks)?tasks:null;
+    Dashboard.paintCondition(stats,list||[]);
+    Dashboard.paintKpis(stats,live,Array.isArray(metrics)?metrics:null,list);
+    Dashboard.paintNodes(stats);
+    Dashboard.paintTasks(list);
   },
-  async charts(){
-    const cutoff=Math.floor(Date.now()/1000)-6*3600;
-    const m=await api(`/metrics?timeframe=day`,{quiet:true}).catch(()=>[]);
-    if(!m||!m.length)return;
-    const pts=m.filter(x=>x.ts>=cutoff).sort((a,b)=>a.ts-b.ts);
-    if(!pts.length)return;
-    const labels=pts.map(x=>new Date(x.ts*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
-    mkChart('cCpu',{type:'line',data:{labels,datasets:[{label:'CPU %',data:pts.map(x=>(x.avg_cpu*100).toFixed(1)),...ser('--amber',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
-    mkChart('cMem',{type:'line',data:{labels,datasets:[{label:'RAM %',data:pts.map(x=>(x.avg_mem*100).toFixed(1)),...ser('--blue',.08),tension:.3,pointRadius:0,fill:true}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,max:100}}}});
+
+  // Una riga di statistica per nodo. Percentuali intere; online = Proxmox riporta status "online".
+  nodeStats(nodes,vms){
+    return nodes.map(n=>{
+      const mine=vms.filter(v=>v.node===n.node);
+      return{
+        name:n.node, online:n.status==='online',
+        cpu:Math.round((n.cpu||0)*100), mem:pct(n.mem,n.maxmem), disk:pct(n.disk,n.maxdisk), maxmem:n.maxmem||0,
+        vms:mine.sort((a,b)=>(a.vmid||0)-(b.vmid||0)),
+        running:mine.filter(v=>v.status==='running').length,
+        cpuR:null, memR:null,                // [min,max] nelle ultime 24h, da RRD
+        cpuSince:null, memSince:null,        // da quando il valore è oltre la soglia critica
+      };
+    });
+  },
+
+  // RRD del giorno per ogni nodo online, con concorrenza limitata e cache breve.
+  async loadRanges(stats){
+    await pool(stats.filter(s=>s.online),4,async s=>{
+      const rrd=await apiCached(`/nodes/${encodeURIComponent(s.name)}/rrd?timeframe=day`,60000).catch(()=>null);
+      if(!Array.isArray(rrd))return;
+      const cutoff=Math.floor(Date.now()/1000)-Dashboard.DAY_S;
+      const pts=rrd.filter(p=>p&&p.time>=cutoff).sort((a,b)=>a.time-b.time);
+      const cpu=pts.filter(p=>p.cpu!=null).map(p=>({t:p.time,v:p.cpu*100}));
+      const mem=pts.filter(p=>p.memused!=null&&p.memtotal).map(p=>({t:p.time,v:p.memused/p.memtotal*100}));
+      const range=a=>a.length?[Math.round(Math.min(...a.map(x=>x.v))),Math.round(Math.max(...a.map(x=>x.v)))]:null;
+      s.cpuR=range(cpu); s.memR=range(mem);
+      s.cpuSince=Dashboard.since(cpu); s.memSince=Dashboard.since(mem);
+    });
+  },
+  // Istante da cui la serie sta (senza interruzioni) sopra la soglia critica; null se l'ultimo valore è sotto.
+  since(series){
+    if(!series.length||series[series.length-1].v<Dashboard.CRIT)return null;
+    let i=series.length-1;
+    while(i>0&&series[i-1].v>=Dashboard.CRIT)i--;
+    return series[i].t;
+  },
+
+  hhmm(ts){
+    const d=new Date(ts*1000), today=new Date();
+    const t=d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    return d.toDateString()===today.toDateString()?t:d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'})+' '+t;
+  },
+  plural(n,one,many){return n===1?one:many;},
+  failedTasks(tasks){
+    const cutoff=Math.floor(Date.now()/1000)-Dashboard.DAY_S;
+    return tasks.filter(t=>t.starttime>=cutoff&&t.endtime&&t.status&&t.status!=='OK'&&!String(t.status).startsWith('WARNINGS'));
+  },
+
+  // La frase riassume, non sostituisce: ogni voce rimanda a un numero che si legge sotto.
+  paintCondition(stats,tasks){
+    const total=stats.length, on=stats.filter(s=>s.online).length;
+    const down=stats.filter(s=>!s.online);
+    const hot=[];
+    for(const s of stats.filter(x=>x.online)){
+      if(s.mem>=Dashboard.CRIT)hot.push({s,what:'RAM',val:s.mem,since:s.memSince});
+      if(s.cpu>=Dashboard.CRIT)hot.push({s,what:'CPU',val:s.cpu,since:s.cpuSince});
+    }
+    const failed=Dashboard.failedTasks(tasks);
+    const level=down.length?'bad':(hot.length||failed.length)?'warn':'ok';
+    const nodesTxt=total===1?'1 nodo operativo':`${on} nodi operativi`;
+    const title=level==='bad'?`Attenzione · ${on} su ${total} nodi operativi`:level==='warn'?`Quasi sereno · ${nodesTxt}`:`Sereno · ${nodesTxt}`;
+    const parts=[];
+    if(down.length)parts.push(`<span class="bad">${esc(down.map(s=>s.name).join(', '))} ${down.length===1?'non risponde':'non rispondono'}</span>`);
+    for(const h of hot)parts.push(`<span class="wrn">${esc(h.s.name)}: ${h.what} al ${h.val}%${h.since?' da '+esc(Dashboard.hhmm(h.since)):''}</span>`);
+    if(failed.length)parts.push(`<span class="wrn">${failed.length} ${Dashboard.plural(failed.length,'task fallito','task falliti')} nelle ultime 24 h</span>`);
+    const run=stats.reduce((a,s)=>a+s.running,0);
+    const sub=parts.length?parts.join(' · '):`Nessuna anomalia nelle ultime 24 ore · ${run} VM in esecuzione`;
+    document.getElementById('dash-cond').innerHTML=`
+      <svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg>
+      <div><h2>${esc(title)}</h2><p>${sub}</p></div>`;
+  },
+
+  spark(points,cls){
+    if(!points||points.length<2)return'';
+    const lo=Math.min(...points), hi=Math.max(...points), span=(hi-lo)||1;
+    const d=points.map((v,i)=>`${(i/(points.length-1)*200).toFixed(1)},${(26-(v-lo)/span*22-2).toFixed(1)}`).join(' ');
+    return`<svg viewBox="0 0 200 28" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline class="spark ${cls||''}" points="${d}"/></svg>`;
+  },
+  bars(tasks){
+    const now=Math.floor(Date.now()/1000), B=12, W=Dashboard.DAY_S/B, counts=Array(B).fill(0), errs=Array(B).fill(false);
+    for(const t of tasks){
+      const age=now-t.starttime; if(age<0||age>=Dashboard.DAY_S)continue;
+      const i=B-1-Math.floor(age/W); counts[i]++;
+      if(t.endtime&&t.status&&t.status!=='OK'&&!String(t.status).startsWith('WARNINGS'))errs[i]=true;
+    }
+    const mx=Math.max(1,...counts);
+    return`<svg viewBox="0 0 200 28" preserveAspectRatio="none" aria-hidden="true" focusable="false">${counts.map((c,i)=>{const h=c?Math.max(3,c/mx*24):1;return`<rect class="sparkbar${errs[i]?' e':''}" x="${(i*16.6+1).toFixed(1)}" width="13" y="${(27-h).toFixed(1)}" height="${h.toFixed(1)}" rx="2"/>`;}).join('')}</svg>`;
+  },
+
+  paintKpis(stats,vms,metrics,tasks){
+    const running=vms.filter(v=>v.status==='running').length;
+    const on=stats.filter(s=>s.online);
+    const avg=k=>on.length?Math.round(on.reduce((a,s)=>a+s[k],0)/on.length):0;
+    const cpu=avg('cpu'), mem=avg('mem');
+    const pts=metrics&&metrics.length?[...metrics].sort((a,b)=>a.ts-b.ts):null;
+    const cls=v=>v>=Dashboard.CRIT?'r':v>=65?'w':'';
+    const day=tasks?tasks.filter(t=>t.starttime>=Math.floor(Date.now()/1000)-Dashboard.DAY_S):null;
+    const failed=tasks?Dashboard.failedTasks(tasks).length:0;
+    document.getElementById('dash-kpis').innerHTML=`
+      <div class="kcell"><div class="kl">VM in esecuzione</div><div class="kv">${running} <small>/ ${vms.length}</small></div><div class="ks">QEMU ${vms.filter(v=>v.type==='qemu').length} · LXC ${vms.filter(v=>v.type==='lxc').length} · ferme ${vms.length-running}</div></div>
+      <div class="kcell"><div class="kl">CPU del cluster</div><div class="kv ${cls(cpu)}">${cpu}<small>%</small></div>${pts?Dashboard.spark(pts.map(p=>p.avg_cpu*100)):'<div class="ks">storico non disponibile</div>'}</div>
+      <div class="kcell"><div class="kl">RAM del cluster</div><div class="kv ${cls(mem)}">${mem}<small>%</small></div>${pts?Dashboard.spark(pts.map(p=>p.avg_mem*100),mem>=65?'w':''):'<div class="ks">storico non disponibile</div>'}</div>
+      <div class="kcell"><div class="kl">Task nelle ultime 24 h</div><div class="kv ${failed?'w':''}">${day?day.length:'—'} <small>${day?(failed?`· ${failed} ${Dashboard.plural(failed,'fallito','falliti')}`:'· nessun errore'):''}</small></div>${day?Dashboard.bars(day):''}</div>`;
+  },
+
+  // Righe per nodo: aggiornate sul posto, così a ogni refresh il punto "adesso" scivola al nuovo valore.
+  paintNodes(stats){
+    const host=document.getElementById('dash-nodes');
+    if(!stats.length){host.innerHTML='<div class="act-empty" style="padding:16px 18px">Nessun nodo</div>';return;}
+    const wanted=new Set(stats.map(s=>s.name));
+    for(const row of [...host.querySelectorAll('.nrow')])if(!wanted.has(row.dataset.node))row.remove();
+    stats.forEach((s,i)=>{
+      let row=[...host.querySelectorAll('.nrow')].find(r=>r.dataset.node===s.name);
+      if(!row){
+        row=document.createElement('div'); row.className='nrow'; row.dataset.node=s.name;
+        row.innerHTML=`
+          <div><button type="button" class="nn" data-k="name"></button><span class="nsub" data-k="sub"></span></div>
+          <div><span class="st" data-k="st"></span><span class="nsub" data-k="since"></span></div>
+          <div class="rb"><div class="rl"><span>CPU</span><b></b></div><div class="track" data-k="cpu" role="img"><div class="range"></div><div class="now"></div></div></div>
+          <div class="rb"><div class="rl"><span>RAM</span><b></b></div><div class="track" data-k="mem" role="img"><div class="range"></div><div class="now"></div></div></div>
+          <div class="vdots" data-k="dots"></div>`;
+        row.querySelector('[data-k=name]').addEventListener('click',()=>Dashboard.openNode(s.name));
+        host.append(row);
+      }
+      host.insertBefore(row,host.children[i]||null);
+      Dashboard.paintRow(row,s);
+    });
+  },
+  paintRow(row,s){
+    row.classList.toggle('off',!s.online);
+    const nn=row.querySelector('[data-k=name]'); nn.textContent=s.name; nn.setAttribute('aria-label',`Apri il nodo ${s.name}`);
+    row.querySelector('[data-k=sub]').textContent=`${s.vms.length} VM · ${fmtB(s.maxmem)}`;
+    const ns=nodeState(s);
+    const st=row.querySelector('[data-k=st]');
+    st.className='st '+ns.cls;
+    st.textContent=ns.word;
+    const since=s.online?(s.mem>=Dashboard.CRIT?s.memSince:s.cpu>=Dashboard.CRIT?s.cpuSince:null):null;
+    row.querySelector('[data-k=since]').textContent=since?`da ${Dashboard.hhmm(since)}`:'';
+    for(const [key,label,val,range] of [['cpu','CPU',s.cpu,s.cpuR],['mem','RAM',s.mem,s.memR]]){
+      const track=row.querySelector(`[data-k=${key}]`), rb=track.parentElement;
+      const rng=track.querySelector('.range'), now=track.querySelector('.now');
+      rb.querySelector('b').textContent=s.online?val+'%':'—';
+      if(!s.online){
+        rng.style.display='none'; now.style.display='none';
+        track.setAttribute('aria-label',`${label} ${s.name}: nodo non raggiungibile`);
+        continue;
+      }
+      now.style.display='';
+      now.style.left=Math.min(100,Math.max(0,val))+'%';
+      if(range){
+        rng.style.display='';
+        rng.style.left=range[0]+'%'; rng.style.width=Math.max(0,range[1]-range[0])+'%';
+        rng.className='range'+(range[1]>=Dashboard.CRIT?' r':range[1]>=Dashboard.WARN?' w':'');
+        track.setAttribute('aria-label',`${label} ${s.name}: ora ${val}%, nelle ultime 24 ore da ${range[0]}% a ${range[1]}%`);
+      }else{
+        rng.style.display='none';
+        track.setAttribute('aria-label',`${label} ${s.name}: ora ${val}%, storico non disponibile`);
+      }
+    }
+    // Un punto per VM: pieno = in esecuzione, vuoto = ferma; il diametro segue la RAM assegnata su una scala fissa.
+    const size=b=>{const g=(b||0)/1073741824;return g<=2?1:g<=4?2:g<=8?3:g<=16?4:5;};
+    const dots=row.querySelector('[data-k=dots]');
+    dots.replaceChildren(...s.vms.map(v=>{
+      const i=document.createElement('i');
+      i.className=`vd s${size(v.maxmem)}`+(v.status==='running'&&s.online?'':' x');
+      i.title=`${v.vmid} ${v.name||''} · ${fmtB(v.maxmem)} · ${v.status||'?'}`;
+      return i;
+    }));
+    dots.setAttribute('role','img');
+    dots.setAttribute('aria-label',`${s.running} VM in esecuzione su ${s.vms.length}`);
+  },
+  openNode(name){Nodes.pending=name;App.nav('nodes');},
+
+  // ── Top 10: le VM che hanno lavorato di piu' nelle ultime ore (core usati in media, da /api/top) ──
+  setTopHours(h){
+    if(![6,12,24].includes(h))return;
+    Dashboard.topHours=h;
+    document.querySelectorAll('#top-win button').forEach(b=>{const on=+b.dataset.h===h;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+    Dashboard.loadTop();
+  },
+  async loadTop(){
+    const seq=++Dashboard._topSeq, host=document.getElementById('dash-top'), h=Dashboard.topHours;
+    document.getElementById('top-sub').textContent=`per lavoro svolto nelle ultime ${h} ore`;
+    if(!host.querySelector('table'))host.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo della classifica…</div>';
+    let d;
+    try{d=await api(`/top?hours=${h}`,{quiet:true});}
+    catch(e){if(seq===Dashboard._topSeq)host.innerHTML=errBox(e.message,'Dashboard.loadTop()');return;}
+    if(seq!==Dashboard._topSeq)return;
+    Dashboard.paintTop(d);
+  },
+  topCond(it){
+    if(it.peak_cpu>=Dashboard.CRIT)return{k:'bad',word:'Temporale'};
+    if(it.peak_cpu>=Dashboard.WARN||it.avg_cpu>=50)return{k:'warn',word:'Variabile'};
+    return{k:'ok',word:'Sereno'};
+  },
+  // Andamento della CPU nella finestra: curva su asse 0-100%, soglia critica tratteggiata, punto bianco sul picco.
+  topSpark(it,cond){
+    const v=it.series||[], n=v.length, Y=x=>34-Math.min(100,Math.max(0,x))/100*32;
+    if(!n)return'';
+    const X=i=>n===1?100:i/(n-1)*200;
+    const pts=v.map((x,i)=>`${X(i).toFixed(1)},${Y(x).toFixed(1)}`);
+    const pi=v.indexOf(Math.max(...v)), cls=cond.k==='bad'?'r':cond.k==='warn'?'w':'';
+    return`<div class="spw"><svg viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <line class="thr" x1="0" x2="200" y1="${Y(Dashboard.CRIT).toFixed(1)}" y2="${Y(Dashboard.CRIT).toFixed(1)}"/>
+      <polygon class="sparkarea ${cls}" points="${pts.join(' ')} 200,34 0,34"/><polyline class="spark ${cls}" points="${pts.join(' ')}"/></svg>
+      <i class="pk" style="left:${(X(pi)/2).toFixed(1)}%;top:${(Y(v[pi])/36*100).toFixed(1)}%"></i></div>`;
+  },
+  paintTop(d){
+    const host=document.getElementById('dash-top'), items=(d&&d.items)||[], h=(d&&d.window_hours)||Dashboard.topHours;
+    if(!items.length){host.innerHTML=`<div class="empty">Nessuna VM ha lavorato nelle ultime ${h} ore.</div>`;return;}
+    const f=(x,dg=1)=>Number(x).toLocaleString('it-IT',{maximumFractionDigits:dg});
+    host.innerHTML=`<table class="toptbl"><thead><tr>
+        <th scope="col"><span class="sr">Posizione</span></th><th scope="col">VM</th><th scope="col">Andamento CPU, ultime ${h} h</th>
+        <th scope="col">CPU media</th><th scope="col">Picco</th><th scope="col">RAM</th><th scope="col">Condizione</th></tr></thead><tbody>`+
+      items.map((it,i)=>{
+        const c=Dashboard.topCond(it);
+        const kind=it.type==='lxc'?'LXC':'QEMU';
+        return`<tr>
+          <td class="rk">${i+1}</td>
+          <td class="tn tid"><button type="button" class="nm-btn" aria-label="Apri i dettagli di ${esc(it.name||it.vmid)}" onclick="VMs.detail(${js(it.node)},${js(it.vmid)},${js(it.type)})"><span class="nm" title="${esc(it.name||'—')}">${esc(it.name||'VM '+it.vmid)}</span></button>
+            <span class="nsub">${it.ip?`<span class="tm">${esc(it.ip)}</span> · `:''}${esc(it.node)} · ${kind} ${esc(it.vmid)}</span></td>
+          <td class="tsp" role="img" aria-label="Andamento della CPU di ${esc(it.name||it.vmid)} nelle ultime ${h} ore: media ${f(it.avg_cpu,0)}%, picco ${f(it.peak_cpu,0)}%">${Dashboard.topSpark(it,c)}</td>
+          <td class="tnum"><b>${f(it.avg_cpu,0)}%</b><span>≈ ${f(it.work)} core su ${f(it.cores,0)}</span></td>
+          <td class="tnum"><b>${f(it.peak_cpu,0)}%</b></td>
+          <td>${it.mem_pct>=0?bar(Math.round(it.mem_pct)):'—'}</td>
+          <td><span class="tcond ${c.k}" aria-label="${c.word}" title="Picco ${f(it.peak_cpu,0)}% e media ${f(it.avg_cpu,0)}% della CPU assegnata"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[c.k]}</svg><span class="cw">${c.word}</span></span></td>
+        </tr>`;
+      }).join('')+'</tbody></table>';
+  },
+
+  TASK_LABELS:{qmstart:'Avvio VM',qmstop:'Arresto forzato VM',qmshutdown:'Spegnimento VM',qmreboot:'Riavvio VM',qmreset:'Reset VM',qmsuspend:'Sospensione VM',qmresume:'Ripresa VM',
+    qmclone:'Clone VM',qmigrate:'Migrazione VM',qmsnapshot:'Snapshot VM',qmdelsnapshot:'Eliminazione snapshot',qmrollback:'Ripristino snapshot',qmcreate:'Creazione VM',qmdestroy:'Eliminazione VM',qmresize:'Ridimensionamento disco',
+    vzstart:'Avvio container',vzstop:'Arresto container',vzshutdown:'Spegnimento container',vzreboot:'Riavvio container',vzcreate:'Creazione container',vzdestroy:'Eliminazione container',vzmigrate:'Migrazione container',vzsnapshot:'Snapshot container',
+    vzdump:'Backup',startall:'Avvio all\'accensione',stopall:'Arresto di tutte le VM',srvreload:'Ricarica servizio',aptupdate:'Aggiornamento pacchetti'},
+  paintTasks(tasks){
+    const host=document.getElementById('dash-tasks');
+    if(!tasks){host.innerHTML='<div class="act-empty">Attività non disponibili (permessi o connessione).</div>';return;}
+    const list=[...tasks].sort((a,b)=>b.starttime-a.starttime).slice(0,10);
+    if(!list.length){host.innerHTML='<div class="act-empty">Nessuna attività recente.</div>';return;}
+    host.innerHTML=list.map(t=>{
+      const running=!t.endtime, failed=!running&&t.status&&t.status!=='OK'&&!String(t.status).startsWith('WARNINGS');
+      const cls=running?'run':failed?'err':'';
+      const label=Dashboard.TASK_LABELS[t.type]||String(t.type||'Operazione');
+      const what=t.id?`${/^\d+$/.test(String(t.id))?'VM ':''}${t.id} · `:'';
+      const detail=failed?String(t.status).replace(/^ERROR:\s*/,'').slice(0,120):`${what}${t.node||''}${t.user?' · '+t.user:''}`;
+      return`<div class="task"><span class="sl ${cls}" aria-hidden="true"></span>
+        <div><b>${esc(label)}${failed?' <span class="sr">non riuscito</span>':''}</b><small${failed?' class="e"':''}>${failed?esc(what)+esc(detail):esc(detail)}</small></div>
+        <time>${running?'in corso':esc(Dashboard.hhmm(t.starttime))}</time></div>`;
+    }).join('');
   }
 };
 
@@ -1462,7 +2084,7 @@ const NodeVMs=(()=>{
 })();
 
 const Nodes={
-  data:[], sel:null,
+  data:[], sel:null, pending:null,
   clearCache(){this.data=[];const s=document.getElementById('nfsel');if(s)s.innerHTML='<option value="">Tutti i nodi</option>';},
   async load(){
     let nodes;
@@ -1475,31 +2097,28 @@ const Nodes={
     const ex=[...sel.options].map(o=>o.value);
     for(const n of nodes) if(!ex.includes(n.node)) sel.add(new Option(n.node,n.node));
     Nodes.renderGrid(nodes);
+    if(Nodes.pending){const n=Nodes.pending;Nodes.pending=null;if(nodes.some(x=>x.node===n))Nodes.selNode(n);}
   },
   filter(){const v=document.getElementById('nfsel').value;Nodes.renderGrid(v?Nodes.data.filter(n=>n.node===v):Nodes.data);if(v)Nodes.selNode(v);},
   renderGrid(nodes){
     const g=document.getElementById('ngrid');
     if(!nodes.length){g.innerHTML='<div class="td">Nessun nodo</div>';return;}
     g.innerHTML=nodes.map(n=>{
-      const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem),d=pct(n.disk,n.maxdisk);
-      return`<div class="nd" style="cursor:pointer" role="button" tabindex="0" aria-label="Dettagli nodo ${esc(n.node)}" onclick="Nodes.selNode(${js(n.node)})">
-        <div class="nd-hdr">
-          <div class="nd-name">${esc(n.node)}</div>
-          <span class="badge ${n.status==='online'?'bo':'bf'}">${esc(n.status)}</span>
-          <div style="flex:1"></div>
-          <div style="font-size:9px;color:var(--text3)">${esc(n.maxcpu||0)} CPU · ${fmtB(n.maxmem)}</div>
-        </div>
-        <div class="mg">
-          <div class="mb2"><div class="ml">CPU</div><div class="mv ${c>80?'tr':c>60?'twn':'tg'}">${c}%</div>${bar(c)}</div>
-          <div class="mb2"><div class="ml">RAM</div><div class="mv ${m>80?'tr':m>60?'twn':'tg'}">${m}%</div>${bar(m)}</div>
-          <div class="mb2"><div class="ml">DISK</div><div class="mv ${d>80?'tr':d>60?'twn':'tg'}">${d}%</div>${bar(d)}</div>
-        </div>
-        <div style="margin-top:8px;font-size:9px;color:var(--text3)">Up: ${n.uptime?Math.floor(n.uptime/86400)+'g '+Math.floor((n.uptime%86400)/3600)+'h':'—'}</div>
+      const off=n.status!=='online', c=Math.round((n.cpu||0)*100), m=pct(n.mem,n.maxmem), d=pct(n.disk,n.maxdisk);
+      const ns=nodeState({online:!off,cpu:c,mem:m,disk:d});
+      const up=n.uptime?`${Math.floor(n.uptime/86400)} g ${Math.floor((n.uptime%86400)/3600)} h`:'—';
+      return`<div class="nc${off?' off':''}${Nodes.sel===n.node?' sel':''}" data-node="${esc(n.node)}" role="button" tabindex="0" aria-pressed="${Nodes.sel===n.node}" aria-label="Dettagli nodo ${esc(n.node)}" onclick="Nodes.selNode(${js(n.node)})">
+        <div class="nc-h"><span class="nc-n">${esc(n.node)}</span><span class="st ${ns.cls}">${ns.word}</span>
+          <span class="nc-s">${esc(n.maxcpu||0)} CPU · ${fmtB(n.maxmem)} ${n.uptime?` · attivo da ${up}`:''}</span></div>
+        <div class="nc-m">${meter('CPU',c,off)}${meter('RAM',m,off)}${meter('Disco',d,off)}</div>
       </div>`;
     }).join('');
   },
   async selNode(node){
     Nodes.sel=node; document.getElementById('nfsel').value=node;
+    document.getElementById('nsel-empty').hidden=true; document.getElementById('nsel-area').hidden=false;
+    document.getElementById('nsel-title').textContent=`VM sul nodo ${node}`;
+    document.querySelectorAll('#ngrid .nc').forEach(el=>{const on=el.dataset.node===node;el.classList.toggle('sel',on);el.setAttribute('aria-pressed',on);});
     let all;
     try{all=await api('/vms',{quiet:true});}
     catch(e){document.getElementById('nvtbody').innerHTML=errRow(9,e.message,`Nodes.selNode(${js(node)})`);return;}
@@ -1527,7 +2146,8 @@ const Nodes={
 // ════════════════════════════════════════════════════════════════════════════
 const VMs=(()=>{
   const S=mkSorter('vmtbody','page-vms');
-  let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[];
+  let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[], picked=new Set();
+  const keyOf=v=>`${v.type}:${v.node}:${v.vmid}`;
 
   function allNodes(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
 
@@ -1544,7 +2164,7 @@ const VMs=(()=>{
   function updateBtn(){
     const ns=allNodes();
     document.getElementById('vm-node-btn').textContent=
-      selectedNodes.size===0?'Nessun nodo ▾':selectedNodes.size===ns.length?'Tutti i nodi ▾':`${selectedNodes.size} nodo/i ▾`;
+      selectedNodes.size===0?'Nessun nodo':selectedNodes.size===ns.length?'Tutti i nodi':`${selectedNodes.size} nodo/i`;
   }
 
   function doFilter(){
@@ -1559,30 +2179,45 @@ const VMs=(()=>{
     });
     sortedData=[...filtered];
     renderRows(sortedData);
+    const run=filtered.filter(v=>v.status==='running').length;
+    document.getElementById('vm-sum').textContent=`${filtered.length} ${filtered.length===1?'risorsa':'risorse'} · ${run} in esecuzione · ${filtered.length-run} ${filtered.length-run===1?'ferma':'ferme'}`;
   }
 
   function renderRows(data){
     document.getElementById('vmtbody').innerHTML=data.map(v=>{
       const diskCell=v.type==='qemu'
-        ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:10px">···</span>')
+        ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:12px">···</span>')
         :bar(pct(v.disk,v.maxdisk));
       const n=js(v.node), id=js(v.vmid), t=js(v.type);
       return `<tr>
+      <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
-      <td class="tn" style="cursor:pointer" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></td>
+      <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td>
       <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
       <td id="${esc(`dk-${v.node}-${v.vmid}`)}">${diskCell}</td>
       <td><div class="flex g8">
         ${v.status==='running'
-          ?`<button class="btn bd sm" onclick="VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
+          ?`<button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
              <button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'reboot')">Reboot</button>
-             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">⬛ Console</button>`:''}`:''}`
+             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>`:''}
+             ${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bg2 sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">Console</button>`:''}`
           :`<button class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
-        <button class="btn bg2 sm" onclick="VMs.detail(${n},${id},${t})">Info</button>
       </div></td>
-    </tr>`;}).join('')||'<tr><td colspan="10" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
+    </tr>`;}).join('')||'<tr><td colspan="11" class="empty">Nessuna VM con questi filtri</td></tr>';
+    updateBar();
+  }
+
+  // Barra di selezione: compare con almeno una VM scelta. La selezione sopravvive ai filtri e dichiara le VM nascoste.
+  function updateBar(){
+    const bar=document.getElementById('selbar'); if(!bar)return;
+    bar.hidden=picked.size===0;
+    const vis=new Set(sortedData.map(keyOf)), hidden=[...picked].filter(k=>!vis.has(k)).length;
+    document.getElementById('sb-n').textContent=`${picked.size} ${picked.size===1?'selezionata':'selezionate'}`;
+    document.getElementById('sb-h').textContent=hidden?`${hidden} non ${hidden===1?'visibile':'visibili'} con i filtri attuali`:'';
+    const cb=document.getElementById('vca'), shown=sortedData.filter(v=>picked.has(keyOf(v))).length;
+    cb.checked=sortedData.length>0&&shown===sortedData.length; cb.indeterminate=shown>0&&shown<sortedData.length;
   }
 
   async function loadFsinfo(){
@@ -1608,11 +2243,22 @@ const VMs=(()=>{
   }
 
   return {
-    clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];},
+    clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];picked=new Set();updateBar();},
+    pick(el){el.checked?picked.add(el.value):picked.delete(el.value);updateBar();},
+    pickAll(cb){sortedData.forEach(v=>cb.checked?picked.add(keyOf(v)):picked.delete(keyOf(v)));renderRows(sortedData);},
+    clearPick(){picked.clear();renderRows(sortedData);},
+    hasPick(){return picked.size>0;},
+    // Variante B: la barra non esegue nulla, apre Batch con selezione (e azione) gia' impostate; li' si conferma e si legge il log.
+    toBatch(action){
+      const vms=all.filter(v=>picked.has(keyOf(v)));
+      if(!vms.length)return;
+      Batch.preselect(vms.map(keyOf),{action,tpl:vms.some(isTemplate)});
+      App.nav('batch');
+    },
     async load(){
       let data;
       try{data=await api('/vms',{quiet:true});}
-      catch(e){document.getElementById('vmtbody').innerHTML=errRow(10,e.message,'VMs.load()');return;}
+      catch(e){document.getElementById('vmtbody').innerHTML=errRow(11,e.message,'VMs.load()');return;}
       all=[];
       if(Array.isArray(data)){
         for(const nd of data){
@@ -1620,6 +2266,7 @@ const VMs=(()=>{
           for(const v of (nd.lxcs||[])) all.push({...v,type:'lxc',node:nd.node});
         }
       }
+      picked=new Set([...picked].filter(k=>all.some(v=>keyOf(v)===k)));
       // initialize node selection with all nodes
       const ns=allNodes();
       if(selectedNodes.size===0) ns.forEach(n=>selectedNodes.add(n));
@@ -1661,47 +2308,67 @@ const VMs=(()=>{
       });
     },
     async detail(node,vmid,type){
-      document.getElementById('movT').textContent=`VM ${vmid} — ${node}`;
+      const kind=type==='lxc'?'lxc':'qemu';
+      const v0=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
+      document.getElementById('movT').textContent=v0?.name||`VM ${vmid}`;
+      document.getElementById('movS').textContent=`${kind==='lxc'?'LXC':'QEMU'} · ${vmid} · ${node}`;
       document.getElementById('movB').innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></div>';
+      Route.replace(`#/vm/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${kind}`);
       openModal('mov');
       try{
         const [r, fsinfo] = await Promise.all([
-          // tollerante: per gli LXC questo endpoint QEMU può fallire, il modal resta usabile con le azioni
+          // tollerante: per gli LXC questo endpoint QEMU può fallire, il pannello resta usabile con le azioni
           api(`/nodes/${node}/qemu/${vmid}/status`,{quiet:true}).catch(()=>null),
-          type==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([])
+          kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([])
         ]);
-        const n=js(node), id=js(vmid), t=js(type);
+        const n=js(node), id=js(vmid), t=js(kind);
         const s=r?.status||{},snaps=r?.snapshots||[];
-        const c=((s.cpu||0)*100).toFixed(1),m=pct(s.mem,s.maxmem);
+        if(s.name) document.getElementById('movT').textContent=s.name;
+        const c=Math.round((s.cpu||0)*100),m=pct(s.mem,s.maxmem);
         const fsRows=Array.isArray(fsinfo)&&fsinfo.length
           ? fsinfo.filter(f=>f.mountpoint).map(f=>{
               const used=f['used-bytes']||0, total=f['total-bytes']||f['disk-size']||0;
-              const pctD=total?Math.round(used/total*100):0;
-              return `<div><span class="td">Disco ${esc(f.mountpoint)}:</span> ${bar(pctD)} ${fmtB(used)}/${fmtB(total)}</div>`;
-            }).join('')||`<div><span class="td">Disco:</span> ${fmtB(s.maxdisk||0)}</div>`
-          : `<div><span class="td">Disco:</span> ${fmtB(s.maxdisk||0)} (guest agent non disponibile)</div>`;
+              return `<dt>Disco ${esc(f.mountpoint)}</dt><dd>${bar(total?Math.round(used/total*100):0)}${fmtB(used)} / ${fmtB(total)}</dd>`;
+            }).join('')||`<dt>Disco</dt><dd>${fmtB(s.maxdisk||0)}</dd>`
+          : `<dt>Disco</dt><dd>${fmtB(s.maxdisk||0)} <span class="td">(guest agent non disponibile)</span></dd>`;
+        const st=s.status||v0?.status||'';
+        const canConsole=kind==='qemu'&&r?.config?.serial0&&st==='running'&&ClusterMgr.hasConsole;
+        // Solo le azioni valide per lo stato: una VM ferma non offre spegnimento, una in esecuzione non offre Start.
+        const power=st==='stopped'?[['bsuc','Start','start']]
+          :st==='running'?[['bg2','Shutdown','shutdown'],['bg2','Reboot','reboot']]
+          :st==='paused'?[['bsuc','Riprendi','resume']]
+          :[['bsuc','Start','start'],['bg2','Shutdown','shutdown'],['bg2','Reboot','reboot']];
+        const canForce=st!=='stopped';
         document.getElementById('movB').innerHTML=`
           <div class="mg mb12">
-            <div class="mb2"><div class="ml">Stato</div>${sbadge(s.status)}</div>
-            <div class="mb2"><div class="ml">CPU</div><div class="mv">${c}%</div></div>
-            <div class="mb2"><div class="ml">RAM</div><div class="mv">${m}%</div></div>
+            <div class="mb2"><div class="ml">Stato</div>${sbadge(st)}</div>
+            <div class="mb2"><div class="ml">CPU</div><div class="mv">${c}%</div>${bar(c)}</div>
+            <div class="mb2"><div class="ml">RAM</div><div class="mv">${m}%</div>${bar(m)}</div>
           </div>
-          <div style="font-size:11px;color:var(--text2);line-height:2;margin-bottom:12px">
-            <div><span class="td">Uptime:</span> ${s.uptime?Math.floor(s.uptime/3600)+'h '+Math.floor((s.uptime%3600)/60)+'m':'—'}</div>
-            <div><span class="td">CPU cores:</span> ${esc(s.cpus||'—')} · <span class="td">RAM:</span> ${fmtB(s.maxmem)}</div>
+          <dl class="dl">
+            <dt>Uptime</dt><dd>${s.uptime?Math.floor(s.uptime/3600)+' h '+Math.floor((s.uptime%3600)/60)+' min':'—'}</dd>
+            <dt>CPU</dt><dd>${esc(s.cpus||'—')} core</dd>
+            <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
+            ${v0?.ip?`<dt>IP</dt><dd class="tm">${esc(v0.ip)}</dd>`:''}
             ${fsRows}
-            <div><span class="td">Net:</span> ↓${fmtB(s.netin)}/s · ↑${fmtB(s.netout)}/s</div>
-            ${snaps.length?`<div><span class="td">Snapshot:</span> ${snaps.length}</div>`:''}
+            <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
+            ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
+          </dl>
+          <h3>Alimentazione</h3>
+          <div class="sh-act">
+            ${power.map(([c,l,a])=>`<button class="btn ${c} sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'${a}')">${l}</button>`).join('')}
           </div>
-          <div class="flex g8 fw">
-            <button class="btn bsuc sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'start')">Start</button>
-            <button class="btn bg2 sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
-            <button class="btn bg2 sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'reboot')">Reboot</button>
+          ${kind==='qemu'?`<h3>Strumenti</h3>
+          <div class="sh-act">
+            ${st==='running'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.addUser(${n},${id})">+ Utente</button>`:''}
+            <button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>
+            <button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>
+            ${canConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">Console</button>`:''}
+          </div>`:''}
+          ${canForce?`<div class="sh-danger">
+            <p>Lo stop forzato interrompe subito la VM senza spegnere il sistema operativo: i dati non salvati si perdono.</p>
             <button class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
-            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>`:''}
-            ${type==='qemu'?`<button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>`:''}
-            ${type==='qemu'&&r?.config?.serial0&&s.status==='running'&&ClusterMgr.hasConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">⬛ Console</button>`:''}
-          </div>`;
+          </div>`:''}`;
       }catch(e){document.getElementById('movB').innerHTML=errBox(e.message,`VMs.detail(${js(node)},${js(vmid)},${js(type)})`);}
     },
     snapshot(node,vmid){
@@ -1744,13 +2411,13 @@ const VMs=(()=>{
         const payload={username};
         if(sshKey) payload.ssh_key=sshKey;
         const res=await api(`/nodes/${node}/qemu/${vmid}/adduser`,{method:'POST',body:JSON.stringify(payload)});
-        out.innerHTML=`<pre style="white-space:pre-wrap;font-size:10px;line-height:1.5">${esc(res.output||'')}</pre>`;
-        if(res.exitcode!==0) out.innerHTML+=`<div class="tr mt12">✗ exitcode ${esc(res.exitcode)}</div>`;
+        out.innerHTML=`<pre style="white-space:pre-wrap;font-size:12px;line-height:1.5">${esc(res.output||'')}</pre>`;
+        if(res.exitcode!==0) out.innerHTML+=`<div class="tr mt12">Codice di uscita ${esc(res.exitcode)}</div>`;
         else{
           toast(`Utente ${username} aggiunto alla VM ${vmid}`,'ok');
         }
       }catch(e){
-        out.innerHTML=`<span class="tr">✗ ${esc(e.message)}</span>`;
+        out.innerHTML=`<span class="tr">${esc(e.message)}</span>`;
       }
       ok.disabled=false;
     }
@@ -1985,12 +2652,32 @@ const Provision=(()=>{
     summary(){
       const el=document.getElementById('pv-summary'), g=id=>document.getElementById(id).value.trim();
       const tpl=templates[parseInt(g('tpl-select'))];
+      Provision.steps(tpl,g);
       el.replaceChildren();
       const line=(t,cls)=>{const d=document.createElement('div');if(cls)d.className=cls;d.textContent=t;el.append(d);};
       if(!tpl){line('Seleziona un template, compila i parametri e clicca Provisiona.','td');return;}
       line(`Clona ${tpl.name} (${tpl.vmid}, ${tpl.node}) in ${g('pv-name')||'— nome mancante —'} sul nodo ${g('pv-node')||tpl.node}`);
       line(`VMID ${g('pv-vmid')&&g('pv-vmid')!=='0'?g('pv-vmid'):'automatico'} · ${g('pv-cpu')||'?'} CPU · ${g('pv-ram')||'?'} GB RAM · disco ${g('pv-disk')?g('pv-disk')+' GB':'come il template'}`);
       line(`Rete: ${g('pv-ip')||'IP non impostato'}${g('pv-gw')?' via '+g('pv-gw'):''}`);
+    },
+
+    // Avanzamento: un passo e' completo quando i suoi campi obbligatori sono validi (stessa validazione del nome di run()).
+    steps(tpl,g){
+      const nameOk=/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(g('pv-name'))&&g('pv-name').length<=253;
+      const d1=!!tpl, d2=d1&&nameOk&&!!g('pv-cpu')&&!!g('pv-ram'), d3=d2&&/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(g('pv-ip'));
+      const done=[d1,d2,d3,false], cur=done.findIndex(x=>!x);
+      document.querySelectorAll('#pv-steps .pv-step').forEach((b,i)=>{
+        b.classList.toggle('done',done[i]); b.classList.toggle('cur',i===cur);
+        if(i===cur)b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current');
+        b.querySelector('.sr')?.remove();
+        if(done[i]){const t=document.createElement('span');t.className='sr';t.textContent=' completato';b.append(t);}
+      });
+    },
+    goto(n){
+      const id={1:'tpl-select',2:'pv-name',3:'pv-ip',4:'pv-btn'}[n], el=document.getElementById(id);
+      if(!el)return;
+      el.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+      el.focus({preventScroll:true});
     },
 
     calcGw(){
@@ -2056,7 +2743,7 @@ const Provision=(()=>{
         logLine(log,`✗ Errore: ${e.message}`,'tr');
         toast(`Provisioning non riuscito: ${e.message}`,'err');
       }finally{
-        btn.disabled=false; btn.textContent='▶ Provisiona VM';
+        btn.disabled=false; btn.textContent='Provisiona VM';
       }
     }
   };
@@ -2075,7 +2762,7 @@ const BatchTbl=(()=>{
 })();
 
 const Batch=(()=>{
-  let all=[], filtered=[], sel=new Set(), selNodes=new Set();
+  let all=[], filtered=[], sel=new Set(), selNodes=new Set(), pending=null;
 
   function allNodeList(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
 
@@ -2127,9 +2814,17 @@ const Batch=(()=>{
       }
       const nodes=allNodeList();
       if(selNodes.size===0) nodes.forEach(n=>selNodes.add(n));
+      if(pending){ // selezione arrivata dalla lista VM: si applica dopo l'inizializzazione dei nodi
+        sel=new Set(pending.keys.filter(k=>all.some(v=>keyOf(v)===k)));
+        for(const k of sel)selNodes.add(k.split(':')[1]);
+        if(pending.tpl)document.getElementById('btpl').checked=true;
+        if(pending.action&&VM_ACTIONS[pending.action]){document.getElementById('baction').value=pending.action;batchActionChanged();}
+        pending=null;
+      }
       renderNodeChips(nodes);
       doFilter();
     },
+    preselect(keys,opts={}){pending={keys:[...keys],action:opts.action||'',tpl:!!opts.tpl};},
     clearCache(){all=[];filtered=[];sel=new Set();selNodes=new Set();},
     filterBy(){doFilter();},
     toggleNodeChip(n){
@@ -2157,11 +2852,11 @@ const Batch=(()=>{
     // La selezione sopravvive ai filtri (scelta voluta): le VM selezionate ma non visibili vengono dichiarate.
     updateInfo(){
       const el=document.getElementById('binfo');
-      if(!sel.size){el.textContent='Nessuna VM selezionata';el.className='td mb12';return;}
+      if(!sel.size){el.textContent='Nessuna VM selezionata';el.className='sel-sum';return;}
       const visible=new Set(filtered.map(keyOf));
       const hidden=[...sel].filter(k=>!visible.has(k)).length;
       el.textContent=`${sel.size} VM selezionate`+(hidden?` (${hidden} non visibili con i filtri attuali)`:'');
-      el.className=hidden?'ta mb12':'td mb12';
+      el.className=hidden?'sel-sum ta':'sel-sum';
     },
     run(){
       if(!sel.size){toast('Seleziona almeno una VM','err');return;}
@@ -2223,17 +2918,17 @@ const Cluster={
   },
   render(){
     document.getElementById('cnlist').innerHTML=Cluster.nodes.map(n=>{
-      const c=Math.round((n.cpu||0)*100),m=pct(n.mem,n.maxmem);
-      return`<div class="nd mb8" style="cursor:pointer" onclick="Cluster.selDetail(${js(n.node)})">
-        <div class="flex ac g12 mb8">
-          <input type="checkbox" aria-label="Seleziona nodo ${esc(n.node)}" ${Cluster.sel.has(n.node)?'checked':''}
-            onchange="Cluster.onCheck(event,${js(n.node)})" onclick="event.stopPropagation()" style="accent-color:var(--amber);width:14px;height:14px">
-          <button type="button" class="nd-name" aria-label="Dettagli nodo ${esc(n.node)}">${esc(n.node)}</button>
-          <span class="badge ${n.status==='online'?'bo':'bf'}">${esc(n.status)}</span>
-          <div style="flex:1"></div>
-          <div style="font-size:11px;color:var(--text2)">CPU: <b>${c}%</b> · RAM: <b>${m}%</b></div>
+      const off=n.status!=='online', c=Math.round((n.cpu||0)*100), m=pct(n.mem,n.maxmem), d=pct(n.disk,n.maxdisk);
+      const up=n.uptime?`${Math.floor(n.uptime/86400)} g ${Math.floor((n.uptime%86400)/3600)} h`:'—';
+      const ns=nodeState({online:!off,cpu:c,mem:m,disk:d});
+      return`<div class="nc${off?' off':''}" style="margin-bottom:var(--gap)" onclick="Cluster.selDetail(${js(n.node)})">
+        <div class="nc-h">
+          <input type="checkbox" class="nc-chk" aria-label="Seleziona nodo ${esc(n.node)}" ${Cluster.sel.has(n.node)?'checked':''} onchange="Cluster.onCheck(event,${js(n.node)})" onclick="event.stopPropagation()">
+          <button type="button" class="nc-n" aria-label="Dettagli nodo ${esc(n.node)}">${esc(n.node)}</button>
+          <span class="st ${ns.cls}">${ns.word}</span>
+          <span class="nc-s">${esc(n.maxcpu||'?')} CPU · ${fmtB(n.maxmem)} ${n.uptime?` · attivo da ${up}`:''}</span>
         </div>
-        <div style="font-size:10px;color:var(--text3)">Up: ${n.uptime?Math.floor(n.uptime/3600)+'h':'—'} · Cores: ${esc(n.maxcpu||'?')} · RAM: ${fmtB(n.mem)}/${fmtB(n.maxmem)}</div>
+        <div class="nc-m">${meter('CPU',c,off)}${meter('RAM',m,off)}${meter('Disco',d,off)}</div>
       </div>`;
     }).join('')||'<div class="td">Nessun nodo</div>';
     document.getElementById('csinfo').textContent=Cluster.sel.size>0?`${Cluster.sel.size} nodo/i selezionato/i`:'Nessun nodo selezionato';
@@ -2246,14 +2941,14 @@ const Cluster={
       const r=await api(`/nodes/${node}/status`,{quiet:true});
       const s=r.status||{};
       document.getElementById('cdetail').innerHTML=`
-        <div style="font-family:var(--cond);font-size:17px;font-weight:700;margin-bottom:8px">${esc(node)}</div>
-        <div style="font-size:11px;color:var(--text2);line-height:2">
-          <div><span class="td">PVE:</span> ${esc(s.pveversion||'—')}</div>
-          <div><span class="td">Kernel:</span> ${esc(s.kversion||'—')}</div>
-          <div><span class="td">CPU:</span> ${esc(s.cpuinfo?.model||'—')} (${esc(s.cpuinfo?.cpus||'?')} cores)</div>
-          <div><span class="td">Load:</span> ${esc((s.loadavg||[]).join(' / '))}</div>
-          <div><span class="td">Up:</span> ${s.uptime?Math.floor(s.uptime/86400)+'g '+Math.floor((s.uptime%86400)/3600)+'h':'—'}</div>
-        </div>`;
+        <div style="font-size:15px;font-weight:600;margin-bottom:10px">${esc(node)}</div>
+        <dl class="dl">
+          <dt>Proxmox VE</dt><dd>${esc(s.pveversion||'—')}</dd>
+          <dt>Kernel</dt><dd>${esc(s.kversion||'—')}</dd>
+          <dt>CPU</dt><dd>${esc(s.cpuinfo?.model||'—')} (${esc(s.cpuinfo?.cpus||'?')} core)</dd>
+          <dt>Carico</dt><dd>${esc((s.loadavg||[]).join(' / '))}</dd>
+          <dt>Attivo da</dt><dd>${s.uptime?Math.floor(s.uptime/86400)+' g '+Math.floor((s.uptime%86400)/3600)+' h':'—'}</dd>
+        </dl>`;
       const rrd=await api(`/nodes/${node}/rrd?timeframe=hour`,{quiet:true}).catch(()=>[]);
       if(Array.isArray(rrd)&&rrd.length){
         const labels=rrd.map(p=>new Date(p.time*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
@@ -2361,19 +3056,25 @@ const Reports={
     if(node) url+=`&node=${encodeURIComponent(node)}`;
     let data;
     try{data=await api(url,{quiet:true});}
-    catch(e){document.getElementById('rtbody').innerHTML=errRow(8,e.message,'Reports.load()');return;}
+    catch(e){document.getElementById('rep-empty').hidden=true;document.getElementById('rep-body').hidden=false;document.getElementById('rtbody').innerHTML=errRow(8,e.message,'Reports.load()');return;}
     Reports.data=Array.isArray(data)?data:[];
     if(!Reports.data.length){toast('Nessun dato nel periodo','info');return;}
     const agg=Reports.agg();
     RepTbl.setData(agg);
+    const mean=k=>agg.reduce((x,r)=>x+r[k],0)/agg.length, top=agg.reduce((m,r)=>r.maxCpu>m.maxCpu?r:m,agg[0]);
+    document.getElementById('rep-sum').hidden=false; document.getElementById('rep-body').hidden=false; document.getElementById('rep-empty').hidden=true;
+    document.getElementById('rep-sum').innerHTML=`
+      <div class="kcell"><div class="kl">Risorse analizzate</div><div class="kv">${agg.length}</div></div>
+      <div class="kcell"><div class="kl">CPU media</div><div class="kv">${mean('avgCpu').toFixed(1)}<small>%</small></div></div>
+      <div class="kcell"><div class="kl">Picco CPU</div><div class="kv ${top.maxCpu>=Dashboard.CRIT?'r':top.maxCpu>=Dashboard.WARN?'w':''}">${top.maxCpu.toFixed(0)}<small>%</small></div><div class="ks">${esc(top.name||'—')} · ${esc(top.node)}</div></div>
+      <div class="kcell"><div class="kl">RAM media</div><div class="kv">${mean('avgMem').toFixed(1)}<small>%</small></div></div>`;
     const labels=agg.slice(0,15).map(r=>r.name||`VM${r.vmid}`);
     const a15=agg.slice(0,15);
-    const cols=seriesCols();
-    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU avg %',data:a15.map(r=>r.avgCpu.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc'),_cols:true},{label:'CPU max %',data:a15.map(r=>r.maxCpu.toFixed(1)),type:'line',...ser('--red',0),borderWidth:1.5,pointRadius:3}]},options:{...CD,indexAxis:'y'}});
-    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM avg %',data:a15.map(r=>r.avgMem.toFixed(1)),backgroundColor:labels.map((_,i)=>cols[i%cols.length]+'cc'),_cols:true}]},options:{...CD,indexAxis:'y'}});
+    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU media %',data:a15.map(r=>r.avgCpu.toFixed(1)),...ser('--accent',.75),borderWidth:0},{label:'CPU picco %',data:a15.map(r=>r.maxCpu.toFixed(1)),...ser('--accent',.3),borderWidth:1}]},options:{...CD,indexAxis:'y',scales:{...CD.scales,x:{...CD.scales.x,max:100}}}});
+    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM media %',data:a15.map(r=>r.avgMem.toFixed(1)),...ser('--accent',.75),borderWidth:0}]},options:{...CD,indexAxis:'y',scales:{...CD.scales,x:{...CD.scales.x,max:100}}}});
     const byH={};for(const m of Reports.data){const h=Math.floor(m.ts/3600)*3600;if(!byH[h])byH[h]=0;byH[h]+=m.avg_netin;}
     const hours=Object.keys(byH).sort(); // NB: non chiamarla `tk`, oscura la funzione dei colori
-    mkChart('rnet',{type:'line',data:{labels:hours.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Net In (B/s)',data:hours.map(t=>byH[t]),...ser('--green',.1),fill:true,tension:.3,pointRadius:0}]},options:CD});
+    mkChart('rnet',{type:'line',data:{labels:hours.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Ingresso',data:hours.map(t=>byH[t]),...ser('--accent',.1),fill:true,tension:.3,pointRadius:0}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>fmtB(v)+'/s'}}}}});
   },
   async xlsx(){
     if(!Reports.data.length){toast('Nessun dato','err');return;}
@@ -2422,6 +3123,7 @@ function applyTheme(t){
   CD.scales.y.grid.color=grid; CD.scales.y.ticks.color=tick;
   recolorCharts();
 }
+function applyDensity(d){document.documentElement.classList.toggle('compact',d==='compact');}
 window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>{
   const sel=document.getElementById('ctheme');
   if(!sel||!sel.value) applyTheme('');
@@ -2431,15 +3133,25 @@ const Settings={
   async load(){
     await ClusterMgr.renderList();
     const cfg=await api('/config',{quiet:true}).catch(()=>null); if(!cfg)return;
-    const t=cfg.theme||'';
+    const t=cfg.theme||'', d=cfg.density||'';
     document.getElementById('ctheme').value=t;
-    applyTheme(t);
+    document.getElementById('cdensity').value=d;
+    applyTheme(t); applyDensity(d); Settings.syncAppearance();
   },
   applyTheme(t){applyTheme(t);},
-  async saveTheme(){
-    const t=document.getElementById('ctheme').value;
-    await api('/config',{method:'POST',body:JSON.stringify({theme:t})});
-    applyTheme(t); toast('Tema salvato','ok');
+  applyDensity(d){applyDensity(d);},
+  // Tessere e controllo segmentato: lo stato sta in due campi nascosti, letti da saveAppearance().
+  pickTheme(t){document.getElementById('ctheme').value=t;applyTheme(t);Settings.syncAppearance();},
+  pickDensity(d){document.getElementById('cdensity').value=d;applyDensity(d);Settings.syncAppearance();},
+  syncAppearance(){
+    const t=document.getElementById('ctheme').value, d=document.getElementById('cdensity').value;
+    document.querySelectorAll('#theme-tiles .tile').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===t));
+    document.querySelectorAll('#dens-seg button').forEach(b=>{const on=b.dataset.v===d;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+  },
+  async saveAppearance(){
+    const t=document.getElementById('ctheme').value, d=document.getElementById('cdensity').value;
+    await api('/config',{method:'POST',body:JSON.stringify({theme:t,density:d})});
+    applyTheme(t); applyDensity(d); toast('Aspetto salvato','ok');
   }
 };
 
@@ -2469,18 +3181,18 @@ const ConsolePage = {
                 display:flex;align-items:center;padding:0 16px;gap:12px;
             ">
                 <span id="con-title" style="
-                    font-family:'Barlow Condensed',sans-serif;
-                    font-size:17px;font-weight:700;
-                    color:var(--amber);letter-spacing:.05em;
+                    font-family:var(--sans);
+                    font-size:14px;font-weight:600;
+                    color:var(--amber);
                 ">CONSOLE</span>
-                <span id="con-sub" style="font-size:10px;color:var(--text3)"></span>
+                <span id="con-sub" style="font-size:12px;color:var(--text3)"></span>
                 <div style="flex:1"></div>
                 <button onclick="window.close()" style="
                     background:transparent;border:1px solid var(--border2);
-                    color:var(--text2);padding:3px 10px;border-radius:3px;
+                    color:var(--text2);padding:3px 10px;border-radius:8px;
                     cursor:pointer;font-family:'JetBrains Mono',monospace;
-                    font-size:11px;text-transform:uppercase;
-                ">✕ Chiudi</button>
+                    font-size:11px;
+                ">Chiudi</button>
             </div>
             <div id="con-term" style="
                 position:relative;flex:1;min-height:0;min-width:0;
@@ -2616,6 +3328,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     A11y.init();
+    Palette.init();
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!_modalStack.length&&App.cur==='vms'&&VMs.hasPick())VMs.clearPick();});
     Provision.bind();
     Drawer.init();
     App.init();

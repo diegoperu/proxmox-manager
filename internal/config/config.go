@@ -19,6 +19,7 @@ type ClusterConfig struct {
 type Config struct {
 	Clusters     []ClusterConfig `json:"clusters"`
 	Theme        string          `json:"theme"`
+	Density      string          `json:"density"`
 	CacheSeconds int             `json:"cache_seconds"`
 	DBPath       string          `json:"db_path"`
 	ListenAddr   string          `json:"listen_addr"`
@@ -28,6 +29,20 @@ var (
 	current Config
 	mu      sync.RWMutex
 )
+
+// Allowed values for the appearance preferences. The empty string means "default":
+// theme follows the OS, density is comfortable. Whitelists live here so that the
+// HTTP handler (on save) and the page renderer (on injection) cannot drift apart.
+var (
+	themes    = map[string]bool{"dark": true, "light": true, "eva01": true, "catppuccino": true}
+	densities = map[string]bool{"compact": true}
+)
+
+// ValidTheme reports whether t is "" or a known theme.
+func ValidTheme(t string) bool { return t == "" || themes[t] }
+
+// ValidDensity reports whether d is "" or a known density.
+func ValidDensity(d string) bool { return d == "" || densities[d] }
 
 const cfgPath = "config.json"
 
