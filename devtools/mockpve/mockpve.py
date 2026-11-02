@@ -49,6 +49,7 @@ NAMES = ["web-lab", "db-test", "ci-runner", "gitea", "nextcloud", "grafana", "pr
          "wiki", "monitor", "proxy", "ldap", "redis-cache", "minio", "registry", "build-arm"]
 
 VMS = []
+CFG_EDITS = {}  # vmid -> {chiave: valore|None}: le uniche scritture accettate (config QEMU e spegnimento), solo in memoria
 vmid = 100
 for node in NODES:
     n = {"datacloud-node-1": 12, "datacloud-node-2": 14, "datacloud-node-3": 12, "datacloud-node-4": 6}[node]
@@ -253,6 +254,9 @@ def route(path):
                 if seg[0] == "qemu" and v["vmid"] % 19 == 0: cfg["hostpci0"] = "0000:02:00"                       # diretta sulla stessa A100 del mapping: doppione
                 if seg[0] == "qemu" and v["vmid"] % 23 == 0: cfg["hostpci0"] = "0000:7a:00"                       # scheda inesistente sul nodo
                 if seg[0] == "qemu" and v["vmid"] % 17 == 0: cfg["hostpci0"] = "0000:03:00.0"                 # NIC, non e' una GPU
+                for k, val in CFG_EDITS.get(v["vmid"], {}).items():
+                    if val is None: cfg.pop(k, None)
+                    else: cfg[k] = val
                 cfg["digest"] = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:40]  # come Proxmox: cambia se cambia il config
                 return cfg
             if seg[2] == "agent" and seg[3] == "network-get-interfaces":
@@ -318,8 +322,34 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
             return
-        self.send_error(405, "anteprima in sola lettura")
+        parts = path[len("/api2/json"):].strip("/").split("/")
+        n = int(self.headers.get("Content-Length", "0") or 0)
+        form = parse_qs(self.rfile.read(min(n, 65536)).decode()) if n else {}
+        # config QEMU: PUT /nodes/{n}/qemu/{id}/config (con digest, come Proxmox)
+        if self.command == "PUT" and len(parts) == 5 and parts[0] == "nodes" and parts[2] == "qemu" and parts[4] == "config" and parts[3].isdigit():
+            vmid = int(parts[3]); cur = route("/" + "/".join(parts))
+            if cur is None: return self.send_error(404)
+            if form.get("digest", [""])[0] != cur["digest"]:
+                return self._json({"data": None, "message": "detected modified configuration - file changed by other user? Try again"}, 500)
+            ed = CFG_EDITS.setdefault(vmid, {})
+            for k, val in form.items():
+                if k == "digest": continue
+                if k == "delete":
+                    for d in val[0].split(","): ed[d] = None
+                else: ed[k] = val[0]
+            return self._json({"data": None}, 200)
+        # spegnimento: POST /nodes/{n}/qemu/{id}/status/{shutdown|stop}
+        if self.command == "POST" and len(parts) == 6 and parts[2] == "qemu" and parts[4] == "status" and parts[5] in ("shutdown", "stop") and parts[3].isdigit():
+            for v in VMS:
+                if v["vmid"] == int(parts[3]): v["status"] = "stopped"
+            return self._json({"data": "UPID:mock:0000"}, 200)
+        self.send_error(405, "anteprima in sola lettura (tranne config QEMU e spegnimento, solo in memoria)")
     do_PUT = do_DELETE = do_POST
+
+    def _json(self, obj, code):
+        body = json.dumps(obj).encode()
+        self.send_response(code); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
 
 ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
