@@ -76,6 +76,9 @@ func (c *Client) Login() error {
 	return nil
 }
 
+// maxResponseBytes: limite alla risposta letta da Proxmox (una lista cluster molto grande resta ben sotto).
+const maxResponseBytes = 32 << 20
+
 func (c *Client) doRequest(method, path string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, c.BaseURL+"/api2/json"+path, body)
 	if err != nil {
@@ -97,9 +100,13 @@ func (c *Client) doRequest(method, path string, body io.Reader) ([]byte, error) 
 		return nil, fmt.Errorf("%s %s: %w", method, path, err)
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
+	// Tetto alla risposta: un guest o un server compromesso non deve poter riempire la memoria del proxy.
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(b) > maxResponseBytes {
+		return nil, fmt.Errorf("risposta di Proxmox troppo grande (oltre %d MiB) su %s", maxResponseBytes>>20, path)
 	}
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("proxmox %d on %s: %s", resp.StatusCode, path, string(b))
@@ -322,6 +329,10 @@ func (c *Client) AgentExec(node string, vmid int, args []string) (json.RawMessag
 		v.Add("command", a)
 	}
 	return c.Post(fmt.Sprintf("/nodes/%s/qemu/%d/agent/exec", node, vmid), v)
+}
+
+func (c *Client) GetVMOSInfo(node string, vmid int) (json.RawMessage, error) {
+	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/get-osinfo", node, vmid))
 }
 
 func (c *Client) AgentExecStatus(node string, vmid, pid int) (json.RawMessage, error) {

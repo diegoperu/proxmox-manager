@@ -289,7 +289,7 @@ func TestGuestToolProbeAndRun(t *testing.T) {
 // Gli script embedded sono la sorgente unica di helper e fallback inline: devono
 // esistere, essere script veri e non contenere segnaposto né dati di richiesta.
 func TestEmbeddedGuestScripts(t *testing.T) {
-	for name, src := range map[string]string{"adduser.sh": addUserScriptSrc, "disk.sh": diskScriptSrc} {
+	for name, src := range map[string]string{"adduser.sh": addUserScriptSrc, "disk.sh": diskScriptSrc, "dmesg.sh": dmesgScriptSrc} {
 		if !strings.HasPrefix(src, "#!/bin/sh\n") {
 			t.Errorf("%s: manca lo shebang #!/bin/sh", name)
 		}
@@ -306,9 +306,20 @@ func TestEmbeddedGuestScripts(t *testing.T) {
 			t.Errorf("adduser.sh: manca %q", must)
 		}
 	}
+	// dmesg.sh: sola lettura, argomenti solo da whitelist (100|300|1000, all|warn), exit 2/3 documentati
+	for _, must := range []string{"100|300|1000)", "all)", "warn)", "exit 2", "exit 3", "tail -n"} {
+		if !strings.Contains(dmesgScriptSrc, must) {
+			t.Errorf("dmesg.sh: manca %q", must)
+		}
+	}
+	for _, write := range []string{" > /", ">>", "rm ", "tee ", "dmesg -c", "dmesg -C", "dmesg --clear", "--console-"} {
+		if strings.Contains(dmesgScriptSrc, write) {
+			t.Errorf("dmesg.sh deve essere a sola lettura, trovato %q", write)
+		}
+	}
 	// nessuna riga che mandi una variabile della richiesta a una shell/eval
 	for _, bad := range []string{"eval ", "sh -c \"$", "bash -c"} {
-		if strings.Contains(addUserScriptSrc, bad) || strings.Contains(diskScriptSrc, bad) {
+		if strings.Contains(addUserScriptSrc, bad) || strings.Contains(diskScriptSrc, bad) || strings.Contains(dmesgScriptSrc, bad) {
 			t.Errorf("script embedded contiene il pattern pericoloso %q", bad)
 		}
 	}

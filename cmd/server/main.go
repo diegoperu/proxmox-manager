@@ -58,6 +58,7 @@ func main() {
 
 	// API
 	r.Route("/api", func(r chi.Router) {
+		r.Use(apiGuard)
 		r.Get("/config", h.GetConfig)
 		r.Post("/config", h.SaveConfig)
 		r.Post("/config/test", h.TestConnection)
@@ -81,6 +82,8 @@ func main() {
 		r.Get("/nodes/{node}/qemu/{vmid}/status", h.GetVMStatus)
 		r.Get("/nodes/{node}/qemu/{vmid}/rrd", h.GetVMRRD)
 		r.Get("/nodes/{node}/qemu/{vmid}/fsinfo", h.GetVMFSInfo)
+		r.Get("/nodes/{node}/qemu/{vmid}/osinfo", h.GetVMOSInfo)
+		r.Post("/nodes/{node}/qemu/{vmid}/dmesg", h.VMDmesg)
 		r.Post("/nodes/{node}/qemu/{vmid}/action/{action}", h.VMAction)
 		r.Post("/nodes/{node}/qemu/{vmid}/snapshot", h.VMSnapshot)
 		r.Post("/nodes/{node}/qemu/{vmid}/migrate", h.VMMigrate)

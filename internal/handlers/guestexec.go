@@ -56,7 +56,7 @@ func runGuestArgv(c agentExecer, node string, vmid int, argv []string, timeout t
 		PID int `json:"pid"`
 	}
 	if err := json.Unmarshal(raw, &started); err != nil || started.PID == 0 {
-		log.Printf("guest agent: risposta inattesa a exec su %s/%d: %s", node, vmid, string(raw))
+		log.Printf("guest agent: risposta inattesa a exec su %s/%d (%d byte): %.200q", node, vmid, len(raw), string(raw))
 		return guestResult{}, fmt.Errorf("risposta inattesa del guest agent")
 	}
 
@@ -197,6 +197,9 @@ var addUserScriptSrc string
 //go:embed guestscripts/disk.sh
 var diskScriptSrc string
 
+//go:embed guestscripts/dmesg.sh
+var dmesgScriptSrc string
+
 const guestHelperDir = "/usr/local/libexec/pmgr"
 
 // guestTool describes one script: helper file name and the embedded inline fallback.
@@ -208,6 +211,7 @@ type guestTool struct {
 var (
 	addUserTool = guestTool{name: "adduser.sh", inline: addUserScriptSrc}
 	diskTool    = guestTool{name: "disk.sh", inline: diskScriptSrc}
+	dmesgTool   = guestTool{name: "dmesg.sh", inline: dmesgScriptSrc}
 )
 
 func (t guestTool) helperPath() string { return guestHelperDir + "/" + t.name }

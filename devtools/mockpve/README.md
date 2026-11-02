@@ -3,7 +3,7 @@
 Server HTTP di **sola lettura** con dati sintetici (4 nodi, ~50 VM, un nodo offline, task di esempio). Serve a vedere l'interfaccia senza un cluster reale e senza token veri. Solo libreria standard di Python 3, nessuna dipendenza.
 
 - Ascolta **solo su 127.0.0.1** (porta 18006 di default, o il primo argomento).
-- Risponde 405 a ogni scrittura (POST/PUT/DELETE): nessuna azione puo' modificare nulla.
+- Risponde 405 a ogni scrittura (POST/PUT/DELETE) tranne `agent/exec`, che e' finto: restituisce un dmesg e un sistema operativo inventati e non esegue nulla.
 - I dati non rappresentano nessun cluster reale.
 
 ## Uso
