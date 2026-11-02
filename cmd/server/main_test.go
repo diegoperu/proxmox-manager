@@ -9,10 +9,10 @@ import (
 	"testing"
 )
 
-func TestInjectTheme(t *testing.T) {
+func TestInjectRootClasses(t *testing.T) {
 	page := []byte(`<!DOCTYPE html><html lang="it"><head></head><body><html lang="it"></body></html>`)
 	for _, th := range []string{"dark", "light", "eva01", "catppuccino"} {
-		got := string(injectTheme(page, th))
+		got := string(injectRootClasses(page, th, ""))
 		if !strings.Contains(got, `<html lang="it" class="`+th+`">`) {
 			t.Errorf("theme %q not injected: %s", th, got)
 		}
@@ -20,14 +20,30 @@ func TestInjectTheme(t *testing.T) {
 			t.Errorf("theme %q injected more than once", th)
 		}
 	}
-	// anything outside the whitelist must leave the page untouched (no attribute injection)
-	for _, th := range []string{"", "DARK", "dark light", `x" onload="alert(1)`, "../x", "catpuccino"} {
-		if got := injectTheme(page, th); string(got) != string(page) {
-			t.Errorf("theme %q must not modify the page", th)
+	if got := string(injectRootClasses(page, "", "compact")); !strings.Contains(got, `<html lang="it" class="compact">`) {
+		t.Errorf("density not injected: %s", got)
+	}
+	if got := string(injectRootClasses(page, "light", "compact")); !strings.Contains(got, `<html lang="it" class="light compact">`) {
+		t.Errorf("theme and density not combined: %s", got)
+	}
+	// anything outside the whitelists must leave the page untouched (no attribute injection)
+	for _, bad := range []string{"DARK", "dark light", `x" onload="alert(1)`, "../x", "catpuccino"} {
+		if got := injectRootClasses(page, bad, ""); string(got) != string(page) {
+			t.Errorf("theme %q must not modify the page", bad)
+		}
+		if got := injectRootClasses(page, "", bad); string(got) != string(page) {
+			t.Errorf("density %q must not modify the page", bad)
 		}
 	}
+	if got := injectRootClasses(page, "", ""); string(got) != string(page) {
+		t.Error("empty preferences must not modify the page")
+	}
+	// a bad value next to a good one: only the good one is written
+	if got := string(injectRootClasses(page, `x" onload="1`, "compact")); !strings.Contains(got, `class="compact"`) || strings.Contains(got, "onload") {
+		t.Errorf("bad theme leaked next to good density: %s", got)
+	}
 	// no <html lang="it"> tag: nothing to do, no panic
-	if got := injectTheme([]byte("plain"), "dark"); string(got) != "plain" {
+	if got := injectRootClasses([]byte("plain"), "dark", "compact"); string(got) != "plain" {
 		t.Errorf("unexpected change: %s", got)
 	}
 }

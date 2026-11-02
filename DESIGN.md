@@ -1,340 +1,295 @@
 ---
 name: ProxmoxManager
-description: Plancia di comando scura per sysadmin: monospace denso, accento ambra, stato sempre leggibile.
+description: Console di amministrazione Proxmox letta come un bollettino meteo notturno - una frase di condizione sopra i numeri, stato come colore + forma della linea + parola.
 colors:
-  deck-black: "#0a0b0d"
-  panel: "#111318"
-  panel-raised: "#181c23"
-  panel-high: "#1e2330"
-  hairline: "#2a3040"
-  hairline-strong: "#3a4558"
-  amber: "#f59e0b"
-  amber-bright: "#fbbf24"
-  amber-wash: "rgba(245,158,11,.12)"
-  amber-glow: "rgba(245,158,11,.06)"
-  alert-red: "#f05050"
-  alert-red-wash: "rgba(239,68,68,.15)"
-  ok-green: "#22c55e"
-  ok-green-wash: "rgba(34,197,94,.15)"
-  info-blue: "#478af7"
-  info-blue-wash: "rgba(59,130,246,.15)"
-  qemu-cyan: "#06b6d4"
-  container-purple: "#ad5ff7"
-  text-primary: "#e2e8f0"
-  text-secondary: "#94a3b8"
-  text-muted: "#76869d"
-  # Tema chiaro (stessi ruoli, valori propri)
-  light-bg: "#f8fafc"
-  light-panel: "#ffffff"
-  light-panel-raised: "#f1f5f9"
-  light-panel-high: "#e2e8f0"
-  light-hairline: "#e2e8f0"
-  light-hairline-strong: "#cbd5e1"
-  light-text-primary: "#0f172a"
-  light-text-secondary: "#334155"
-  light-text-muted: "#617087"
-  light-amber-text: "#996206"
-  light-ok-green: "#167f3d"
-  light-alert-red: "#d41212"
-  light-info-blue: "#0b62f0"
-  light-qemu-cyan: "#047a8f"
-  light-container-purple: "#9530f5"
-  light-scrim: "rgba(0,0,0,.45)"
-  # Tema Eva 01
-  eva-bg: "#0d0617"
-  eva-panel: "#1a0f2e"
-  eva-panel-raised: "#261540"
-  eva-panel-high: "#311d52"
-  eva-hairline: "#4a2d7a"
-  eva-hairline-strong: "#6b3fa8"
-  eva-accent: "#7cc443"
-  eva-accent-bright: "#95d45a"
-  eva-warn: "#ffa24a"
-  eva-ok-green: "#4ade80"
-  eva-alert-red: "#f15757"
-  eva-info-blue: "#c084fc"
-  eva-qemu-cyan: "#2dd4bf"
-  eva-container-purple: "#d946ef"
-  eva-text-primary: "#f0e6ff"
-  eva-text-secondary: "#c4a0e0"
-  eva-text-muted: "#9779bb"
-  # Tema Catppuccin Mocha
-  mocha-bg: "#1e1e2e"
-  mocha-panel: "#181825"
-  mocha-panel-raised: "#313244"
-  mocha-panel-high: "#45475a"
-  mocha-hairline-strong: "#585b70"
-  mocha-accent: "#fab387"
-  mocha-accent-bright: "#f9c29c"
-  mocha-alert-red: "#f38ba8"
-  mocha-ok-green: "#a6e3a1"
-  mocha-info-blue: "#89b4fa"
-  mocha-qemu-cyan: "#89dceb"
-  mocha-container-purple: "#cba6f7"
-  mocha-text-primary: "#cdd6f4"
-  mocha-text-secondary: "#a6adc8"
-  mocha-text-muted: "#979cb4"
+  sky-night: "#0b1424"
+  sky-glow: "#1d3560"
+  card-night: "#13213a"
+  card-raised: "#182a48"
+  track-night: "#213a60"
+  text: "#e9eef7"
+  text-secondary: "#a9b6cc"
+  text-muted: "#8394b0"
+  accent: "#7fb2ff"
+  accent-bright: "#a6c8ff"
+  on-accent: "#06142b"
+  ok-green: "#34c27a"
+  danger-red: "#ff6b6b"
+  on-danger: "#1a0505"
+  warn-amber: "#f2a93b"
+  badge-indigo: "#a3a1ff"
+  badge-cyan: "#4fd1e0"
+  badge-violet: "#c58bff"
+  dawn-bg: "#eef2f8"
+  dawn-card: "#ffffff"
+  dawn-text: "#0d1b33"
+  dawn-accent: "#1d5fd1"
+  dawn-accent-fill: "#2d6cdf"
 typography:
-  display:
-    fontFamily: "'Barlow Condensed', sans-serif"
-    fontSize: "40px"
-    fontWeight: 900
-    lineHeight: 1
   headline:
-    fontFamily: "'Barlow Condensed', sans-serif"
-    fontSize: "22px"
-    fontWeight: 700
-    letterSpacing: "0.08em"
+    fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+    fontSize: "30px"
+    fontWeight: 600
+    lineHeight: 1.12
+    letterSpacing: "-0.02em"
+  display-number:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "26px"
+    fontWeight: 600
+    lineHeight: 1.1
+    letterSpacing: "-0.02em"
+    fontFeature: "tabular-nums"
   title:
-    fontFamily: "'Barlow Condensed', sans-serif"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "17px"
-    fontWeight: 700
-    letterSpacing: "0.05em"
+    fontWeight: 600
+    letterSpacing: "-0.01em"
+  section:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 600
+    letterSpacing: "-0.005em"
   body:
-    fontFamily: "'JetBrains Mono', monospace"
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "13px"
     fontWeight: 400
-  table:
-    fontFamily: "'JetBrains Mono', monospace"
-    fontSize: "12px"
-    fontWeight: 400
+    lineHeight: 1.45
   label:
-    fontFamily: "'JetBrains Mono', monospace"
-    fontSize: "9px"
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "12px"
     fontWeight: 500
-    letterSpacing: "0.18em"
-  button:
-    fontFamily: "'JetBrains Mono', monospace"
+  badge:
+    fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "11px"
     fontWeight: 600
-    letterSpacing: "0.04em"
-  meta:
-    fontFamily: "'JetBrains Mono', monospace"
-    fontSize: "10px"
+  mono:
+    fontFamily: "'JetBrains Mono', ui-monospace, monospace"
+    fontSize: "12px"
     fontWeight: 400
-  input-touch:
-    fontFamily: "'JetBrains Mono', monospace"
-    fontSize: "16px"
-    fontWeight: 400
+    lineHeight: 1.8
 rounded:
-  badge: "2px"
-  control: "3px"
-  card: "4px"
-  modal: "5px"
-  chip: "20px"
+  badge: "6px"
+  control: "8px"
+  inset: "10px"
+  toast: "12px"
+  card: "14px"
+  modal: "16px"
+  pill: "20px"
 spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "14px"
-  lg: "22px"
+  card-pad: "16px"
+  card-pad-compact: "12px"
+  cell-y: "9px"
+  cell-y-compact: "5px"
+  cell-x: "12px"
+  gap: "14px"
+  gap-compact: "10px"
+  row-h: "62px"
+  row-h-compact: "46px"
+  rail: "212px"
+  topbar: "52px"
 components:
   button-primary:
-    backgroundColor: "{colors.amber}"
-    textColor: "#000000"
-    typography: "{typography.button}"
+    backgroundColor: "{colors.accent}"
+    textColor: "{colors.on-accent}"
+    typography: "{typography.label}"
     rounded: "{rounded.control}"
-    padding: "6px 13px"
+    height: "30px"
+    padding: "0 14px"
   button-primary-hover:
-    backgroundColor: "{colors.amber-bright}"
+    backgroundColor: "{colors.accent-bright}"
   button-ghost:
     backgroundColor: "transparent"
     textColor: "{colors.text-secondary}"
     rounded: "{rounded.control}"
-    padding: "6px 13px"
-  button-danger:
-    backgroundColor: "{colors.alert-red-wash}"
-    textColor: "{colors.alert-red}"
+    height: "30px"
+  button-destructive:
+    backgroundColor: "transparent"
+    textColor: "{colors.danger-red}"
     rounded: "{rounded.control}"
-    padding: "6px 13px"
-  input:
-    backgroundColor: "{colors.panel-raised}"
-    textColor: "{colors.text-primary}"
+    height: "30px"
+  button-destructive-confirm:
+    backgroundColor: "{colors.danger-red}"
+    textColor: "{colors.on-danger}"
     rounded: "{rounded.control}"
-    padding: "7px 9px"
   card:
-    backgroundColor: "{colors.panel}"
-    textColor: "{colors.text-primary}"
+    backgroundColor: "{colors.card-night}"
+    textColor: "{colors.text}"
     rounded: "{rounded.card}"
-    padding: "14px"
-  badge-running:
-    backgroundColor: "{colors.ok-green-wash}"
-    textColor: "{colors.ok-green}"
-    typography: "{typography.label}"
+    padding: "16px"
+  input:
+    backgroundColor: "{colors.card-raised}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.control}"
+    height: "32px"
+    padding: "0 10px"
+  badge:
+    backgroundColor: "{colors.card-raised}"
+    textColor: "{colors.text}"
+    typography: "{typography.badge}"
     rounded: "{rounded.badge}"
-    padding: "2px 6px"
-  node-chip:
-    backgroundColor: "{colors.panel-raised}"
+    padding: "2px 8px"
+  chip-step:
+    backgroundColor: "{colors.card-night}"
     textColor: "{colors.text-muted}"
-    rounded: "{rounded.chip}"
-    padding: "3px 10px"
-  modal:
-    backgroundColor: "{colors.panel}"
-    rounded: "{rounded.modal}"
-    padding: "22px"
+    rounded: "{rounded.pill}"
+    height: "30px"
+    padding: "0 12px"
+  nav-item:
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.control}"
+    height: "32px"
+    padding: "0 10px"
+  nav-item-active:
+    textColor: "{colors.accent}"
 ---
 
 # Design System: ProxmoxManager
 
 ## Overview
 
-**Creative North Star: "The Flight Deck"**
+**Creative North Star: "Il Bollettino"**
 
-Plancia di comando per chi legge lo stato di un'infrastruttura tutto il giorno. Fondo quasi nero, testo monospace, numeri grandi in condensed, un solo accento ambra che dice "qui puoi agire" o "qui sei". Tutto è denso e piccolo: 9-13px, tabelle compatte, etichette in maiuscolo spaziato come sigle di strumento. L'operatore scansiona, non legge.
+Il cluster e' letto come un bollettino meteo notturno. Una frase di condizione ("Quasi sereno - 3 nodi su 4 operativi", titolo 30px con icona 48px) sta sopra i numeri e non li sostituisce; sotto, una striscia di quattro KPI con storia recente e una tabella di nodi dove ogni riga mostra l'escursione min-max di CPU e RAM nelle ultime 24h con un punto "adesso". Il sistema rifiuta la griglia di schede KPI piu' grafico ad area che ogni console cloud ripete.
 
-Il colore ha un lavoro: stato. Verde, rosso, blu, ciano e viola indicano condizione della VM o tipo di risorsa, mai decorazione. L'ambra è l'unica voce di marca ed è anche selezione, hover, focus e azione primaria. La variabile CSS si chiama `--amber` in tutti i temi; negli altri temi cambia solo il valore (verde lime in eva01, pesca in catppuccino).
-
-Il sistema rifiuta l'ornamento: niente ombre decorative, niente gradienti riempitivi, niente icone grandi. Cinque temi (auto, dark, light, eva01, catppuccino) sono parte dell'identità e usano gli stessi nomi di variabile.
+Il mondo e' un cielo blu profondo con schede un gradino piu' chiare e filetti azzurri a bassa opacita'; il tema chiaro e' la stessa struttura in "alba" lattiginosa. La densita' e' da sala operativa, non da vetrina: due densita' (comoda, compatta) sulle stesse proporzioni, nessun effetto che faccia aspettare. Lo stato non e' mai solo colore: colore + forma della linea + parola.
 
 **Key Characteristics:**
-- Monospace 12-13px per dati, Barlow Condensed per titoli e numeri chiave.
-- Etichette 9px in maiuscolo con spaziatura larga (0.13-0.18em).
-- Profondità tonale a quattro gradini, bordi 1px, quasi nessuna ombra.
-- Un accento (`--amber`) rimappato per tema.
-- Angoli piccoli: 2-5px, tranne i chip nodo (pillola).
+- Frase di condizione sopra i numeri; l'eccezione (il nodo che devia) in rosso nel sottotitolo.
+- Stato = colore + forma della linea (piena ok, tratteggiata offline/in corso, spessa 3px errore) + parola.
+- Inter per l'interfaccia con cifre tabellari, JetBrains Mono solo per identificatori, IP, log.
+- Raggi 8-16px, filetti a 1px, un solo colore di marca per tema.
+- Vetro smerigliato in quattro punti soltanto; niente ombre sulle schede a riposo.
+- Cinque temi con nome fisso: auto (segue il sistema), dark, light, eva01, catppuccino - stessa struttura, palette diverse.
 
 ## Colors
 
-Palette scura a tinta fredda (blu-grigio quasi neutro) con un accento caldo ambra. Il tema dark è il valore canonico in `:root`; gli altri temi sovrascrivono le stesse variabili.
+Cielo notturno con un solo accento azzurro; verde, ambra e rosso sono riservati allo stato.
 
 ### Primary
-- **Amber Signal** (#f59e0b): azione primaria, voce attiva in sidebar, ordinamento tabella, hover di bordi e link, spinner, titolo logo. Unico accento di marca.
-- **Amber Bright** (#fbbf24): solo stato hover del pulsante primario.
-- **Amber Wash** (rgba(245,158,11,.12)) e **Amber Glow** (rgba(245,158,11,.06)): sfondo di badge/chip attivi e voce di nav attiva.
+- **Azzurro Quota** (accent): colore di marca - voce di menu attiva, azione primaria, selezione, focus ring, intervallo min-max normale, ordinamento attivo. In chiaro diventa un blu scuro (dawn-accent) per il testo e un blu piu' pieno (dawn-accent-fill) per il riempimento dei bottoni. `--amber*` nel CSS sono alias legacy di `--accent*` usati da JS (`tk('--amber')`); i nuovi usi scrivono `--accent`.
+- **Azzurro Alto** (accent-bright): hover del bottone primario.
 
-### Secondary (stato e tipo risorsa)
-- **Alert Red** (#f05050): errore, stop, pulsanti distruttivi, barra critica, pallino connessione KO.
-- **OK Green** (#22c55e): in esecuzione, successo, barra sana, pallino connessione OK.
-- **Info Blue** (#478af7): badge VM prima/pausa e informazioni neutre.
-
-### Tertiary
-- **QEMU Cyan** (#06b6d4): badge delle VM QEMU.
-- **Container Purple** (#ad5ff7): badge LXC e template, azioni speciali.
+### Secondary (stato)
+- **Verde Operativo** (ok-green): attivo, in esecuzione, task riuscito.
+- **Ambra Attenzione** (warn-amber): soglie superate; distinto dal marchio. Nei temi eva01 e catppuccino e' ridefinito per restare leggibile accanto all'accento.
+- **Rosso Allarme** (danger-red): offline, errore, azioni distruttive, eccezione nel sottotitolo.
+- Badge di tipo: indaco (VM in pausa/pool), ciano (QEMU), viola (LXC/template), mai usati per lo stato di salute.
 
 ### Neutral
-- **Deck Black** (#0a0b0d): sfondo pagina.
-- **Panel** (#111318): sidebar, topbar, card, modal.
-- **Panel Raised** (#181c23): intestazioni tabella, input, blocchi interni.
-- **Panel High** (#1e2330): tracce di barre di avanzamento.
-- **Hairline** (#2a3040) e **Hairline Strong** (#3a4558): bordi di card/tabelle e bordi di controlli.
-- **Text Primary** (#e2e8f0), **Text Secondary** (#94a3b8), **Text Muted** (#76869d): testo, dati secondari, etichette.
-
-### Altri temi (stesse variabili, valori diversi)
-I valori completi di ogni tema sono nel frontmatter con prefisso `light-`, `eva-` e `mocha-`; sotto, i tratti che li distinguono.
-- **Light**: sfondo #f8fafc, pannelli #ffffff, testo #0f172a, testo muted #617087. Gli accenti sono scuriti per il testo (ambra #996206, verde #167f3d, rosso #d41212, blu #0b62f0, ciano #047a8f, viola #9530f5); il riempimento del bottone primario resta ambra #f59e0b con testo nero (`--amber-fill`).
-- **Eva 01**: sfondo #0d0617, pannelli #1a0f2e; `--amber` diventa verde lime #7cc443; testo #f0e6ff; `--blue` vira al viola chiaro; `--warn` è arancio #ffa24a (il lime di marca si confonderebbe col verde "ok") e `--cyan`, usato per i badge QEMU, è azzurro-verde #2dd4bf.
-- **Catppuccin Mocha**: sfondo #1e1e2e, pannelli #181825; `--amber` diventa pesca #fab387; testo #cdd6f4.
-- **Auto** (nessuna classe): segue `prefers-color-scheme`, light o dark.
+- **Cielo Notte** (sky-night) sfondo, con gradiente verso **Bagliore di Cielo** (sky-glow) nei primi 380px della pagina.
+- **Scheda Notte** (card-night) superfici; **Scheda Rialzata** (card-raised) campi, intestazioni tabella, riquadri interni; **Binario** (track-night) piste delle barre.
+- Testo in tre gradini: text (primario), text-secondary (celle, corpo), text-muted (etichette, meta).
+- Filetti: bianco-azzurro al 16% (`--border`) e 30% (`--border2`, bordi di campi/modal).
+- **Alba** (dawn-bg, dawn-card, dawn-text): tema chiaro con gli stessi ruoli; accenti e semantici ridefiniti piu' scuri.
+- eva01 (viola scuro, accento lime #7cc443) e catppuccino (Mocha, accento pesca #fab387) ridefiniscono le stesse variabili; nomi dei temi invariabili.
 
 ### Named Rules
-**The 4.5 Floor Rule.** Ogni colore usato come testo raggiunge 4.5:1 su `--bg`, `--bg2` e `--bg3` in tutti e cinque i temi, compresi i badge sul loro velo. Un nuovo ruolo colore si verifica prima di entrare nel sistema.
-**The Fill Is Not Text Rule.** Dove un colore è sia riempimento sia testo (ambra), i due ruoli hanno variabili separate (`--amber` testo, `--amber-fill` riempimento): così il tema chiaro scurisce il testo senza spegnere il bottone.
-**The Warn Is Not Brand Rule.** L'attenzione (soglie, barre `.warn2`, valori sopra il 60%) usa `--warn`, non `--amber`. Di norma coincidono; in un tema dove il marchio si confonde con "ok" (eva01) si separano.
-**The One Voice Rule.** L'ambra è l'unico accento di marca. Le altre tinte indicano stato o tipo di risorsa e non si usano come decorazione.
-**The Semantic Variable Rule.** Il codice usa `--amber`, `--green` ecc. come ruoli. Un tema cambia il valore, non il nome: non scrivere colori letterali nei componenti.
+**The State Is Never Colour Alone Rule.** Ogni stato porta forma della linea e parola oltre al colore (`.st`, `.toast::before`, `.task .sl`, `.pv-step::before`). Un nuovo stato definisce prima la forma.
+**The One Brand Rule.** Il marchio e' `--accent`; ambra/verde/rosso significano solo stato. Un grafico o un componente nuovo legge i token, mai esadecimali letterali.
+**The Contrast Floor Rule.** Ogni colore usato come testo e' >=4.5:1 su bg/bg2/bg3 in tutti i temi, badge compresi (verificato per progetto, non rimisurato in questa passata).
 
 ## Typography
 
-**Pesi caricati:** JetBrains Mono variabile 300-700; Barlow Condensed solo 700 e 900 (gli altri pesi non sono usati e non sono incorporati).
+**Interface Font:** Inter variabile, vendorizzata, con system-ui di riserva
+**Data Font:** JetBrains Mono variabile, vendorizzata (`.tm`, `.plog`, VMID, IP, log)
 
-**Display / Titoli:** Barlow Condensed (con sans-serif)
-**Body / Dati / Label:** JetBrains Mono (con monospace)
-
-**Character:** coppia da strumentazione. La condensed dà peso ai numeri e ai titoli senza occupare spazio; la mono allinea colonne e rende leggibili ID, IP e nomi di nodo. Font incorporati nel binario (subset latin, `/static/fonts/`), con fallback di sistema.
+**Character:** Inter sobria con spaziatura negativa sui titoli e cifre tabellari ovunque ci siano numeri; il mono compare solo dove il carattere identifica un oggetto.
 
 ### Hierarchy
-- **Display** (900, 40px, 1): valore KPI delle card dashboard.
-- **Headline** (700, 22px, 0.08em): titolo logo; valori metrica dei nodi (22px, 700).
-- **Title** (700, 17px, 0.05em): titolo topbar, nome nodo (Nodi e Cluster), titolo modal, titolo della console.
-- **Section** (700, 13px condensed, 0.1em, maiuscolo): intestazione di sezione con filetto che riempie la riga.
-- **Body** (400, 13px): testo base; i controlli e le voci di navigazione usano 12px.
-- **Table** (400, 12px): celle; le intestazioni colonna sono label 9px.
-- **Label** (500, 9px, 0.13-0.18em, maiuscolo): etichette card, form, intestazioni di colonna, sezioni nav.
-- **Button** (600, 11px, 0.04em, maiuscolo): pulsanti; le varianti `.sm` usano 10px.
-- **Meta** (400, 10px): sotto-righe e suggerimenti (uptime, core, hint) in `--text3`.
-- **Input touch** (400, 16px): solo con puntatore grosso, così iOS non zooma al focus.
+- **Headline** (600, 30px, 1.12, -0.02em): frase di condizione della dashboard (22px sotto 700px).
+- **Number** (600, 26px, tabular): valori della striscia KPI (`.kv`, `.card-v`).
+- **Title** (600, 17px, -0.01em): titolo di modal e pannello laterale.
+- **Section** (600, 15px): titolo pagina in topbar, `.sec`, nome nodo, ricerca rapida.
+- **Body** (400-500, 13px, 1.45): menu, tab, sottotitolo condizione (14px).
+- **Label** (500, 12px): tabelle, campi, bottoni (600), meta, intestazioni di gruppo.
+- **Badge** (600, 11px): solo badge e tasto `kbd`.
 
 ### Named Rules
-**The Number Is Condensed Rule.** Le metriche grandi sono sempre Barlow Condensed, con cifre tabulari (`tabular-nums`): i valori non ballano quando si aggiornano. Gli identificatori (VMID, IP, nodo) restano in mono.
-**The Ramp Is Closed Rule.** Le dimensioni ammesse sono quelle dei ruoli sopra (40, 22, 17, 13, 12, 11, 10, 9). Un valore nuovo si aggiunge qui prima di comparire nel CSS.
-**The Small Caps Label Rule.** Ogni etichetta di campo o colonna è 9px, maiuscola e spaziata. Nessuna etichetta in sentence case.
+**The Closed Scale Rule.** Scala chiusa 30/26/17/15/13/12/11 (piu' 14px per nome-nodo e sottotitolo condizione, 20px per i valori `.mv`, 16px solo input con `pointer:coarse`). Il 11 e' riservato ai badge. Nessun valore nuovo senza passare da questo file.
+**The Mono For Identifiers Rule.** Il mono e' per VMID, IP, log, mai per titoli o numeri di metrica.
 
 ## Layout
 
-Shell a due colonne a tutta altezza (`100vh`, nessuno scroll sul body): sidebar fissa da 220px e area principale con topbar da 48px e contenuto scrollabile (padding 20px 22px). Griglie CSS a 2, 3 o 4 colonne con gap 14px; sotto 1200px le 4 colonne diventano 2, sotto 850px le 3 diventano 2, sotto 650px tutto a 1 colonna. La pagina batch riempie l'altezza residua.
+Desktop-first, griglia body a due colonne: rail 212px + contenuto, riga topbar 52px; il contenuto scorre da solo (`overflow:hidden` sul body). Dashboard: colonna principale fluida + centro attivita' 320px sticky a destra (gap 28px); sotto 1180px il centro attivita' passa sopra la tabella VM in colonna unica. Padding contenuto 20px 28px.
 
-Ritmo compatto: gap 8-16px, padding celle 7px 11px, padding card 14px. La densità è intenzionale; non aumentare il padding per "respirare". Il target è desktop; il mobile è consultazione. Sotto 850px la sidebar diventa un menu a scomparsa e il Batch impila le colonne; sotto 650px le griglie vanno a una colonna. Con puntatore grosso (dito) i controlli salgono a 44px e i campi a 16px; con il mouse il minimo è 24px.
+Ritmo: padding scheda 16px, gap 14px, celle 9px/12px, righe nodo min 62px. La densita' compatta (`html.compact`, da Impostazioni, in config.json) porta 12px, 10px, 5px/10px e 46px senza cambiare proporzioni.
+
+Responsive: sotto 850px la rail diventa cassetto (pulsante menu in topbar, scrim, vetro 20px); sotto 700px KPI a 2 colonne e righe nodo a due colonne; sotto 650px niente crumb/badge, toast a tutta larghezza, ricerca ridotta a icona, colonne secondarie della tabella VM nascoste. `pointer:coarse`: bersagli 44px e campi 16px (non verificato su dispositivo touch).
 
 ## Elevation & Depth
 
-Tonale, non ombreggiato. La profondità viene da quattro gradini di sfondo (Deck Black → Panel → Panel Raised → Panel High) e da bordi 1px. Le card hanno un filetto in gradiente (1px, trasparente-hairline-trasparente) sul bordo superiore. L'unica ombra è il glow colorato dei pallini di stato connessione. Il modal si stacca con overlay nero al 78% e `backdrop-filter: blur(4px)`.
+Tonale e piatto: la profondita' viene da gradini di superficie (bg, bg2, bg3, bg4) e filetti 1px, non da ombre. Le schede e le tabelle non hanno ombra. Un'unica ombra esiste, `--shadow-pop` (`0 24px 60px -12px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.3)`), per modal, pannello laterale, ricerca rapida e toast.
 
-### Shadow Vocabulary
-- **Status Glow** (`box-shadow: 0 0 6px var(--green)` / `var(--red)`): solo pallino connessione.
-- **Modal Scrim** (`rgba(0,0,0,.78)` + `blur(4px)`): sfondo dietro i modal; 45% nero in light.
+Il vetro smerigliato (backdrop-filter) e' ammesso in quattro punti: intestazione sticky delle tabelle (blur 10px), toast (14px), scrim dei modal (6px), cassetto mobile (20px). La barra superiore usa solo un velo traslucido (55% di bg2) senza blur.
 
 ### Named Rules
-**The Flat-By-Default Rule.** Le superfici non hanno ombre a riposo. Il glow serve solo a dire "stato vivo".
+**The Four Glass Rule.** Vetro solo su intestazione tabella sticky, toast, scrim modal, cassetto mobile. Una scheda in vetro e' un errore.
+**The Flat At Rest Rule.** A riposo nessuna ombra; l'ombra pop appartiene alle sole superfici sovrapposte.
 
 ## Shapes
 
-Angoli quasi vivi: 2px per badge, 3px per pulsanti e input, 4px per card e tabelle, 5px per modal. Eccezione unica: chip selezione nodo a pillola (20px). Bordi 1px sempre; la voce attiva di sidebar e le tab usano un filo 2px sul lato. Barre di avanzamento alte 4px con estremi arrotondati.
+Raggi dichiarati: 6 (badge), 8 (controlli, voci menu, righe palette), 10 (riquadri interni, log, lista conferma), 12 (toast), 14 (schede, tabelle, pannelli), 16 (modal; il pannello laterale lo arrotonda solo sul lato sinistro), pill 20 (chip nodo, passi del provisioning). Barre e tracce sono capsule da 5-6px; i punti VM e il punto "adesso" sono cerchi. Filetti 1px ovunque; la tab attiva e' l'unico bordo da 2px, in basso. Nessuna striscia colorata sul lato sinistro di schede o righe.
 
 ## Components
 
-Tutti i controlli sono piccoli, in maiuscolo e senza ornamenti. L'accento ambra compare sull'azione primaria e sugli hover.
-
 ### Buttons
-- **Shape:** angolo 3px, padding 6px 13px (`.sm`: 3px 9px), mono 11px 600 maiuscolo.
-- **Primary (`.ba`):** sfondo ambra, testo nero; hover ambra brillante.
-- **Ghost (`.bg2`):** trasparente, bordo hairline-strong; hover: bordo e testo ambra.
-- **Danger (`.bd`), Success (`.bsuc`), Special (`.bpurp`):** sfondo wash della tinta, testo e bordo (30%) della tinta; hover wash più intenso.
-- **Disabled:** opacità .35, cursore `not-allowed`.
+- **Shape:** angoli da 8px, altezza 30px (26px `.sm`), etichetta 12px/600.
+- **Primary:** pieno accento con testo on-accent; hover accent-bright. Un solo primario per vista ("Nuova VM").
+- **Ghost:** trasparente, bordo border2, hover bordo e testo accento.
+- **Destructive:** a contorno (rosso al 45%) e testo rosso; riempie con velo rosso solo su hover o focus-visible. Il pieno (`.bx`, testo on-danger) esiste solo nel dialogo di conferma.
+- **Success / purple:** velo tinto a bordo sottile per azioni di avvio e secondarie tipizzate.
+- **Disabled:** opacita' .4.
 
-### Badges
-- **Style:** angolo 2px, mono 9px 700 maiuscolo, wash + bordo 30% della tinta di stato.
-- **Stato:** running = verde, stopped = rosso (anche valore di default), paused = blu.
-- **Tipo risorsa:** QEMU = ciano, LXC e template = viola, nodo = ambra.
-
-### Chips
-- **Node chip:** pillola 20px, bordo hairline, mono 11px; attivo = ambra wash, bordo e testo ambra, 600.
+### Chips (passi del provisioning, selettore nodi)
+Pill 20px con filetto; il passo ha una linea a sinistra: tratteggiata (da fare), piena verde (fatto), bordo accento (corrente). Il chip nodo attivo ha velo accento, bordo e testo accento.
 
 ### Cards / Containers
-- **Corner Style:** 4px.
-- **Background:** Panel; blocchi interni (metriche, input) su Panel Raised.
-- **Border:** 1px hairline, filetto in gradiente in alto.
-- **Internal Padding:** 14px.
-- **KPI card:** etichetta label, valore display, sotto-riga 10px muted; il valore prende ambra, verde o rosso secondo il significato.
+Raggio 14px, fondo card-night, filetto 1px, padding 16px, nessuna ombra. La striscia KPI e' un unico contenitore con quattro celle separate da filetti verticali, non quattro schede; ogni cella ha un mini grafico (linea 1.5px accento, ambra se in soglia; barre rosse per gli errori).
 
 ### Inputs / Fields
-- **Style:** sfondo Panel Raised, bordo hairline, angolo 3px, mono 12px, padding 7px 9px.
-- **Focus:** il bordo diventa ambra, nessun anello esterno.
-- **Select:** stesso stile, cursore pointer. Checkbox in selezione nodi usano `accent-color` ambra.
+Fondo card-raised, filetto 1px, raggio 8px, altezza 32px, testo 12px. Focus: bordo accento piu' outline 2px accento. Etichette sopra in 12px/500 text-muted.
 
 ### Navigation
-- **Sidebar:** voci 11.5px 500, icona 14px, padding 8px 16px; sezioni in label 9px.
-- **Active:** testo ambra, filo sinistro 2px ambra, sfondo ambra glow.
-- **Hover:** testo primario con velo bianco al 3% (nero al 4% in light).
-- **Tabs:** maiuscolo 11px, sottolineatura 2px ambra per la tab attiva.
+Rail con gruppi in 12px/600 muted (Operazioni, Analisi), voci 32px con icona 16px; attiva = testo accento su velo accento. Topbar 52px: marchio, crumb (cluster / pagina), pulsante ricerca a 32px con `kbd` Ctrl/Cmd+K, indicatore di connessione (punto 8px), densita'. Le tab sono sottolineate in accento da 2px.
 
-### Tables (componente firma)
-Intestazione sticky su Panel Raised con label 9px; celle 12px, righe separate da bordo al 45%, hover con velo; colonne ordinabili con freccia ↑/↓ in ambra. Barre di utilizzo 4px verde/ambra/rosso per soglia. I dati restano su una riga (`nowrap`) e il contenitore scorre in orizzontale.
+### Riga nodo (firma)
+Griglia: nome + sottotitolo, stato (`.st`), pista CPU, pista RAM, punti VM. La pista mostra l'intervallo min-max 24h come capsula (accento; ambra o rossa oltre soglia), una tacca tratteggiata verticale all'85% e un punto "adesso" da 12px con bordo del colore della scheda che scorre al nuovo valore (0.6s, `--ease`, disattivato con reduced-motion). Nodo offline: riga al 62%, pista sostituita da una linea tratteggiata. I punti VM hanno diametro 6-14px su cinque gradini per RAM, verdi se attive, vuoti con bordo se spente.
 
-### Toasts e Modal
-- **Toast:** Panel Raised, bordo, filo sinistro 3px (verde ok, rosso errore, ambra info); entra da destra in .18s.
-- **Modal:** Panel, bordo hairline-strong, 5px, padding 22px, 360-620px; sale di 8px in .18s.
+### Centro attivita'
+Elenco a filetti: ogni task ha una linea di stato (verde piena = riuscito, accento tratteggiata = in corso, rossa da 3px = errore), titolo, dettaglio (rosso per errori) e orario tabellare.
+
+### Pannello laterale e ricerca rapida
+Il dettaglio VM si apre da destra (460px, scorrimento 0.24s) sopra uno scrim, con intestazione, elenco dt/dd, azioni e una "zona pericolo" separata da filetto in fondo. La ricerca (Ctrl/Cmd+K) e' un modal 640px con campo da 52px, risultati raggruppati, riga selezionata con velo accento.
+
+### Toast
+Vetro, raggio 12px, ombra pop, in basso a destra; una linea a sinistra dice lo stato (accento info, verde ok, rossa da 3px errore) prima del testo.
+
+### Badge
+Raggio 6px, 11px/600, velo del colore al 12-15% con bordo al 32%: verde (attivo), rosso (fermo/fallito), indaco, ciano (QEMU), viola (LXC/template), accento (nuovo).
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** usare le variabili semantiche (`--amber`, `--green`, `--bg2`) in ogni nuovo stile, per far funzionare tutti i temi.
-- **Do** tenere etichette in 9px maiuscolo spaziato e numeri grandi in Barlow Condensed.
-- **Do** codificare lo stato con la tinta più un testo (badge con parola), non con il solo colore.
-- **Do** dare ai controlli distruttivi la variante danger rossa, separata dall'ambra.
-- **Do** verificare ogni nuova superficie in tutti e cinque i temi, compresi eva01 e catppuccino.
+- **Do** aprire ogni vista di riepilogo con una frase che dice la condizione, poi i numeri.
+- **Do** dare a ogni stato colore + forma della linea + parola.
+- **Do** leggere colori da `--accent`, `--green`, `--warn`, `--red` e dai token di superficie; nei grafici usare i token del tema.
+- **Do** tenere i distruttivi a contorno e separati dal primario; il pieno rosso solo nella conferma.
+- **Do** usare cifre tabellari per ogni numero e il mono per ID, IP e log.
+- **Do** rispettare `prefers-reduced-motion`: lo stato resta, il movimento no.
 
 ### Don't:
-- **Don't** usare l'ambra come decorazione o su più di una azione primaria per vista.
-- **Don't** aggiungere ombre a riposo, gradienti riempitivi o angoli superiori a 5px (eccetto i chip pillola).
-- **Don't** scrivere colori esadecimali nei componenti: passano da variabile.
-- **Don't** aumentare il padding per rendere l'interfaccia "più ariosa": la densità serve all'operatore.
-- **Don't** introdurre un framework JS o un secondo accento di marca.
+- **Don't** fare una griglia di schede KPI affiancate a un grafico ad area come primo schermo.
+- **Don't** indicare lo stato con il solo colore.
+- **Don't** usare bordi colorati sul lato sinistro di schede, righe o avvisi.
+- **Don't** applicare il vetro a schede o pannelli fuori dai quattro punti ammessi.
+- **Don't** introdurre dimensioni di testo fuori scala o usare l'11px fuori dai badge.
+- **Don't** aggiungere ombre alle schede a riposo.
+- **Don't** usare il marchio (azzurro) per significare salute o errore.
+- **Don't** rinominare i temi (auto, dark, light, eva01, catppuccino) ne' aggiungere framework o font da CDN.
+
+## Non canonizzato
+
+- Barra flottante delle azioni di massa: non costruita, non e' una regola del sistema.
+- Alias legacy `--amber*` e `--cond` (= Inter): residui di compatibilita', non da usare in codice nuovo.
+- Righe pre-esistenti con stili inline non ricondotti ai token non sono state riparate.
+- Non verificato dal codice: indicazione "dato vecchio" a mezza altezza e "spento barrato" (nessuna regola CSS trovata); transizioni di pagina con View Transitions (nessun uso trovato nel file).

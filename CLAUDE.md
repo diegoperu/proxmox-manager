@@ -63,13 +63,13 @@ Go non supporta embed con path che escono dallo scope del file (`../../`).
 
 ### Asset statici (decisione 2026-10-13)
 
-Chart.js, SheetJS, xterm.js, xterm-addon-fit e i font (JetBrains Mono, Barlow Condensed, subset latin) sono **vendorizzati** in `cmd/server/web/static/` e serviti da `GET /static/*` (`staticHandler`): allowlist di estensioni (`.js .css .woff2`), `nosniff`, nessun listing, niente traversal. Motivo: la UI deve funzionare su VPN isolata e non eseguire codice da CDN. `index.html` resta l'**unico file di codice dell'app**; in `<head>` solo `/static/...` con `defer`.
+Chart.js, SheetJS, xterm.js, xterm-addon-fit e i font (Inter, JetBrains Mono, subset latin) sono **vendorizzati** in `cmd/server/web/static/` e serviti da `GET /static/*` (`staticHandler`): allowlist di estensioni (`.js .css .woff2`), `nosniff`, nessun listing, niente traversal. Motivo: la UI deve funzionare su VPN isolata e non eseguire codice da CDN. `index.html` resta l'**unico file di codice dell'app**; in `<head>` solo `/static/...` con `defer`.
 Per aggiornare una libreria: scaricarla, confrontare l'hash con una seconda fonte, mettere la versione nel nome file, aggiornare `index.html` e `web/static/THIRD_PARTY.md` (versioni, licenze, SHA-256). `TestIndexUsesOnlyEmbeddedAssets` fallisce se compare una risorsa esterna o un file non incorporato.
 SheetJS: usare >= 0.20.2 (le 0.18.x hanno CVE note); l'app lo usa solo per **scrivere** l'export Excel.
 
 ### Tema nel primo render
 
-`serveIndex` inserisce `class="<tema>"` nel tag `<html lang="it">` leggendo `theme` da `config.json` (whitelist `dark|light|eva01|catppuccino`, `injectTheme`); niente lampeggio e nessun `localStorage`. La pagina ha `Cache-Control: no-cache` perché varia col tema.
+`serveIndex` inserisce `class="<tema> <densita>"` nel tag `<html lang="it">` leggendo `theme` e `density` da `config.json` (`injectRootClasses`; whitelist in `config.ValidTheme`/`config.ValidDensity`: tema `dark|light|eva01|catppuccino`, densita' `compact`; vuoto = nessuna classe); niente lampeggio e nessun `localStorage`. La pagina ha `Cache-Control: no-cache` perché varia con tema e densita'. `POST /api/config` accetta `{theme, density}` (campo assente = invariato) e risponde 400 se un valore non e' in whitelist.
 
 ## Config (config.json)
 
@@ -84,6 +84,7 @@ SheetJS: usare >= 0.20.2 (le 0.18.x hanno CVE note); l'app lo usa solo per **scr
     }
   ],
   "theme": "",
+  "density": "",
   "cache_seconds": 30,
   "db_path": "proxmox.db",
   "listen_addr": ":8080"
@@ -109,6 +110,7 @@ type ClusterConfig struct {
 type Config struct {
     Clusters     []ClusterConfig `json:"clusters"`
     Theme        string          `json:"theme"`
+    Density      string          `json:"density"`
     CacheSeconds int             `json:"cache_seconds"`
     DBPath       string          `json:"db_path"`
     ListenAddr   string          `json:"listen_addr"`
@@ -121,7 +123,7 @@ Helper config: `GetCluster(idx int)` e `GetDefaultCluster()` leggono con RLock. 
 
 ```
 GET  /api/config                                    GetConfig (token mascherati)
-POST /api/config                                    SaveConfig (solo theme)
+POST /api/config                                    SaveConfig (theme, density; validati a whitelist)
 POST /api/config/test                               TestConnection → GetNodes
 
 GET  /api/clusters                                  GetClusters (token mascherati: ...last8chars)
@@ -337,7 +339,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 ## Frontend (index.html — SPA vanilla)
 
 **Pagine** (routing client-side):
-- `dashboard` — KPI cluster + grafici CPU/RAM 6h (da `/api/metrics?timeframe=day`, slice last 6h) + tabella VM con disk% da fsinfo; ordine iniziale: in esecuzione, poi spente, template in fondo (poi per VMID), intestazioni ordinabili come prima
+- `dashboard` — **"Bollettino"** (branch `experiment/ui-redesign`): frase di condizione (sereno / quasi sereno / attenzione, calcolata da nodi offline, RAM/CPU >=85%, task falliti 24h) + striscia di 4 KPI con storico (sparkline da `/api/metrics?timeframe=day`, barre task da `/api/tasks`) + un riga per nodo con barre min-max 24h CPU/RAM (RRD `day` per nodo, punto = valore attuale, tratto = soglia 85%, aggiornate sul posto) e un punto per VM (pieno = in esecuzione, vuoto = ferma, diametro = RAM) + colonna Attivita' (`/api/tasks`) + tabella VM con disk% da fsinfo; ordine iniziale: in esecuzione, poi spente, template in fondo (poi per VMID), intestazioni ordinabili come prima
 - `nodes` — card per nodo (ordinati natural sort) + RRD grafici (memused/memtotal) + VM per nodo
 - `vms` — tabella QEMU+LXC con colonna IP; multi-nodo selector (natural sort, modello esplicito); sort; disk% da fsinfo async; **nessuna selezione a checkbox** (le operazioni di massa stanno nella pagina `batch`; la colonna checkbox era inutilizzata ed è stata rimossa il 2026-10-13)
 - `provision` — form clone template cloudinit con calcolo delta disco
@@ -367,11 +369,13 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 **Temi** (applicati via classe su `<html>`):
 - `""` (nessuna classe) → segue `prefers-color-scheme`
 - `html.dark` → scuro forzato
-- `html.light` → chiaro (`#f8fafc` bg, `#0f172a` text)
+- (default, `dark` o OS scuro) → "cielo notturno" `#0b1424`, accento azzurro `#7fb2ff`
+- `html.light` → chiaro "alba" (`#eef2f8` bg, `#0d1b33` text, accento `#1d5fd1`)
 - `html.eva01` → Evangelion Unit 01 (viola scuro, verde lime `#7cc443`)
 - `html.catppuccino` → Catppuccin Mocha (Base `#1e1e2e`, Peach `#fab387`)
 - `applyTheme(t)` aggiorna classi HTML + colori Chart.js `CD` object
-- Preferenza salvata in `config.json` campo `theme`
+- Preferenza salvata in `config.json` campi `theme` e `density` (`html.compact` = densita' compatta: `--card-pad`, `--cell-y`, `--row-h`)
+- Token: `--accent*` e' il colore di marca; `--amber*` restano **alias** (JS usa `tk('--amber')`). Nuovi: `--on-accent`, `--on-danger`, `--hover`, `--scrim`, `--sky-glow`, `--shadow-pop`
 - Media query `@media(prefers-color-scheme:light)` usa `:not(.dark):not(.eva01):not(.catppuccino)` per non sovrascrivere temi scuri
 
 **Pattern sort tabelle**: `mkSorter(tbodyId, headId)` → `.sort(data, key)` con classi CSS `asc`/`desc`.
@@ -386,11 +390,20 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 
 **Librerie a richiesta**: nessuno script di libreria nell'`<head>`. `lib('chart'|'xlsx'|'xterm')` carica da `/static/` al primo uso e memorizza la promessa (se fallisce si può riprovare). `mkChart` è asincrona; `Reports.xlsx` fa `await lib('xlsx')`; la console in popup carica solo xterm + fit (non Chart.js né SheetJS).
 
+**Pagine secondarie (2026-11-02)**: componenti condivisi `.toolbar`, `.seg` (controllo segmentato), `.panel` (+ `.panel-h`/`.panel-b`), `.nc` (scheda nodo con `meter()`), `.tiles` (tessere tema), `.cl-row`, `.dl` (lista definizioni), `.empty`. `nodeState(o)` e' l'unica definizione dello stato di un nodo (Panoramica, Nodi, Cluster); soglie in `Dashboard.WARN/CRIT`. Nodi: schede + pannello VM/grafici visibili solo dopo la scelta di un nodo. VM: toolbar con riepilogo (`#vm-sum`), il nome apre il pannello, nessun rosso a riposo; sotto 650px restano VMID, Nome, Stato, RAM. Batch: solo restyle; il bottone diventa rosso pieno solo per azioni `danger` (`batchActionChanged`). Cluster: zona distruttiva isolata (`.sh-danger`) con conferma scritta. Report: contenuto nascosto finche' non si genera, striscia KPI, grafici a tinta unica (rosso/ambra solo oltre soglia). Impostazioni: colonna singola, tessere tema con anteprime colore (gli esadecimali delle anteprime sono voluti), densita' segmentata con anteprima immediata e salvataggio esplicito.
+
+**Navigazione e pannelli (2026-11-02, step 3)**:
+- **Indirizzi nell'hash** (`Route`): `#/<pagina>` e `#/vm/<nodo>/<vmid>/<qemu|lxc>` (pannello VM); Indietro/Avanti funzionano (`popstate`); ogni valore letto dall'hash e' validato a whitelist/regex. `App.nav(p,{silent:true})` non scrive nella cronologia.
+- **Dettaglio VM = pannello laterale** (`#mov.ov.sheet`, `VMs.detail`): sostituisce il modal; l'azione distruttiva (stop forzato) sta isolata in fondo e a contorno. Si apre anche dal nome VM nella tabella della dashboard e dalla ricerca.
+- **Ricerca rapida** `Ctrl/⌘ K` (`Palette`, `#mpal`): pagine (con sinonimi), azioni, nodi, VM/LXC da `/api/vms` (cache 60s). Tutto il testo via `textContent`; si apre solo se non c'e' un altro dialogo. Clic sullo sfondo chiude pannello e ricerca.
+- **Provisioning**: barra di avanzamento a 4 passi (`Provision.steps`, `Provision.goto`) calcolata dagli stessi campi del riepilogo; le sezioni restano tutte visibili.
+- Scala inline ripulita: niente font da 9/10px, niente maiuscolo spaziato, raggi 8/10px negli stili inline.
+
 **Colore "warn"**: `--warn` (default = `--amber`) è il colore di attenzione per soglie e barre (`.warn2`, `.twn`, `.card-v.w`); `--amber` resta il colore di marca (selezione, azione primaria). In eva01 il marchio è lime e si confondeva col verde "ok", quindi `--warn:#ffa24a`; sempre in eva01 `--cyan` (badge QEMU) è `#2dd4bf`. Verificare ≥4.5:1 per ogni nuovo ruolo.
 
 **Nomi degli helper globali**: `tk`, `tka`, `esc`, `js`, `lib`, `pool`, `apiCached`, `logLine`, `errRow`, `errBox` sono funzioni globali. **Non** dichiarare variabili locali con questi nomi: una `const tk=[...]` in `Reports.load` oscurava `tk()` e rompeva i grafici dei Report (TDZ) senza errori di sintassi.
 
-**Tipografia (2026-10-13)**: scala chiusa di ruoli — 40 KPI, 22 headline, 17 titoli, 13 body, 12 controlli/nav, 11 pulsanti, 10 meta, 9 label (16 solo input con `pointer:coarse`); un valore fuori scala va prima in DESIGN.md. Barlow Condensed incorporato solo nei pesi 700 e 900. `.card-v`/`.mv` usano `tabular-nums`. Nomi di VM nelle tabelle: `<span class="nm" title="…">` con ellissi a 34ch (il nome completo è nel `title`).
+**Tipografia (2026-11-02, Bollettino)**: Inter variabile (UI e cifre tabellari) + JetBrains Mono solo per VMID, IP, log. Scala: 30 condizione, 26 KPI, 17 titoli modal, 15 titoli sezione/pagina, 13 body, 12 tabelle/controlli/etichette, 11 solo badge (16 solo input con `pointer:coarse`). Niente maiuscolo spaziato: etichette in frase. Barlow Condensed rimosso (`--cond` e' un alias di `--sans`). DESIGN.md e `.impeccable/design.json` descrivono il look Bollettino (riscritti il 2026-11-02 dal codice). `.card-v`/`.mv` usano `tabular-nums`. Nomi di VM nelle tabelle: `<span class="nm" title="…">` con ellissi a 34ch (il nome completo è nel `title`).
 
 **Adattamento (2026-10-13)**: desktop-first; il mobile è per consultazione. Sotto 850px la sidebar diventa un drawer (`#menu-btn` in topbar, `Drawer` in JS: Esc/scrim/click su una voce lo chiudono; chiuso è `visibility:hidden`, aperto rende `#main` `inert`); sotto 650px niente badge in topbar, padding ridotto, toast a tutta larghezza. Batch impila le colonne sotto 850px (`.batch-cols`/`.batch-side`). I modal non superano mai `100vw - 24px` (`min()` nel CSS e negli stili inline). Bersaglio minimo 24px per `.sm` (WCAG 2.5.8); con `pointer:coarse` 44px, campi a 16px (niente zoom su iOS) e checkbox da 22px. Altezze con `dvh`. **Ordine nel CSS**: le regole di base di un componente vanno *prima* delle sue media query (a pari specificità vince la più bassa: una regola base in fondo al file annullava il responsive del Batch). Il comportamento `pointer:coarse` non è verificato su un dispositivo touch.
 
@@ -434,3 +447,19 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 - Non usare `command[N]` per agent exec — Proxmox vuole repeated `command` keys (`url.Values.Add`).
 - Non rimuovere il `copy()` in `config.Get()` — senza, handler che mutano `cfg.Clusters` (es. `GetConfig` che maschera i token) corrompono `current.Clusters` per aliasing Go; poi qualsiasi `SaveConfig` scrive i token mascherati su disco.
 - Non inviare `api_token` completo al frontend in nessuna risposta — mascherare sempre con `...last8chars`.
+
+## Branch sperimentale `experiment/ui-redesign`
+
+Creato il 2026-11-02 da `main` (d5fa513) per sperimentare grafica e UX nuove ispirate ai servizi cloud moderni. Decisioni 2026-11-02 (`DOMANDE.md` D1-D6): ambito completo (pelle + flussi + dashboard) a fasi; nomi tema invariati, auto/dark/light col nuovo look "Horizon", eva01/catppuccino come palette sulla stessa struttura; due densita' (comoda/compatta) in `config.json`; Inter vendorizzato + JetBrains Mono per dati; anteprima su `:8081` con dati finti; barra azioni flottante = assunzione provvisoria (D6, l'utente valuta alla fine). **Direzione scelta 2026-11-02: "Bollettino"** (cluster come bollettino meteo: frase di condizione, barre min-max 24h per nodo, centro attivita'); contratto in `.impeccable/surfaces/cmd-server-web-templates-index-html.md`, schizzo `.impeccable/mocks/decision/assigned.html`. Nota: "Horizon" era il nome provvisorio, sostituito da "Bollettino". `main` e `proxmox-manager-use/` non vengono toccati. Vincoli invariati: un solo `index.html`, vanilla JS, asset vendorizzati, nessun CDN, temi di brand (vedi `PRODUCT.md`).
+
+## Registro modifiche
+
+- 2026-11-02 — creato branch `experiment/ui-redesign`, aggiunto `DOMANDE.md` (D1-D6) — avvio sperimentazione redesign UI/UX, discussione prima del codice — `CLAUDE.md`, `DOMANDE.md`
+- 2026-11-02 — risposte D1-D6 registrate, avvio step 1 (direzione visiva) — `CLAUDE.md`, `DOMANDE.md`
+- 2026-11-02 — scelta direzione "Bollettino" tra 5 (scartate: Riepilogo Salute, Console Grafite, Linee, standard di categoria) — fine step 1, prossimo step 2 implementazione — `.impeccable/surfaces/…index-html.md`, `.impeccable/mocks/decision/`
+- 2026-11-02 — step 2: token "Bollettino" (5 temi + 2 densita'), Inter vendorizzato (Barlow rimosso), nuova shell (barra superiore + menu + briciole), dashboard Bollettino; backend: `density` in config, `config.ValidTheme/ValidDensity`, `SaveConfig` valida a whitelist con campi opzionali, `injectRootClasses` — richiesto da D2/D3/D4 — `cmd/server/web/templates/index.html`, `cmd/server/main.go`, `internal/config`, `internal/handlers/handlers.go`, `web/static/`
+- 2026-11-02 — anteprima su `:8090` e non `:8081`: la 8081 e' occupata da un altro servizio (podman/pasta) — dati finti da `devtools/mockpve/mockpve.py` (D7: nel repo, sola lettura, solo 127.0.0.1; uso nel suo README)
+- 2026-11-02 — D7 risolta (opzione B): `mockpve.py` aggiunto al repo con README; D8 presa d'atto — `devtools/mockpve/`, `DOMANDE.md`, `CLAUDE.md`
+- 2026-11-02 — step 3: hash routing con deep link VM, pannello laterale VM, ricerca Ctrl/⌘ K, avanzamento provisioning, pulizia stili inline; mock con VMID univoci — D1 (tutto) — `cmd/server/web/templates/index.html`, `devtools/mockpve/mockpve.py`
+- 2026-11-02 — revisione finale (2 giri) e fix: pannello VM sensibile allo stato, glifi sostituiti da SVG/parole, attivita' sopra la tabella sotto 1180px, tabella dashboard leggibile su mobile, 'da HH:MM' sotto lo stato del nodo (scartata la tacca sulla barra: l'asse e' il valore, non il tempo); DESIGN.md riscritto — non costruiti: tacche 'dato vecchio/spento' a mezza altezza e View Transitions (promessi nel contratto), barra azioni flottante (D6 aperta) — `DESIGN.md`, `.impeccable/design.json`, `cmd/server/web/templates/index.html`
+- 2026-11-02 — ridisegno pagine Nodi, VM, Batch (restyle), Cluster, Report, Impostazioni con i componenti della dashboard; `nodeState` unico; revisione e fix (stato coerente tra pagine, grafici Report senza colori di stato, tabelle mobile con Stato visibile) — richiesta utente — `cmd/server/web/templates/index.html`, `devtools/mockpve/mockpve.py`

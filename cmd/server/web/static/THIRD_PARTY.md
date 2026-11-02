@@ -12,11 +12,10 @@ Per aggiornare un file: scaricare la nuova versione, confrontarne l'hash con una
 | `xterm-5.3.0.css` | xterm.js 5.3.0 (CSS) | MIT | https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css | hash verificato contro jsDelivr (sha256) | `832f3f2c603b43ad4351ff04970150cc7a873014276db126a6065c6dd81e4872` |
 | `xterm-addon-fit-0.8.0.js` | xterm-addon-fit 0.8.0 | MIT | https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js | hash verificato contro jsDelivr (sha256) | `10f3194c5f17c1786fb7d5db865c1ec8539b6736a318063fd38bdaaf7c46848f` |
 | `fonts/jetbrains-mono-latin-var.woff2` | JetBrains Mono (variabile 300-700, subset latin) | OFL-1.1 | https://fonts.googleapis.com/css2 (Google Fonts) | scaricato dal CSS ufficiale con User-Agent Chrome | `18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e` |
-| `fonts/barlow-condensed-latin-700.woff2` | Barlow Condensed 700 (subset latin) | OFL-1.1 | https://fonts.googleapis.com/css2 (Google Fonts) | scaricato dal CSS ufficiale con User-Agent Chrome | `3787a5a419171630e6890cfa47c4da067474d005cd0ff8dc11ec090fdc3ee2b8` |
-| `fonts/barlow-condensed-latin-900.woff2` | Barlow Condensed 900 (subset latin) | OFL-1.1 | https://fonts.googleapis.com/css2 (Google Fonts) | scaricato dal CSS ufficiale con User-Agent Chrome | `aa01966de3f608a765a172237a3ffc6161fe4c7e3870b1a904dc6437e54c4e24` |
+| `fonts/inter-latin-var.woff2` | Inter (variabile 100-900, subset latin) | OFL-1.1 | https://fonts.googleapis.com/css2?family=Inter:wght@100..900 (Google Fonts, v20) | scaricato con User-Agent Chrome; hash identico al pacchetto `@fontsource-variable/inter` su jsDelivr (`inter-latin-wght-normal.woff2`) | `3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62` |
 
 ## Note
 - Le intestazioni di copyright e licenza dentro i file `.js` e `.css` sono lasciate intatte.
 - **SheetJS**: la versione 0.18.5 usata prima aveva CVE note (CVE-2023-30533, CVE-2024-22363, solo in lettura di file non fidati). Qui si usa 0.20.3, che le corregge. L'app usa SheetJS solo per scrivere l'export Excel.
-- **Font**: JetBrains Mono e Barlow Condensed sono sotto SIL Open Font License 1.1, che consente la ridistribuzione con i font stessi.
+- **Font**: Inter e JetBrains Mono sono sotto SIL Open Font License 1.1, che consente la ridistribuzione con i font stessi.
 - Nessun file qui è codice dell'applicazione: il frontend dell'app resta `web/templates/index.html`.

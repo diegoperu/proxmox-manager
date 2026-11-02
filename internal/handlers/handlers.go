@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -106,15 +107,30 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
+	// Pointers: a missing field leaves the saved value untouched, an empty string resets it to the default.
 	var body struct {
-		Theme string `json:"theme"`
+		Theme   *string `json:"theme"`
+		Density *string `json:"density"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, err, 400)
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		writeError(w, errors.New("richiesta non valida"), 400)
+		return
+	}
+	if body.Theme != nil && !config.ValidTheme(*body.Theme) {
+		writeError(w, errors.New("tema non valido"), 400)
+		return
+	}
+	if body.Density != nil && !config.ValidDensity(*body.Density) {
+		writeError(w, errors.New("densita non valida"), 400)
 		return
 	}
 	cfg := config.Get()
-	cfg.Theme = body.Theme
+	if body.Theme != nil {
+		cfg.Theme = *body.Theme
+	}
+	if body.Density != nil {
+		cfg.Density = *body.Density
+	}
 	if err := config.Update(cfg); err != nil {
 		writeError(w, err, 500)
 		return

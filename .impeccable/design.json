@@ -1,333 +1,176 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-13T09:52:20Z",
+  "generatedAt": "2026-11-02T11:20:36+00:00",
   "title": "Design System: ProxmoxManager",
   "extensions": {
     "colorMeta": {
-      "deck-black": {
+      "sky-night": {
         "role": "neutral",
-        "displayName": "Deck Black",
-        "canonical": "#0a0b0d",
+        "displayName": "Cielo Notte",
+        "canonical": "#0b1424",
         "tonalRamp": [
-          "oklch(15.0% 0.005 264)",
-          "oklch(26.4% 0.005 264)",
-          "oklch(37.9% 0.005 264)",
-          "oklch(49.3% 0.005 264)",
-          "oklch(60.7% 0.005 264)",
-          "oklch(72.1% 0.005 264)",
-          "oklch(83.6% 0.005 264)",
-          "oklch(95.0% 0.005 264)"
+          "#12213b",
+          "#1e3662",
+          "#2a4c89",
+          "#3662b0",
+          "#638acf",
+          "#92adde",
+          "#c0d0ec",
+          "#ebf0f9"
         ]
       },
-      "panel": {
+      "card-night": {
         "role": "neutral",
-        "displayName": "Panel",
-        "canonical": "#111318",
+        "displayName": "Scheda Notte",
+        "canonical": "#13213a",
         "tonalRamp": [
-          "oklch(15.0% 0.011 268)",
-          "oklch(26.4% 0.011 268)",
-          "oklch(37.9% 0.011 268)",
-          "oklch(49.3% 0.011 268)",
-          "oklch(60.7% 0.011 268)",
-          "oklch(72.1% 0.011 268)",
-          "oklch(83.6% 0.011 268)",
-          "oklch(95.0% 0.011 268)"
+          "#13213a",
+          "#1f3760",
+          "#2c4d86",
+          "#3962ad",
+          "#658acd",
+          "#93addc",
+          "#c2d0eb",
+          "#ecf0f9"
         ]
       },
-      "panel-raised": {
+      "text": {
         "role": "neutral",
-        "displayName": "Panel Raised",
-        "canonical": "#181c23",
+        "displayName": "Testo Bollettino",
+        "canonical": "#e9eef7",
         "tonalRamp": [
-          "oklch(15.0% 0.015 262)",
-          "oklch(26.4% 0.015 262)",
-          "oklch(37.9% 0.015 262)",
-          "oklch(49.3% 0.015 262)",
-          "oklch(60.7% 0.015 262)",
-          "oklch(72.1% 0.015 262)",
-          "oklch(83.6% 0.015 262)",
-          "oklch(95.0% 0.015 262)"
+          "#142138",
+          "#22375e",
+          "#304d83",
+          "#3d63a8",
+          "#698bc9",
+          "#96aed9",
+          "#c3d1e9",
+          "#ecf1f8"
         ]
       },
-      "panel-high": {
-        "role": "neutral",
-        "displayName": "Panel High",
-        "canonical": "#1e2330",
-        "tonalRamp": [
-          "oklch(15.0% 0.026 268)",
-          "oklch(26.4% 0.026 268)",
-          "oklch(37.9% 0.026 268)",
-          "oklch(49.3% 0.026 268)",
-          "oklch(60.7% 0.026 268)",
-          "oklch(72.1% 0.026 268)",
-          "oklch(83.6% 0.026 268)",
-          "oklch(95.0% 0.026 268)"
-        ]
-      },
-      "hairline": {
-        "role": "neutral",
-        "displayName": "Hairline",
-        "canonical": "#2a3040",
-        "tonalRamp": [
-          "oklch(15.0% 0.030 269)",
-          "oklch(26.4% 0.030 269)",
-          "oklch(37.9% 0.030 269)",
-          "oklch(49.3% 0.030 269)",
-          "oklch(60.7% 0.030 269)",
-          "oklch(72.1% 0.030 269)",
-          "oklch(83.6% 0.030 269)",
-          "oklch(95.0% 0.030 269)"
-        ]
-      },
-      "hairline-strong": {
-        "role": "neutral",
-        "displayName": "Hairline Strong",
-        "canonical": "#3a4558",
-        "tonalRamp": [
-          "oklch(15.0% 0.036 261)",
-          "oklch(26.4% 0.036 261)",
-          "oklch(37.9% 0.036 261)",
-          "oklch(49.3% 0.036 261)",
-          "oklch(60.7% 0.036 261)",
-          "oklch(72.1% 0.036 261)",
-          "oklch(83.6% 0.036 261)",
-          "oklch(95.0% 0.036 261)"
-        ]
-      },
-      "amber": {
+      "accent": {
         "role": "primary",
-        "displayName": "Amber Signal",
-        "canonical": "#f59e0b",
+        "displayName": "Azzurro Quota",
+        "canonical": "#7fb2ff",
         "tonalRamp": [
-          "oklch(15.0% 0.165 70)",
-          "oklch(26.4% 0.165 70)",
-          "oklch(37.9% 0.165 70)",
-          "oklch(49.3% 0.165 70)",
-          "oklch(60.7% 0.165 70)",
-          "oklch(72.1% 0.165 70)",
-          "oklch(83.6% 0.165 70)",
-          "oklch(95.0% 0.165 70)"
-        ]
-      },
-      "amber-bright": {
-        "role": "primary",
-        "displayName": "Amber Bright",
-        "canonical": "#fbbf24",
-        "tonalRamp": [
-          "oklch(15.0% 0.164 84)",
-          "oklch(26.4% 0.164 84)",
-          "oklch(37.9% 0.164 84)",
-          "oklch(49.3% 0.164 84)",
-          "oklch(60.7% 0.164 84)",
-          "oklch(72.1% 0.164 84)",
-          "oklch(83.6% 0.164 84)",
-          "oklch(95.0% 0.164 84)"
-        ]
-      },
-      "alert-red": {
-        "role": "secondary",
-        "displayName": "Alert Red",
-        "canonical": "#f05050",
-        "tonalRamp": [
-          "oklch(15.0% 0.197 24)",
-          "oklch(26.4% 0.197 24)",
-          "oklch(37.9% 0.197 24)",
-          "oklch(49.3% 0.197 24)",
-          "oklch(60.7% 0.197 24)",
-          "oklch(72.1% 0.197 24)",
-          "oklch(83.6% 0.197 24)",
-          "oklch(95.0% 0.197 24)"
+          "#001e4c",
+          "#003380",
+          "#0047b2",
+          "#005be6",
+          "#3384ff",
+          "#70a9ff",
+          "#adceff",
+          "#e5f0ff"
         ]
       },
       "ok-green": {
         "role": "secondary",
-        "displayName": "OK Green",
-        "canonical": "#22c55e",
+        "displayName": "Verde Operativo",
+        "canonical": "#34c27a",
         "tonalRamp": [
-          "oklch(15.0% 0.192 150)",
-          "oklch(26.4% 0.192 150)",
-          "oklch(37.9% 0.192 150)",
-          "oklch(49.3% 0.192 150)",
-          "oklch(60.7% 0.192 150)",
-          "oklch(72.1% 0.192 150)",
-          "oklch(83.6% 0.192 150)",
-          "oklch(95.0% 0.192 150)"
+          "#103c26",
+          "#1b653f",
+          "#268d59",
+          "#31b572",
+          "#5ed498",
+          "#8ee1b7",
+          "#bfeed6",
+          "#ebfaf2"
         ]
       },
-      "info-blue": {
+      "danger-red": {
         "role": "secondary",
-        "displayName": "Info Blue",
-        "canonical": "#478af7",
+        "displayName": "Rosso Allarme",
+        "canonical": "#ff6b6b",
         "tonalRamp": [
-          "oklch(15.0% 0.177 260)",
-          "oklch(26.4% 0.177 260)",
-          "oklch(37.9% 0.177 260)",
-          "oklch(49.3% 0.177 260)",
-          "oklch(60.7% 0.177 260)",
-          "oklch(72.1% 0.177 260)",
-          "oklch(83.6% 0.177 260)",
-          "oklch(95.0% 0.177 260)"
+          "#4c0000",
+          "#800000",
+          "#b20000",
+          "#e60000",
+          "#ff3333",
+          "#ff7070",
+          "#ffadad",
+          "#ffe5e5"
         ]
       },
-      "qemu-cyan": {
-        "role": "tertiary",
-        "displayName": "QEMU Cyan",
-        "canonical": "#06b6d4",
+      "warn-amber": {
+        "role": "secondary",
+        "displayName": "Ambra Attenzione",
+        "canonical": "#f2a93b",
         "tonalRamp": [
-          "oklch(15.0% 0.126 215)",
-          "oklch(26.4% 0.126 215)",
-          "oklch(37.9% 0.126 215)",
-          "oklch(49.3% 0.126 215)",
-          "oklch(60.7% 0.126 215)",
-          "oklch(72.1% 0.126 215)",
-          "oklch(83.6% 0.126 215)",
-          "oklch(95.0% 0.126 215)"
-        ]
-      },
-      "container-purple": {
-        "role": "tertiary",
-        "displayName": "Container Purple",
-        "canonical": "#ad5ff7",
-        "tonalRamp": [
-          "oklch(15.0% 0.221 305)",
-          "oklch(26.4% 0.221 305)",
-          "oklch(37.9% 0.221 305)",
-          "oklch(49.3% 0.221 305)",
-          "oklch(60.7% 0.221 305)",
-          "oklch(72.1% 0.221 305)",
-          "oklch(83.6% 0.221 305)",
-          "oklch(95.0% 0.221 305)"
-        ]
-      },
-      "text-primary": {
-        "role": "neutral",
-        "displayName": "Text Primary",
-        "canonical": "#e2e8f0",
-        "tonalRamp": [
-          "oklch(15.0% 0.013 256)",
-          "oklch(26.4% 0.013 256)",
-          "oklch(37.9% 0.013 256)",
-          "oklch(49.3% 0.013 256)",
-          "oklch(60.7% 0.013 256)",
-          "oklch(72.1% 0.013 256)",
-          "oklch(83.6% 0.013 256)",
-          "oklch(95.0% 0.013 256)"
-        ]
-      },
-      "text-secondary": {
-        "role": "neutral",
-        "displayName": "Text Secondary",
-        "canonical": "#94a3b8",
-        "tonalRamp": [
-          "oklch(15.0% 0.035 257)",
-          "oklch(26.4% 0.035 257)",
-          "oklch(37.9% 0.035 257)",
-          "oklch(49.3% 0.035 257)",
-          "oklch(60.7% 0.035 257)",
-          "oklch(72.1% 0.035 257)",
-          "oklch(83.6% 0.035 257)",
-          "oklch(95.0% 0.035 257)"
-        ]
-      },
-      "text-muted": {
-        "role": "neutral",
-        "displayName": "Text Muted",
-        "canonical": "#76869d",
-        "tonalRamp": [
-          "oklch(15.0% 0.040 257)",
-          "oklch(26.4% 0.040 257)",
-          "oklch(37.9% 0.040 257)",
-          "oklch(49.3% 0.040 257)",
-          "oklch(60.7% 0.040 257)",
-          "oklch(72.1% 0.040 257)",
-          "oklch(83.6% 0.040 257)",
-          "oklch(95.0% 0.040 257)"
+          "#482d05",
+          "#784b08",
+          "#a7690b",
+          "#d7870e",
+          "#f2ab40",
+          "#f6c479",
+          "#faddb2",
+          "#fdf5e7"
         ]
       }
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Display",
-        "purpose": "Valore KPI delle card dashboard."
-      },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Titolo logo e valori metrica dei nodi."
+        "purpose": "Frase di condizione della dashboard."
       },
-      "title": {
-        "displayName": "Title",
-        "purpose": "Titolo topbar, nome nodo, titolo modal."
-      },
-      "body": {
-        "displayName": "Body",
-        "purpose": "Testo base e controlli."
-      },
-      "table": {
-        "displayName": "Table",
-        "purpose": "Celle di tabella."
+      "display-number": {
+        "displayName": "Number",
+        "purpose": "Valori KPI, cifre tabellari."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Etichette card, form, colonne, sezioni nav; sempre maiuscolo."
+        "purpose": "Tabelle, campi, bottoni, meta."
       },
-      "button": {
-        "displayName": "Button",
-        "purpose": "Pulsanti, maiuscolo."
+      "badge": {
+        "displayName": "Badge",
+        "purpose": "Unico uso dell'11px."
       },
-      "meta": {
-        "displayName": "Meta",
-        "purpose": "Sotto-righe e suggerimenti (uptime, core, hint)."
-      },
-      "input-touch": {
-        "displayName": "Input touch",
-        "purpose": "Campi a 16px solo con puntatore grosso (niente zoom su iOS)."
+      "mono": {
+        "displayName": "Data mono",
+        "purpose": "VMID, IP, log."
       }
     },
     "shadows": [
       {
-        "name": "status-glow-ok",
-        "value": "0 0 6px #22c55e",
-        "purpose": "Pallino connessione OK."
-      },
-      {
-        "name": "status-glow-err",
-        "value": "0 0 6px #ef4444",
-        "purpose": "Pallino connessione KO."
-      },
-      {
-        "name": "modal-scrim",
-        "value": "rgba(0,0,0,.78) + backdrop-filter: blur(4px)",
-        "purpose": "Sfondo dietro i modal."
+        "name": "shadow-pop",
+        "value": "0 24px 60px -12px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.3)",
+        "purpose": "Solo superfici sovrapposte: modal, pannello laterale, ricerca, toast."
       }
     ],
     "motion": [
       {
-        "name": "quick",
-        "value": "all .13s",
-        "purpose": "Hover su nav, pulsanti, chip, input."
+        "name": "ease",
+        "value": "cubic-bezier(.2,.8,.2,1)",
+        "purpose": "Barre, punto adesso, pannello laterale, modal."
       },
       {
-        "name": "overlay",
-        "value": "opacity .18s, transform .18s",
-        "purpose": "Apertura modal e ingresso toast."
+        "name": "now-slide",
+        "value": "left/width .6s var(--ease)",
+        "purpose": "Intervallo min-max e punto adesso; disattivato con prefers-reduced-motion."
       },
       {
-        "name": "bar",
-        "value": "width .35s",
-        "purpose": "Riempimento barre di utilizzo."
+        "name": "state-change",
+        "value": ".12s",
+        "purpose": "Hover di bottoni, voci menu, campi."
       }
     ],
     "breakpoints": [
       {
-        "name": "wide",
-        "value": "1200px"
+        "name": "dash-single-column",
+        "value": "1180px"
       },
       {
-        "name": "mid",
+        "name": "drawer",
         "value": "850px"
       },
       {
-        "name": "narrow",
+        "name": "compact-rows",
+        "value": "700px"
+      },
+      {
+        "name": "phone",
         "value": "650px"
       }
     ]
@@ -335,147 +178,142 @@
   "components": [
     {
       "name": "Primary Button",
-      "kind": "button",
+      "kind": "custom",
       "refersTo": "button-primary",
-      "description": "Azione primaria; una per vista.",
-      "html": "<button class=\"ds-btn-primary\">AVVIA</button>",
-      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:3px;border:none;background:var(--amber);color:#000;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .13s}.ds-btn-primary:hover{background:var(--amber2)}.ds-btn-primary:focus-visible{outline:2px solid var(--amber2);outline-offset:2px}"
+      "description": "Unica azione primaria della vista.",
+      "html": "<button class=\"ds-btn ds-primary\">Nuova VM</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 14px;border-radius:8px;border:1px solid transparent;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;transition:background .12s,border-color .12s,color .12s}.ds-primary{background:#7fb2ff;color:#06142b}.ds-primary:hover{background:#a6c8ff}.ds-btn:focus-visible{outline:2px solid #7fb2ff;outline-offset:2px}"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "custom",
+      "refersTo": "button-destructive",
+      "description": "A contorno finche' non ha hover o focus.",
+      "html": "<button class=\"ds-btn ds-del\">Elimina</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:8px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;transition:background .12s,border-color .12s}.ds-del{background:transparent;color:#ff6b6b;border:1px solid rgba(255,107,107,.45)}.ds-del:hover,.ds-del:focus-visible{background:rgba(255,107,107,.15);border-color:#ff6b6b;outline:none}"
     },
     {
       "name": "Ghost Button",
-      "kind": "button",
+      "kind": "custom",
       "refersTo": "button-ghost",
-      "description": "Azione secondaria; bordo che si accende in ambra.",
-      "html": "<button class=\"ds-btn-ghost\">ANNULLA</button>",
-      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:3px;background:transparent;color:var(--text2);border:1px solid var(--border2);font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .13s}.ds-btn-ghost:hover{border-color:var(--amber);color:var(--amber)}.ds-btn-ghost:focus-visible{outline:2px solid var(--amber);outline-offset:2px}"
+      "description": "Azione secondaria.",
+      "html": "<button class=\"ds-btn ds-ghost\">Annulla</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:8px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}.ds-ghost{background:transparent;color:#a9b6cc;border:1px solid rgba(160,190,240,.30)}.ds-ghost:hover{border-color:#7fb2ff;color:#7fb2ff}"
     },
     {
-      "name": "Danger Button",
-      "kind": "button",
-      "refersTo": "button-danger",
-      "description": "Azioni distruttive: stop, elimina.",
-      "html": "<button class=\"ds-btn-danger\">ELIMINA</button>",
-      "css": ".ds-btn-danger{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:3px;background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.3);font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .13s}.ds-btn-danger:hover{background:rgba(239,68,68,.25)}.ds-btn-danger:focus-visible{outline:2px solid var(--red);outline-offset:2px}"
-    },
-    {
-      "name": "Text Input",
+      "name": "Field",
       "kind": "input",
       "refersTo": "input",
-      "description": "Campo di testo; il focus accende il bordo in ambra.",
-      "html": "<input class=\"ds-input\" placeholder=\"10.75.4.20/24\">",
-      "css": ".ds-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:3px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .13s;width:220px}.ds-input::placeholder{color:var(--text3)}.ds-input:focus{border-color:var(--amber)}"
-    },
-    {
-      "name": "Status Badge",
-      "kind": "chip",
-      "refersTo": "badge-running",
-      "description": "Stato VM: running verde, stopped rosso, paused blu.",
-      "html": "<span class=\"ds-badge\">running</span>",
-      "css": ".ds-badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:2px;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.3)}"
-    },
-    {
-      "name": "Node Chip",
-      "kind": "chip",
-      "refersTo": "node-chip",
-      "description": "Selettore nodo a pillola; attivo in ambra.",
-      "html": "<span class=\"ds-chip active\">pve1</span>",
-      "css": ".ds-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .13s;white-space:nowrap}.ds-chip:hover{border-color:var(--amber);color:var(--amber)}.ds-chip.active{background:var(--amber-dim);border-color:var(--amber);color:var(--amber);font-weight:600}"
-    },
-    {
-      "name": "KPI Card",
-      "kind": "card",
-      "refersTo": "card",
-      "description": "Card dashboard: etichetta, valore condensed, sotto-riga.",
-      "html": "<div class=\"ds-card\"><div class=\"ds-card-t\">VM in esecuzione</div><div class=\"ds-card-v\">42</div><div class=\"ds-card-s\">su 58 totali</div></div>",
-      "css": ".ds-card{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:14px;position:relative;overflow:hidden;width:200px;color:var(--text)}.ds-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent)}.ds-card-t{font-size:9px;letter-spacing:.18em;color:var(--text3);text-transform:uppercase;margin-bottom:8px}.ds-card-v{font-family:var(--cond);font-size:40px;font-weight:900;line-height:1;color:var(--green)}.ds-card-s{font-size:10px;color:var(--text3);margin-top:5px}"
+      "description": "Campo 32px con focus azzurro.",
+      "html": "<input class=\"ds-inp\" placeholder=\"Cerca una VM\">",
+      "css": ".ds-inp{background:#182a48;border:1px solid rgba(160,190,240,.16);color:#e9eef7;height:32px;padding:0 10px;border-radius:8px;font:12px Inter,system-ui,sans-serif;outline:none}.ds-inp:focus{border-color:#7fb2ff}.ds-inp::placeholder{color:#8394b0}"
     },
     {
       "name": "Nav Item",
       "kind": "nav",
-      "refersTo": "card",
-      "description": "Voce sidebar; attiva con filo e testo ambra.",
-      "html": "<div class=\"ds-ni active\">Dashboard</div>",
-      "css": ".ds-ni{display:flex;align-items:center;gap:9px;padding:8px 16px;width:200px;color:var(--text2);cursor:pointer;font-family:var(--mono);font-size:11.5px;font-weight:500;border-left:2px solid transparent;transition:all .13s}.ds-ni:hover{color:var(--text);background:rgba(255,255,255,.03)}.ds-ni.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}"
+      "refersTo": "nav-item",
+      "description": "Voce della rail, attiva con velo accento.",
+      "html": "<button class=\"ds-ni ds-on\">Panoramica</button> <button class=\"ds-ni\">Nodi</button>",
+      "css": ".ds-ni{display:flex;align-items:center;width:200px;height:32px;padding:0 10px;margin-bottom:2px;border:0;border-radius:8px;background:transparent;color:#a9b6cc;font:500 13px Inter,system-ui,sans-serif;cursor:pointer}.ds-ni:hover{color:#e9eef7;background:rgba(255,255,255,.045)}.ds-on{color:#7fb2ff;background:rgba(127,178,255,.14)}"
     },
     {
-      "name": "Data Table",
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Velo 15% + bordo 32% + parola.",
+      "html": "<span class=\"ds-b ds-ok\">In esecuzione</span> <span class=\"ds-b ds-off\">Fermo</span>",
+      "css": ".ds-b{display:inline-flex;padding:2px 8px;border-radius:6px;font:600 11px Inter,system-ui,sans-serif}.ds-ok{background:rgba(52,194,122,.15);color:#34c27a;border:1px solid rgba(52,194,122,.32)}.ds-off{background:rgba(255,107,107,.15);color:#ff6b6b;border:1px solid rgba(255,107,107,.32)}"
+    },
+    {
+      "name": "Step Chip",
+      "kind": "chip",
+      "refersTo": "chip-step",
+      "description": "Passo del provisioning: linea tratteggiata, piena se fatto.",
+      "html": "<span class=\"ds-st ds-done\">Template</span> <span class=\"ds-st ds-cur\">Rete</span> <span class=\"ds-st\">Riepilogo</span>",
+      "css": ".ds-st{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:20px;border:1px solid rgba(160,190,240,.16);background:#13213a;color:#8394b0;font:500 12px Inter,system-ui,sans-serif}.ds-st::before{content:'';width:12px;border-top:2px dashed currentColor}.ds-done{color:#34c27a;border-color:rgba(52,194,122,.35)}.ds-done::before{border-top-style:solid}.ds-cur{color:#7fb2ff;border-color:#7fb2ff}"
+    },
+    {
+      "name": "Node Row Track",
       "kind": "custom",
       "refersTo": "card",
-      "description": "Componente firma: intestazione sticky 9px, celle 12px, barre di utilizzo.",
-      "html": "<div class=\"ds-tw\"><table class=\"ds-table\"><thead><tr><th>VMID</th><th>Nome</th><th>Stato</th></tr></thead><tbody><tr><td>101</td><td class=\"ds-tn\">web-01</td><td>running</td></tr><tr><td>102</td><td class=\"ds-tn\">db-01</td><td>stopped</td></tr></tbody></table></div>",
-      "css": ".ds-tw{border:1px solid var(--border);border-radius:4px;overflow:hidden;width:320px}.ds-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}.ds-table thead{background:var(--bg3)}.ds-table th{padding:7px 11px;text-align:left;font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);font-weight:500}.ds-table td{padding:7px 11px;border-bottom:1px solid rgba(42,48,64,.45);color:var(--text2);white-space:nowrap}.ds-table tr:last-child td{border-bottom:none}.ds-table tr:hover td{background:rgba(255,255,255,.018)}.ds-tn{color:var(--text);font-weight:500}"
+      "description": "Intervallo min-max 24h con punto adesso e tacca di soglia all'85%.",
+      "html": "<div class=\"ds-track\"><div class=\"ds-range\"></div><div class=\"ds-now\"></div></div>",
+      "css": ".ds-track{position:relative;width:220px;height:6px;border-radius:8px;background:#213a60;margin:12px}.ds-track::after{content:'';position:absolute;left:85%;top:-3px;height:12px;border-left:1px dashed rgba(131,148,176,.55)}.ds-range{position:absolute;top:0;left:30%;width:35%;height:6px;border-radius:8px;background:#7fb2ff}.ds-now{position:absolute;top:-3px;left:52%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#e9eef7;border:3px solid #13213a;box-sizing:border-box}"
+    },
+    {
+      "name": "State Line",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Stato = linea + parola: piena ok, tratteggiata offline.",
+      "html": "<span class=\"ds-s ds-sok\">Online</span> <span class=\"ds-s ds-soff\">Offline</span>",
+      "css": ".ds-s{display:inline-flex;align-items:center;gap:7px;font:500 12px Inter,system-ui,sans-serif}.ds-s::before{content:'';width:14px;border-top:2px solid currentColor}.ds-sok{color:#34c27a}.ds-soff{color:#ff6b6b}.ds-soff::before{border-top-style:dashed}"
     }
   ],
   "narrative": {
-    "northStar": "The Flight Deck",
-    "overview": "Plancia di comando per chi legge lo stato di un'infrastruttura tutto il giorno. Fondo quasi nero, testo monospace, numeri grandi in condensed, un solo accento ambra che dice \"qui puoi agire\" o \"qui sei\". Tutto è denso e piccolo: 9-13px, tabelle compatte, etichette in maiuscolo spaziato come sigle di strumento. L'operatore scansiona, non legge.\n\nIl colore ha un lavoro: stato. Verde, rosso, blu, ciano e viola indicano condizione della VM o tipo di risorsa, mai decorazione. L'ambra è l'unica voce di marca ed è anche selezione, hover, focus e azione primaria. La variabile CSS si chiama `--amber` in tutti i temi; negli altri temi cambia solo il valore (verde lime in eva01, pesca in catppuccino).\n\nIl sistema rifiuta l'ornamento: niente ombre decorative, niente gradienti riempitivi, niente icone grandi. Cinque temi (auto, dark, light, eva01, catppuccino) sono parte dell'identità e usano gli stessi nomi di variabile.",
+    "northStar": "Il Bollettino",
+    "overview": "Il cluster e' letto come un bollettino meteo notturno. Una frase di condizione (\"Quasi sereno - 3 nodi su 4 operativi\", titolo 30px con icona 48px) sta sopra i numeri e non li sostituisce; sotto, una striscia di quattro KPI con storia recente e una tabella di nodi dove ogni riga mostra l'escursione min-max di CPU e RAM nelle ultime 24h con un punto \"adesso\". Il sistema rifiuta la griglia di schede KPI piu' grafico ad area che ogni console cloud ripete.\n\nIl mondo e' un cielo blu profondo con schede un gradino piu' chiare e filetti azzurri a bassa opacita'; il tema chiaro e' la stessa struttura in \"alba\" lattiginosa. La densita' e' da sala operativa, non da vetrina: due densita' (comoda, compatta) sulle stesse proporzioni, nessun effetto che faccia aspettare. Lo stato non e' mai solo colore: colore + forma della linea + parola.",
     "keyCharacteristics": [
-      "Monospace 12-13px per dati, Barlow Condensed per titoli e numeri chiave.",
-      "Etichette 9px in maiuscolo con spaziatura larga (0.13-0.18em).",
-      "Profondità tonale a quattro gradini, bordi 1px, quasi nessuna ombra.",
-      "Un accento (`--amber`) rimappato per tema.",
-      "Angoli piccoli: 2-5px, tranne i chip nodo (pillola)."
+      "Frase di condizione sopra i numeri; l'eccezione (il nodo che devia) in rosso nel sottotitolo.",
+      "Stato = colore + forma della linea (piena ok, tratteggiata offline/in corso, spessa 3px errore) + parola.",
+      "Inter per l'interfaccia con cifre tabellari, JetBrains Mono solo per identificatori, IP, log.",
+      "Raggi 8-16px, filetti a 1px, un solo colore di marca per tema.",
+      "Vetro smerigliato in quattro punti soltanto; niente ombre sulle schede a riposo.",
+      "Cinque temi con nome fisso: auto (segue il sistema), dark, light, eva01, catppuccino - stessa struttura, palette diverse."
     ],
     "rules": [
       {
-        "name": "The Warn Is Not Brand Rule",
-        "body": "L'attenzione (soglie, barre `.warn2`, valori sopra il 60%) usa `--warn`, non `--amber`. Di norma coincidono; in un tema dove il marchio si confonde con \"ok\" (eva01) si separano.",
+        "name": "The State Is Never Colour Alone Rule",
+        "body": "Ogni stato porta forma della linea e parola oltre al colore (`.st`, `.toast::before`, `.task .sl`, `.pv-step::before`). Un nuovo stato definisce prima la forma.",
         "section": "colors"
       },
       {
-        "name": "The 4.5 Floor Rule",
-        "body": "Ogni colore usato come testo raggiunge 4.5:1 su `--bg`, `--bg2` e `--bg3` in tutti e cinque i temi, compresi i badge sul loro velo. Un nuovo ruolo colore si verifica prima di entrare nel sistema.",
+        "name": "The One Brand Rule",
+        "body": "Il marchio e' `--accent`; ambra/verde/rosso significano solo stato. Un grafico o un componente nuovo legge i token, mai esadecimali letterali.",
         "section": "colors"
       },
       {
-        "name": "The Fill Is Not Text Rule",
-        "body": "Dove un colore è sia riempimento sia testo (ambra), i due ruoli hanno variabili separate (`--amber` testo, `--amber-fill` riempimento): così il tema chiaro scurisce il testo senza spegnere il bottone.",
+        "name": "The Contrast Floor Rule",
+        "body": "Ogni colore usato come testo e' >=4.5:1 su bg/bg2/bg3 in tutti i temi, badge compresi (verificato per progetto, non rimisurato in questa passata).",
         "section": "colors"
       },
       {
-        "name": "The One Voice Rule",
-        "body": "L'ambra è l'unico accento di marca. Le altre tinte indicano stato o tipo di risorsa e non si usano come decorazione.",
-        "section": "colors"
-      },
-      {
-        "name": "The Semantic Variable Rule",
-        "body": "Il codice usa `--amber`, `--green` ecc. come ruoli. Un tema cambia il valore, non il nome: non scrivere colori letterali nei componenti.",
-        "section": "colors"
-      },
-      {
-        "name": "The Number Is Condensed Rule",
-        "body": "Le metriche grandi sono sempre Barlow Condensed, con cifre tabulari (`tabular-nums`): i valori non ballano quando si aggiornano. Gli identificatori (VMID, IP, nodo) restano in mono.",
+        "name": "The Closed Scale Rule",
+        "body": "Scala chiusa 30/26/17/15/13/12/11 (piu' 14px per nome-nodo e sottotitolo condizione, 20px per i valori `.mv`, 16px solo input con `pointer:coarse`). Il 11 e' riservato ai badge. Nessun valore nuovo senza passare da questo file.",
         "section": "typography"
       },
       {
-        "name": "The Small Caps Label Rule",
-        "body": "Ogni etichetta di campo o colonna è 9px, maiuscola e spaziata. Nessuna etichetta in sentence case.",
+        "name": "The Mono For Identifiers Rule",
+        "body": "Il mono e' per VMID, IP, log, mai per titoli o numeri di metrica.",
         "section": "typography"
       },
       {
-        "name": "The Flat-By-Default Rule",
-        "body": "Le superfici non hanno ombre a riposo. Il glow serve solo a dire \"stato vivo\".",
+        "name": "The Four Glass Rule",
+        "body": "Vetro solo su intestazione tabella sticky, toast, scrim modal, cassetto mobile. Una scheda in vetro e' un errore.",
         "section": "elevation"
       },
       {
-        "name": "The Ramp Is Closed Rule",
-        "body": "Le dimensioni ammesse sono quelle dei ruoli sopra (40, 22, 17, 13, 12, 11, 10, 9). Un valore nuovo si aggiunge qui prima di comparire nel CSS.",
-        "section": "typography"
+        "name": "The Flat At Rest Rule",
+        "body": "A riposo nessuna ombra; l'ombra pop appartiene alle sole superfici sovrapposte.",
+        "section": "elevation"
       }
     ],
     "dos": [
-      "**Do** usare le variabili semantiche (`--amber`, `--green`, `--bg2`) in ogni nuovo stile, per far funzionare tutti i temi.",
-      "**Do** tenere etichette in 9px maiuscolo spaziato e numeri grandi in Barlow Condensed.",
-      "**Do** codificare lo stato con la tinta più un testo (badge con parola), non con il solo colore.",
-      "**Do** dare ai controlli distruttivi la variante danger rossa, separata dall'ambra.",
-      "**Do** verificare ogni nuova superficie in tutti e cinque i temi, compresi eva01 e catppuccino."
+      "**Do** aprire ogni vista di riepilogo con una frase che dice la condizione, poi i numeri.",
+      "**Do** dare a ogni stato colore + forma della linea + parola.",
+      "**Do** leggere colori da `--accent`, `--green`, `--warn`, `--red` e dai token di superficie; nei grafici usare i token del tema.",
+      "**Do** tenere i distruttivi a contorno e separati dal primario; il pieno rosso solo nella conferma.",
+      "**Do** usare cifre tabellari per ogni numero e il mono per ID, IP e log.",
+      "**Do** rispettare `prefers-reduced-motion`: lo stato resta, il movimento no."
     ],
     "donts": [
-      "**Don't** usare l'ambra come decorazione o su più di una azione primaria per vista.",
-      "**Don't** aggiungere ombre a riposo, gradienti riempitivi o angoli superiori a 5px (eccetto i chip pillola).",
-      "**Don't** scrivere colori esadecimali nei componenti: passano da variabile.",
-      "**Don't** aumentare il padding per rendere l'interfaccia \"più ariosa\": la densità serve all'operatore.",
-      "**Don't** introdurre un framework JS o un secondo accento di marca."
+      "**Don't** fare una griglia di schede KPI affiancate a un grafico ad area come primo schermo.",
+      "**Don't** indicare lo stato con il solo colore.",
+      "**Don't** usare bordi colorati sul lato sinistro di schede, righe o avvisi.",
+      "**Don't** applicare il vetro a schede o pannelli fuori dai quattro punti ammessi.",
+      "**Don't** introdurre dimensioni di testo fuori scala o usare l'11px fuori dai badge.",
+      "**Don't** aggiungere ombre alle schede a riposo.",
+      "**Don't** usare il marchio (azzurro) per significare salute o errore.",
+      "**Don't** rinominare i temi (auto, dark, light, eva01, catppuccino) ne' aggiungere framework o font da CDN."
     ]
   }
 }

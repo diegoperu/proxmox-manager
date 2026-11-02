@@ -12,3 +12,9 @@ test-reports/
 
 # Report di revisione design (lavoro locale, contengono percorsi della home)
 .impeccable/critique/
+
+# File locali di Impeccable (bozze di design, schermate di revisione, contratti di superficie)
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/review/
+.impeccable/surfaces/
