@@ -114,6 +114,7 @@ func main() {
 		r.Get("/report", h.GetReportData)
 		r.Get("/top", h.GetTopVMs)
 		r.Get("/ceph/summary", h.GetCephSummary())
+		r.Get("/gpus", h.GetGPUs())
 		r.Get("/ceph", h.GetCeph())
 	})
 
