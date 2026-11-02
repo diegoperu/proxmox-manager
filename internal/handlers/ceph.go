@@ -108,7 +108,8 @@ type cephOverview struct {
 		In    int `json:"in"`
 		Total int `json:"total"`
 	} `json:"mon_quorum"`
-	Updated int64 `json:"updated"`
+	Updated int64    `json:"updated"`
+	quorum  []string // monitor names in quorum: on Proxmox they are node names, tried first for per-node calls
 }
 
 type cephOSD struct {
@@ -383,6 +384,11 @@ func normalizeCephStatus(raw json.RawMessage, now time.Time) (cephOverview, erro
 	o.Recovery = rc
 
 	o.MonQuorum.In, o.MonQuorum.Total = len(st.QuorumNames), len(st.MonMap.Mons)
+	for _, n := range st.QuorumNames {
+		if len(o.quorum) < 64 && nodeNamePattern.MatchString(n) {
+			o.quorum = append(o.quorum, n)
+		}
+	}
 	return o, nil
 }
 
@@ -599,26 +605,48 @@ func fetchCephOverview(c cephAPI, now time.Time) (cephOverview, error) {
 	return normalizeCephStatus(raw, now)
 }
 
-// firstOnlineNode picks the node the per-node Ceph calls are sent to.
-func firstOnlineNode(c cephAPI) (string, error) {
+// cephNodeCandidates lists the online nodes the per-node Ceph calls may go to, monitor hosts first:
+// a node of a Ceph cluster without the Ceph packages answers 500 to /nodes/{n}/ceph/*.
+func cephNodeCandidates(c cephAPI, prefer []string) ([]string, error) {
 	raw, err := c.GetNodes()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var nodes []struct {
 		Node   string `json:"node"`
 		Status string `json:"status"`
 	}
 	if json.Unmarshal(raw, &nodes) != nil {
-		return "", errors.New("elenco nodi non valido")
+		return nil, errors.New("elenco nodi non valido")
 	}
+	online := map[string]bool{}
+	var rest []string
 	for _, n := range nodes {
-		if n.Status == "online" && nodeNamePattern.MatchString(n.Node) {
-			return n.Node, nil
+		if n.Status == "online" && nodeNamePattern.MatchString(n.Node) && !online[n.Node] {
+			online[n.Node] = true
+			rest = append(rest, n.Node)
 		}
 	}
-	return "", errors.New("nessun nodo in linea")
+	out := []string{}
+	used := map[string]bool{}
+	for _, n := range prefer {
+		if online[n] && !used[n] {
+			used[n] = true
+			out = append(out, n)
+		}
+	}
+	for _, n := range rest {
+		if !used[n] {
+			out = append(out, n)
+		}
+	}
+	if len(out) == 0 {
+		return nil, errors.New("nessun nodo in linea")
+	}
+	return out, nil
 }
+
+const cephNodeAttempts = 3
 
 func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 	ov, err := fetchCephOverview(c, now)
@@ -628,10 +656,22 @@ func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 	}
 	full := cephFull{cephOverview: ov, OSDs: []cephOSD{}, Pools: []cephPool{}, Mons: []cephService{}, Mgrs: []cephService{},
 		Mdss: []cephService{}, Flags: []cephFlag{}, Partial: []string{}}
-	node, err := firstOnlineNode(c)
-	if err != nil {
+	// The OSD tree decides the node: the first candidate that answers is used for the other per-node calls.
+	node := ""
+	if cands, err := cephNodeCandidates(c, ov.quorum); err == nil {
+		for i, n := range cands {
+			if i >= cephNodeAttempts {
+				break
+			}
+			if raw, err := c.GetCephOSD(n); err == nil {
+				node = n
+				full.OSDs = normalizeCephOSDs(raw)
+				break
+			}
+		}
+	}
+	if node == "" {
 		full.Partial = append(full.Partial, "osd", "pools", "mon", "mgr", "mds")
-		node = ""
 	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -650,7 +690,6 @@ func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 		}()
 	}
 	if node != "" {
-		part("osd", func() (json.RawMessage, error) { return c.GetCephOSD(node) }, func(r json.RawMessage) { full.OSDs = normalizeCephOSDs(r) })
 		part("pools", func() (json.RawMessage, error) { return c.GetCephPools(node) }, func(r json.RawMessage) { full.Pools = normalizeCephPools(r) })
 		part("mon", func() (json.RawMessage, error) { return c.GetCephServices(node, "mon") }, func(r json.RawMessage) { full.Mons = normalizeCephServices(r) })
 		part("mgr", func() (json.RawMessage, error) { return c.GetCephServices(node, "mgr") }, func(r json.RawMessage) { full.Mgrs = normalizeCephServices(r) })

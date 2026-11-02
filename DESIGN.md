@@ -264,6 +264,9 @@ Sezione "Log del kernel" nel pannello: pulsante primario "Leggi dmesg" (diventa 
 ### Barra di selezione (lista VM)
 Barra sticky in basso al centro dell'area contenuto, raggio 14px, vetro e ombra pop: conteggio, avviso se ci sono VM selezionate nascoste dai filtri, poi Start, Shutdown, Reboot, "Altre azioni in Batch" e Deseleziona. Non esegue nulla: apre Batch con VM e azione preselezionate, dove restano conferma e log. Su mobile occupa tutta la larghezza.
 
+### Ceph (osservatorio meteo)
+Pagina presente solo dove Ceph risponde. Stesso titolo di condizione della panoramica, poi tre strumenti in pannelli: pluviometro (capacita', tubo che si riempie con tacche tratteggiate a 85/90/95), anemometro (lettura/scrittura e IOPS, curva degli ultimi 10 minuti), fronte (recupero: linea con i triangoli del fronte freddo fin dove i dati sono ricostruiti, pallino che avanza). Sotto: avvisi meteo (gravita' = parola + spessore e stile della linea, codice in mono, frase italiana, originale nel tooltip), stazioni OSD (una riga per nodo, una tessera per OSD riempita come un mini pluviometro; giu' = bordo tratteggiato rosso, fuori = punteggiato), barra dei PG per stato con legenda a parole, pool e servizi. In panoramica un riquadro cliccabile sotto i KPI. Aggiornamento ogni 5 s che riscrive solo le sezioni cambiate.
+
 ### Pagine secondarie
 Componenti condivisi: barra strumenti (`.toolbar`) con campo di ricerca con icona, controllo segmentato (`.seg`), riepilogo a destra; pannello (`.panel`, titolo 15px/600); scheda nodo (`.nc`) con tre misuratori CPU/RAM/Disco nella stessa lingua della riga nodo; tessere tema con anteprima dei colori; elenco a definizioni (`.dl`); stato vuoto (`.empty`). Lo stato del nodo ha una sola definizione (`nodeState`) per Panoramica, Nodi e Cluster.
 

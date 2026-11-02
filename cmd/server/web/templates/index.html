@@ -696,7 +696,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.74.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.75.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -736,7 +736,7 @@ html.catppuccino{
 
     <!-- ██ CEPH ██ -->
     <div class="page" id="page-ceph">
-      <div class="ceph-top"><div class="cond" id="ceph-cond" aria-live="polite"></div><div class="ceph-upd" id="ceph-upd" role="status"></div></div>
+      <div class="ceph-top"><div class="cond" id="ceph-cond" aria-live="polite"></div><div class="ceph-upd" id="ceph-upd"></div></div>
       <div id="ceph-body"></div>
     </div>
 
@@ -2193,10 +2193,11 @@ const Ceph={
     const downN=Math.max(0,o.osd_counts.total-o.osd_counts.up);
     const parts=[]; let short='';
     if(o.health==='HEALTH_ERR'){bump('bad');short='Ceph in errore';}
-    else if(o.health==='HEALTH_WARN'||o.health==='HEALTH_UNKNOWN'){bump('warn');short='Ceph con avvisi';}
+    else if(o.health==='HEALTH_WARN'){bump('warn');short='Ceph con avvisi';}
+    else if(o.health!=='HEALTH_OK'){bump('warn');short='stato di Ceph sconosciuto';}
     if(cap>=th.full){bump('bad');short='Ceph quasi pieno';parts.push({k:'bad',t:`capacità al ${Math.round(cap)}%`});}
     else if(cap>=th.nearfull){bump('warn');parts.push({k:'warn',t:`capacità al ${Math.round(cap)}%`});}
-    if(downN>0)parts.push({k:'warn',t:`${downN} OSD ${downN===1?'giù':'giù'}`});
+    if(downN>0)parts.push({k:'warn',t:`${downN} OSD giù`});
     if(o.recovery&&o.recovery.active){const p=o.recovery.progress_pct;parts.push({k:'info',t:p==null?'recupero dei dati in corso':`recupero dei dati ${Math.round(p)}%`});}
     const live=(o.checks||[]).filter(c=>!c.muted);
     return{level,short,parts,checks:live,downN,cap};
@@ -2221,7 +2222,7 @@ const Ceph={
     const live=st.checks.slice(0,2).map(c=>Ceph.checkText(c).text); if(st.checks.length>2)live.push(`+${st.checks.length-2} avvisi`);
     const sub=[`${o.osd_counts.up}/${o.osd_counts.total} OSD`,...subs,...(st.level==='ok'||subs.length?[]:live)].join(' · ');
     const word=st.level==='bad'?'Attenzione':st.level==='warn'?'Quasi sereno':'Sereno';
-    const cls=st.cap>=95?'crit2':st.cap>=85?'warn2':'ok2';
+    const cls={r:'crit2',w:'warn2'}[Ceph.lvl(st.cap,o.thresholds)]||'ok2';
     host.hidden=false;
     host.innerHTML=`
       <svg class="cs-ico ${st.level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[st.level]}</svg>
@@ -2235,7 +2236,7 @@ const Ceph={
   async load(){
     Ceph.stop();
     const seq=Ceph.seq, idx=ClusterMgr.current, body=document.getElementById('ceph-body');
-    if(!Ceph.data||Ceph.dataIdx!==idx){Ceph.data=null;document.getElementById('ceph-cond').innerHTML='';body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura di Ceph…</div>';}
+    if(!Ceph.data||Ceph.dataIdx!==idx){Ceph.data=null;Ceph.put(document.getElementById('ceph-cond'),'');body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura di Ceph…</div>';}
     await Ceph.tick(seq,idx);
   },
   async tick(seq,idx){
@@ -2267,10 +2268,18 @@ const Ceph={
     el.className='ceph-upd'+(old?' stale':'');
     el.innerHTML=old?`<i></i>non raggiungibile · dati delle ${esc(Ceph.hhmmss(Ceph.lastOk/1000))}`:`<i></i>aggiornato ${esc(Ceph.hhmmss(Ceph.lastOk/1000))} · ogni 5 s`;
   },
+  // Scrive solo se il contenuto e' cambiato: ogni 5 s cambia l'I/O, ma avvisi, tessere e tabelle restano
+  // fermi (niente perdita di selezione o tooltip) e la condizione (aria-live) si annuncia solo quando cambia davvero.
+  put(el,html){if(el._h!==html){el._h=html;el.innerHTML=html;}},
+  section(k){
+    const body=document.getElementById('ceph-body');
+    if(!body.querySelector('[data-cs]'))body.innerHTML=['inst','alerts','stations','pgs','pools','partial'].map(x=>`<div data-cs="${x}"></div>`).join('');
+    return body.querySelector(`[data-cs="${k}"]`);
+  },
   paint(){
     const o=Ceph.data, cond=document.getElementById('ceph-cond'), body=document.getElementById('ceph-body');
     if(!o||!o.available){
-      cond.innerHTML='';
+      Ceph.put(cond,'');
       const why=o&&o.reason==='forbidden'?'Il token non ha il permesso di leggere lo stato di Ceph (serve Sys.Audit).':'Questo cluster non ha Ceph.';
       body.innerHTML=`<div class="panel"><div class="empty">${esc(why)}<div style="margin-top:12px"><button type="button" class="btn bg2 sm" onclick="App.nav('dashboard')">Torna alla panoramica</button></div></div></div>`;
       return;
@@ -2281,11 +2290,15 @@ const Ceph={
     for(const p of st.parts.filter(p=>!/OSD/.test(p.t)))lead.push(p.k==='info'?esc(p.t):`<span class="${p.k==='bad'?'bad':'wrn'}">${esc(p.t)}</span>`);
     if(!lead.length&&st.checks.length)lead.push(`<span class="wrn">${esc(Ceph.checkText(st.checks[0]).text)}</span>`);
     const sub=lead.length?lead.join(' · '):`Nessuna anomalia · capacità ${Math.round(st.cap)}%`;
-    cond.innerHTML=`
+    Ceph.put(cond,`
       <svg class="cond-ico ${st.level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[st.level]}</svg>
-      <div><h2>${esc(Ceph.title(st,o))}</h2><p>${sub}</p></div>`;
-    body.innerHTML=Ceph.instruments(o,st)+Ceph.alerts(o)+Ceph.stations(o)+Ceph.pgs(o)+Ceph.poolsAndServices(o)+
-      (o.partial&&o.partial.length?`<p class="cnote" style="margin-top:12px">Non è stato possibile leggere: ${esc(o.partial.join(', '))}.</p>`:'');
+      <div><h2>${esc(Ceph.title(st,o))}</h2><p>${sub}</p></div>`);
+    Ceph.put(Ceph.section('inst'),Ceph.instruments(o,st));
+    Ceph.put(Ceph.section('alerts'),Ceph.alerts(o));
+    Ceph.put(Ceph.section('stations'),Ceph.stations(o));
+    Ceph.put(Ceph.section('pgs'),Ceph.pgs(o));
+    Ceph.put(Ceph.section('pools'),Ceph.poolsAndServices(o));
+    Ceph.put(Ceph.section('partial'),o.partial&&o.partial.length?`<p class="cnote" style="margin-top:12px">Non è stato possibile leggere: ${esc(o.partial.join(', '))}.</p>`:'');
     Ceph.paintStamp();
   },
 
@@ -2320,7 +2333,7 @@ const Ceph={
         <div class="big" style="margin-top:12px">Nessuno</div><p class="cnote">Tutti i dati sono al loro posto${o.pgs.total?` · ${esc(Ceph.cleanPGs(o))} PG su ${o.pgs.total} puliti`:''}.</p></div></div>`;
     }else{
       const done=pct==null?0:Math.min(100,Math.max(0,pct)), tris=Math.floor(done/6);
-      const eta=r.eta_seconds==null?'stima non disponibile':r.eta_seconds>172800?'fine stimata: oltre 2 giorni':`fine stimata ${Ceph.hhmmss(Date.now()/1000+r.eta_seconds).slice(0,5)}`;
+      const eta=r.eta_seconds==null?'stima non disponibile':r.eta_seconds>172800?'fine stimata: oltre 2 giorni':`fine stimata ${Dashboard.hhmm(Date.now()/1000+r.eta_seconds)}`;
       front=`<div class="panel"><div class="panel-b"><div class="inst-h">Recupero dati <em>fronte in movimento</em></div>
         <div class="big" style="margin-top:8px">${pct==null?'In corso':Math.round(done)+'<small>% completato</small>'}</div>
         <div class="ftrack" role="img" aria-label="${pct==null?'Recupero in corso':'Recupero completato al '+Math.round(done)+'%'}"><div class="fb"></div>${pct==null?'':`<div class="fd" style="width:${done}%"></div>${Array.from({length:tris},(_,i)=>`<div class="tri" style="left:${(i*6+3)}%"></div>`).join('')}<div class="fh" style="left:${done}%"></div>`}</div>

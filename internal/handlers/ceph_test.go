@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -80,5 +82,98 @@ func TestClassifyCephError(t *testing.T) {
 func TestNaturalLess(t *testing.T) {
 	if !naturalLess("node-2", "node-10") || naturalLess("node-10", "node-2") {
 		t.Fatal("natural order")
+	}
+}
+
+// fakeCeph answers like Proxmox; nodes listed in noCeph fail the per-node calls as a node without Ceph packages does.
+type fakeCeph struct {
+	statusErr error
+	noCeph    map[string]bool
+	mu        sync.Mutex // per-node calls run in parallel
+	calls     []string
+}
+
+func (f *fakeCeph) GetNodes() (json.RawMessage, error) {
+	return json.RawMessage(`[{"node":"pve1","status":"online"},{"node":"pve2","status":"online"},{"node":"pve3","status":"offline"},{"node":"bad name","status":"online"}]`), nil
+}
+func (f *fakeCeph) GetCephStatus() (json.RawMessage, error) {
+	if f.statusErr != nil {
+		return nil, f.statusErr
+	}
+	return json.RawMessage(`{"health":{"status":"HEALTH_OK"},"quorum_names":["pve2","pve3","$(x)"],"monmap":{"mons":[{"name":"pve2"}]}}`), nil
+}
+func (f *fakeCeph) per(node, what string) (json.RawMessage, error) {
+	f.mu.Lock()
+	f.calls = append(f.calls, what+"@"+node)
+	f.mu.Unlock()
+	if f.noCeph[node] {
+		return nil, errors.New(`proxmox 500 on /nodes/x/ceph: {"message":"binary not installed: /usr/bin/ceph-mon"}`)
+	}
+	switch what {
+	case "osd":
+		return json.RawMessage(`{"root":{"type":"root","children":[{"type":"osd","id":"0","name":"osd.0","host":"` + node + `","status":"up","in":1}]}}`), nil
+	case "pool":
+		return json.RawMessage(`[{"pool_name":"p","percent_used":0.1}]`), nil
+	}
+	return json.RawMessage(`[]`), nil
+}
+func (f *fakeCeph) GetCephOSD(n string) (json.RawMessage, error)   { return f.per(n, "osd") }
+func (f *fakeCeph) GetCephPools(n string) (json.RawMessage, error) { return f.per(n, "pool") }
+func (f *fakeCeph) GetCephServices(n, k string) (json.RawMessage, error) {
+	return f.per(n, k)
+}
+func (f *fakeCeph) GetCephFlags() (json.RawMessage, error) { return json.RawMessage(`[]`), nil }
+
+func TestFetchCephFullPrefersMonitorNodeAndFallsBack(t *testing.T) {
+	f := &fakeCeph{noCeph: map[string]bool{"pve2": true}}
+	full, err := fetchCephFull(f, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// pve2 is the monitor (tried first) but has no Ceph packages: pve1 must serve every per-node call.
+	if len(full.OSDs) != 1 || full.OSDs[0].Host != "pve1" || len(full.Pools) != 1 || len(full.Partial) != 0 {
+		t.Fatalf("got osds=%+v pools=%+v partial=%v calls=%v", full.OSDs, full.Pools, full.Partial, f.calls)
+	}
+	if f.calls[0] != "osd@pve2" || f.calls[1] != "osd@pve1" {
+		t.Fatalf("order %v", f.calls)
+	}
+	for _, c := range f.calls {
+		if strings.Contains(c, "bad name") || strings.Contains(c, "pve3") || strings.Contains(c, "$(x)") {
+			t.Fatalf("invalid or offline node used: %v", f.calls)
+		}
+	}
+}
+
+func TestFetchCephFullAllNodesFailIsPartial(t *testing.T) {
+	f := &fakeCeph{noCeph: map[string]bool{"pve1": true, "pve2": true}}
+	full, err := fetchCephFull(f, time.Now())
+	if err != nil || !full.Available {
+		t.Fatalf("err=%v full=%+v", err, full)
+	}
+	if strings.Join(full.Partial, ",") != "mds,mgr,mon,osd,pools" || full.OSDs == nil || full.Pools == nil {
+		t.Fatalf("partial=%v", full.Partial)
+	}
+}
+
+func TestFetchCephNotConfiguredAndForbidden(t *testing.T) {
+	f := &fakeCeph{statusErr: errors.New(`proxmox 500 on /cluster/ceph/status: {"message":"binary not installed: /usr/bin/ceph-mon\n"}`)}
+	full, err := fetchCephFull(f, time.Now())
+	if err != nil || full.Available || full.Reason != "not_configured" || full.PGs.States == nil || full.Recovery.Events == nil {
+		t.Fatalf("err=%v full=%+v", err, full)
+	}
+	b, _ := json.Marshal(full)
+	// lists must be [] (the browser iterates them); progress_pct and eta_seconds are null on purpose
+	for _, k := range []string{"checks", "states", "events", "osds", "pools", "mons", "mgrs", "mdss", "flags", "partial", "thresholds"} {
+		if strings.Contains(string(b), `"`+k+`":null`) {
+			t.Fatalf("%s is null in unavailable answer: %s", k, b)
+		}
+	}
+	f = &fakeCeph{statusErr: errors.New("proxmox 403 on /cluster/ceph/status: permission check failed")}
+	if ov, err := fetchCephOverview(f, time.Now()); err != nil || ov.Reason != "forbidden" {
+		t.Fatalf("forbidden: %v %+v", err, ov)
+	}
+	f = &fakeCeph{statusErr: errors.New("dial tcp: connection refused")}
+	if _, err := fetchCephOverview(f, time.Now()); err == nil {
+		t.Fatal("network errors must stay errors (502), not 'no Ceph'")
 	}
 }

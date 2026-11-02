@@ -29,9 +29,9 @@ func NewClient(baseURL, token string) *Client {
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				// InsecureSkipVerify is intentional: Proxmox VE uses self-signed TLS
-				// certificates by default. Do not remove without configuring a valid
-				// certificate on the Proxmox host.
-				TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			// certificates by default. Do not remove without configuring a valid
+			// certificate on the Proxmox host.
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 				MaxIdleConns:        20,
 				MaxIdleConnsPerHost: 10,
 				IdleConnTimeout:     90 * time.Second,
@@ -119,9 +119,7 @@ func (c *Client) Get(path string) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct {
-		Data json.RawMessage `json:"data"`
-	}
+	var r struct{ Data json.RawMessage `json:"data"` }
 	if err := json.Unmarshal(b, &r); err != nil {
 		return nil, err
 	}
@@ -133,9 +131,7 @@ func (c *Client) Post(path string, params url.Values) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct {
-		Data json.RawMessage `json:"data"`
-	}
+	var r struct{ Data json.RawMessage `json:"data"` }
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
@@ -145,9 +141,7 @@ func (c *Client) Put(path string, params url.Values) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct {
-		Data json.RawMessage `json:"data"`
-	}
+	var r struct{ Data json.RawMessage `json:"data"` }
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
@@ -157,9 +151,7 @@ func (c *Client) Delete(path string) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct {
-		Data json.RawMessage `json:"data"`
-	}
+	var r struct{ Data json.RawMessage `json:"data"` }
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
@@ -174,8 +166,8 @@ func (c *Client) GetClusterResources(resType string) (json.RawMessage, error) {
 	}
 	return c.Get(path)
 }
-func (c *Client) GetClusterTasks() (json.RawMessage, error) { return c.Get("/cluster/tasks") }
-func (c *Client) GetNextVMID() (json.RawMessage, error)     { return c.Get("/cluster/nextid") }
+func (c *Client) GetClusterTasks() (json.RawMessage, error)  { return c.Get("/cluster/tasks") }
+func (c *Client) GetNextVMID() (json.RawMessage, error)      { return c.Get("/cluster/nextid") }
 
 // ── Nodes ─────────────────────────────────────────────────────────────────────
 
@@ -296,9 +288,7 @@ func (c *Client) TermproxyCreate(node string, vmid int, proxmoxBaseURL string) (
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("proxmox %d: %s", resp.StatusCode, string(b))
 	}
-	var r struct {
-		Data json.RawMessage `json:"data"`
-	}
+	var r struct{ Data json.RawMessage `json:"data"` }
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
