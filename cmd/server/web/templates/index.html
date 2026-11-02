@@ -606,7 +606,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.68.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.69.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1401,6 +1401,11 @@ function osLabel(o){
 function osCell(v){
   const agent=v.osSrc==='agent';
   return `<span class="${agent?'':'td'}" title="${agent?'Rilevato dal guest agent':'Dal tipo OS configurato in Proxmox: versione non rilevata (VM spenta, container o agent non raggiungibile)'}">${esc(v.os||'—')}</span>`;
+}
+// IP: quello configurato in Proxmox, o (grigio, con spiegazione) quello riportato dal guest agent.
+function ipCell(v){
+  const agent=v.ipSrc==='agent';
+  return `<span class="${agent?'td':''}" title="${agent?'Indirizzo riportato dal guest agent: non e\' configurato in Proxmox':''}">${esc(v.ip||'—')}</span>`;
 }
 function pct(v,max){return max?Math.min(100,Math.round(v/max*100)):0;}
 function bar(p){const c=p>85?'crit2':p>65?'warn2':'ok2';return `<div class="bw"><div class="bf2 ${c}" style="width:${p}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:1px">${p}%</div>`;}
@@ -2384,7 +2389,7 @@ const VMs=(()=>{
       <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
       <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td>
-      <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
+      <td>${nodeCell(v)}</td><td class="tm" id="${esc(`ip-${v.node}-${v.vmid}`)}">${ipCell(v)}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
       <td id="${esc(`dk-${v.node}-${v.vmid}`)}">${diskCell}</td>
@@ -2422,6 +2427,18 @@ const VMs=(()=>{
       v.os=lab; v.osSrc='agent'; v.osid=o.id||'';
       const el=document.getElementById(`os-${v.node}-${v.vmid}`);
       if(el)el.innerHTML=osCell(v);
+    });
+  }
+
+  // VM in esecuzione senza IP in Proxmox (DHCP, configurazione manuale): lo chiede al guest agent, con cache di 10 minuti.
+  async function loadAgentIps(){
+    const need=all.filter(v=>v.type==='qemu'&&v.status==='running'&&!v.ip);
+    await pool(need,6,async v=>{
+      const n=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/netinfo`,600000).catch(()=>null);
+      if(!n||!n.primary_ipv4)return;
+      v.ip=n.primary_ipv4; v.ipSrc='agent';
+      const el=document.getElementById(`ip-${v.node}-${v.vmid}`);
+      if(el)el.innerHTML=ipCell(v);
     });
   }
 
@@ -2482,6 +2499,7 @@ const VMs=(()=>{
       doFilter();
       loadFsinfo();
       loadOsinfo();
+      loadAgentIps();
     },
     toggleNodePicker(){
       const p=document.getElementById('vm-node-picker');
@@ -2523,11 +2541,12 @@ const VMs=(()=>{
       Route.replace(`#/vm/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${kind}`);
       openModal('mov');
       try{
-        const [r, fsinfo, osinfo] = await Promise.all([
+        const [r, fsinfo, osinfo, netinfo] = await Promise.all([
           // tollerante: per gli LXC questo endpoint QEMU può fallire, il pannello resta usabile con le azioni
           api(`/nodes/${node}/qemu/${vmid}/status`,{quiet:true}).catch(()=>null),
           kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([]),
-          kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/osinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({})
+          kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/osinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({}),
+          kind==='qemu'&&!v0?.ip ? api(`/nodes/${node}/qemu/${vmid}/netinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({})
         ]);
         const n=js(node), id=js(vmid), t=js(kind);
         const s=r?.status||{},snaps=r?.snapshots||[];
@@ -2557,7 +2576,7 @@ const VMs=(()=>{
             <dt>Uptime</dt><dd>${s.uptime?Math.floor(s.uptime/3600)+' h '+Math.floor((s.uptime%3600)/60)+' min':'—'}</dd>
             <dt>CPU</dt><dd>${esc(s.cpus||'—')} core</dd>
             <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
-            ${v0?.ip?`<dt>IP</dt><dd class="tm">${esc(v0.ip)}</dd>`:''}
+            ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>

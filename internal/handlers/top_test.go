@@ -1,6 +1,10 @@
 package handlers
 
-import "testing"
+import (
+	"encoding/json"
+	"errors"
+	"testing"
+)
 
 func pts(from int64, step int64, cpus ...float64) []topPoint {
 	out := make([]topPoint, len(cpus))
@@ -101,4 +105,63 @@ func TestRankTopHotPctSeparatesSpikesFromSustainedLoad(t *testing.T) {
 	if len(edge) != 1 || edge[0].HotPct != 50 {
 		t.Errorf("edge: %+v", edge)
 	}
+}
+
+type fakeIPSource struct {
+	cfg      string
+	cfgErr   error
+	net      string
+	netErr   error
+	netCalls int
+}
+
+func (f *fakeIPSource) GetVMConfig(string, int) (json.RawMessage, error) {
+	return json.RawMessage(f.cfg), f.cfgErr
+}
+func (f *fakeIPSource) GetContainerConfig(string, int) (json.RawMessage, error) {
+	return json.RawMessage(f.cfg), f.cfgErr
+}
+func (f *fakeIPSource) GetVMNetworkInterfaces(string, int) (json.RawMessage, error) {
+	f.netCalls++
+	return json.RawMessage(f.net), f.netErr
+}
+
+func TestVMIPFromConfigFallsBackToGuestAgent(t *testing.T) {
+	agent := `{"result":[{"name":"lo","ip-addresses":[{"ip-address":"127.0.0.1"}]},{"name":"ens18","ip-addresses":[{"ip-address":"10.7.7.133"}]}]}`
+	t.Run("IP in Proxmox: niente chiamata all'agent", func(t *testing.T) {
+		f := &fakeIPSource{cfg: `{"ipconfig0":"ip=10.1.1.1/24,gw=10.1.1.254"}`, net: agent}
+		if got := vmIPFromConfig(f, "qemu", "n", 100); got != "10.1.1.1" || f.netCalls != 0 {
+			t.Errorf("ip=%q chiamate agent=%d", got, f.netCalls)
+		}
+	})
+	t.Run("DHCP: usa l'agent", func(t *testing.T) {
+		f := &fakeIPSource{cfg: `{"ipconfig0":"ip=dhcp"}`, net: agent}
+		if got := vmIPFromConfig(f, "qemu", "n", 100); got != "10.7.7.133" {
+			t.Errorf("ip=%q", got)
+		}
+	})
+	t.Run("nessuna ipconfig: usa l'agent", func(t *testing.T) {
+		f := &fakeIPSource{cfg: `{"name":"x"}`, net: agent}
+		if got := vmIPFromConfig(f, "qemu", "n", 100); got != "10.7.7.133" {
+			t.Errorf("ip=%q", got)
+		}
+	})
+	t.Run("agent muto: stringa vuota", func(t *testing.T) {
+		f := &fakeIPSource{cfg: `{"ipconfig0":"ip=dhcp"}`, netErr: errors.New("agent not running")}
+		if got := vmIPFromConfig(f, "qemu", "n", 100); got != "" {
+			t.Errorf("ip=%q", got)
+		}
+	})
+	t.Run("LXC: mai l'agent", func(t *testing.T) {
+		f := &fakeIPSource{cfg: `{"net0":"name=eth0,ip=dhcp"}`, net: agent}
+		if got := vmIPFromConfig(f, "lxc", "n", 100); got != "" || f.netCalls != 0 {
+			t.Errorf("ip=%q chiamate agent=%d", got, f.netCalls)
+		}
+	})
+	t.Run("configurazione non leggibile", func(t *testing.T) {
+		f := &fakeIPSource{cfgErr: errors.New("boom"), net: agent}
+		if got := vmIPFromConfig(f, "qemu", "n", 100); got != "" || f.netCalls != 0 {
+			t.Errorf("ip=%q chiamate agent=%d", got, f.netCalls)
+		}
+	})
 }
