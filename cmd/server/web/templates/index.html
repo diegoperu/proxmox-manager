@@ -233,9 +233,9 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .spark.w{stroke:var(--warn)}
 .sparkbar{fill:var(--accent);opacity:.7}.sparkbar.e{fill:var(--red);opacity:1}
 .npanel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden;margin-bottom:26px}
-.nrow{display:grid;grid-template-columns:112px 116px minmax(110px,1fr) minmax(110px,1fr) minmax(140px,230px);align-items:center;gap:18px;min-height:var(--row-h);padding:var(--cell-y) 18px;border-top:1px solid var(--border)}
+.nrow{display:grid;grid-template-columns:minmax(112px,150px) 116px minmax(110px,1fr) minmax(110px,1fr) minmax(140px,230px);align-items:center;gap:18px;min-height:var(--row-h);padding:var(--cell-y) 18px;border-top:1px solid var(--border)}
 .nrow:first-child{border-top:0}
-.nrow .nn{font-size:14px;font-weight:600;background:none;border:0;color:var(--text);padding:0;cursor:pointer;text-align:left;font-family:inherit;display:block}
+.nrow .nn{font-size:14px;font-weight:600;background:none;border:0;color:var(--text);padding:0;cursor:pointer;text-align:left;font-family:inherit;display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nrow .nn:hover{color:var(--accent)}
 .nrow .nsub{display:block;color:var(--text3);font-weight:400;font-size:12px;margin-top:1px}
 .st{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:500;white-space:nowrap}
@@ -403,6 +403,24 @@ td.ck,th.ck{width:36px;padding-right:0}
 .tcond{display:inline-flex;align-items:center;gap:8px;font-weight:500;white-space:nowrap}
 .tcond svg{width:24px;height:24px;flex-shrink:0}
 .tcond.ok{color:var(--green)}.tcond.warn{color:var(--warn)}.tcond.bad{color:var(--red)}
+/* Sotto 1600px la tabella sarebbe piu' larga del pannello: colonne fisse, il testo lungo del nome si tronca;
+   sotto 1320px si toglie anche la RAM (resta nella lista VM e nel pannello). Sopra 1600px (es. 4K al 100%) non cambia nulla. */
+@media(max-width:1600px){
+  .toptbl{table-layout:fixed}
+  .toptbl th:nth-child(1),.toptbl td.rk{width:34px}
+  .toptbl th:nth-child(4),.toptbl td:nth-child(4){width:100px}
+  .toptbl th:nth-child(5),.toptbl td:nth-child(5){width:68px}
+  .toptbl th:nth-child(6),.toptbl td:nth-child(6){width:84px}
+  .toptbl th:nth-child(7),.toptbl td:nth-child(7){width:124px}
+  .toptbl .tsp{width:24%;min-width:0}
+  .toptbl th{white-space:normal;line-height:1.25}
+  .toptbl td.tid{overflow:hidden}
+  .toptbl .tid .nsub{overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:1320px){.toptbl th:nth-child(6),.toptbl td:nth-child(6){display:none}}
+/* Righe nodo: sotto 1320px i pallini VM vanno su una seconda riga invece di uscire dal pannello (la fascia sotto 700px ha gia' il suo layout). */
+@media(min-width:701px) and (max-width:1320px){.nrow{grid-template-columns:minmax(112px,150px) 116px minmax(90px,1fr) minmax(90px,1fr)}.nrow .vdots{grid-column:1/-1}}
+@media(max-width:650px){.toptbl th .cw{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.toptbl th:nth-child(7),.toptbl td:nth-child(7){width:44px}.toptbl th:nth-child(4),.toptbl td:nth-child(4){width:64px}.toptbl .tsp{width:30%}}
 @media(max-width:650px){.toptbl th:nth-child(5),.toptbl td:nth-child(5),.toptbl th:nth-child(6),.toptbl td:nth-child(6),.tcond .cw{display:none}.toptbl .tsp{min-width:90px;width:30%}.toptbl .tid .nsub{white-space:normal}.toptbl th{white-space:normal}.tnum span{display:none}.toptbl td,.toptbl th{padding-left:8px;padding-right:8px}.toptbl .rk{padding-left:12px}}
 @media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.g2,.g4{grid-template-columns:1fr}}
@@ -575,7 +593,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.61.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.63.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1941,7 +1959,7 @@ const Dashboard={
   },
   paintRow(row,s){
     row.classList.toggle('off',!s.online);
-    const nn=row.querySelector('[data-k=name]'); nn.textContent=s.name; nn.setAttribute('aria-label',`Apri il nodo ${s.name}`);
+    const nn=row.querySelector('[data-k=name]'); nn.textContent=s.name; nn.title=s.name; nn.setAttribute('aria-label',`Apri il nodo ${s.name}`);
     row.querySelector('[data-k=sub]').textContent=`${s.vms.length} VM · ${fmtB(s.maxmem)}`;
     const ns=nodeState(s);
     const st=row.querySelector('[data-k=st]');
@@ -2001,9 +2019,14 @@ const Dashboard={
     if(seq!==Dashboard._topSeq)return;
     Dashboard.paintTop(d);
   },
+  // Condizione di una VM: conta quanto a lungo ha lavorato forte, non il singolo picco.
+  //  Temporale: media >= 75% oppure almeno il 10% del tempo oltre la soglia critica (carico sostenuto).
+  //  Variabile: media >= 50% oppure un picco >= 65% (anche breve). Sereno: tutto il resto.
+  TOP:{badAvg:75,badShare:10,varAvg:50},
   topCond(it){
-    if(it.peak_cpu>=Dashboard.CRIT)return{k:'bad',word:'Temporale'};
-    if(it.peak_cpu>=Dashboard.WARN||it.avg_cpu>=50)return{k:'warn',word:'Variabile'};
+    const T=Dashboard.TOP;
+    if(it.avg_cpu>=T.badAvg||(it.hot_pct||0)>=T.badShare)return{k:'bad',word:'Temporale'};
+    if(it.avg_cpu>=T.varAvg||it.peak_cpu>=Dashboard.WARN)return{k:'warn',word:'Variabile'};
     return{k:'ok',word:'Sereno'};
   },
   // Andamento della CPU nella finestra: curva su asse 0-100%, soglia critica tratteggiata, punto bianco sul picco.
@@ -2024,19 +2047,19 @@ const Dashboard={
     const f=(x,dg=1)=>Number(x).toLocaleString('it-IT',{maximumFractionDigits:dg});
     host.innerHTML=`<table class="toptbl"><thead><tr>
         <th scope="col"><span class="sr">Posizione</span></th><th scope="col">VM</th><th scope="col">Andamento CPU, ultime ${h} h</th>
-        <th scope="col">CPU media</th><th scope="col">Picco</th><th scope="col">RAM</th><th scope="col">Condizione</th></tr></thead><tbody>`+
+        <th scope="col">CPU media</th><th scope="col">Picco</th><th scope="col">RAM</th><th scope="col"><span class="cw">Condizione</span></th></tr></thead><tbody>`+
       items.map((it,i)=>{
         const c=Dashboard.topCond(it);
         const kind=it.type==='lxc'?'LXC':'QEMU';
         return`<tr>
           <td class="rk">${i+1}</td>
           <td class="tn tid"><button type="button" class="nm-btn" aria-label="Apri i dettagli di ${esc(it.name||it.vmid)}" onclick="VMs.detail(${js(it.node)},${js(it.vmid)},${js(it.type)})"><span class="nm" title="${esc(it.name||'—')}">${esc(it.name||'VM '+it.vmid)}</span></button>
-            <span class="nsub">${it.ip?`<span class="tm">${esc(it.ip)}</span> · `:''}${esc(it.node)} · ${kind} ${esc(it.vmid)}</span></td>
+            <span class="nsub" title="${esc([it.ip,it.node,kind+' '+it.vmid].filter(Boolean).join(' · '))}">${it.ip?`<span class="tm">${esc(it.ip)}</span> · `:''}${esc(it.node)} · ${kind} ${esc(it.vmid)}</span></td>
           <td class="tsp" role="img" aria-label="Andamento della CPU di ${esc(it.name||it.vmid)} nelle ultime ${h} ore: media ${f(it.avg_cpu,0)}%, picco ${f(it.peak_cpu,0)}%">${Dashboard.topSpark(it,c)}</td>
           <td class="tnum"><b>${f(it.avg_cpu,0)}%</b><span>≈ ${f(it.work)} core su ${f(it.cores,0)}</span></td>
           <td class="tnum"><b>${f(it.peak_cpu,0)}%</b></td>
           <td>${it.mem_pct>=0?bar(Math.round(it.mem_pct)):'—'}</td>
-          <td><span class="tcond ${c.k}" aria-label="${c.word}" title="Picco ${f(it.peak_cpu,0)}% e media ${f(it.avg_cpu,0)}% della CPU assegnata"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[c.k]}</svg><span class="cw">${c.word}</span></span></td>
+          <td><span class="tcond ${c.k}" aria-label="${c.word}" title="Media ${f(it.avg_cpu,0)}%, picco ${f(it.peak_cpu,0)}%, ${f(it.hot_pct||0,0)}% del tempo oltre ${Dashboard.CRIT}% della CPU assegnata"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[c.k]}</svg><span class="cw">${c.word}</span></span></td>
         </tr>`;
       }).join('')+'</tbody></table>';
   },

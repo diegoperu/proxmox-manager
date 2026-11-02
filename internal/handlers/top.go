@@ -24,6 +24,7 @@ const (
 	topConcurrency  = 8
 	topCacheTTL     = 60 * time.Second
 	topCacheMax     = 64
+	topHotThreshold = 0.85 // soglia critica (come Dashboard.CRIT nel browser)
 )
 
 // topAllowedHours e' la whitelist della finestra (ore) accettata dall'endpoint.
@@ -63,6 +64,7 @@ type TopVM struct {
 	Work    float64   `json:"work"`     // core usati in media nella finestra
 	AvgCPU  float64   `json:"avg_cpu"`  // % media della CPU assegnata
 	PeakCPU float64   `json:"peak_cpu"` // % massima
+	HotPct  float64   `json:"hot_pct"`  // % dei campioni oltre la soglia critica: distingue un picco isolato da un carico sostenuto
 	MemPct  float64   `json:"mem_pct"`  // % RAM all'ultimo campione, -1 se non nota
 	Series  []float64 `json:"series"`   // % CPU nel tempo, campioni equispaziati dell'RRD
 }
@@ -82,6 +84,7 @@ func rankTop(cands []topCandidate, from int64, n int) []TopVM {
 	for _, c := range cands {
 		var series []float64
 		var sum, peak float64
+		hot := 0
 		mem := -1.0
 		for _, p := range c.Points {
 			if p.T < from {
@@ -91,6 +94,9 @@ func rankTop(cands []topCandidate, from int64, n int) []TopVM {
 			sum += p.CPU
 			if p.CPU > peak {
 				peak = p.CPU
+			}
+			if p.CPU >= topHotThreshold {
+				hot++
 			}
 			if p.Mem >= 0 {
 				mem = p.Mem
@@ -109,7 +115,7 @@ func rankTop(cands []topCandidate, from int64, n int) []TopVM {
 		}
 		out = append(out, TopVM{
 			Type: c.Type, Node: c.Node, VMID: c.VMID, Name: c.Name, Cores: c.Cores,
-			Work: math.Round(avg*c.Cores*100) / 100, AvgCPU: round1(avg * 100), PeakCPU: round1(peak * 100),
+			Work: math.Round(avg*c.Cores*100) / 100, AvgCPU: round1(avg * 100), PeakCPU: round1(peak * 100), HotPct: round1(100 * float64(hot) / float64(len(series))),
 			MemPct: memPct, Series: series,
 		})
 	}

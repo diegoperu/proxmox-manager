@@ -74,3 +74,31 @@ func TestRankTopMemUnknown(t *testing.T) {
 		t.Fatalf("mem should stay unknown: %+v", got)
 	}
 }
+
+func TestRankTopHotPctSeparatesSpikesFromSustainedLoad(t *testing.T) {
+	spike := make([]float64, 20)
+	spike[7] = 1.0 // un solo campione su 20 oltre la soglia
+	sustained := make([]float64, 20)
+	for i := range sustained {
+		sustained[i] = 0.9 // sempre oltre la soglia
+	}
+	got := rankTop([]topCandidate{
+		{Name: "spike", VMID: 1, Cores: 1, Points: pts(100, 10, spike...)},
+		{Name: "sustained", VMID: 2, Cores: 1, Points: pts(100, 10, sustained...)},
+	}, 0, 10)
+	by := map[string]TopVM{}
+	for _, g := range got {
+		by[g.Name] = g
+	}
+	if by["spike"].HotPct != 5 || by["spike"].PeakCPU != 100 {
+		t.Errorf("spike: %+v", by["spike"])
+	}
+	if by["sustained"].HotPct != 100 {
+		t.Errorf("sustained: %+v", by["sustained"])
+	}
+	// il limite e' incluso: esattamente 0.85 conta come oltre soglia
+	edge := rankTop([]topCandidate{{Name: "edge", VMID: 3, Cores: 1, Points: pts(100, 10, 0.85, 0.5)}}, 0, 10)
+	if len(edge) != 1 || edge[0].HotPct != 50 {
+		t.Errorf("edge: %+v", edge)
+	}
+}
