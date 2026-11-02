@@ -113,6 +113,8 @@ func main() {
 		r.Get("/metrics", h.GetMetrics)
 		r.Get("/report", h.GetReportData)
 		r.Get("/top", h.GetTopVMs)
+		r.Get("/ceph/summary", h.GetCephSummary())
+		r.Get("/ceph", h.GetCeph())
 	})
 
 	log.Printf("ProxmoxManager → http://localhost%s", cfg.ListenAddr)

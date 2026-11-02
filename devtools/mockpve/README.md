@@ -26,3 +26,7 @@ CGO_ENABLED=1 go build -o /tmp/pmgr-preview/proxmox-manager /path/al/repo/cmd/se
 ```
 
 Il token e' finto: non usarlo contro un Proxmox vero e non copiare qui il `config.json` di produzione.
+
+## Ceph finto
+
+`CEPH_SCENARIO=healthy|warn|error|recovery|down|none python3 devtools/mockpve/mockpve.py` (default `recovery`): 36 OSD su 6 nodi, 3 pool, 3 MON. `error` = capacita' 97% + `OSD_FULL`; `recovery` = OSD giu', fronte di recupero e flag `noout`; `none` = come un cluster senza Ceph (500 "binary not installed").
