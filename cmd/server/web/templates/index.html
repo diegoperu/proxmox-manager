@@ -271,7 +271,7 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .act-empty{padding:14px 0;color:var(--text3);border-top:1px solid var(--border)}
 @media(max-width:1180px){.dash{display:flex;flex-direction:column;align-items:stretch;gap:0}.dash-main{display:contents}.dash>*,.dash-main>*,.dash-vms{min-width:0;max-width:100%}.dash-side{position:static;order:1;margin-bottom:26px}.dash-vms{order:2}}
 @media(max-width:650px){
-  #page-vms table th:nth-child(1),#page-vms table td:nth-child(1),#page-vms table th:nth-child(4),#page-vms table td:nth-child(4),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(7),#page-vms table td:nth-child(7),#page-vms table th:nth-child(9),#page-vms table td:nth-child(9),#page-vms table th:nth-child(10),#page-vms table td:nth-child(10),
+  #page-vms table th:nth-child(2),#page-vms table td:nth-child(2),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(6),#page-vms table td:nth-child(6),#page-vms table th:nth-child(8),#page-vms table td:nth-child(8),#page-vms table th:nth-child(10),#page-vms table td:nth-child(10),#page-vms table th:nth-child(11),#page-vms table td:nth-child(11),
   #page-batch table th:nth-child(2),#page-batch table td:nth-child(2),#page-batch table th:nth-child(5),#page-batch table td:nth-child(5),#page-batch table th:nth-child(6),#page-batch table td:nth-child(6){display:none}
 }
 @media(max-width:650px){#dtbl th:nth-child(1),#dtbl td:nth-child(1),#dtbl th:nth-child(2),#dtbl td:nth-child(2),#dtbl th:nth-child(4),#dtbl td:nth-child(4),#dtbl th:nth-child(8),#dtbl td:nth-child(8){display:none}}
@@ -375,6 +375,15 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .sel-sum b{color:var(--text);font-variant-numeric:tabular-nums}
 @media(max-width:650px){.ngrid{grid-template-columns:minmax(0,1fr)}.nc-m{grid-template-columns:1fr;gap:12px}.toolbar .sp{display:none}}
 
+/* ══ BARRA DI SELEZIONE (lista VM) ══ */
+.selbar{position:sticky;bottom:16px;z-index:20;width:max-content;max-width:calc(100% - 8px);margin:16px auto 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px 10px 16px;border-radius:14px;border:1px solid var(--border2);background:color-mix(in srgb,var(--bg3) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(--shadow-pop)}
+.selbar .sb-n{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.selbar .sb-h{font-size:12px;color:var(--warn)}
+.selbar .sb-sep{width:1px;align-self:stretch;background:var(--border)}
+.chk{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+td.ck,th.ck{width:36px;padding-right:0}
+@media(max-width:650px){.selbar{width:auto;margin:12px 0 0;bottom:max(12px,env(safe-area-inset-bottom))}}
+@media(prefers-reduced-motion:no-preference){.selbar:not([hidden]){animation:sbin .18s var(--ease)}@keyframes sbin{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}}
 @media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.g2,.g4{grid-template-columns:1fr}}
 
@@ -546,7 +555,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.56.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.57.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -652,6 +661,7 @@ html.catppuccino{
       </div>
       <div class="tw"><table>
         <thead><tr>
+          <th class="ck"><input type="checkbox" class="chk" id="vca" aria-label="Seleziona tutte le VM visibili" onchange="VMs.pickAll(this)"></th>
           <th class="s" onclick="VMs.sort('type')">Tipo</th>
           <th class="s" onclick="VMs.sort('vmid')">VMID</th>
           <th class="s" onclick="VMs.sort('name')">Nome</th>
@@ -663,8 +673,18 @@ html.catppuccino{
           <th class="s" onclick="VMs.sort('disk')">Disco</th>
           <th>Azioni</th>
         </tr></thead>
-        <tbody id="vmtbody"><tr><td colspan="10" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
+        <tbody id="vmtbody"><tr><td colspan="11" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
       </table></div>
+      <div class="selbar" id="selbar" role="region" aria-label="Azioni sulla selezione" hidden>
+        <span class="sb-n" id="sb-n" aria-live="polite"></span>
+        <span class="sb-h" id="sb-h"></span>
+        <span class="sb-sep" aria-hidden="true"></span>
+        <button type="button" class="btn bsuc sm" onclick="VMs.toBatch('start')">Start</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('shutdown')">Shutdown</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('reboot')">Reboot</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('')">Altre azioni in Batch</button>
+        <button type="button" class="btn bg2 sm" onclick="VMs.clearPick()">Deseleziona</button>
+      </div>
     </div>
 
     <!-- ██ PROVISION ██ -->
@@ -2123,7 +2143,8 @@ const Nodes={
 // ════════════════════════════════════════════════════════════════════════════
 const VMs=(()=>{
   const S=mkSorter('vmtbody','page-vms');
-  let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[];
+  let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[], picked=new Set();
+  const keyOf=v=>`${v.type}:${v.node}:${v.vmid}`;
 
   function allNodes(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
 
@@ -2166,6 +2187,7 @@ const VMs=(()=>{
         :bar(pct(v.disk,v.maxdisk));
       const n=js(v.node), id=js(v.vmid), t=js(v.type);
       return `<tr>
+      <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
       <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td>
       <td>${nodeCell(v)}</td><td class="tm">${esc(v.ip||'—')}</td><td>${sbadge(v.status)}</td>
@@ -2176,10 +2198,23 @@ const VMs=(()=>{
         ${v.status==='running'
           ?`<button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
              <button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'reboot')">Reboot</button>
-             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>`:''}`
+             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>`:''}
+             ${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bg2 sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">Console</button>`:''}`
           :`<button class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
       </div></td>
-    </tr>`;}).join('')||'<tr><td colspan="10" class="empty">Nessuna VM con questi filtri</td></tr>';
+    </tr>`;}).join('')||'<tr><td colspan="11" class="empty">Nessuna VM con questi filtri</td></tr>';
+    updateBar();
+  }
+
+  // Barra di selezione: compare con almeno una VM scelta. La selezione sopravvive ai filtri e dichiara le VM nascoste.
+  function updateBar(){
+    const bar=document.getElementById('selbar'); if(!bar)return;
+    bar.hidden=picked.size===0;
+    const vis=new Set(sortedData.map(keyOf)), hidden=[...picked].filter(k=>!vis.has(k)).length;
+    document.getElementById('sb-n').textContent=`${picked.size} ${picked.size===1?'selezionata':'selezionate'}`;
+    document.getElementById('sb-h').textContent=hidden?`${hidden} non ${hidden===1?'visibile':'visibili'} con i filtri attuali`:'';
+    const cb=document.getElementById('vca'), shown=sortedData.filter(v=>picked.has(keyOf(v))).length;
+    cb.checked=sortedData.length>0&&shown===sortedData.length; cb.indeterminate=shown>0&&shown<sortedData.length;
   }
 
   async function loadFsinfo(){
@@ -2205,11 +2240,22 @@ const VMs=(()=>{
   }
 
   return {
-    clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];},
+    clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];picked=new Set();updateBar();},
+    pick(el){el.checked?picked.add(el.value):picked.delete(el.value);updateBar();},
+    pickAll(cb){sortedData.forEach(v=>cb.checked?picked.add(keyOf(v)):picked.delete(keyOf(v)));renderRows(sortedData);},
+    clearPick(){picked.clear();renderRows(sortedData);},
+    hasPick(){return picked.size>0;},
+    // Variante B: la barra non esegue nulla, apre Batch con selezione (e azione) gia' impostate; li' si conferma e si legge il log.
+    toBatch(action){
+      const vms=all.filter(v=>picked.has(keyOf(v)));
+      if(!vms.length)return;
+      Batch.preselect(vms.map(keyOf),{action,tpl:vms.some(isTemplate)});
+      App.nav('batch');
+    },
     async load(){
       let data;
       try{data=await api('/vms',{quiet:true});}
-      catch(e){document.getElementById('vmtbody').innerHTML=errRow(10,e.message,'VMs.load()');return;}
+      catch(e){document.getElementById('vmtbody').innerHTML=errRow(11,e.message,'VMs.load()');return;}
       all=[];
       if(Array.isArray(data)){
         for(const nd of data){
@@ -2217,6 +2263,7 @@ const VMs=(()=>{
           for(const v of (nd.lxcs||[])) all.push({...v,type:'lxc',node:nd.node});
         }
       }
+      picked=new Set([...picked].filter(k=>all.some(v=>keyOf(v)===k)));
       // initialize node selection with all nodes
       const ns=allNodes();
       if(selectedNodes.size===0) ns.forEach(n=>selectedNodes.add(n));
@@ -2712,7 +2759,7 @@ const BatchTbl=(()=>{
 })();
 
 const Batch=(()=>{
-  let all=[], filtered=[], sel=new Set(), selNodes=new Set();
+  let all=[], filtered=[], sel=new Set(), selNodes=new Set(), pending=null;
 
   function allNodeList(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
 
@@ -2764,9 +2811,17 @@ const Batch=(()=>{
       }
       const nodes=allNodeList();
       if(selNodes.size===0) nodes.forEach(n=>selNodes.add(n));
+      if(pending){ // selezione arrivata dalla lista VM: si applica dopo l'inizializzazione dei nodi
+        sel=new Set(pending.keys.filter(k=>all.some(v=>keyOf(v)===k)));
+        for(const k of sel)selNodes.add(k.split(':')[1]);
+        if(pending.tpl)document.getElementById('btpl').checked=true;
+        if(pending.action&&VM_ACTIONS[pending.action]){document.getElementById('baction').value=pending.action;batchActionChanged();}
+        pending=null;
+      }
       renderNodeChips(nodes);
       doFilter();
     },
+    preselect(keys,opts={}){pending={keys:[...keys],action:opts.action||'',tpl:!!opts.tpl};},
     clearCache(){all=[];filtered=[];sel=new Set();selNodes=new Set();},
     filterBy(){doFilter();},
     toggleNodeChip(n){
@@ -3271,6 +3326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     A11y.init();
     Palette.init();
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!_modalStack.length&&App.cur==='vms'&&VMs.hasPick())VMs.clearPick();});
     Provision.bind();
     Drawer.init();
     App.init();

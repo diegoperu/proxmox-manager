@@ -139,7 +139,10 @@ def route(path):
             if seg[2] == "config":
                 key = "ipconfig0" if seg[0] == "qemu" else "net0"
                 val = f"ip={v['ip']}/24,gw=10.75.4.254" if v["ip"] else ""
-                return {"name": v["name"], "cores": 2, "memory": v["maxmem"] // (1024 * 1024), key: val} if val else {"name": v["name"]}
+                cfg = {"name": v["name"], "cores": 2, "memory": v["maxmem"] // (1024 * 1024)}
+                if val: cfg[key] = val
+                if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
+                return cfg
             if seg[2] == "agent": return dict(result=[dict(mountpoint="/", **{"used-bytes": v["disk"], "total-bytes": v["maxdisk"]}, type="ext4", name="vda1")])
             if seg[2] == "rrddata":
                 pts = rrd(node, "day")

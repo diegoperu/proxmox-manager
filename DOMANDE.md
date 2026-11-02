@@ -54,7 +54,7 @@ Domande a cui rispondere prima di scrivere codice per il redesign grafico/UX.
 **Perché conta**: decisione già presa il 2026-10-13 di toglierla; la riapro solo se vuoi.
 **Opzioni**: A) no, batch resta separata B) sì, barra flottante che porta alla pagina batch con la selezione precompilata C) sì, azioni dirette dalla barra
 **Suggerimento**: B.
-**Risposta utente**: 2026-11-02 — campo libero, l'utente valuta alla fine. Assunzione provvisoria: B (barra flottante che porta a batch con selezione precompilata).
+**Risposta utente**: 2026-11-02 — costruire, opzione B (la barra apre Batch con selezione e azione preselezionate). 2026-11-02 — campo libero, l'utente valuta alla fine. Assunzione provvisoria: B (barra flottante che porta a batch con selezione precompilata).
 
 ### D7 — Server Proxmox finto per le anteprime: tenerlo nel repo?
 **Stato**: RISPOSTA
