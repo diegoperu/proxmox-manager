@@ -83,6 +83,7 @@ func main() {
 		r.Get("/nodes/{node}/qemu/{vmid}/rrd", h.GetVMRRD)
 		r.Get("/nodes/{node}/qemu/{vmid}/fsinfo", h.GetVMFSInfo)
 		r.Get("/nodes/{node}/qemu/{vmid}/osinfo", h.GetVMOSInfo)
+		r.Get("/nodes/{node}/qemu/{vmid}/netinfo", h.GetVMNetInfo)
 		r.Post("/nodes/{node}/qemu/{vmid}/dmesg", h.VMDmesg)
 		r.Post("/nodes/{node}/qemu/{vmid}/action/{action}", h.VMAction)
 		r.Post("/nodes/{node}/qemu/{vmid}/snapshot", h.VMSnapshot)
