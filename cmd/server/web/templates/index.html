@@ -274,7 +274,6 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
   #page-vms table th:nth-child(2),#page-vms table td:nth-child(2),#page-vms table th:nth-child(5),#page-vms table td:nth-child(5),#page-vms table th:nth-child(6),#page-vms table td:nth-child(6),#page-vms table th:nth-child(8),#page-vms table td:nth-child(8),#page-vms table th:nth-child(10),#page-vms table td:nth-child(10),#page-vms table th:nth-child(11),#page-vms table td:nth-child(11),
   #page-batch table th:nth-child(2),#page-batch table td:nth-child(2),#page-batch table th:nth-child(5),#page-batch table td:nth-child(5),#page-batch table th:nth-child(6),#page-batch table td:nth-child(6){display:none}
 }
-@media(max-width:650px){#dtbl th:nth-child(1),#dtbl td:nth-child(1),#dtbl th:nth-child(2),#dtbl td:nth-child(2),#dtbl th:nth-child(4),#dtbl td:nth-child(4),#dtbl th:nth-child(8),#dtbl td:nth-child(8){display:none}}
 @media(max-width:700px){
   .cond h2{font-size:22px}.cond-ico{width:36px;height:36px}
   .kstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.kcell:nth-child(3){border-left:0}.kcell:nth-child(n+3){border-top:1px solid var(--border)}
@@ -384,6 +383,27 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 td.ck,th.ck{width:36px;padding-right:0}
 @media(max-width:650px){.selbar{width:auto;margin:12px 0 0;bottom:max(12px,env(safe-area-inset-bottom))}}
 @media(prefers-reduced-motion:no-preference){.selbar:not([hidden]){animation:sbin .18s var(--ease)}@keyframes sbin{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}}
+/* ══ TOP 10 (dashboard): andamento come una previsione oraria ══ */
+.sec-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.sec-row .sec{margin:0;flex:1;min-width:220px;flex-wrap:wrap}
+.toptbl{width:100%}
+.toptbl td{vertical-align:middle}
+.toptbl .rk{width:30px;color:var(--text3);font-variant-numeric:tabular-nums;padding-right:0}
+.toptbl .tid .nsub{display:block;color:var(--text3);font-size:12px;margin-top:1px;white-space:nowrap}
+.toptbl .tsp{width:32%;min-width:150px}
+.spw{position:relative;height:38px}
+.spw svg{width:100%;height:100%;display:block}
+.sparkarea{fill:var(--accent-dim);stroke:none}
+.sparkarea.w{fill:color-mix(in srgb,var(--warn) 10%,transparent)}.sparkarea.r{fill:color-mix(in srgb,var(--red) 10%,transparent)}
+.spark.r{stroke:var(--red)}
+.thr{stroke:color-mix(in srgb,var(--text3) 55%,transparent);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.spw .pk{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg2)}
+.tnum b{display:block;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
+.tnum span{font-size:12px;color:var(--text3);white-space:nowrap}
+.tcond{display:inline-flex;align-items:center;gap:8px;font-weight:500;white-space:nowrap}
+.tcond svg{width:24px;height:24px;flex-shrink:0}
+.tcond.ok{color:var(--green)}.tcond.warn{color:var(--warn)}.tcond.bad{color:var(--red)}
+@media(max-width:650px){.toptbl th:nth-child(5),.toptbl td:nth-child(5),.toptbl th:nth-child(6),.toptbl td:nth-child(6),.tcond .cw{display:none}.toptbl .tsp{min-width:90px;width:30%}.toptbl .tid .nsub{white-space:normal}.toptbl th{white-space:normal}.tnum span{display:none}.toptbl td,.toptbl th{padding-left:8px;padding-right:8px}.toptbl .rk{padding-left:12px}}
 @media(max-width:1200px){.g4{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.g2,.g4{grid-template-columns:1fr}}
 
@@ -555,7 +575,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.57.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.58.0 · 2026-11-02</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -572,20 +592,16 @@ html.catppuccino{
           <h2 class="sec">Nodi <small>ultime 24 ore · la barra va dal minimo al massimo, il punto bianco è il valore attuale, il tratto tratteggiato è la soglia critica (85%). Un pallino per VM: pieno = in esecuzione, vuoto = ferma, diametro = RAM</small></h2>
           <div class="npanel" id="dash-nodes"></div>
           <div class="dash-vms">
-          <h2 class="sec">VM &amp; Container</h2>
-          <div class="tw"><table id="dtbl">
-            <thead><tr>
-              <th class="s" onclick="DashTbl.sort('type')">Tipo</th>
-              <th class="s" onclick="DashTbl.sort('vmid')">VMID</th>
-              <th class="s" onclick="DashTbl.sort('name')">Nome</th>
-              <th class="s" onclick="DashTbl.sort('node')">Nodo</th>
-              <th class="s" onclick="DashTbl.sort('status')">Stato</th>
-              <th class="s" onclick="DashTbl.sort('cpu')">CPU %</th>
-              <th class="s" onclick="DashTbl.sort('mem')">RAM %</th>
-              <th class="s" onclick="DashTbl.sort('disk')">Disco %</th>
-            </tr></thead>
-            <tbody id="dtbody"><tr><td colspan="8" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
-          </table></div>
+            <div class="sec-row">
+              <h2 class="sec" id="top-title">Top 10 VM &amp; Container <small id="top-sub"></small></h2>
+              <div class="seg" id="top-win" role="group" aria-label="Finestra di tempo">
+                <button type="button" data-h="6" class="on" aria-pressed="true" onclick="Dashboard.setTopHours(6)">6 h</button>
+                <button type="button" data-h="12" aria-pressed="false" onclick="Dashboard.setTopHours(12)">12 h</button>
+                <button type="button" data-h="24" aria-pressed="false" onclick="Dashboard.setTopHours(24)">24 h</button>
+              </div>
+              <button type="button" class="btn bg2 sm" onclick="App.nav('vms')">Tutte le VM</button>
+            </div>
+            <div class="panel" id="dash-top"><div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo della classifica…</div></div>
           </div>
         </div>
         <section class="dash-side" aria-labelledby="act-title">
@@ -1743,82 +1759,19 @@ const Palette={
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-// DASHBOARD TABLE SORTER
-// ════════════════════════════════════════════════════════════════════════════
-let _dashVMs=[];
-const DashTbl=(()=>{
-  const S=mkSorter('dtbody','dtbl');
-  let data=[];
-  return {
-    // Ordine iniziale: prima le VM in esecuzione, i template in fondo, poi per VMID. Le intestazioni ordinano come prima.
-    setData(d){
-      const rank=v=>(isTemplate(v)?2:v.status==='running'?0:1);
-      data=[...d].sort((a,b)=>rank(a)-rank(b)||(a.vmid||0)-(b.vmid||0));
-      DashTbl.renderWith(data);
-    },
-    sort(k){DashTbl.renderWith(S.sort(data,k));},
-    renderWith(d){
-      document.getElementById('dtbody').innerHTML=d.map(v=>{
-        const diskCell=v.type==='qemu'
-          ?(v.diskPct!=null?bar(v.diskPct):'<span style="color:var(--text3);font-size:12px">···</span>')
-          :bar(pct(v.disk,v.maxdisk));
-        return `<tr>
-        <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid||'-')}</td>
-        <td class="tn"><button type="button" class="nm-btn" aria-label="Apri i dettagli di ${esc(v.name||v.vmid)}" onclick="VMs.detail(${js(v.node)},${js(v.vmid)},${js(v.type)})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button></td><td>${nodeCell(v)}</td>
-        <td>${sbadge(v.status)}</td>
-        <td>${v.cpu?(v.cpu*100).toFixed(1)+'%':'—'}</td>
-        <td id="${esc(`dmem-${v.node}-${v.vmid}`)}">${bar(pct(v.mem,v.maxmem))}</td>
-        <td id="${esc(`ddk-${v.node}-${v.vmid}`)}">${diskCell}</td>
-      </tr>`;}).join('')||'<tr><td colspan="8" style="padding:18px;text-align:center;color:var(--text3)">Nessuna VM</td></tr>';
-    }
-  };
-})();
-
-// /cluster/resources riporta mem = RSS del processo KVM lato host (tende a ~100%
-// appena il guest tocca tutte le pagine). status/current corregge con free_mem
-// dal balloon/guest-agent → uso reale. Patch progressiva della cella RAM%.
-async function loadDashMem(vms){
-  const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
-  await pool(running,6,async v=>{
-    // in caso di errore resta il valore da cluster/resources
-    const r=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/status`).catch(()=>null);
-    const s=r?.status;
-    if(!s||!s.maxmem)return;
-    v.mem=s.mem; v.maxmem=s.maxmem;
-    const el=document.getElementById(`dmem-${v.node}-${v.vmid}`);
-    if(el)el.innerHTML=bar(pct(s.mem,s.maxmem));
-  });
-}
-
-async function loadDashFsinfo(vms){
-  const running=vms.filter(v=>v.type==='qemu'&&v.status==='running');
-  await pool(running,6,async v=>{
-    // VM senza guest agent → cella "—" con tooltip, nessun toast
-    let fs=[], fsErr='';
-    try{fs=await apiCached(`/nodes/${v.node}/qemu/${v.vmid}/fsinfo`);}catch(e){fsErr=e.message;}
-    const el=document.getElementById(`ddk-${v.node}-${v.vmid}`);
-    if(el&&fsErr) el.title=`Guest agent non disponibile: ${fsErr}`;
-    if(Array.isArray(fs)&&fs.length){
-      const root=fs.find(f=>f.mountpoint==='/')||fs[0];
-      if(root){
-        const used=root['used-bytes']||0,total=root['total-bytes']||root['disk-size']||0;
-        v.diskPct=total?Math.round(used/total*100):null;
-        if(el)el.innerHTML=v.diskPct!=null?bar(v.diskPct):'—';
-        return;
-      }
-    }
-    v.diskPct=null;
-    if(el)el.innerHTML='—';
-  });
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // DASHBOARD — "Bollettino": una frase di condizione, i numeri sotto, i nodi come barre min–max 24h
 // ════════════════════════════════════════════════════════════════════════════
 const Dashboard={
   CRIT:85,                                   // % oltre cui un valore è critico (stessa soglia di bar())
   WARN:65,                                   // % oltre cui un valore chiede attenzione
   DAY_S:24*3600,
+  // Glifi meteo (viewBox 48): stessa serie per la condizione della panoramica e per le righe della Top 10.
+  ICONS:{
+      ok:'<circle cx="24" cy="24" r="8"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11.3 11.3l3.5 3.5M33.2 33.2l3.5 3.5M11.3 36.7l3.5-3.5M33.2 14.8l3.5-3.5"/>',
+      warn:'<circle cx="17" cy="17" r="6"/><path d="M17 4v3M5 17h3M8.5 8.5l2 2M25.5 8.5l-2 2"/><path d="M16 40h19a7 7 0 0 0 .6-14 10 10 0 0 0-19.2 2.5A6 6 0 0 0 16 40z"/>',
+      bad:'<path d="M14 32h20a7 7 0 0 0 .6-14 10 10 0 0 0-19.2 2.5A6 6 0 0 0 14 32z"/><path d="M25 33l-5 8h7l-4 7"/>'
+    },
+  topHours:6, _topSeq:0,
   _seq:0,                                    // scarta le risposte di un caricamento superato da uno più recente
 
   async load(){
@@ -1830,7 +1783,7 @@ const Dashboard={
       document.getElementById('dash-cond').innerHTML='';
       document.getElementById('dash-nodes').innerHTML='';
       document.getElementById('dash-kpis').innerHTML=`<div style="grid-column:1/-1">${errBox(e.message+' — verifica il cluster in Impostazioni','Dashboard.load()')}</div>`;
-      document.getElementById('dtbody').innerHTML=errRow(8,e.message,'Dashboard.load()');
+      document.getElementById('dash-top').innerHTML='';
       document.getElementById('dash-tasks').innerHTML='';
       return;
     }
@@ -1844,9 +1797,7 @@ const Dashboard={
     Dashboard.paintCondition(stats,[]);
     Dashboard.paintKpis(stats,live,null,null);
     Dashboard.paintNodes(stats);
-    DashTbl.setData(vms);
-    loadDashMem(vms);
-    loadDashFsinfo(vms);
+    Dashboard.loadTop();
     const [metrics,tasks]=await Promise.all([
       api('/metrics?timeframe=day',{quiet:true}).catch(()=>null),
       api('/tasks',{quiet:true}).catch(()=>null),
@@ -1927,13 +1878,8 @@ const Dashboard={
     if(failed.length)parts.push(`<span class="wrn">${failed.length} ${Dashboard.plural(failed.length,'task fallito','task falliti')} nelle ultime 24 h</span>`);
     const run=stats.reduce((a,s)=>a+s.running,0);
     const sub=parts.length?parts.join(' · '):`Nessuna anomalia nelle ultime 24 ore · ${run} VM in esecuzione`;
-    const icons={
-      ok:'<circle cx="24" cy="24" r="8"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11.3 11.3l3.5 3.5M33.2 33.2l3.5 3.5M11.3 36.7l3.5-3.5M33.2 14.8l3.5-3.5"/>',
-      warn:'<circle cx="17" cy="17" r="6"/><path d="M17 4v3M5 17h3M8.5 8.5l2 2M25.5 8.5l-2 2"/><path d="M16 40h19a7 7 0 0 0 .6-14 10 10 0 0 0-19.2 2.5A6 6 0 0 0 16 40z"/>',
-      bad:'<path d="M14 32h20a7 7 0 0 0 .6-14 10 10 0 0 0-19.2 2.5A6 6 0 0 0 14 32z"/><path d="M25 33l-5 8h7l-4 7"/>'
-    };
     document.getElementById('dash-cond').innerHTML=`
-      <svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${icons[level]}</svg>
+      <svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg>
       <div><h2>${esc(title)}</h2><p>${sub}</p></div>`;
   },
 
@@ -2037,6 +1983,63 @@ const Dashboard={
     dots.setAttribute('aria-label',`${s.running} VM in esecuzione su ${s.vms.length}`);
   },
   openNode(name){Nodes.pending=name;App.nav('nodes');},
+
+  // ── Top 10: le VM che hanno lavorato di piu' nelle ultime ore (core usati in media, da /api/top) ──
+  setTopHours(h){
+    if(![6,12,24].includes(h))return;
+    Dashboard.topHours=h;
+    document.querySelectorAll('#top-win button').forEach(b=>{const on=+b.dataset.h===h;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
+    Dashboard.loadTop();
+  },
+  async loadTop(){
+    const seq=++Dashboard._topSeq, host=document.getElementById('dash-top'), h=Dashboard.topHours;
+    document.getElementById('top-sub').textContent=`per lavoro svolto nelle ultime ${h} ore`;
+    if(!host.querySelector('table'))host.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo della classifica…</div>';
+    let d;
+    try{d=await api(`/top?hours=${h}`,{quiet:true});}
+    catch(e){if(seq===Dashboard._topSeq)host.innerHTML=errBox(e.message,'Dashboard.loadTop()');return;}
+    if(seq!==Dashboard._topSeq)return;
+    Dashboard.paintTop(d);
+  },
+  topCond(it){
+    if(it.peak_cpu>=Dashboard.CRIT)return{k:'bad',word:'Temporale'};
+    if(it.peak_cpu>=Dashboard.WARN||it.avg_cpu>=50)return{k:'warn',word:'Variabile'};
+    return{k:'ok',word:'Sereno'};
+  },
+  // Andamento della CPU nella finestra: curva su asse 0-100%, soglia critica tratteggiata, punto bianco sul picco.
+  topSpark(it,cond){
+    const v=it.series||[], n=v.length, Y=x=>34-Math.min(100,Math.max(0,x))/100*32;
+    if(!n)return'';
+    const X=i=>n===1?100:i/(n-1)*200;
+    const pts=v.map((x,i)=>`${X(i).toFixed(1)},${Y(x).toFixed(1)}`);
+    const pi=v.indexOf(Math.max(...v)), cls=cond.k==='bad'?'r':cond.k==='warn'?'w':'';
+    return`<div class="spw"><svg viewBox="0 0 200 36" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <line class="thr" x1="0" x2="200" y1="${Y(Dashboard.CRIT).toFixed(1)}" y2="${Y(Dashboard.CRIT).toFixed(1)}"/>
+      <polygon class="sparkarea ${cls}" points="${pts.join(' ')} 200,34 0,34"/><polyline class="spark ${cls}" points="${pts.join(' ')}"/></svg>
+      <i class="pk" style="left:${(X(pi)/2).toFixed(1)}%;top:${(Y(v[pi])/36*100).toFixed(1)}%"></i></div>`;
+  },
+  paintTop(d){
+    const host=document.getElementById('dash-top'), items=(d&&d.items)||[], h=(d&&d.window_hours)||Dashboard.topHours;
+    if(!items.length){host.innerHTML=`<div class="empty">Nessuna VM ha lavorato nelle ultime ${h} ore.</div>`;return;}
+    const f=(x,dg=1)=>Number(x).toLocaleString('it-IT',{maximumFractionDigits:dg});
+    host.innerHTML=`<table class="toptbl"><thead><tr>
+        <th scope="col"><span class="sr">Posizione</span></th><th scope="col">VM</th><th scope="col">Andamento CPU, ultime ${h} h</th>
+        <th scope="col">CPU media</th><th scope="col">Picco</th><th scope="col">RAM</th><th scope="col">Condizione</th></tr></thead><tbody>`+
+      items.map((it,i)=>{
+        const c=Dashboard.topCond(it);
+        const kind=it.type==='lxc'?'LXC':'QEMU';
+        return`<tr>
+          <td class="rk">${i+1}</td>
+          <td class="tn tid"><button type="button" class="nm-btn" aria-label="Apri i dettagli di ${esc(it.name||it.vmid)}" onclick="VMs.detail(${js(it.node)},${js(it.vmid)},${js(it.type)})"><span class="nm" title="${esc(it.name||'—')}">${esc(it.name||'VM '+it.vmid)}</span></button>
+            <span class="nsub">${it.ip?`<span class="tm">${esc(it.ip)}</span> · `:''}${esc(it.node)} · ${kind} ${esc(it.vmid)}</span></td>
+          <td class="tsp" role="img" aria-label="Andamento della CPU di ${esc(it.name||it.vmid)} nelle ultime ${h} ore: media ${f(it.avg_cpu,0)}%, picco ${f(it.peak_cpu,0)}%">${Dashboard.topSpark(it,c)}</td>
+          <td class="tnum"><b>${f(it.avg_cpu,0)}%</b><span>≈ ${f(it.work)} core su ${f(it.cores,0)}</span></td>
+          <td class="tnum"><b>${f(it.peak_cpu,0)}%</b></td>
+          <td>${it.mem_pct>=0?bar(Math.round(it.mem_pct)):'—'}</td>
+          <td><span class="tcond ${c.k}" aria-label="${c.word}" title="Picco ${f(it.peak_cpu,0)}% e media ${f(it.avg_cpu,0)}% della CPU assegnata"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[c.k]}</svg><span class="cw">${c.word}</span></span></td>
+        </tr>`;
+      }).join('')+'</tbody></table>';
+  },
 
   TASK_LABELS:{qmstart:'Avvio VM',qmstop:'Arresto forzato VM',qmshutdown:'Spegnimento VM',qmreboot:'Riavvio VM',qmreset:'Reset VM',qmsuspend:'Sospensione VM',qmresume:'Ripresa VM',
     qmclone:'Clone VM',qmigrate:'Migrazione VM',qmsnapshot:'Snapshot VM',qmdelsnapshot:'Eliminazione snapshot',qmrollback:'Ripristino snapshot',qmcreate:'Creazione VM',qmdestroy:'Eliminazione VM',qmresize:'Ridimensionamento disco',

@@ -164,6 +164,7 @@ GET  /api/storage                                   GetStorage
 GET  /api/pools                                     GetPools
 GET  /api/tasks                                     GetClusterTasks
 GET  /static/*                                      asset incorporati (librerie, font); non è API
+GET  /api/top?hours=6|12|24                          GetTopVMs: classifica delle 10 VM in esecuzione con piu' lavoro (CPU media x core assegnati, RRD `day`), IP dei soli 10 risultati, cache 60s per cluster+finestra, concorrenza 8
 GET  /api/metrics?timeframe=hour|day|week|month|year  GetMetrics: RRD nodi aggregato cluster (avg cpu/mem per 5min bucket)
 GET  /api/report?timeframe=...&type=qemu|lxc|all&node=  GetReportData: RRD per VM aggregato orario (parallel goroutine per VM)
 ```
@@ -220,7 +221,7 @@ Client methods: `GetVMConfig`, `GetContainerConfig` (aggiunto).
 - Campo: `mountpoint` (singolare, non `mountpoints`)
 - Handler `GetVMFSInfo` usa `c.Get()` (non POST) e unwrappa `result` prima di rispondere
 - Frontend filtra per `f.mountpoint` e usa `f['used-bytes']`/`f['total-bytes']`
-- Lista VM carica fsinfo in background post-render (`loadFsinfo()`, `loadDashFsinfo()`)
+- Lista VM carica fsinfo in background post-render (`loadFsinfo()`); la dashboard non lo fa piu' (niente tabella VM)
 
 ### Esecuzione nel guest: helper etichettato o script inline (2026-10-14)
 
@@ -339,7 +340,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 ## Frontend (index.html — SPA vanilla)
 
 **Pagine** (routing client-side):
-- `dashboard` — **"Bollettino"** (branch `experiment/ui-redesign`): frase di condizione (sereno / quasi sereno / attenzione, calcolata da nodi offline, RAM/CPU >=85%, task falliti 24h) + striscia di 4 KPI con storico (sparkline da `/api/metrics?timeframe=day`, barre task da `/api/tasks`) + un riga per nodo con barre min-max 24h CPU/RAM (RRD `day` per nodo, punto = valore attuale, tratto = soglia 85%, aggiornate sul posto) e un punto per VM (pieno = in esecuzione, vuoto = ferma, diametro = RAM) + colonna Attivita' (`/api/tasks`) + tabella VM con disk% da fsinfo; ordine iniziale: in esecuzione, poi spente, template in fondo (poi per VMID), intestazioni ordinabili come prima
+- `dashboard` — **"Bollettino"** (branch `experiment/ui-redesign`): frase di condizione (sereno / quasi sereno / attenzione, calcolata da nodi offline, RAM/CPU >=85%, task falliti 24h) + striscia di 4 KPI con storico (sparkline da `/api/metrics?timeframe=day`, barre task da `/api/tasks`) + un riga per nodo con barre min-max 24h CPU/RAM (RRD `day` per nodo, punto = valore attuale, tratto = soglia 85%, aggiornate sul posto) e un punto per VM (pieno = in esecuzione, vuoto = ferma, diametro = RAM) + colonna Attivita' (`/api/tasks`) + **Top 10 VM & Container** (le VM che hanno lavorato di piu' nelle ultime 6/12/24 h, da `/api/top`: andamento CPU come previsione oraria con punto sul picco, CPU media e core usati, picco, RAM, condizione sereno/variabile/temporale con glifo meteo; il nome apre il pannello VM); ordine iniziale: in esecuzione, poi spente, template in fondo (poi per VMID), intestazioni ordinabili come prima
 - `nodes` — card per nodo (ordinati natural sort) + RRD grafici (memused/memtotal) + VM per nodo
 - `vms` — tabella QEMU+LXC con colonna IP; multi-nodo selector (natural sort, modello esplicito); sort; disk% da fsinfo async; **selezione a checkbox con barra flottante** (ripristinata il 2026-11-02, D6 opzione B: la barra non esegue, apre Batch con VM e azione preselezionate via `VMs.toBatch` → `Batch.preselect`; le operazioni di massa si confermano e si loggano solo in `batch`)
 - `provision` — form clone template cloudinit con calcolo delta disco
@@ -464,3 +465,4 @@ Creato il 2026-11-02 da `main` (d5fa513) per sperimentare grafica e UX nuove isp
 - 2026-11-02 — revisione finale (2 giri) e fix: pannello VM sensibile allo stato, glifi sostituiti da SVG/parole, attivita' sopra la tabella sotto 1180px, tabella dashboard leggibile su mobile, 'da HH:MM' sotto lo stato del nodo (scartata la tacca sulla barra: l'asse e' il valore, non il tempo); DESIGN.md riscritto — non costruiti: tacche 'dato vecchio/spento' a mezza altezza e View Transitions (promessi nel contratto), barra azioni flottante (D6 aperta) — `DESIGN.md`, `.impeccable/design.json`, `cmd/server/web/templates/index.html`
 - 2026-11-02 — ridisegno pagine Nodi, VM, Batch (restyle), Cluster, Report, Impostazioni con i componenti della dashboard; `nodeState` unico; revisione e fix (stato coerente tra pagine, grafici Report senza colori di stato, tabelle mobile con Stato visibile) — richiesta utente — `cmd/server/web/templates/index.html`, `devtools/mockpve/mockpve.py`
 - 2026-11-02 — D6 risolta (opzione B): colonna checkbox e barra di selezione nella lista VM (sticky in basso, Esc deseleziona, dichiara le VM nascoste dai filtri, handoff a Batch); pulsante Console ripristinato nelle righe VM (era stato tolto dal ridisegno senza richiesta: appare solo con `has_serial` e credenziali console) — richiesta utente — `cmd/server/web/templates/index.html`, `devtools/mockpve/mockpve.py`
+- 2026-11-02 — dashboard: la tabella VM & Container (ridondante) e' sostituita da Top 10 VM & Container; nuovo endpoint `/api/top` (ranking testato in `internal/handlers/top_test.go`), rimossi DashTbl/loadDashMem/loadDashFsinfo (meno richieste per-VM al caricamento) — richiesta utente — `internal/handlers/top.go`, `cmd/server/main.go`, `cmd/server/web/templates/index.html`
