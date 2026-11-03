@@ -346,7 +346,7 @@ Note provisioning:
 api_cache(key TEXT PK, value TEXT, expires_at INTEGER)
 ```
 
-Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
+Nessuna tabella metrics — storico dei consumi delegato a Proxmox RRD. Report v2 (D28) aggiungera' una tabella di fotografie giornaliere dell'inventario (vedi "Report v2").
 
 ## Frontend (index.html — SPA vanilla)
 
@@ -465,7 +465,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 - Non usare `localStorage`/`sessionStorage` — preferenze salvate in `config.json` via backend.
 - Non aggiungere `?ds=...` alle chiamate RRD — Proxmox 8 risponde 400.
 - Non usare `c.Post()` per endpoint agent read-only (`get-fsinfo`) — usare `c.Get()`.
-- Non reintrodurre collector SQLite — storico ora da RRD Proxmox.
+- Non reintrodurre collector SQLite per le metriche — lo storico dei consumi viene dall'RRD di Proxmox. **Eccezione decisa il 2026-11-03 (D28):** una fotografia giornaliera minima dell'inventario per i Report v2 (conteggi e assegnazioni per nodo/gruppo: VM, risorse assegnate, GPU; niente IP, niente dati dei guest, niente metriche), retention 5 anni; nient'altro va salvato senza una nuova decisione.
 - Non reintrodurre username/password — autenticazione solo via API Token.
 - Non usare "empty=all" per `selectedNodes` nei selettori nodi — modello esplicito, inizializzare con tutti i nodi al load.
 - Non mischiare selettori CSS con `@media` in liste comma — CSS non supporta quella sintassi (regole separate obbligatorie).
@@ -498,11 +498,13 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 
 ## Report v2 (in progettazione, branch `feat/reports-v2`)
 
-**Obiettivo:** sostituire la pagina Report (oggi: periodo + tipo, qualche grafico, Excel) con due famiglie di report. **Tecnici** per chi gestisce il servizio: dettaglio per nodo/VM/GPU/storage, anomalie, capacita', export Excel/CSV/PDF. **Manageriali** per direttore e consiglio di dipartimento (valutazione del servizio, richieste di finanziamento): poche pagine A4 in PDF, KPI grandi, tendenze, saturazione e previsione, linguaggio del Bollettino. Generati a richiesta (nessuna programmazione). Storico = quello di Proxmox alle sue risoluzioni (fino a un anno, risoluzione via via piu' grossa; da misurare sul cluster: con Proxmox 9 il formato RRD e' cambiato). Domande D27-D34 in `DOMANDE.md`.
+**Obiettivo:** sostituire la pagina Report (oggi: periodo + tipo, qualche grafico, Excel) con due famiglie di report. **Tecnici** per chi gestisce il servizio: dettaglio per nodo/VM/GPU/storage, anomalie, capacita', export Excel/CSV/PDF. **Manageriali** per direttore e consiglio di dipartimento (valutazione del servizio, richieste di finanziamento): poche pagine A4 in PDF, KPI grandi, tendenze, saturazione e previsione, linguaggio del Bollettino. Generati a richiesta (nessuna programmazione). Storico = quello di Proxmox alle sue risoluzioni (fino a un anno, risoluzione via via piu' grossa; da misurare sul cluster: con Proxmox 9 il formato RRD e' cambiato). Domande D27-D34 in `DOMANDE.md`, risposte del 2026-11-03: gruppo = prefisso del nome VM prima del primo `-` (D27); fotografia giornaliera dell'inventario si' (D28); copertina con dati e loghi di DataCloud da https://datacloud.polimi.it/ (D29); manageriale solo aggregati, tecnico completo "uso interno" (D30); PDF dalla stampa del browser (D31); soglie proposte (D32); manageriale **bilingue: tutto in italiano e poi uguale in inglese nello stesso PDF**, tecnico solo italiano (D33); uso reale GPU fuori scope (D34).
 
 **Fonti dati gia' disponibili:** RRD di nodi e VM (CPU, RAM, rete, disco), RRD degli storage (`/nodes/{n}/storage/{s}/rrddata`: usato/totale nel tempo, anche per gli storage Ceph RBD), elenco VM con risorse assegnate, sistema operativo e GPU, inventario GPU, stato Ceph, task del cluster, pool e tag di Proxmox.
 
-**Cosa non c'e' (e va deciso):** storico dell'inventario (quante VM/GPU assegnate nel passato, VM cancellate) -> D28; attribuzione delle VM ai gruppi -> D27; uso reale delle GPU -> D34.
+**Cosa non c'e':** storico dell'inventario -> fotografia giornaliera (D28: la crescita si vedra' dal giorno di attivazione in poi); attribuzione ai gruppi -> prefisso del nome (D27); uso reale delle GPU -> rinviato (D34).
+
+**Identita' (D29):** servizio **DataCloud**, laboratorio interdipartimentale del Politecnico di Milano (DEIB, DABC, DASTU, Matematica), IaaS per il personale di ricerca; contatto datacloud-lab@polimi.it. Loghi dal sito: `DataCloud-01-1.png` (blu, per fondo chiaro) e `Bandiera_Bianco.png` (bandiera Polimi bianca, per fondo scuro), da vendorizzare in `web/static/` come PNG (non SVG: niente script) con estensione `.png` aggiunta alla allowlist di `/static` e annotati in `THIRD_PARTY.md` (marchi del Politecnico, uso interno del servizio).
 
 **Proposta di architettura (da confermare con le risposte):**
 - Calcolo lato server in Go: un endpoint per modello di report (`/api/reports/<modello>?from=&to=&...`), aggregazioni (media, p95, massimo, tempo oltre soglia, tendenza lineare e previsione di esaurimento), concorrenza limitata verso Proxmox, cache breve, un report alla volta per cluster. Il browser non chiama piu' un RRD per VM.
@@ -515,10 +517,15 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 **Piano a step (proposto):**
 1. Misura delle fonti sul cluster (risoluzioni RRD per timeframe, RRD storage/Ceph, pool e tag usati), sola lettura — [Modello suggerito: Sonnet — ragionamento: medio — motivo: ricognizione su API note]
 2. Direzione visiva: schizzo del PDF manageriale (copertina + 3-4 pagine A4) e di un report tecnico, con dati finti — [Modello suggerito: Opus — ragionamento: medio — motivo: design e gerarchia dell'informazione per un pubblico non tecnico]
-3. Backend aggregati + (se D28 A) fotografia giornaliera, test — [Modello suggerito: Sonnet — ragionamento: alto — motivo: calcoli ben specificati su dati noti]
+3. Backend aggregati + fotografia giornaliera dell'inventario (tabella SQLite, scritta una volta al giorno dal server), test — [Modello suggerito: Sonnet — ragionamento: alto — motivo: calcoli ben specificati su dati noti]
 4. Pagina Report: modelli, filtri, anteprima, tabelle tecniche, export Excel/CSV sicuri — [Modello suggerito: Sonnet — ragionamento: alto — motivo: UI su componenti esistenti]
-5. Vista documento e PDF (manageriale e tecnico) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: CSS di stampa e grafici ad alta risoluzione]
+5. Vista documento e PDF (manageriale bilingue IT poi EN, tecnico IT) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: CSS di stampa e grafici ad alta risoluzione]
 6. Revisione di sicurezza e di design, prova sui dati reali — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione]
+
+## Lavori da fare (non pianificati)
+
+- **Uso reale delle GPU nei guest** (D34): helper `nvidia-smi` in `/usr/local/libexec/pmgr/` (stesse regole degli altri helper: ASCII, argomenti posizionali, sola lettura) + raccolta; quando c'e', **estendere la reportistica** (Report v2: utilizzo GPU per VM/gruppo, GPU assegnate ma inutilizzate).
+- **Convertire le 22 assegnazioni GPU dirette ai mapping** (in Proxmox, a VM spenta): finche' restano dirette l'app le mostra ma non le modifica.
 
 ## Registro modifiche
 
@@ -553,3 +560,4 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 - 2026-11-03 — panoramica: cella KPI "GPU" (assegnate / totali, libere e tramite mapping) tra RAM e task, solo informativa (non entra nel meteo), cliccabile verso la pagina GPU, assente dove non ci sono schede; branch `feat/vm-gpu` e `feat/gpu-assign` cancellati — richiesta utente — `cmd/server/web/templates/index.html`, `CLAUDE.md`
 - 2026-11-03 — nuovo tema "spiderman" (blu del costume + rosso, pericolo rosa e attenzione oro per non confondere il marchio con gli stati): whitelist `config.themes`, CSS `html.spiderman`, tessera in Impostazioni, `applyTheme`, media query chiara, test — richiesta utente — `internal/config/config.go`, `config_test.go`, `cmd/server/main_test.go`, `cmd/server/web/templates/index.html`, `CLAUDE.md`
 - 2026-11-03 — avvio Report v2: branch `feat/reports-v2`, decisioni utente (pubblico manageriale = direttore e consiglio di dipartimento per valutazione e finanziamenti; PDF; a richiesta; storico massimo di Proxmox), proposta di architettura, threat model, piano a step, domande D27-D34 — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
+- 2026-11-03 — Report v2: risposte D27-D34 (gruppo dal prefisso del nome, fotografia giornaliera dell'inventario con eccezione alla regola "niente collector", identita' DataCloud e loghi dal sito, manageriale bilingue IT+EN, nvidia-smi tra i lavori da fare) — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
