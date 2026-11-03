@@ -54,7 +54,10 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
   - **Avvio automatico** dopo l'assegnazione della GPU e in generale dopo la creazione (opzione, attiva di default; se la GPU fallisce la VM non parte e lo dice).
   - **Elenco delle schede disponibili** mostrato nel modulo (per nodo: modello, mapping, libera/prenotata).
   - **Utente aggiuntivo** nel modulo (nome + chiave SSH o password fissa, stessa logica del pulsante "Aggiungi utente" via guest agent e `adduser.sh`): fino a **due utenti al primo avvio** (uno da cloud-init, uno aggiunto dopo); serve attendere l'agent dopo l'avvio; se fallisce la VM resta creata e l'utente si aggiunge dal pulsante.
-- **Ancora da decidere:** modello di GPU o scheda precisa; cosa mostrare se nessun nodo e' idoneo.
+- **Scheda precisa:** l'utente sceglie la scheda esatta; l'elenco e' **raggruppato per memoria della scheda** (24/40/80 GB…; da ricavare dal modello, tabella da verificare sulle schede reali), poi per modello e nodo.
+- **Schede in uso:** restano visibili **in grigio, non selezionabili, con il nome della VM** assegnata (anche se diretta); una scheda prenotata dal soft lock compare come "in creazione".
+- **Nessun nodo idoneo:** il modulo spiega **perche'**, nodo per nodo: RAM (richiesta vs. disponibile dopo la riserva), core, scheda non libera, storage incompatibile, nodo fuori linea; con la quantita' che manca ("mancano 12 GB di RAM") e il nodo piu' vicino a essere idoneo.
+- **Decisioni complete:** non restano punti aperti per 3b a parte quelli del bilanciamento (riserva di RAM, tetto CPU).
 - **Primo passo utile:** prova in sola lettura/su VM di test del clone con `target` verso un altro nodo.
 - **Dipende da:** 3 (modello di carico) e dalla pagina GPU (gia' fatta). Si puo' partire con una versione senza GPU nel deploy (solo nodo consigliato) e aggiungere la GPU dopo.
 - **Modelli:** design Opus medio, implementazione Sonnet alto, revisione Opus medio (scrive configurazione hardware).
