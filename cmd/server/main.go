@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"io/fs"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"proxmox-manager/internal/cache"
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/handlers"
+	"proxmox-manager/internal/history"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -38,6 +40,14 @@ func main() {
 	defer store.Close()
 
 	h := handlers.New(store)
+
+	// Daily inventory snapshot for the reports (D28): counts and assignments only.
+	hist, err := history.New(cfg.DBPath)
+	if err != nil {
+		log.Fatalf("history db: %v", err)
+	}
+	defer hist.Close()
+	handlers.StartSnapshots(context.Background(), hist)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

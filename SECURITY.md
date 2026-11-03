@@ -70,6 +70,10 @@ and the VM's operating system through `guest-get-osinfo`.
 - On SELinux-enforcing guests this needs a third helper, `dmesg.sh`, in
   `/usr/local/libexec/pmgr/` with the same label as the others.
 
+## Daily inventory snapshot
+
+The server writes one small snapshot per cluster per day into the SQLite file (`inv_*` tables): counts and assignments per node and group (VMs, allocated cores/RAM/disk, GPU cards), never IPs, VM names, guest data or metrics; the group is the name prefix before the first `-`, validated as `[a-z0-9]{1,32}`, otherwise `altro`. Rows older than 5 years are deleted. The database file is as sensitive as `config.json`'s neighbours: it lives next to the binary with the process's umask. Keys written to SQL are validated and all statements are parameterised. A failed read stores nothing and is retried; unreadable GPU data is stored as "unknown", not as zero.
+
 ## GPU assignment (PCI passthrough)
 
 The only hardware write the app performs. `GET /api/gpus` and `GET .../gpu/plan` only read; `POST .../gpu` and `DELETE .../gpu/{slot}` write the VM config.

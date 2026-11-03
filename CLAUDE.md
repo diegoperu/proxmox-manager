@@ -35,6 +35,8 @@ proxmox-manager/
     │   └── store.go                # SQLite: solo api_cache (TTL)
     ├── config/
     │   └── config.go               # config.json, singleton con RWMutex
+    ├── history/
+    │   └── store.go                # SQLite: fotografia giornaliera dell'inventario (D28), 4 tabelle `inv_*`
     └── handlers/
         └── handlers.go             # tutti gli HTTP handler (proxy → Proxmox)
 ```
@@ -340,6 +342,10 @@ Note provisioning:
 - Default gateway: `10.75.4.254`, default IP prefix: `10.75.4.`
 - Frontend (2026-10-13): il gateway digitato a mano non viene sovrascritto dall'auto-calcolo (`gwManual`; svuotarlo o scegliere un template lo riattiva); il nome VM è validato (`^[A-Za-z0-9][A-Za-z0-9.-]*$`, max 253) prima della chiamata; `#pv-summary` mostra cosa verrà creato e si aggiorna mentre si compila (solo `textContent`).
 
+## Fotografia giornaliera dell'inventario (D28, 2026-11-03)
+
+`internal/history` + `internal/handlers/snapshot.go`. Il server, 30 s dopo l'avvio e poi ogni ora, controlla per ogni cluster configurato se esiste la fotografia di oggi (data locale del server); se manca la legge e la salva (`INSERT` in una transazione, una per cluster e giorno; se la lettura fallisce riprova all'ora dopo e non salva niente). Contenuto: `inv_node` (nodo, online, core, RAM), `inv_group` (nodo, **gruppo**, tipo qemu/lxc: n. VM, in esecuzione, core, RAM e disco assegnati; template esclusi), `inv_gpu` (nodo, modello, gruppo, n. schede; gruppo vuoto = libere), `inv_meta` (`gpu_known`: se l'inventario GPU non e' leggibile o e' parziale non si salvano righe GPU, cosi' l'assenza non diventa "zero GPU"). **Niente IP, nomi di VM, dati dei guest, metriche.** Gruppo = prefisso del nome VM prima del primo `-` (D27), `altro` se non e' `[a-z0-9]{1,32}`. Il cluster e' identificato dalla **label**: rinominarla in `config.json` interrompe la serie storica. Retention 5 anni (`history.Retention`, pulizia a ogni giro). Stessa base dati del file `db_path` (WAL, una connessione per ciascun `Store`). Verificato sul cluster reale il 2026-11-03: CALCOLO 11 nodi / 107 VM / 27 schede, HOSTING 2 nodi / 28 VM.
+
 ## SQLite schema (solo cache)
 
 ```sql
@@ -561,3 +567,4 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 - 2026-11-03 — nuovo tema "spiderman" (blu del costume + rosso, pericolo rosa e attenzione oro per non confondere il marchio con gli stati): whitelist `config.themes`, CSS `html.spiderman`, tessera in Impostazioni, `applyTheme`, media query chiara, test — richiesta utente — `internal/config/config.go`, `config_test.go`, `cmd/server/main_test.go`, `cmd/server/web/templates/index.html`, `CLAUDE.md`
 - 2026-11-03 — avvio Report v2: branch `feat/reports-v2`, decisioni utente (pubblico manageriale = direttore e consiglio di dipartimento per valutazione e finanziamenti; PDF; a richiesta; storico massimo di Proxmox), proposta di architettura, threat model, piano a step, domande D27-D34 — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
 - 2026-11-03 — Report v2: risposte D27-D34 (gruppo dal prefisso del nome, fotografia giornaliera dell'inventario con eccezione alla regola "niente collector", identita' DataCloud e loghi dal sito, manageriale bilingue IT+EN, nvidia-smi tra i lavori da fare) — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
+- 2026-11-03 — fotografia giornaliera dell'inventario anticipata (D28): `internal/history` (4 tabelle, `Save` transazionale e sostitutivo, `Prune` a 5 anni, chiavi validate), `BuildSnapshot` puro e `StartSnapshots` (prima lettura dopo 30 s, poi ogni ora, una per cluster e giorno, riprova se fallisce), gruppo dal nome (D27); test con `-race` (conteggi, nessuna fuga di nomi/IP, GPU ignota, una sola lettura al giorno, retry, retention); provata sui cluster reali in una copia isolata (CALCOLO 107 VM, HOSTING 28, nessun dato personale salvato) — `internal/history/`, `internal/handlers/snapshot.go`, `snapshot_test.go`, `cmd/server/main.go`, `CLAUDE.md`
