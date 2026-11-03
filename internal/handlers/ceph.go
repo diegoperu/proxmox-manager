@@ -735,6 +735,13 @@ func cephCached(key string, ttl time.Duration, fn func() (interface{}, error)) (
 	return v, nil
 }
 
+// cephForget drops a cached entry (after a write that changes what it describes).
+func cephForget(key string) {
+	cephCache.Lock()
+	delete(cephCache.m, key)
+	cephCache.Unlock()
+}
+
 func (h *Handler) cephHandler(full bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idx := clusterIdx(r)

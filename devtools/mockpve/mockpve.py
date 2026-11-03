@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Finto Proxmox VE per l'anteprima grafica (solo dati sintetici, solo localhost, sola lettura)."""
-import json, math, os, random, sys, time
+import hashlib, json, math, os, random, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -49,6 +49,7 @@ NAMES = ["web-lab", "db-test", "ci-runner", "gitea", "nextcloud", "grafana", "pr
          "wiki", "monitor", "proxy", "ldap", "redis-cache", "minio", "registry", "build-arm"]
 
 VMS = []
+CFG_EDITS = {}  # vmid -> {chiave: valore|None}: le uniche scritture accettate (config QEMU e spegnimento), solo in memoria
 vmid = 100
 for node in NODES:
     n = {"datacloud-node-1": 12, "datacloud-node-2": 14, "datacloud-node-3": 12, "datacloud-node-4": 6}[node]
@@ -208,7 +209,7 @@ def route(path):
         return [dict(type="cluster", name="polimi-deib", nodes=4, quorate=1, version=7)] + \
                [dict(type="node", name=n, online=1 if b["status"] == "online" else 0, id=f"node/{n}") for n, b in NODES.items()]
     if p.startswith("/cluster/ceph/"): return ceph_route(p[len("/cluster/ceph/"):])
-    if p == "/cluster/mapping/pci": return [dict(id="gpu-a100", map=[f"node={n},path=0000:02:00,id=10de:20f1" for n in NODES])]
+    if p == "/cluster/mapping/pci": return [dict(id="gpu-a100", map=[f"node={n},path=0000:02:00,id=10de:20f1" for n in NODES]), dict(id="gpu-3090", map=["node=datacloud-node-1,path=0000:01:00"])]
     if p == "/cluster/tasks": return tasks()
     if p == "/cluster/nextid": return "214"
     if p == "/nodes":
@@ -227,9 +228,9 @@ def route(path):
                         loadavg=["1.2", "1.1", "0.9"], pveversion="pve-manager/8.2.4", kversion="Linux 6.8.8-2-pve",
                         cpuinfo=dict(cpus=b["cores"], model="AMD EPYC 7313"))
         if rest == "hardware/pci":
-            return [dict(id="0000:01:00.0", **{"class": "0x030000"}, vendor_name="NVIDIA Corporation", device_name="GA102 [GeForce RTX 3090]"),
+            return [dict(id="0000:01:00.0", **{"class": "0x030000"}, vendor="0x10de", iommugroup=12, vendor_name="NVIDIA Corporation", device_name="GA102 [GeForce RTX 3090]"),
                     dict(id="0000:01:00.1", **{"class": "0x040300"}, vendor_name="NVIDIA Corporation", device_name="GA102 High Definition Audio"),
-                    dict(id="0000:02:00.0", **{"class": "0x030200"}, vendor_name="NVIDIA Corporation", device_name="A100 PCIe 80GB"),
+                    dict(id="0000:02:00.0", **{"class": "0x030200"}, vendor="0x10de", iommugroup=13, vendor_name="NVIDIA Corporation", device_name="A100 PCIe 80GB"),
                     dict(id="0000:03:00.0", **{"class": "0x020000"}, vendor_name="Intel Corporation", device_name="Ethernet X710")]
         if rest == "qemu": return [x for x in VMS if x["node"] == node and x["type"] == "qemu"]
         if rest == "lxc": return [x for x in VMS if x["node"] == node and x["type"] == "lxc"]
@@ -250,7 +251,13 @@ def route(path):
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
                 if seg[0] == "qemu" and v["vmid"] % 11 == 0: cfg["hostpci0"] = "0000:01:00,pcie=1,x-vga=1"  # GPU diretta
                 if seg[0] == "qemu" and v["vmid"] % 13 == 0: cfg["hostpci0"] = "mapping=gpu-a100,pcie=1"      # GPU da mapping
+                if seg[0] == "qemu" and v["vmid"] % 19 == 0: cfg["hostpci0"] = "0000:02:00"                       # diretta sulla stessa A100 del mapping: doppione
+                if seg[0] == "qemu" and v["vmid"] % 23 == 0: cfg["hostpci0"] = "0000:7a:00"                       # scheda inesistente sul nodo
                 if seg[0] == "qemu" and v["vmid"] % 17 == 0: cfg["hostpci0"] = "0000:03:00.0"                 # NIC, non e' una GPU
+                for k, val in CFG_EDITS.get(v["vmid"], {}).items():
+                    if val is None: cfg.pop(k, None)
+                    else: cfg[k] = val
+                cfg["digest"] = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:40]  # come Proxmox: cambia se cambia il config
                 return cfg
             if seg[2] == "agent" and seg[3] == "network-get-interfaces":
                 if v["status"] != "running" or v["type"] != "qemu" or v["vmid"] % 14 == 0: return None  # agent muto
@@ -315,8 +322,34 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
             return
-        self.send_error(405, "anteprima in sola lettura")
+        parts = path[len("/api2/json"):].strip("/").split("/")
+        n = int(self.headers.get("Content-Length", "0") or 0)
+        form = parse_qs(self.rfile.read(min(n, 65536)).decode()) if n else {}
+        # config QEMU: PUT /nodes/{n}/qemu/{id}/config (con digest, come Proxmox)
+        if self.command == "PUT" and len(parts) == 5 and parts[0] == "nodes" and parts[2] == "qemu" and parts[4] == "config" and parts[3].isdigit():
+            vmid = int(parts[3]); cur = route("/" + "/".join(parts))
+            if cur is None: return self.send_error(404)
+            if form.get("digest", [""])[0] != cur["digest"]:
+                return self._json({"data": None, "message": "detected modified configuration - file changed by other user? Try again"}, 500)
+            ed = CFG_EDITS.setdefault(vmid, {})
+            for k, val in form.items():
+                if k == "digest": continue
+                if k == "delete":
+                    for d in val[0].split(","): ed[d] = None
+                else: ed[k] = val[0]
+            return self._json({"data": None}, 200)
+        # spegnimento: POST /nodes/{n}/qemu/{id}/status/{shutdown|stop}
+        if self.command == "POST" and len(parts) == 6 and parts[2] == "qemu" and parts[4] == "status" and parts[5] in ("shutdown", "stop") and parts[3].isdigit():
+            for v in VMS:
+                if v["vmid"] == int(parts[3]): v["status"] = "stopped"
+            return self._json({"data": "UPID:mock:0000"}, 200)
+        self.send_error(405, "anteprima in sola lettura (tranne config QEMU e spegnimento, solo in memoria)")
     do_PUT = do_DELETE = do_POST
+
+    def _json(self, obj, code):
+        body = json.dumps(obj).encode()
+        self.send_response(code); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
 
 ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()

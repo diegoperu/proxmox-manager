@@ -26,9 +26,16 @@ var (
 
 // PCIInfo is what we keep of a node's PCI device.
 type PCIInfo struct {
-	Class  string // 6 hex digits, e.g. "030200"
-	Vendor string
-	Device string
+	Class    string // 6 hex digits, e.g. "030200"
+	Vendor   string
+	VendorID string // lowercase hex without 0x, e.g. "10de"
+	Device   string
+	Group    int // IOMMU group, -1 unknown
+}
+
+// IsNvidiaDisplay: the cards the app manages (video cards by NVIDIA; BMC/ASPEED controllers are excluded).
+func (i PCIInfo) IsNvidiaDisplay() bool {
+	return isDisplayClass(i.Class) && (i.VendorID == "10de" || strings.Contains(strings.ToLower(i.Vendor), "nvidia"))
 }
 
 // PCITable: normalised "bus:dev" (lowercase, domain 0000 assumed) -> device. A card with several functions
@@ -72,7 +79,13 @@ func ParsePCIList(raw json.RawMessage) PCITable {
 		class, _ := d["class"].(string)
 		vendor, _ := d["vendor_name"].(string)
 		device, _ := d["device_name"].(string)
-		info := PCIInfo{Class: shortPCIClass(class), Vendor: clampText(vendor, 60), Device: clampText(device, 80)}
+		vid, _ := d["vendor"].(string)
+		group := -1
+		if g, ok := d["iommugroup"].(float64); ok && g >= 0 && g < 1e6 {
+			group = int(g)
+		}
+		info := PCIInfo{Class: shortPCIClass(class), Vendor: clampText(vendor, 60), VendorID: strings.TrimPrefix(strings.ToLower(strings.TrimSpace(vid)), "0x"),
+			Device: clampText(device, 80), Group: group}
 		if old, ok := t[key]; ok && isDisplayClass(old.Class) && !isDisplayClass(info.Class) {
 			continue
 		}

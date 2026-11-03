@@ -85,6 +85,9 @@ func main() {
 		r.Get("/nodes/{node}/qemu/{vmid}/osinfo", h.GetVMOSInfo)
 		r.Get("/nodes/{node}/qemu/{vmid}/netinfo", h.GetVMNetInfo)
 		r.Post("/nodes/{node}/qemu/{vmid}/dmesg", h.VMDmesg)
+		r.Get("/nodes/{node}/qemu/{vmid}/gpu/plan", h.PlanGPU)
+		r.Post("/nodes/{node}/qemu/{vmid}/gpu", h.AssignGPU)
+		r.Delete("/nodes/{node}/qemu/{vmid}/gpu/{slot}", h.UnassignGPU)
 		r.Post("/nodes/{node}/qemu/{vmid}/action/{action}", h.VMAction)
 		r.Post("/nodes/{node}/qemu/{vmid}/snapshot", h.VMSnapshot)
 		r.Post("/nodes/{node}/qemu/{vmid}/migrate", h.VMMigrate)
@@ -114,6 +117,7 @@ func main() {
 		r.Get("/report", h.GetReportData)
 		r.Get("/top", h.GetTopVMs)
 		r.Get("/ceph/summary", h.GetCephSummary())
+		r.Get("/gpus", h.GetGPUs())
 		r.Get("/ceph", h.GetCeph())
 	})
 

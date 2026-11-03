@@ -114,6 +114,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--hover)}
 .br{background:var(--green-dim);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent)}
 .bs{background:var(--red-dim);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 32%,transparent)}
 .bp{background:var(--blue-dim);color:var(--blue);border:1px solid color-mix(in srgb,var(--blue) 32%,transparent)}
+.gacts{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:6px}
+#page-gpu table{table-layout:fixed}
+#page-gpu th:nth-child(1){width:22%}#page-gpu th:nth-child(2){width:12%}#page-gpu th:nth-child(3){width:12%}#page-gpu th:nth-child(4){width:30%}#page-gpu th:nth-child(5){width:12%}#page-gpu td{overflow-wrap:anywhere}
 .badge.gpu{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent);margin-left:6px;vertical-align:middle}
 .bq{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 32%,transparent)}
 .bl{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 32%,transparent)}
@@ -678,6 +681,9 @@ html.catppuccino{
     <button type="button" class="ni" data-page="ceph" hidden>
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Ceph
     </button>
+    <button type="button" class="ni" data-page="gpu" hidden>
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="18" height="11" rx="2"/><path d="M20 9h2v5h-2M6 17v3M10 17v3M14 17v3"/><circle cx="11" cy="11.5" r="2.5"/></svg>GPU
+    </button>
     <div class="nav-sec">Operazioni</div>
     <button type="button" class="ni" data-page="provision">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
@@ -697,7 +703,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.78.0 · 2026-11-02</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.84.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -739,6 +745,12 @@ html.catppuccino{
     <div class="page" id="page-ceph">
       <div class="ceph-top"><div class="cond" id="ceph-cond" aria-live="polite"></div><div class="ceph-upd" id="ceph-upd"></div></div>
       <div id="ceph-body"></div>
+    </div>
+
+    <!-- ██ GPU ██ -->
+    <div class="page" id="page-gpu">
+      <div class="cond" id="gpu-cond" aria-live="polite"></div>
+      <div id="gpu-body" style="margin-top:18px"></div>
     </div>
 
     <!-- ██ NODES ██ -->
@@ -1170,6 +1182,20 @@ html.catppuccino{
   <input class="inp pal-in" id="pal-q" type="text" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" aria-label="Cerca VM, nodi, pagine e azioni" autocomplete="off" spellcheck="false" placeholder="Cerca VM, nodi, pagine, azioni…">
   <div class="pal-list" id="pal-list" role="listbox" aria-label="Risultati"></div>
   <div class="pal-foot"><kbd>↑</kbd><kbd>↓</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>Esc</kbd> chiudi</div>
+</div></div>
+
+<!-- MODAL ASSEGNA GPU -->
+<div class="ov" id="mgpu"><div class="modal" style="min-width:min(520px,calc(100vw - 24px))">
+  <div class="mt" id="mgpuT">Assegna GPU</div>
+  <div class="td" id="mgpuS" style="margin-bottom:12px"></div>
+  <div class="fr mb12"><label class="fl" for="gpu-vm">VM (solo dello stesso nodo)</label><select class="inp w" id="gpu-vm"></select></div>
+  <div class="fr mb12"><label class="fl" for="gpu-map">Mapping</label><select class="inp w" id="gpu-map"></select></div>
+  <p class="cnote">La VM deve essere spenta. Il server ricontrolla tutto prima di scrivere: scheda libera, stessa VM, nodo, configurazione non cambiata nel frattempo.</p>
+  <div id="gpu-msg" role="status" style="margin-top:10px"></div>
+  <div class="mf">
+    <button class="btn bg2" onclick="closeModal('mgpu')">Annulla</button>
+    <button class="btn ba" onclick="Gpu.next()">Continua</button>
+  </div>
 </div></div>
 
 <!-- MODAL DISCO -->
@@ -1751,7 +1777,7 @@ const ClusterMgr={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',reports:'Report',settings:'Impostazioni'};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',reports:'Report',settings:'Impostazioni'};
 // Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
@@ -1802,6 +1828,8 @@ const App={
     if(p==='cluster')   Cluster.load();
     if(p==='ceph')      Ceph.load();
     else                Ceph.probe();
+    if(p==='gpu')       Gpu.load();
+    else                Gpu.probe();
     if(p==='settings')  Settings.load();
   },
   async checkConn(){
@@ -1990,9 +2018,9 @@ const Palette={
   },
   base(){
     const KW={dashboard:'home panoramica stato salute',nodes:'nodi server host hardware',vms:'virtual machine container lxc qemu kvm',
-      provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',ceph:'ceph storage osd pool rbd salute capacita meteo',
+      provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',ceph:'ceph storage osd pool rbd salute capacita meteo',gpu:'gpu scheda video nvidia assegna passthrough pci mapping',
       reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
-    const items=Object.entries(PMETA).filter(([k])=>k!=='ceph'||Ceph.isAvail()).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
+    const items=Object.entries(PMETA).filter(([k])=>(k!=='ceph'||Ceph.isAvail())&&(k!=='gpu'||Gpu.isAvail())).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
     items.push({group:'Azioni',label:'Aggiorna i dati',sub:'',run:()=>App.refresh()});
     for(const c of ClusterMgr.clusters.filter(c=>c.idx!==ClusterMgr.current)){
       items.push({group:'Azioni',label:`Passa al cluster ${c.label}`,sub:'',run:()=>{document.getElementById('cluster-select').value=c.idx;ClusterMgr.switchTo(c.idx);}});
@@ -2418,6 +2446,202 @@ const Ceph={
   },
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// GPU: schede video Nvidia per nodo, chi le usa e cosa correggere. Le assegnazioni dall'app passano solo dai
+// mapping PCI di Proxmox (una scheda per mapping); quelle dirette si leggono e si segnalano, mai modificate.
+// Ogni scrittura e' riverificata dal server (VM spenta, scheda libera, stesso nodo, digest): qui si guida soltanto.
+// Ogni testo esterno passa da esc() o textContent.
+// ════════════════════════════════════════════════════════════════════════════
+const Gpu={
+  by:{},          // inventario per indice cluster
+  availBy:{},     // true se il cluster ha almeno una scheda Nvidia
+  seq:0, busy:false, ctx:null,
+  short(n){return String(n||'Scheda video').replace(/^NVIDIA Corporation\s+/i,'');},
+  summary(d){
+    if(!d)return null;
+    const cards=d.nodes.reduce((a,n)=>a+n.cards.length,0);
+    const free=d.nodes.reduce((a,n)=>a+n.cards.filter(c=>c.status==='free').length,0);
+    const used=d.nodes.flatMap(n=>n.cards.flatMap(c=>c.uses));
+    return{cards,free,problems:d.problems.length,direct:used.filter(u=>u.kind==='direct').length,mapped:used.filter(u=>u.kind==='mapping').length};
+  },
+  note(d,idx){Gpu.by[idx]=d;Gpu.availBy[idx]=!!(d&&d.nodes.some(n=>n.cards.length));Gpu.syncNav();},
+  isAvail(){return Gpu.availBy[ClusterMgr.current]===true;},
+  syncNav(){const b=document.querySelector('.ni[data-page="gpu"]');if(b)b.hidden=!Gpu.isAvail()&&App.cur!=='gpu';},
+  // Per la panoramica e la voce di menu; non genera toast e non blocca niente (la prima lettura costa qualche secondo).
+  async fetch(){
+    const idx=ClusterMgr.current;
+    try{const d=await api('/gpus',{quiet:true,timeoutMs:30000});Gpu.note(d,idx);return d;}catch(e){return Gpu.by[idx]||null;}
+  },
+  async probe(){if(Gpu.availBy[ClusterMgr.current]===undefined)await Gpu.fetch();Gpu.syncNav();},
+
+  async load(){
+    const seq=++Gpu.seq, body=document.getElementById('gpu-body');
+    if(!Gpu.by[ClusterMgr.current]){document.getElementById('gpu-cond').innerHTML='';body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura delle schede (la prima volta richiede qualche secondo)…</div>';}
+    let d;
+    try{d=await api('/gpus',{quiet:true,timeoutMs:30000});}
+    catch(e){if(seq===Gpu.seq&&!Gpu.by[ClusterMgr.current])body.innerHTML=errBox(e.message,'Gpu.load()');return;}
+    if(seq!==Gpu.seq)return;
+    Gpu.note(d,ClusterMgr.current); Gpu.paint();
+  },
+
+  vmBtn(node,u){
+    return`<button type="button" class="nm-btn" onclick="VMs.detail(${js(node)},${js(u.vmid)},'qemu')"><span class="nm" title="${esc(u.name||'')}">${esc(u.name||'VM '+u.vmid)}</span></button> <span class="tm">${esc(u.vmid)}</span>`;
+  },
+  useBadge(u){return u.kind==='mapping'?`<span class="badge bn" title="Assegnata tramite il mapping ${esc(u.mapping)}">${esc(u.mapping)}</span>`:`<span class="badge" title="Assegnazione diretta (${esc(u.slot)}): si modifica solo in Proxmox">Diretta</span>`;},
+
+  paint(){
+    const d=Gpu.by[ClusterMgr.current], cond=document.getElementById('gpu-cond'), body=document.getElementById('gpu-body');
+    const sm=Gpu.summary(d);
+    if(!sm||!sm.cards){
+      cond.innerHTML=''; body.innerHTML='<div class="panel"><div class="empty">Questo cluster non ha schede video Nvidia.<div style="margin-top:12px"><button type="button" class="btn bg2 sm" onclick="App.nav(\'dashboard\')">Torna alla panoramica</button></div></div></div>'; return;
+    }
+    const level=sm.problems?'warn':'ok';
+    const title=sm.problems?`Quasi sereno · ${sm.problems} ${Dashboard.plural(sm.problems,'GPU da correggere','GPU da correggere')}`:`Sereno · ${sm.cards} schede, ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')}`;
+    const sub=sm.problems?`${sm.cards} schede · ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')} · ${sm.direct} assegnazioni dirette, ${sm.mapped} tramite mapping`:`${sm.direct} assegnazioni dirette · ${sm.mapped} tramite mapping · nessun conflitto`;
+    cond.innerHTML=`<svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg><div><h2>${esc(title)}</h2><p>${esc(sub)}${d.partial&&d.partial.length?` · <span class="wrn">dati incompleti: ${esc(d.partial.slice(0,4).join(', '))}</span>`:''}</p></div>`;
+    body.innerHTML=Gpu.problems(d)+d.nodes.filter(n=>n.cards.length).map(n=>Gpu.nodePanel(n)).join('')+
+      (!d.mappings.length?'<p class="cnote" style="margin-top:12px">Non ci sono mapping PCI: per assegnare una scheda dall\'app serve un mapping per ogni scheda (Datacenter › Resource Mappings › PCI in Proxmox).</p>':'');
+  },
+
+  problemText(p){
+    const u=p.uses[0]||{}, who=p.uses.map(x=>`${x.name||'VM'} (${x.vmid})`).join(', ');
+    switch(p.kind){
+      case'double':return`La scheda ${Gpu.short(p.card)} (${p.addr}) è assegnata a ${p.uses.length} VM: ${who}`;
+      case'overbooked':return`Il mapping ${p.mapping} (gruppo di schede) è usato da più VM che schede: ${who}`;
+      case'device_missing':return`${who} punta a ${p.addr}${p.mapping?` (mapping ${p.mapping})`:''}, che non esiste su ${p.node}`;
+      case'mapping_no_node':return`${who} usa il mapping ${p.mapping}, che non ha schede su ${p.node}`;
+    }
+    return'Problema sulle GPU';
+  },
+  problems(d){
+    if(!d.problems.length)return'';
+    const rows=d.problems.map(p=>{
+      const acts=p.uses.map(u=>u.editable
+        ?`<button type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(p.node)},${js(u.vmid)},${js(u.slot)})">Togli da ${esc(u.name||'VM '+u.vmid)}</button>`
+        :`<span class="cnote">${esc(u.name||'VM '+u.vmid)}: assegnazione diretta (${esc(u.slot)}), correggila in Proxmox</span>`).join('');
+      return`<div class="calert"><span class="sev w">Da correggere</span><span class="ccode">${esc(p.node)}</span><div class="cmsg">${esc(Gpu.problemText(p))}<div class="gacts">${acts}</div></div></div>`;
+    }).join('');
+    return`<h2 class="sec">Da correggere <small>${d.problems.length}</small></h2><div class="panel calerts">${rows}</div>`;
+  },
+  nodePanel(n){
+    const free=n.cards.filter(c=>c.status==='free').length;
+    const rows=n.cards.map(c=>{
+      const st=c.status==='free'?'<span class="st ok">Libera</span>':c.status==='conflict'?'<span class="st warn">In conflitto</span>':'<span class="st">Assegnata</span>';
+      const uses=c.uses.map(u=>`<div>${Gpu.vmBtn(n.node,u)} ${Gpu.useBadge(u)}${u.status==='running'?' <span class="td">· accesa</span>':''}</div>`).join('')||'<span class="td">—</span>';
+      const acts=c.uses.filter(u=>u.editable).map(u=>`<button type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(n.node)},${js(u.vmid)},${js(u.slot)})">Togli</button>`).join(' ')
+        ||(c.status==='free'?(c.mappings.length?`<button type="button" class="btn ba sm" onclick="Gpu.assign(${js(n.node)},${js(c.addr)})">Assegna…</button>`:'<span class="td" title="In Proxmox: Datacenter › Resource Mappings › PCI">serve un mapping</span>'):'');
+      return`<tr><td><b>${esc(Gpu.short(c.name))}</b></td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td><td>${acts}</td></tr>`;
+    }).join('');
+    const groups=n.groups.length?`<p class="cnote" style="padding:0 var(--card-pad) 12px">Mapping a gruppo (sola lettura): ${n.groups.map(g=>esc(`${g.id} · ${g.cards} schede · ${new Set(g.uses.map(u=>u.vmid)).size} VM`)).join(' · ')}</p>`:'';
+    return`<div class="panel"><div class="panel-h"><h2>${esc(n.node)}</h2><small>${n.cards.length} ${Dashboard.plural(n.cards.length,'scheda','schede')} · ${free} ${Dashboard.plural(free,'libera','libere')}</small></div>
+      <div class="tw"><table><thead><tr><th>Scheda</th><th>Indirizzo</th><th>Stato</th><th>VM</th><th>Mapping</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${groups}</div>`;
+  },
+
+  // ── assegna ──
+  async assign(node,addr){
+    const d=Gpu.by[ClusterMgr.current], n=d&&d.nodes.find(x=>x.node===node), c=n&&n.cards.find(x=>x.addr===addr);
+    if(!c)return;
+    Gpu.ctx={node,card:c,vms:null};
+    document.getElementById('mgpuT').textContent=`Assegna ${Gpu.short(c.name)}`;
+    document.getElementById('mgpuS').textContent=`${node} · ${c.addr}`;
+    const mapSel=document.getElementById('gpu-map'); mapSel.replaceChildren();
+    for(const m of c.mappings){const o=document.createElement('option');o.value=m;o.textContent=m;mapSel.append(o);}
+    const vmSel=document.getElementById('gpu-vm'); vmSel.replaceChildren(); const o0=document.createElement('option');o0.value='';o0.textContent='Caricamento…';vmSel.append(o0);
+    Gpu.msg('');
+    openModal('mgpu');
+    try{
+      const list=await apiCached('/vms',60000);
+      const mine=(Array.isArray(list)?list:[]).filter(x=>x.node===node).flatMap(x=>x.vms||[]).filter(v=>v.type!=='lxc'&&!isTemplate(v)).sort((a,b)=>(a.vmid||0)-(b.vmid||0));
+      vmSel.replaceChildren();
+      const p=document.createElement('option');p.value='';p.textContent='Scegli una VM di questo nodo…';vmSel.append(p);
+      for(const v of mine){const o=document.createElement('option');o.value=String(v.vmid);o.textContent=`${v.vmid} · ${v.name||'—'}${v.status==='running'?' (accesa)':''}${Array.isArray(v.gpus)&&v.gpus.length?' · ha già una GPU':''}`;vmSel.append(o);}
+      Gpu.ctx.vms=mine;
+    }catch(e){Gpu.msg('Elenco VM non disponibile: '+e.message,'err');}
+  },
+  msg(text,kind,action){
+    const el=document.getElementById('gpu-msg'); el.replaceChildren(); el.className='cnote'; if(!text)return;
+    const p=document.createElement('div'); p.textContent=text; if(kind==='err')p.style.color='var(--red)'; el.append(p);
+    if(action){const b=document.createElement('button');b.type='button';b.className='btn bg2 sm mt8';b.textContent=action.label;b.onclick=action.run;el.append(b);}
+  },
+  vmSel(){const v=document.getElementById('gpu-vm').value;return/^[1-9][0-9]{0,8}$/.test(v)?Number(v):0;},
+  async next(){
+    if(Gpu.busy||!Gpu.ctx)return;
+    const vmid=Gpu.vmSel(), mapping=document.getElementById('gpu-map').value;
+    if(!vmid||!mapping){Gpu.msg('Scegli la VM e il mapping.','err');return;}
+    Gpu.msg('Verifica in corso…');
+    const {node,card}=Gpu.ctx; let plan;
+    try{plan=await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/gpu/plan?mapping=${encodeURIComponent(mapping)}`,{quiet:true,timeoutMs:30000});}
+    catch(e){
+      const r=e.body&&e.body.reason;
+      if(r==='running')Gpu.msg('La VM è accesa: per cambiare la scheda video va spenta.','err',{label:'Spegni la VM…',run:()=>Gpu.askShutdown(node,vmid,()=>Gpu.next())});
+      else Gpu.msg(e.message,'err');
+      return;
+    }
+    closeModal('mgpu');
+    const vm=(Gpu.ctx.vms||[]).find(v=>v.vmid===vmid), label=vm&&vm.name?`${vm.name} (${vmid})`:`VM ${vmid}`;
+    askConfirm({title:`Assegna la scheda a ${label}`,
+      lines:[`Scheda: ${Gpu.short(plan.card)} (${plan.addr})`,`Nodo: ${plan.node}`,`Mapping: ${plan.mapping}`,`Slot: ${plan.slot}${plan.options?' · opzioni: '+plan.options:' · nessuna opzione'}`],
+      consequence:'La scheda viene collegata alla VM spenta; sarà disponibile al prossimo avvio. Nessun altro dato viene modificato.',level:'warn',okLabel:'Assegna'},
+      async()=>{
+        Gpu.busy=true;
+        try{
+          await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/gpu`,{method:'POST',body:JSON.stringify({mapping:plan.mapping,slot:plan.slot,options:plan.options}),quiet:true,timeoutMs:60000});
+          toast(`Scheda assegnata a ${label}`,'ok');
+        }catch(e){toast(`Assegnazione non riuscita: ${e.message}`,'err');}
+        Gpu.busy=false; dropVmCache(node,vmid); _tc.clear(); Gpu.refreshAll();
+      });
+  },
+  // ── togli ──
+  unassign(node,vmid,slot){
+    if(Gpu.busy)return;
+    const d=Gpu.by[ClusterMgr.current]; if(!d)return; let u=null;
+    for(const n of d.nodes)if(n.node===node)for(const c of n.cards)for(const x of c.uses)if(x.vmid===vmid&&x.slot===slot)u=x;
+    for(const p of d.problems)for(const x of p.uses)if(p.node===node&&x.vmid===vmid&&x.slot===slot&&!u)u=x;
+    const label=u&&u.name?`${u.name} (${vmid})`:`VM ${vmid}`;
+    const go=()=>askConfirm({title:`Togli la scheda da ${label}`,lines:[`VM: ${label}`,`Nodo: ${node}`,`Slot: ${slot}${u&&u.mapping?' · mapping '+u.mapping:''}`],
+      consequence:'La scheda viene scollegata dalla VM spenta e torna libera. Il resto della configurazione non cambia.',level:'warn',okLabel:'Togli'},
+      async()=>{
+        Gpu.busy=true;
+        try{await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/gpu/${encodeURIComponent(slot)}`,{method:'DELETE',quiet:true,timeoutMs:60000});toast(`Scheda tolta da ${label}`,'ok');}
+        catch(e){
+          const r=e.body&&e.body.reason;
+          if(r==='running')toast(`${label} è accesa: spegnila e riprova.`,'err');else toast(`Operazione non riuscita: ${e.message}`,'err');
+        }
+        Gpu.busy=false; dropVmCache(node,vmid); _tc.clear(); Gpu.refreshAll();
+      });
+    if(u&&u.status==='running'){
+      Gpu.askShutdown(node,vmid,go);
+    }else go();
+  },
+  askShutdown(node,vmid,then){
+    askConfirm({title:`Spegni la VM ${vmid}`,lines:[`Nodo: ${node}`],consequence:VM_ACTIONS.shutdown.cons+' Attendo fino a 2 minuti; se non basta ti propongo lo stop forzato.',level:'warn',okLabel:'Spegni'},()=>Gpu.shutdown(node,vmid,then));
+  },
+  // ── spegnimento (D24 A): ordinato, attesa 2 minuti, poi stop forzato con conferma di pericolo ──
+  async shutdown(node,vmid,then){
+    try{await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/action/shutdown`,{method:'POST',body:'{}',quiet:true});}
+    catch(e){toast(`Spegnimento non riuscito: ${e.message}`,'err');return;}
+    toast(`Spegnimento inviato alla VM ${vmid}: attendo fino a 2 minuti…`,'ok');
+    const end=Date.now()+120000;
+    while(Date.now()<end){
+      await new Promise(r=>setTimeout(r,3000));
+      try{const r=await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status`,{quiet:true,timeoutMs:15000});
+        if(r&&r.status&&r.status.status==='stopped'){dropVmCache(node,vmid);_tc.clear();toast(`VM ${vmid} spenta`,'ok');if(then&&App.cur==='gpu')then();return;}}catch(e){}
+    }
+    if(App.cur!=='gpu'){toast(`La VM ${vmid} è ancora accesa dopo 2 minuti`,'err');return;}
+    askConfirm({title:`La VM ${vmid} è ancora accesa`,lines:['Lo spegnimento ordinato non è riuscito entro 2 minuti.'],
+      consequence:VM_ACTIONS.stop.cons,level:'danger',okLabel:'Stop forzato'},async()=>{
+      try{await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/action/stop`,{method:'POST',body:'{}',quiet:true});}
+      catch(e){toast(`Stop forzato non riuscito: ${e.message}`,'err');return;}
+      await new Promise(r=>setTimeout(r,3000)); dropVmCache(node,vmid); _tc.clear(); if(then&&App.cur==='gpu')then();
+    });
+  },
+  async refreshAll(){
+    try{const d=await api('/gpus?fresh='+Date.now(),{quiet:true,timeoutMs:30000});Gpu.note(d,ClusterMgr.current);}catch(e){}
+    if(App.cur==='gpu')Gpu.paint();
+    if(App.cur==='dashboard')Dashboard.paintGpu();
+  },
+};
+
 const Dashboard={
   CRIT:85,                                   // % oltre cui un valore è critico (stessa soglia di bar())
   WARN:65,                                   // % oltre cui un valore chiede attenzione
@@ -2452,7 +2676,9 @@ const Dashboard={
     const live=vms.filter(v=>!isTemplate(v));
     // Prima passata con i soli dati istantanei, poi si completa con RRD e task senza bloccare la tabella.
     const stats=Dashboard.nodeStats(nodes,live);
+    Dashboard._last={stats,tasks:[]};
     Dashboard.paintCondition(stats,[]);
+    Gpu.fetch().then(()=>{if(seq===Dashboard._seq)Dashboard.paintGpu();});
     Dashboard.paintKpis(stats,live,null,null);
     Dashboard.paintNodes(stats);
     Dashboard.loadTop();
@@ -2464,6 +2690,7 @@ const Dashboard={
     ]);
     if(seq!==Dashboard._seq)return;
     const list=Array.isArray(tasks)?tasks:null;
+    Dashboard._last={stats,tasks:list||[]};
     Dashboard.paintCondition(stats,list||[]);
     Ceph.paintCard(Ceph.last[ClusterMgr.current]||null);
     Dashboard.paintKpis(stats,live,Array.isArray(metrics)?metrics:null,list);
@@ -2519,6 +2746,7 @@ const Dashboard={
     return tasks.filter(t=>t.starttime>=cutoff&&t.endtime&&t.status&&t.status!=='OK'&&!String(t.status).startsWith('WARNINGS'));
   },
 
+  paintGpu(){if(Dashboard._last&&App.cur==='dashboard')Dashboard.paintCondition(Dashboard._last.stats,Dashboard._last.tasks);},
   // La frase riassume, non sostituisce: ogni voce rimanda a un numero che si legge sotto.
   paintCondition(stats,tasks){
     const total=stats.length, on=stats.filter(s=>s.online).length;
@@ -2530,7 +2758,8 @@ const Dashboard={
     }
     const failed=Dashboard.failedTasks(tasks);
     const cst=Ceph.stateOf(Ceph.last[ClusterMgr.current]||null);
-    const level=(down.length||(cst&&cst.level==='bad'))?'bad':(hot.length||failed.length||(cst&&cst.level==='warn'))?'warn':'ok';
+    const gsm=Gpu.summary(Gpu.by[ClusterMgr.current]||null), gprob=gsm?gsm.problems:0;
+    const level=(down.length||(cst&&cst.level==='bad'))?'bad':(hot.length||failed.length||gprob||(cst&&cst.level==='warn'))?'warn':'ok';
     const nodesTxt=total===1?'1 nodo operativo':`${on} nodi operativi`;
     const title=level==='bad'?(down.length?`Attenzione · ${on} su ${total} nodi operativi`:`Attenzione · ${cst.short}`):level==='warn'?`Quasi sereno · ${nodesTxt}`:`Sereno · ${nodesTxt}`;
     const parts=[];
@@ -2538,6 +2767,7 @@ const Dashboard={
     for(const h of hot)parts.push(`<span class="wrn">${esc(h.s.name)}: ${h.what} al ${h.val}%${h.since?' da '+esc(Dashboard.hhmm(h.since)):''}</span>`);
     if(failed.length)parts.push(`<span class="wrn">${failed.length} ${Dashboard.plural(failed.length,'task fallito','task falliti')} nelle ultime 24 h</span>`);
     if(cst&&cst.level!=='ok')parts.push(`<span class="${cst.level==='bad'?'bad':'wrn'}">${esc(cst.short)}${cst.downN?` · ${cst.downN} OSD giù`:''}</span>`);
+    if(gprob)parts.push(`<span class="wrn">${gprob} GPU da correggere</span>`);
     const run=stats.reduce((a,s)=>a+s.running,0);
     const sub=parts.length?parts.join(' · '):`Nessuna anomalia nelle ultime 24 ore · ${run} VM in esecuzione`;
     document.getElementById('dash-cond').innerHTML=`
@@ -3052,7 +3282,7 @@ const VMs=(()=>{
             <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
             ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
-            ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')}</dd>`:''}
+            ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
