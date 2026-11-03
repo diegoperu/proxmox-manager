@@ -13,6 +13,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | da fare |
 | 2 | Convertire le 22 assegnazioni GPU dirette ai mapping | l'app può gestire tutte le GPU | S (lavoro in Proxmox) | — | da fare |
 | 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | in discussione |
+| 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | da fare |
 | 4 | Uso reale delle GPU (`nvidia-smi`) | report su GPU assegnate ma inutilizzate | M | helper nei guest | da fare |
 | 5 | Coda richieste dell'intranet per i report | domanda non soddisfatta nei report manageriali | M | accesso/API intranet | da fare |
 | 6 | Correggere `setup-disk` (usa il disco richiesto) | evita formattazioni/riavvii inutili | S | — | da fare |
@@ -42,6 +43,14 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Domande aperte:** riserva di RAM per host e Ceph; tetto di CPU; migrazione a caldo o a freddo e finestre di manutenzione; uso del reale (p95) oltre all'assegnato; simulazione "e se spengo il nodo X".
 - **Passi proposti:** (1) domande e specifiche, (2) algoritmo e simulatore con dati di prova e test dei casi limite (Opus alto), (3) endpoint del piano in sola lettura, (4) pagina con piano e conferma passo-passo (Sonnet alto), (5) revisione di sicurezza e prova reale su VM indicate dall'utente (Opus medio).
 - **Rischi:** una migrazione a caldo carica rete e storage; il piano non deve mai superare la RAM fisica; il piano si ricalcola subito prima di ogni passo (lo stato cambia).
+
+### 3b. Nodo consigliato alla creazione VM + GPU nel deploy
+- **Richiesta (2026-11-03), in cascata al bilanciamento:** in **Nuova VM**, dopo aver compilato i dati e scelto se la VM avra' o no una GPU (e quale modello), l'app propone il **nodo consigliato** (carico prima/dopo, motivazione, alternative); l'utente puo' cambiarlo.
+- **Regole:** stessi vincoli del bilanciamento (niente overbooking di RAM, riserva host/Ceph, RAM poi CPU, pareggio). Con GPU i candidati sono solo i nodi con una scheda libera del modello richiesto (da `/api/gpus`, con mapping).
+- **GPU nel deploy:** dopo il clone, a VM spenta, scrivere `hostpciN=mapping=<id>` con la logica di piano/conferma/lucchetto/digest gia' scritta per la pagina GPU. Se l'assegnazione fallisce dopo il clone: messaggio chiaro, la VM resta senza GPU (assegnabile dalla pagina GPU), nessuna cancellazione automatica.
+- **Punti da decidere:** clonare direttamente sul nodo scelto o clonare e migrare (oggi `ProvisionVM` clona sul nodo del template); prenotazione della scheda mentre si compila il modulo (due utenti insieme); avvio automatico dopo l'assegnazione; modello di GPU o scheda precisa; cosa mostrare se nessun nodo e' idoneo.
+- **Dipende da:** 3 (modello di carico) e dalla pagina GPU (gia' fatta). Si puo' partire con una versione senza GPU nel deploy (solo nodo consigliato) e aggiungere la GPU dopo.
+- **Modelli:** design Opus medio, implementazione Sonnet alto, revisione Opus medio (scrive configurazione hardware).
 
 ### 4. Uso reale delle GPU (`nvidia-smi`)
 - **Perché:** Proxmox sa quale VM ha quale scheda, non quanto la usa (D34).
