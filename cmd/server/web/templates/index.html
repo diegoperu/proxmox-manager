@@ -274,6 +274,77 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .task small.e{color:var(--red)}
 .task time{color:var(--text3);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .act-empty{padding:14px 0;color:var(--text3);border-top:1px solid var(--border)}
+/* ── Report v2 ── */
+.rp-models{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.rp-model{text-align:left;font:inherit;color:var(--text);background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer}
+.rp-model:hover{background:var(--hover)}
+.rp-model.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.rp-model i{font-style:normal;font-size:11px;color:var(--accent);display:block;margin-bottom:6px;font-weight:600}.rp-model.mgr i{color:var(--warn)}
+.rp-model b{display:block;font-size:13px;font-weight:600}.rp-model span{color:var(--text3);font-size:12px}
+.rp-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.rp-grp{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap}.rp-grp[hidden]{display:none}
+.rp-thr{margin:-4px 0 14px;font-size:12px;color:var(--text2)}.rp-thr summary{cursor:pointer;color:var(--text3)}
+.rp-thr-g{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:10px}.rp-thr-g label{display:grid;gap:4px;color:var(--text3)}
+.thb{background:none;border:0;color:inherit;font:inherit;font-weight:500;cursor:pointer;padding:0}.thb:hover{color:var(--text)}
+.thb.on.asc::after,.thb.on.desc::after{content:'';display:inline-block;margin-left:6px;border:4px solid transparent;vertical-align:1px}
+.thb.on.asc::after{border-bottom-color:var(--accent);border-top-width:0}.thb.on.desc::after{border-top-color:var(--accent);border-bottom-width:0}
+th.n,td.n{text-align:right}
+.rp-spark{display:block;width:120px;height:24px;fill:none;stroke:var(--accent);stroke-width:1.4;vector-effect:non-scaling-stroke}.rp-spark polyline{vector-effect:non-scaling-stroke}
+td.spk{width:130px}
+.chip{display:inline-block;padding:2px 9px;border-radius:12px;border:1px dashed var(--warn);color:var(--warn);font-size:11px;font-weight:600;white-space:nowrap}
+.rp-previewbar{margin:6px 0 10px;color:var(--text3);font-size:12px}
+.rp-sheetwrap{overflow:auto;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-card)}
+.rp-sheetwrap .rp-doc{zoom:.62}.rp-sheetwrap .rp-doc.rp-land{zoom:.5}
+/* il documento ha una carta bianca propria: i suoi colori non seguono il tema (sono la veste del PDF) */
+.rp-doc{--navy:#13294f;--ink:#1a2333;--ink2:#4a5568;--ink3:#6b7686;--line:#d9dee7;--soft:#f3f5f9;--hot:#b4232a;color:var(--ink);font:10.5pt/1.45 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.rp-doc *{box-sizing:border-box}
+.rp-doc table,.rp-doc th,.rp-doc td{color:var(--ink);background:transparent}
+.rp-page{width:210mm;height:297mm;background:#fff;margin:0 auto 10mm;padding:16mm 18mm 15mm;position:relative;overflow:hidden;break-after:page;page-break-after:always;box-shadow:0 2px 14px rgba(0,0,0,.25)}
+.rp-land .rp-page{width:297mm;height:210mm;padding:13mm 18mm 13mm}
+.rp-page h2{font-size:17pt;color:var(--navy);letter-spacing:-.01em;margin-bottom:4mm}
+.rp-h3{font-size:12pt;color:var(--navy);margin:6mm 0 2mm}
+.rp-lead{color:var(--ink2);margin-bottom:5mm;max-width:150mm}
+.rp-cover{display:flex;flex-direction:column;padding:22mm 20mm}.rp-land .rp-cover{display:grid;grid-template-columns:95mm 1fr;grid-template-rows:1fr auto;column-gap:16mm;padding:24mm 22mm}
+.rp-logo{width:78mm;margin-top:6mm}.rp-land .rp-logo{width:88mm;align-self:center;margin:0}
+.rp-ct{margin-top:auto;border-left:3mm solid var(--navy);padding-left:7mm}.rp-land .rp-ct{margin:0;align-self:center}
+.rp-ct h1{font-size:34pt;letter-spacing:-.02em;color:var(--navy);line-height:1.05}.rp-per{font-size:15pt;color:var(--ink);margin:3mm 0 6mm}.rp-ct p{color:var(--ink2)}
+.rp-cf{margin-top:22mm;color:var(--ink3);font-size:9pt}.rp-land .rp-cf{grid-column:1/-1;margin:0}
+.rp-lang{position:absolute;top:12mm;right:18mm;font-size:8.5pt;color:var(--ink3);border:1px solid var(--line);border-radius:10px;padding:1mm 3mm}
+.rp-sum{display:block}.rp-land .rp-sum{display:grid;grid-template-columns:1fr 1.25fr;gap:10mm}
+.rp-cond{display:flex;gap:6mm;align-items:flex-start;padding:5mm 0 6mm;border-bottom:1px solid var(--line);margin-bottom:6mm}
+.rp-cond svg{width:14mm;height:14mm;flex-shrink:0;color:#c07a00}.rp-cond svg.ok{color:#1f7a4d}.rp-cond svg.bad{color:var(--hot)}
+.rp-cond h3{font-size:16pt;letter-spacing:-.01em;margin-bottom:2mm}.rp-cond p{color:var(--ink2);max-width:135mm}
+.rp-kg{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;align-content:start}
+.rp-kt{border:1px solid var(--line);border-radius:3mm;padding:4mm}.rp-kt span{display:block;color:var(--ink3);font-size:9pt}
+.rp-kt b{display:block;font-size:22pt;letter-spacing:-.02em;color:var(--navy);margin:1mm 0}.rp-kt b .u{font-size:11pt;font-weight:500;color:var(--ink3)}.rp-kt small{color:var(--ink2);font-size:8.5pt}.rp-kt.hot b{color:var(--hot)}
+.rp-cg{display:grid;grid-template-columns:1fr 1fr;gap:4mm}.rp-land .rp-cg{grid-template-columns:repeat(4,1fr)}
+.rp-cc{border:1px solid var(--line);border-radius:3mm;padding:3.5mm 4mm}.rp-cch{display:flex;justify-content:space-between;align-items:baseline}.rp-cch span{color:var(--ink3);font-size:9pt}.rp-cch b{font-size:15pt;color:var(--navy)}
+.rp-cc small{color:var(--ink2);font-size:8.5pt}.rp-cc small.hot,.rp-need td.hot{color:var(--hot);font-weight:600}
+.rp-ch{display:block;width:100%;height:30mm;margin:2mm 0}.rp-land .rp-ch{height:62mm}
+.rp-ch .ln{fill:none;stroke:var(--navy);stroke-width:1.6;vector-effect:non-scaling-stroke}.rp-ch .ln.hot{stroke:var(--hot)}.rp-ch .ar{fill:var(--soft);stroke:none}
+.rp-ch .fc{fill:none;stroke:var(--ink3);stroke-width:1.4;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}.rp-ch .thr{stroke:var(--hot);stroke-width:1;stroke-dasharray:1 3;vector-effect:non-scaling-stroke}
+.rp-nodata{height:30mm;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:9pt;text-align:center;margin:2mm 0;background:var(--soft);border-radius:2mm}.rp-land .rp-nodata{height:62mm}
+.rp-two{display:block}.rp-two>div+div{margin-top:9mm}.rp-land .rp-two{display:grid;grid-template-columns:1.1fr 1fr;gap:12mm}.rp-land .rp-two>div+div{margin-top:0}
+.rp-bars{display:grid;gap:2.2mm}.rp-br{display:grid;grid-template-columns:28mm 1fr 20mm;gap:3mm;align-items:center;font-size:9.5pt}.rp-br span{color:var(--ink2)}.rp-br em{font-style:normal;text-align:right}
+.rp-br i{height:3.2mm;background:var(--soft);border-radius:2mm;overflow:hidden;display:block}.rp-br u{display:block;height:100%;background:var(--navy);border-radius:2mm}
+.rp-need{width:100%;border-collapse:collapse}.rp-need td{padding:3mm 2mm;border-bottom:1px solid var(--line);vertical-align:baseline}.rp-need td:first-child{font-weight:600;width:38mm}
+.rp-eff{margin:1mm 0 2mm}.rp-rule{font-size:8.5pt;color:var(--ink3)}
+.rp-meth{position:absolute;bottom:18mm;left:18mm;right:18mm;font-size:8.5pt;color:var(--ink3);border-top:1px solid var(--line);padding-top:3mm}.rp-land .rp-meth{bottom:16mm}
+.rp-page footer{position:absolute;left:18mm;right:18mm;bottom:8mm;display:flex;justify-content:space-between;font-size:8pt;color:var(--ink3)}
+.rp-techdoc .rp-page{height:auto;min-height:210mm;box-shadow:none}
+.rp-techdoc table,.rp-techdoc th,.rp-techdoc td{color:var(--ink);border-color:var(--line);background:#fff}.rp-techdoc th .thb,.rp-techdoc .thb{color:var(--ink2)}
+.rp-techdoc .chip{color:var(--hot);border-color:var(--hot)}.rp-techdoc .rp-spark{stroke:var(--navy)}
+#rpt-print{display:none}
+@media print{
+  html.rp-printing{background:#fff}
+  html.rp-printing body{background:#fff;display:block}
+  html.rp-printing body>*:not(#rpt-print){display:none!important}
+  html.rp-printing #rpt-print{display:block}
+  html.rp-printing .rp-page{margin:0;box-shadow:none}
+  html.rp-printing .rp-doc{zoom:1}
+}
+@media(max-width:1180px){.rp-models{grid-template-columns:repeat(3,minmax(0,1fr))}.rp-thr-g{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.rp-models{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-thr-g{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* ── Ceph: osservatorio meteo (pagina) + riquadro in panoramica ── */
 .ni[hidden]{display:none}
 .ceph-top{display:flex;align-items:flex-start;gap:0;border-bottom:1px solid var(--border);padding-bottom:18px}
@@ -721,7 +792,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.93.0 · 2026-11-03</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.102.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1081,50 +1152,44 @@ html.spiderman{
 
     <!-- ██ REPORTS ██ -->
     <div class="page" id="page-reports">
-      <div class="toolbar">
-        <label class="sr" for="rtf">Periodo</label>
-        <select class="inp" id="rtf">
-          <option value="hour">Ultima ora</option>
-          <option value="day" selected>Ultimo giorno</option>
-          <option value="week">Ultima settimana</option>
-          <option value="month">Ultimo mese</option>
-          <option value="year">Ultimo anno</option>
-        </select>
-        <label class="sr" for="rtype">Tipo</label>
-        <select class="inp" id="rtype">
-          <option value="all">Tutte le risorse</option><option value="qemu">QEMU</option><option value="lxc">LXC</option>
-        </select>
-        <label class="sr" for="rnode">Nodo</label>
-        <select class="inp" id="rnode"><option value="">Tutti i nodi</option></select>
-        <button class="btn ba" onclick="Reports.load()">Genera report</button>
+      <div class="rp-models" id="rp-models" role="group" aria-label="Modello di report"></div>
+      <div class="rp-bar">
+        <div class="seg" id="rp-presets" role="group" aria-label="Periodo"></div>
+        <label class="sr" for="rp-from">Dal</label><input class="inp" type="date" id="rp-from" aria-label="Data iniziale">
+        <label class="sr" for="rp-to">Al</label><input class="inp" type="date" id="rp-to" aria-label="Data finale">
+        <span id="rp-filters" class="rp-grp">
+          <label class="sr" for="rp-node">Nodo</label><select class="inp" id="rp-node"><option value="">Tutti i nodi</option></select>
+          <label class="sr" for="rp-group">Gruppo</label><input class="inp" id="rp-group" type="text" maxlength="32" placeholder="Gruppo (es. rossi)" autocomplete="off" style="width:150px">
+          <label class="sr" for="rp-q">Cerca</label><input class="inp" id="rp-q" type="text" maxlength="64" placeholder="Cerca per nome" autocomplete="off" style="width:150px">
+        </span>
+        <span id="rp-vmfilters" class="rp-grp" hidden>
+          <label class="sr" for="rp-type">Tipo</label><select class="inp" id="rp-type"><option value="all">QEMU + LXC</option><option value="qemu">Solo QEMU</option><option value="lxc">Solo LXC</option></select>
+        </span>
+        <div class="seg" id="rp-orient" role="group" aria-label="Orientamento del PDF">
+          <button type="button" data-o="portrait" class="on" aria-pressed="true" onclick="Reports.setOrient('portrait')">Verticale</button>
+          <button type="button" data-o="landscape" aria-pressed="false" onclick="Reports.setOrient('landscape')">Orizzontale</button>
+        </div>
         <span class="sp"></span>
-        <button class="btn bg2" onclick="Reports.xlsx()"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>Esporta Excel</button>
+        <button type="button" class="btn ba" id="rp-go" onclick="Reports.load()">Genera</button>
+        <button type="button" class="btn bg2" id="rp-xl" onclick="Reports.xlsx()">Excel</button>
+        <button type="button" class="btn bg2" id="rp-csv" onclick="Reports.csv()">CSV</button>
+        <button type="button" class="btn bg2" id="rp-pdf" onclick="Reports.print()"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7"/></svg> PDF…</button>
       </div>
-      <div class="panel" id="rep-empty"><div class="empty">Imposta periodo, tipo e nodo, poi premi «Genera report»: vedrai medie, picchi e andamento di ogni risorsa.</div></div>
-      <div class="kstrip" id="rep-sum" hidden></div>
-      <div id="rep-body" hidden>
-      <div class="g g2 mb14">
-        <div class="cc"><div class="ct">CPU per risorsa: media e picco</div><canvas id="rcpu" height="190"></canvas></div>
-        <div class="cc"><div class="ct">RAM media per risorsa</div><canvas id="rmem" height="190"></canvas></div>
-      </div>
-      <div class="g g2 mb14">
-        <div class="cc"><div class="ct">Traffico in ingresso nel tempo</div><canvas id="rnet" height="190"></canvas></div>
-      </div>
-      <h2 class="sec">Dati tabellari</h2>
-      <div class="tw"><table>
-        <thead><tr>
-          <th class="s" onclick="RepTbl.sort('name')">Nome</th>
-          <th class="s" onclick="RepTbl.sort('node')">Nodo</th>
-          <th class="s" onclick="RepTbl.sort('type')">Tipo</th>
-          <th class="s" onclick="RepTbl.sort('avgCpu')">CPU avg %</th>
-          <th class="s" onclick="RepTbl.sort('maxCpu')">CPU max %</th>
-          <th class="s" onclick="RepTbl.sort('avgMem')">RAM avg %</th>
-          <th class="s" onclick="RepTbl.sort('avgNetIn')">Net In avg</th>
-          <th class="s" onclick="RepTbl.sort('avgNetOut')">Net Out avg</th>
-        </tr></thead>
-        <tbody id="rtbody"></tbody>
-      </table></div>
-      </div>
+      <details class="rp-thr" id="rp-thr" hidden>
+        <summary>Soglie per «inattive» e «sovradimensionate» (valide solo per questo report; vuoto = predefinita)</summary>
+        <div class="rp-thr-g">
+          <label>CPU media inattiva<input class="inp" id="th-icpu" inputmode="decimal" placeholder="0.02"></label>
+          <label>Rete inattiva (byte/s)<input class="inp" id="th-inet" inputmode="decimal" placeholder="1024"></label>
+          <label>Giorni minimi (inattiva)<input class="inp" id="th-idays" inputmode="decimal" placeholder="7"></label>
+          <label>RAM p95 sovradim.<input class="inp" id="th-omem" inputmode="decimal" placeholder="0.25"></label>
+          <label>CPU p95 sovradim.<input class="inp" id="th-ocpu" inputmode="decimal" placeholder="0.10"></label>
+          <label>Giorni minimi (sovradim.)<input class="inp" id="th-odays" inputmode="decimal" placeholder="14"></label>
+        </div>
+      </details>
+      <div id="rp-status"></div>
+      <div class="kstrip" id="rp-kpis"></div>
+      <div id="rp-body"></div>
+      <div id="rp-preview"></div>
     </div>
 
     <!-- ██ SETTINGS ██ -->
@@ -1202,6 +1267,8 @@ html.spiderman{
   <div class="pal-list" id="pal-list" role="listbox" aria-label="Risultati"></div>
   <div class="pal-foot"><kbd>↑</kbd><kbd>↓</kbd> scorri · <kbd>Invio</kbd> apri · <kbd>Esc</kbd> chiudi</div>
 </div></div>
+
+<div id="rpt-print" aria-hidden="true"></div>
 
 <!-- MODAL ASSEGNA GPU -->
 <div class="ov" id="mgpu"><div class="modal" style="min-width:min(520px,calc(100vw - 24px))">
@@ -3983,90 +4050,370 @@ const Cluster={
 // ════════════════════════════════════════════════════════════════════════════
 // REPORTS — sortable table
 // ════════════════════════════════════════════════════════════════════════════
-const RepTbl=(()=>{
-  const S=mkSorter('rtbody','page-reports');
-  let data=[];
-  return{
-    setData(d){data=d;RepTbl.renderWith(data);},
-    sort(k){RepTbl.renderWith(S.sort(data,k));},
-    renderWith(d){
-      document.getElementById('rtbody').innerHTML=d.map(r=>`<tr>
-        <td class="tn"><span class="nm" title="${esc(r.name||'—')}">${esc(r.name||'—')}</span></td><td class="td">${esc(r.node)}</td><td>${tbadge(r.type||'qemu')}</td>
-        <td class="${r.avgCpu>80?'tr':r.avgCpu>60?'twn':'tg'}">${r.avgCpu.toFixed(1)}%</td>
-        <td class="td">${r.maxCpu.toFixed(1)}%</td>
-        <td>${r.avgMem.toFixed(1)}%</td>
-        <td>${fmtB(r.avgNetIn)}/s</td><td>${fmtB(r.avgNetOut)}/s</td>
-      </tr>`).join('')||'<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--text3)">Nessun dato</td></tr>';
-    }
-  };
-})();
-
+// ════════════════════════════════════════════════════════════════════════════
+// REPORT v2: un modello "manageriale" (documento A4 bilingue, PDF dalla stampa del browser, verticale o
+// orizzontale) e cinque modelli tecnici (tabelle ordinabili, Excel/CSV). I calcoli sono tutti nel server
+// (/api/reports/*): qui si sceglie, si filtra e si disegna. Ogni testo esterno passa da esc(); in Excel/CSV
+// ogni cella testuale che potrebbe essere letta come formula e' neutralizzata.
+// ════════════════════════════════════════════════════════════════════════════
+const RPT_ID={name:'DataCloud',org:'Politecnico di Milano · DEIB · DABC · DASTU · Matematica',mail:'datacloud-lab@polimi.it',logo:'/static/datacloud-logo.png'};
+const RPT_MODELS=[
+  {id:'service',kind:'manager',label:'Stato del servizio',sub:'PDF per direttore e consiglio (IT + EN)'},
+  {id:'nodes',kind:'tech',label:'Nodi e capacità',sub:'media, p95, picchi, PSI, previsione'},
+  {id:'vms',kind:'tech',label:'VM e container',sub:'consumi, inattive, sovradimensionate'},
+  {id:'gpu',kind:'tech',label:'GPU',sub:'schede, gruppi, storico'},
+  {id:'storage',kind:'tech',label:'Storage e Ceph',sub:'andamento e previsione'},
+  {id:'reliability',kind:'tech',label:'Affidabilità',sub:'task falliti e backup'},
+];
+const RPT_PRESETS=[{id:'30',label:'30 giorni',days:30},{id:'91',label:'Trimestre',days:91},{id:'182',label:'Semestre',days:182},{id:'365',label:'12 mesi',days:365},{id:'custom',label:'Personalizzato',days:0}];
+const RPT_TXT={
+  it:{loc:'it-IT',title:'Rapporto sul servizio',sub:'Infrastruttura cloud IaaS per la ricerca',gen:'Generato il',s1:'In sintesi',
+    lvl:{ok:'Servizio in buona salute',warn:'Servizio stabile, alcuni indicatori da tenere sotto controllo',bad:'Servizio in difficoltà: servono interventi'},
+    reason:{ram_exhaustion:(v)=>`la memoria raggiungerà la soglia di attenzione entro circa ${rptMonths(v)} mesi al ritmo attuale`,
+      storage_exhaustion:(v)=>`lo spazio di archiviazione raggiungerà la soglia di attenzione entro circa ${rptMonths(v)} mesi`,
+      availability:(v)=>`la disponibilità stimata è del ${v}%`,gpu_full:()=>'tutte le schede GPU sono assegnate',task_failures:(v)=>`il ${v}% delle operazioni automatiche è fallito`},
+    none:'nessuna criticità rilevata nel periodo',
+    intro:(d,k)=>`Dal ${d.from} al ${d.to} il servizio ha ${k.vms_running} macchine virtuali attive (su ${k.vms_total}) usate da ${k.groups} gruppi di ricerca, su ${k.nodes} nodi.`,
+    k:{vms:'VM attive',groups:'Gruppi di ricerca',gpu:'GPU assegnate',mem:'Memoria assegnata',avail:'Disponibilità',sto:'Storage Ceph'},
+    since:(d)=>`dato storico dal ${d}`,grew:(n,d)=>`${n>=0?'+':''}${n} dal ${d}`,gpuFull:(d)=>`tutte assegnate dal ${d}`,gpuFree:(n)=>`${n} libere`,
+    thr:'soglia di attenzione 85%',availSub:'stimata dai dati di monitoraggio',stoSub:(u,t)=>`${u} su ${t}`,
+    s2:'Capacità nel tempo',s2p:'Andamento nel periodo. La linea tratteggiata è la previsione al ritmo attuale; la linea punteggiata è la soglia di attenzione (85%).',
+    c:{cpu:'Processori (CPU)',mem:'Memoria (RAM)',sto:'Storage Ceph',gpu:'GPU assegnate'},
+    avgSub:'media sul cluster',noTrend:'nessuna tendenza di esaurimento',exh:(m)=>`esaurimento stimato tra circa ${m} mesi`,exh0:'soglia già raggiunta',gpuSub:(t)=>`${t} schede in totale`,
+    s3:'Chi usa il servizio',s3p:(n)=>`Memoria assegnata per gruppo di ricerca (primi 10 su ${n}). Il gruppo è ricavato dal nome della macchina virtuale.`,
+    s4:'Fabbisogno e uso delle risorse',needs:'Stato delle risorse',eff:'Efficienza',
+    effLine:(e)=>`${e.inactive} macchine virtuali risultano inattive e ${e.oversized} sovradimensionate: liberarle recupererebbe fino a ${e.mem} di memoria e ${e.cores} processori.`,
+    effRule:'Inattiva: accesa ma con CPU media sotto il 2% e rete sotto 1 KB/s per almeno 7 giorni. Sovradimensionata: memoria usata (95° percentile) sotto il 25% di quella assegnata, oppure CPU (95° percentile) sotto il 10%, per almeno 14 giorni.',
+    effNone:'Il dato di efficienza non è disponibile per questo periodo.',
+    inv:(d)=>`Lo storico dell'inventario (numero di VM, gruppi, GPU) è disponibile dal ${d}: le variazioni nel tempo si completeranno col passare dei mesi.`,
+    method:'Fonti: statistiche di Proxmox VE e fotografia giornaliera dell\'inventario. Previsioni lineari sulle medie settimanali. Nessun dato personale.',
+    land:'orizzontale',port:'verticale',lang:'Italiano'},
+  en:{loc:'en-GB',title:'Service report',sub:'IaaS cloud infrastructure for research',gen:'Generated on',s1:'Summary',
+    lvl:{ok:'Service in good health',warn:'Stable service, a few indicators need watching',bad:'Service under strain: action needed'},
+    reason:{ram_exhaustion:(v)=>`memory will reach the warning threshold within about ${rptMonths(v)} months at the current pace`,
+      storage_exhaustion:(v)=>`storage will reach the warning threshold within about ${rptMonths(v)} months`,
+      availability:(v)=>`estimated availability is ${v}%`,gpu_full:()=>'all GPU cards are assigned',task_failures:(v)=>`${v}% of automated operations failed`},
+    none:'no issues detected in the period',
+    intro:(d,k)=>`From ${d.from} to ${d.to} the service had ${k.vms_running} active virtual machines (out of ${k.vms_total}) used by ${k.groups} research groups, on ${k.nodes} nodes.`,
+    k:{vms:'Active VMs',groups:'Research groups',gpu:'GPUs assigned',mem:'Memory allocated',avail:'Availability',sto:'Ceph storage'},
+    since:(d)=>`history since ${d}`,grew:(n,d)=>`${n>=0?'+':''}${n} since ${d}`,gpuFull:(d)=>`all assigned since ${d}`,gpuFree:(n)=>`${n} free`,
+    thr:'warning threshold 85%',availSub:'estimated from monitoring data',stoSub:(u,t)=>`${u} of ${t}`,
+    s2:'Capacity over time',s2p:'Trend over the period. The dashed line is the forecast at the current pace; the dotted line is the warning threshold (85%).',
+    c:{cpu:'Processors (CPU)',mem:'Memory (RAM)',sto:'Ceph storage',gpu:'GPUs assigned'},
+    avgSub:'cluster average',noTrend:'no exhaustion trend',exh:(m)=>`estimated exhaustion in about ${m} months`,exh0:'threshold already reached',gpuSub:(t)=>`${t} cards in total`,
+    s3:'Who uses the service',s3p:(n)=>`Memory allocated per research group (top 10 of ${n}). The group is derived from the virtual machine name.`,
+    s4:'Requirements and resource use',needs:'Resource status',eff:'Efficiency',
+    effLine:(e)=>`${e.inactive} virtual machines are idle and ${e.oversized} are oversized: releasing them would recover up to ${e.mem} of memory and ${e.cores} processors.`,
+    effRule:'Idle: running with average CPU below 2% and network below 1 KB/s for at least 7 days. Oversized: memory used (95th percentile) below 25% of the assigned amount, or CPU (95th percentile) below 10%, for at least 14 days.',
+    effNone:'Efficiency data is not available for this period.',
+    inv:(d)=>`Inventory history (number of VMs, groups, GPUs) is available since ${d}: changes over time will fill in as months go by.`,
+    method:'Sources: Proxmox VE statistics and the daily inventory snapshot. Linear forecasts on weekly averages. No personal data.',
+    land:'landscape',port:'portrait',lang:'English'},
+};
+function rptMonths(days){return Math.max(1,Math.round(days/30));}
+// Excel/CSV: una cella testuale che inizia con = + - @ (o tab/CR) verrebbe letta come formula: si antepone un apice.
+function rptSafeCell(v){
+  if(typeof v!=='string')return v;
+  return /^[=+\-@\t\r]/.test(v)?"'"+v:v;
+}
+function rptCsv(rows){
+  return rows.map(r=>r.map(c=>{
+    let s=c==null?'':String(rptSafeCell(c));
+    if(/[";\n\r]/.test(s))s='"'+s.replace(/"/g,'""')+'"';
+    return s;
+  }).join(';')).join('\r\n');
+}
+function rptIso(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
+function rptSpark(points,w,h){
+  if(!points||points.length<2)return'';
+  const v=points.map(p=>p.v), lo=Math.min(...v), hi=Math.max(...v), span=(hi-lo)||1;
+  const d=points.map((p,i)=>`${(i/(points.length-1)*w).toFixed(1)},${(h-2-(p.v-lo)/span*(h-4)).toFixed(1)}`).join(' ');
+  return`<svg class="rp-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline points="${d}"/></svg>`;
+}
+// Retta ai minimi quadrati sui punti di una serie (per disegnare la previsione tratteggiata).
+function rptFit(points){
+  const n=points.length; if(n<8)return null;
+  let sx=0,sy=0,sxx=0,sxy=0;
+  for(let i=0;i<n;i++){sx+=i;sy+=points[i].v;sxx+=i*i;sxy+=i*points[i].v;}
+  const den=n*sxx-sx*sx; if(!den)return null;
+  const m=(n*sxy-sx*sy)/den, b=(sy-m*sx)/n;
+  return{m,b};
+}
+// Grafico del documento: area, linea, soglia punteggiata e previsione tratteggiata. Scala 0-100 (o 0-max per le GPU).
+function rptChart(points,opt){
+  const W=300,H=110,pad=6;
+  if(!points||points.length<2)return`<div class="rp-nodata">${esc(opt.empty||'')}</div>`;
+  const max=opt.max||100, n=points.length, ext=opt.forecast?Math.round(n*0.25):0, tot=n-1+ext;
+  const X=i=>(i/tot*W).toFixed(1), Y=v=>(H-pad-Math.min(Math.max(v,0),max)/max*(H-pad*2)).toFixed(1);
+  const line=points.map((p,i)=>`${X(i)},${Y(p.v)}`).join(' ');
+  let out=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="rp-ch" role="img" aria-label="${esc(opt.label||'')}">`;
+  if(opt.thr!=null)out+=`<line x1="0" x2="${W}" y1="${Y(opt.thr)}" y2="${Y(opt.thr)}" class="thr"/>`;
+  out+=`<polygon points="0,${H-pad} ${line} ${X(n-1)},${H-pad}" class="ar"/><polyline points="${line}" class="ln${opt.hot?' hot':''}"/>`;
+  if(opt.forecast){const f=rptFit(points.slice(-Math.max(8,Math.floor(n/2))));
+    if(f){const k=Math.max(8,Math.floor(n/2)); const y0=f.b+f.m*(k-1), y1=f.b+f.m*(k-1+ext);
+      out+=`<polyline class="fc" points="${X(n-1)},${Y(y0)} ${X(n-1+ext)},${Y(y1)}"/>`;}}
+  return out+'</svg>';
+}
+function rptBytes(v,loc){
+  if(v==null)return'—'; const u=['B','KB','MB','GB','TB','PB']; let i=0; v=Number(v);
+  while(v>=1024&&i<u.length-1){v/=1024;i++;}
+  return v.toLocaleString(loc||'it-IT',{minimumFractionDigits:i?1:0,maximumFractionDigits:i?1:0})+' '+u[i];
+}
 const Reports={
-  data:[],
+  model:'service', preset:'365', orient:'portrait', data:null, eff:null, seq:0, sort:{k:null,dir:1}, flag:'', busy:false,
+  fmtNum(v,dec,loc){return v==null?'—':Number(v).toLocaleString(loc||'it-IT',{minimumFractionDigits:dec||0,maximumFractionDigits:dec==null?0:dec});},
+  pct(v){return v==null?'—':Reports.fmtNum(v,1)+'%';},
+  isManager(){return Reports.model==='service';},
   init(){
-    // quiet: se fallisce resta solo "tutti i nodi"; l'errore di connessione è già nel pallino di stato
-    api('/nodes',{quiet:true}).then(ns=>{if(!Array.isArray(ns))return;const sel=document.getElementById('rnode');for(const n of ns)sel.add(new Option(n.node,n.node));}).catch(e=>console.warn('Report: elenco nodi non caricato:',e.message));
+    Reports.buildModels(); Reports.buildPresets(); Reports.applyPreset('365'); Reports.syncControls();
+    const today=new Date(), min=new Date(today.getTime()-488*864e5);
+    for(const id of ['rp-from','rp-to']){const el=document.getElementById(id);el.max=rptIso(today);el.min=rptIso(min);}
+    api('/nodes',{quiet:true}).then(ns=>{if(!Array.isArray(ns))return;const sel=document.getElementById('rp-node');for(const n of ns.map(x=>x.node).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})))sel.add(new Option(n,n));}).catch(()=>{});
   },
-  agg(){
-    const map={};
-    for(const m of Reports.data){
-      const key=`${m.node}:${m.vmid!=null?m.vmid:m.name}`;
-      if(!map[key])map[key]={name:m.name||`VM${m.vmid}`,node:m.node,vmid:m.vmid,type:m.vmtype,cpu:[],mc:[],mem:[],ni:[],no:[]};
-      map[key].cpu.push(m.avg_cpu*100); map[key].mc.push(m.max_cpu*100);
-      map[key].mem.push(m.avg_mem*100);
-      map[key].ni.push(m.avg_netin);    map[key].no.push(m.avg_netout);
+  buildModels(){
+    document.getElementById('rp-models').innerHTML=RPT_MODELS.map(m=>`<button type="button" class="rp-model${m.kind==='manager'?' mgr':''}${m.id===Reports.model?' on':''}" aria-pressed="${m.id===Reports.model}" onclick="Reports.pickModel(${js(m.id)})"><i>${m.kind==='manager'?'Manageriale · PDF IT + EN':'Tecnico'}</i><b>${esc(m.label)}</b><span>${esc(m.sub)}</span></button>`).join('');
+  },
+  buildPresets(){
+    document.getElementById('rp-presets').innerHTML=RPT_PRESETS.map(p=>`<button type="button" data-p="${p.id}" class="${p.id===Reports.preset?'on':''}" aria-pressed="${p.id===Reports.preset}" onclick="Reports.applyPreset(${js(p.id)})">${esc(p.label)}</button>`).join('');
+  },
+  applyPreset(id){
+    Reports.preset=id; Reports.buildPresets();
+    const p=RPT_PRESETS.find(x=>x.id===id); if(!p)return;
+    if(p.days){const to=new Date(), from=new Date(to.getTime()-p.days*864e5);document.getElementById('rp-from').value=rptIso(from);document.getElementById('rp-to').value=rptIso(to);}
+    document.getElementById('rp-from').disabled=document.getElementById('rp-to').disabled=id!=='custom';
+  },
+  pickModel(id){
+    Reports.model=id; Reports.data=null; Reports.eff=null; Reports.sort={k:null,dir:1}; Reports.flag='';
+    Reports.buildModels(); Reports.syncControls(); Reports.clear();
+  },
+  syncControls(){
+    const mgr=Reports.isManager(), vms=Reports.model==='vms';
+    document.getElementById('rp-filters').hidden=mgr;
+    document.getElementById('rp-vmfilters').hidden=!vms;
+    document.getElementById('rp-thr').hidden=!vms;
+    document.getElementById('rp-orient').hidden=!mgr;
+    document.getElementById('rp-xl').hidden=mgr; document.getElementById('rp-csv').hidden=mgr;
+    document.getElementById('rp-pdf').hidden=false;
+    document.getElementById('rp-pdf').lastChild.textContent=mgr?' PDF…':' PDF (stampa)';
+  },
+  clear(){
+    document.getElementById('rp-status').innerHTML='<div class="panel"><div class="empty">Scegli il periodo e premi «Genera»: i report manageriali producono un documento da stampare in PDF, quelli tecnici una tabella con i dettagli.</div></div>';
+    for(const id of ['rp-kpis','rp-body','rp-preview'])document.getElementById(id).innerHTML='';
+  },
+  setOrient(o){Reports.orient=o;for(const b of document.querySelectorAll('#rp-orient button')){const on=b.dataset.o===o;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);}if(Reports.data&&Reports.isManager())Reports.paintManager();},
+  query(){
+    const val=id=>document.getElementById(id).value.trim(), q=new URLSearchParams();
+    const from=val('rp-from'), to=val('rp-to');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)){toast('Date non valide','err');return null;}
+    if(from>=to){toast('La data iniziale deve precedere quella finale','err');return null;}
+    q.set('from',from);q.set('to',to);
+    if(!Reports.isManager()){
+      const node=val('rp-node'),type=val('rp-type'),grp=val('rp-group').toLowerCase(),txt=val('rp-q');
+      if(node)q.set('nodes',node);
+      if(type&&type!=='all')q.set('type',type);
+      if(grp){if(!/^[a-z0-9]{1,32}$/.test(grp)){toast('Il gruppo è formato da lettere minuscole e cifre','err');return null;}q.set('group',grp);}
+      if(txt)q.set('q',txt);
+      if(Reports.model==='vms')for(const [id,k] of [['th-icpu','inactive_cpu'],['th-inet','inactive_net'],['th-idays','inactive_days'],['th-omem','oversized_mem'],['th-ocpu','oversized_cpu'],['th-odays','oversized_days']]){const v=val(id);if(v!==''){if(!/^\d+(\.\d+)?$/.test(v)){toast('Soglia non valida','err');return null;}q.set(k,v);}}
     }
-    const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
-    return Object.values(map).map(r=>({
-      ...r,avgCpu:avg(r.cpu),maxCpu:Math.max(...r.mc),
-      avgMem:avg(r.mem),
-      avgNetIn:avg(r.ni),avgNetOut:avg(r.no)
-    })).sort((a,b)=>b.avgCpu-a.avgCpu);
+    return q;
+  },
+  async fetchModel(model,q){
+    return api(`/reports/${model}?${q.toString()}`,{quiet:true,timeoutMs:180000});
   },
   async load(){
-    const tf=document.getElementById('rtf').value;
-    const type=document.getElementById('rtype').value, node=document.getElementById('rnode').value;
-    let url=`/report?timeframe=${tf}&type=${type}`;
-    if(node) url+=`&node=${encodeURIComponent(node)}`;
-    let data;
-    try{data=await api(url,{quiet:true});}
-    catch(e){document.getElementById('rep-empty').hidden=true;document.getElementById('rep-body').hidden=false;document.getElementById('rtbody').innerHTML=errRow(8,e.message,'Reports.load()');return;}
-    Reports.data=Array.isArray(data)?data:[];
-    if(!Reports.data.length){toast('Nessun dato nel periodo','info');return;}
-    const agg=Reports.agg();
-    RepTbl.setData(agg);
-    const mean=k=>agg.reduce((x,r)=>x+r[k],0)/agg.length, top=agg.reduce((m,r)=>r.maxCpu>m.maxCpu?r:m,agg[0]);
-    document.getElementById('rep-sum').hidden=false; document.getElementById('rep-body').hidden=false; document.getElementById('rep-empty').hidden=true;
-    document.getElementById('rep-sum').innerHTML=`
-      <div class="kcell"><div class="kl">Risorse analizzate</div><div class="kv">${agg.length}</div></div>
-      <div class="kcell"><div class="kl">CPU media</div><div class="kv">${mean('avgCpu').toFixed(1)}<small>%</small></div></div>
-      <div class="kcell"><div class="kl">Picco CPU</div><div class="kv ${top.maxCpu>=Dashboard.CRIT?'r':top.maxCpu>=Dashboard.WARN?'w':''}">${top.maxCpu.toFixed(0)}<small>%</small></div><div class="ks">${esc(top.name||'—')} · ${esc(top.node)}</div></div>
-      <div class="kcell"><div class="kl">RAM media</div><div class="kv">${mean('avgMem').toFixed(1)}<small>%</small></div></div>`;
-    const labels=agg.slice(0,15).map(r=>r.name||`VM${r.vmid}`);
-    const a15=agg.slice(0,15);
-    mkChart('rcpu',{type:'bar',data:{labels,datasets:[{label:'CPU media %',data:a15.map(r=>r.avgCpu.toFixed(1)),...ser('--accent',.75),borderWidth:0},{label:'CPU picco %',data:a15.map(r=>r.maxCpu.toFixed(1)),...ser('--accent',.3),borderWidth:1}]},options:{...CD,indexAxis:'y',scales:{...CD.scales,x:{...CD.scales.x,max:100}}}});
-    mkChart('rmem',{type:'bar',data:{labels,datasets:[{label:'RAM media %',data:a15.map(r=>r.avgMem.toFixed(1)),...ser('--accent',.75),borderWidth:0}]},options:{...CD,indexAxis:'y',scales:{...CD.scales,x:{...CD.scales.x,max:100}}}});
-    const byH={};for(const m of Reports.data){const h=Math.floor(m.ts/3600)*3600;if(!byH[h])byH[h]=0;byH[h]+=m.avg_netin;}
-    const hours=Object.keys(byH).sort(); // NB: non chiamarla `tk`, oscura la funzione dei colori
-    mkChart('rnet',{type:'line',data:{labels:hours.map(t=>new Date(t*1000).toLocaleString('it-IT',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})),datasets:[{label:'Ingresso',data:hours.map(t=>byH[t]),...ser('--accent',.1),fill:true,tension:.3,pointRadius:0}]},options:{...CD,scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>fmtB(v)+'/s'}}}}});
+    if(Reports.busy)return;
+    const q=Reports.query(); if(!q)return;
+    const seq=++Reports.seq; Reports.busy=true;
+    const st=document.getElementById('rp-status');
+    st.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo del report… (le VM e i periodi lunghi richiedono qualche secondo)</div>';
+    for(const id of ['rp-kpis','rp-body','rp-preview'])document.getElementById(id).innerHTML='';
+    try{
+      Reports.data=await Reports.fetchModel(Reports.model,q);
+      Reports.eff=null;
+      if(Reports.isManager()){ // l'efficienza (VM inattive/sovradimensionate) serve anche al manageriale; un report alla volta per cluster
+        const eq=new URLSearchParams({from:q.get('from'),to:q.get('to')});
+        try{Reports.eff=await Reports.fetchModel('vms',eq);}catch(e){Reports.eff=null;}
+      }
+      if(seq!==Reports.seq)return;
+      st.innerHTML='';
+      Reports.paint();
+    }catch(e){
+      if(seq!==Reports.seq)return;
+      st.innerHTML=e.status===429?`<div class="errrow">Un altro report è in corso su questo cluster: riprova tra qualche secondo.<button class="btn bg2 sm" onclick="Reports.load()">Riprova</button></div>`:errBox(e.message,'Reports.load()');
+    }finally{Reports.busy=false;}
+  },
+  paint(){if(Reports.isManager())Reports.paintManager();else Reports.paintTech();},
+
+  // ── tecnici ──
+  kpi(label,val,sub,cls){return`<div class="kcell"><div class="kl">${esc(label)}</div><div class="kv ${cls||''}">${val}</div><div class="ks">${sub||''}</div></div>`;},
+  notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n)).join('<br>')}</p>`:'';},
+  cols(){
+    const n=(v,d)=>Reports.fmtNum(v,d), p=v=>Reports.pct(v), mb=v=>v==null?'—':rptBytes(v);
+    const C={
+      nodes:[
+        {k:'node',l:'Nodo'},{k:'online',l:'Stato',get:r=>r.online?'Operativo':'Non risponde'},
+        {k:'cores',l:'Core',num:1},{k:'mem_total',l:'RAM',num:1,fmt:mb},
+        {k:'alloc_cores',l:'Core assegnati',num:1},{k:'alloc_mem',l:'RAM assegnata',num:1,fmt:mb},
+        {k:'cpu_avg',l:'CPU media',num:1,get:r=>r.cpu.avg,fmt:p},{k:'cpu_p95',l:'CPU p95',num:1,get:r=>r.cpu.p95,fmt:p},{k:'cpu_max',l:'CPU picco',num:1,get:r=>r.cpu.max,fmt:p},
+        {k:'mem_avg',l:'RAM media',num:1,get:r=>r.mem.avg,fmt:p},{k:'mem_p95',l:'RAM p95',num:1,get:r=>r.mem.p95,fmt:p},{k:'mem_max',l:'RAM picco',num:1,get:r=>r.mem.max,fmt:p},
+        {k:'psi_cpu_avg',l:'PSI CPU',num:1,fmt:v=>n(v,1)},{k:'psi_io_avg',l:'PSI I/O',num:1,fmt:v=>n(v,1)},
+        {k:'mem_days_to_85',l:'Giorni a RAM 85%',num:1,fmt:v=>v==null?'—':n(v)},{k:'saturated',l:'Segnalazione',get:r=>r.saturated?'satura':'',flag:1},
+        {k:'coverage_pct',l:'Copertura',num:1,fmt:p},{k:'spark',l:'Andamento CPU',spark:1,noexp:1}],
+      vms:[
+        {k:'name',l:'VM'},{k:'vmid',l:'VMID',num:1},{k:'group',l:'Gruppo'},{k:'node',l:'Nodo'},{k:'kind',l:'Tipo',get:r=>r.kind==='lxc'?'LXC':'QEMU'},{k:'status',l:'Stato'},
+        {k:'cores',l:'vCPU',num:1},{k:'max_mem',l:'RAM',num:1,fmt:mb},
+        {k:'cpu_avg',l:'CPU media',num:1,fmt:p},{k:'cpu_p95',l:'CPU p95',num:1,fmt:p},{k:'cpu_max',l:'CPU picco',num:1,fmt:p},
+        {k:'mem_avg',l:'RAM media',num:1,fmt:p},{k:'mem_p95',l:'RAM p95',num:1,fmt:p},
+        {k:'net_in_bps',l:'Rete in /s',num:1,fmt:mb},{k:'net_out_bps',l:'Rete out /s',num:1,fmt:mb},{k:'data_days',l:'Giorni di dati',num:1,fmt:v=>n(v,0)},
+        {k:'flag',l:'Segnalazione',get:r=>r.flag==='inactive'?'inattiva':r.flag==='oversized'?'sovradimensionata':'',flag:1},{k:'spark',l:'Andamento CPU',spark:1,noexp:1}],
+      storage:[
+        {k:'storage',l:'Storage'},{k:'type',l:'Tipo'},{k:'node',l:'Nodo'},{k:'total',l:'Totale',num:1,fmt:mb},{k:'used',l:'Usato',num:1,fmt:mb},{k:'used_pct',l:'Usato %',num:1,fmt:p},
+        {k:'days_to_85',l:'Giorni a 85%',num:1,fmt:v=>v==null?'—':n(v)},{k:'days_to_100',l:'Giorni a 100%',num:1,fmt:v=>v==null?'—':n(v)},
+        {k:'unreadable',l:'Segnalazione',get:r=>r.unreadable?'RRD non leggibile':'',flag:1},{k:'series',l:'Andamento',spark:1,noexp:1}],
+      gpu:[{k:'node',l:'Nodo'},{k:'model',l:'Modello'},{k:'cards',l:'Schede',num:1},{k:'assigned',l:'Assegnate',num:1},{k:'free',l:'Libere',num:1,get:r=>r.cards-r.assigned}],
+      reliability:[{k:'type',l:'Tipo di operazione'},{k:'total',l:'Totale',num:1},{k:'failed',l:'Fallite',num:1},{k:'pct',l:'% fallite',num:1,get:r=>r.total?r.failed/r.total*100:0,fmt:p}],
+    };
+    return C[Reports.model];
+  },
+  rows(){
+    const d=Reports.data; if(!d)return[];
+    let rows=Reports.model==='gpu'?d.models:Reports.model==='reliability'?d.by_type:d.rows;
+    rows=rows||[];
+    if(Reports.model==='vms'&&Reports.flag)rows=rows.filter(r=>r.flag===Reports.flag);
+    return rows;
+  },
+  val(col,r){return col.get?col.get(r):r[col.k];},
+  sortBy(k){const s=Reports.sort;s.dir=s.k===k?-s.dir:1;s.k=k;Reports.paintTable();},
+  setFlag(f){Reports.flag=f;Reports.paintTable();},
+  paintTech(){
+    const d=Reports.data, m=Reports.model, K=Reports.kpi;
+    let k='';
+    if(m==='nodes')k=K('Nodi',d.totals.nodes,'')+K('Nodi saturi',d.totals.saturated,'p95 CPU o RAM ≥ 85%',d.totals.saturated?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to))+K('Risoluzione dei dati',d.meta.timeframe==='year'?'6 h / 1 sett.':d.meta.timeframe==='day'?'1 min':'30 min',d.meta.timeframe==='year'?'6 ore negli ultimi ~90 giorni, poi settimanale':'passo di campionamento di Proxmox');
+    if(m==='vms')k=K('VM nel report',d.totals.vms,d.totals.running+' accese')+K('Inattive',d.totals.inactive,'libererebbero '+rptBytes(d.totals.reclaimable_mem_bytes)+' · '+d.totals.reclaimable_cores+' core',d.totals.inactive?'w':'')+K('Sovradimensionate',d.totals.oversized,'RAM p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedMem*100)+'% o CPU p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedCPU*100)+'%',d.totals.oversized?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
+    if(m==='storage'){const ceph=(d.rows||[]).filter(r=>r.type==='rbd');k=K('Storage',d.rows.length,ceph.length+' Ceph')+K('Più pieno',Reports.pct(Math.max(0,...d.rows.map(r=>r.used_pct))),'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));}
+    if(m==='gpu')k=K('Schede',d.total,'')+K('Assegnate',d.assigned,d.total-d.assigned+' libere',d.total&&d.assigned>=d.total?'w':'')+K('Da correggere',d.problems,'conflitti e incoerenze',d.problems?'w':'')+K('Tutte assegnate dal',d.full_since?esc(d.full_since):'—','storico dal '+esc(d.snapshot_from||'—'));
+    if(m==='reliability')k=K('Operazioni',Reports.fmtNum(d.totals.tasks),'copertura '+Reports.fmtNum(d.coverage_days,0)+' giorni')+K('Fallite',Reports.fmtNum(d.totals.failed),Reports.fmtNum(d.totals.fail_pct,1)+'%',d.totals.fail_pct>=5?'w':'')+K('Backup',Reports.fmtNum(d.totals.backups),Reports.fmtNum(d.totals.backups_failed)+' falliti',d.totals.backups_failed?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
+    document.getElementById('rp-kpis').innerHTML=k;
+    let extra='';
+    if(m==='vms')extra=`<div class="seg" role="group" aria-label="Filtra per segnalazione" style="margin-bottom:10px">${[['','Tutte'],['inactive','Inattive'],['oversized','Sovradimensionate']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${l}</button>`).join('')}</div>`;
+    if(m==='gpu'&&d.by_group&&Object.keys(d.by_group).length)extra=`<p class="cnote" style="margin-bottom:10px">Per gruppo: ${Object.entries(d.by_group).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
+    if(m==='reliability'&&d.failed_by_node&&Object.keys(d.failed_by_node).length)extra=`<p class="cnote" style="margin-bottom:10px">Fallite per nodo: ${Object.entries(d.failed_by_node).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
+    document.getElementById('rp-body').innerHTML=`${extra}<div class="panel"><div class="tw" id="rp-tbl"></div></div><p class="cnote" style="margin-top:8px">Report tecnico — uso interno.</p>${Reports.notes(d)}`;
+    Reports.paintTable();
+  },
+  paintTable(){
+    const cols=Reports.cols(); if(!cols)return;
+    let rows=[...Reports.rows()];
+    const s=Reports.sort, sc=cols.find(c=>c.k===s.k);
+    if(sc)rows.sort((a,b)=>{const x=Reports.val(sc,a),y=Reports.val(sc,b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return-1;return(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),undefined,{numeric:true}))*s.dir;});
+    const head=cols.map(c=>`<th${c.num?' class="n"':''}${c.noexp?'':` aria-sort="${s.k===c.k?(s.dir>0?'ascending':'descending'):'none'}"`}>${c.noexp?esc(c.l):`<button type="button" class="thb${s.k===c.k?' on '+(s.dir>0?'asc':'desc'):''}" onclick="Reports.sortBy(${js(c.k)})">${esc(c.l)}</button>`}</th>`).join('');
+    const body=rows.map(r=>`<tr>${cols.map(c=>{
+      if(c.spark)return`<td class="spk">${rptSpark(r[c.k],120,24)}</td>`;
+      const v=Reports.val(c,r), t=c.fmt?c.fmt(v,r):(v==null||v===''?'—':typeof v==='number'?Reports.fmtNum(v,v%1?1:0):String(v));
+      if(c.flag)return`<td>${v?`<span class="chip">${esc(v)}</span>`:''}</td>`;
+      return`<td${c.num?' class="n"':''}>${esc(t)}</td>`;}).join('')}</tr>`).join('');
+    document.getElementById('rp-tbl').innerHTML=`<table><thead><tr>${head}</tr></thead><tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Nessun dato con questi filtri</td></tr>`}</tbody></table>`;
+  },
+  exportData(){
+    const cols=(Reports.cols()||[]).filter(c=>!c.noexp&&!c.spark);
+    const rows=Reports.rows().map(r=>cols.map(c=>{const v=Reports.val(c,r);return v==null?'':v;}));
+    return{header:cols.map(c=>c.l),rows};
+  },
+  fileName(ext){const q=Reports.data&&Reports.data.meta;return`report-${Reports.model}-${q?q.from+'_'+q.to:rptIso(new Date())}.${ext}`;},
+  download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);},
+  csv(){
+    if(!Reports.data||Reports.isManager()){toast('Genera prima un report tecnico','info');return;}
+    const{header,rows}=Reports.exportData();
+    Reports.download(new Blob(['﻿'+rptCsv([header,...rows])],{type:'text/csv;charset=utf-8'}),Reports.fileName('csv'));
   },
   async xlsx(){
-    if(!Reports.data.length){toast('Nessun dato','err');return;}
+    if(!Reports.data||Reports.isManager()){toast('Genera prima un report tecnico','info');return;}
     try{await lib('xlsx');}catch(e){toast('Libreria Excel non caricata: '+e.message,'err');return;}
-    const agg=Reports.agg();
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
-      ['Nome','Nodo','Tipo','CPU avg %','CPU max %','RAM avg %','Net In avg (B/s)','Net Out avg (B/s)'],
-      ...agg.map(r=>[r.name,r.node,r.type,r.avgCpu.toFixed(1),r.maxCpu.toFixed(1),r.avgMem.toFixed(1),r.avgNetIn.toFixed(0),r.avgNetOut.toFixed(0)])
-    ]),'Riepilogo');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
-      ['Timestamp','Nodo','VMID','Nome','Tipo','CPU avg %','CPU max %','RAM avg %','Net In','Net Out'],
-      ...Reports.data.map(m=>[new Date(m.ts*1000).toLocaleString('it-IT'),m.node,m.vmid||'',m.name||'',m.vmtype||'',(m.avg_cpu*100).toFixed(2),(m.max_cpu*100).toFixed(2),(m.avg_mem*100).toFixed(2),m.avg_netin.toFixed(0),m.avg_netout.toFixed(0)])
-    ]),'Dati grezzi');
-    XLSX.writeFile(wb,`proxmox-report-${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast('Excel esportato','ok');
-  }
+    const{header,rows}=Reports.exportData();
+    const ws=XLSX.utils.aoa_to_sheet([header,...rows]); // SheetJS scrive le stringhe come stringhe (mai come formule); il CSV invece e' neutralizzato
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Report');
+    XLSX.writeFile(wb,Reports.fileName('xlsx'));
+  },
+  print(){
+    if(!Reports.data){toast('Genera prima il report','info');return;}
+    if(Reports.isManager()){Reports.paintManager(true);}
+    else{Reports.printTech();return;}
+    Reports.doPrint();
+  },
+  doPrint(){
+    let st=document.getElementById('rp-page-size');
+    if(!st){st=document.createElement('style');st.id='rp-page-size';document.head.append(st);}
+    st.textContent=`@page{size:A4 ${Reports.orient};margin:0}`;
+    const h=document.documentElement; h.classList.add('rp-printing');
+    const done=()=>{h.classList.remove('rp-printing');window.removeEventListener('afterprint',done);};
+    window.addEventListener('afterprint',done);
+    // window.print() blocca finche' il dialogo e' aperto; se un browser non emette afterprint, la classe si toglie comunque
+    setTimeout(()=>{window.print();setTimeout(done,1000);},60);
+  },
+  // Stampa di un report tecnico: la tabella cosi' com'e', su A4 orizzontale, con intestazione "uso interno".
+  printTech(){
+    const tbl=document.getElementById('rp-tbl'), d=Reports.data, m=RPT_MODELS.find(x=>x.id===Reports.model);
+    document.getElementById('rpt-print').innerHTML=`<div class="rp-doc rp-land rp-techdoc"><section class="rp-page"><h2>${esc(RPT_ID.name)} — ${esc(m.label)}</h2><p class="rp-lead">${esc(d.meta.cluster)} · ${esc(d.meta.from)} → ${esc(d.meta.to)} · uso interno</p>${tbl.innerHTML}</section></div>`;
+    Reports.orient='landscape'; Reports.doPrint();
+  },
+
+  // ── manageriale ──
+  paintManager(forPrint){
+    const d=Reports.data; if(!d)return;
+    const doc=(l)=>Reports.docHTML(l,d,Reports.eff);
+    const html=`<div class="rp-doc ${Reports.orient==='landscape'?'rp-land':''}">${doc('it')}${doc('en')}</div>`;
+    document.getElementById('rpt-print').innerHTML=html;
+    document.getElementById('rp-preview').innerHTML=`<div class="rp-previewbar"><span>Anteprima (${Reports.orient==='landscape'?'orizzontale':'verticale'} · italiano, poi inglese)</span></div><div class="rp-sheetwrap">${html}</div>`;
+    const lvl=d.condition.level;
+    document.getElementById('rp-kpis').innerHTML='';
+    document.getElementById('rp-status').innerHTML=`<p class="cnote">Condizione: <b>${esc(RPT_TXT.it.lvl[lvl])}</b>. Usa «PDF…» per stampare o salvare il documento (scegli «Salva come PDF» e, se serve, «Sfondi grafici»).</p>${Reports.notes(d)}`;
+  },
+  docHTML(L,d,eff){
+    const T=RPT_TXT[L], loc=T.loc, N=(v,dec)=>Reports.fmtNum(v,dec,loc), B=v=>rptBytes(v,loc), k=d.kpi, inv=d.inventory;
+    const dateFmt=s=>{const x=new Date(s+'T12:00:00');return x.toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'});};
+    const per={from:dateFmt(d.meta.from),to:dateFmt(d.meta.to)};
+    const foot=(n)=>`<footer><span>${esc(RPT_ID.name)} · ${esc(T.title)} · ${esc(per.from)} – ${esc(per.to)}</span><span>${n}</span></footer>`;
+    const reasons=d.condition.reasons.map(r=>(T.reason[r.code]||(()=>r.code))(r.code==='availability'||r.code==='task_failures'?N(r.value,1):r.value));
+    const condP=reasons.length?reasons.map((x,i)=>i?x:x.charAt(0).toUpperCase()+x.slice(1)).join('; ')+'.':T.none.charAt(0).toUpperCase()+T.none.slice(1)+'.';
+    const span=inv.span_days>=7;
+    const tile=(label,val,sub,hot)=>`<div class="rp-kt${hot?' hot':''}"><span>${esc(label)}</span><b>${val}</b><small>${esc(sub||'')}</small></div>`;
+    const growVMs=span?T.grew(inv.vms_last-inv.vms_first,dateFmt(inv.first_day)):(inv.first_day?T.since(dateFmt(inv.first_day)):'');
+    const growGrp=span?T.grew(inv.groups_last-inv.groups_first,dateFmt(inv.first_day)):(inv.first_day?T.since(dateFmt(inv.first_day)):'');
+    const gpuSub=k.gpu_total?(d.gpu_full_since?T.gpuFull(dateFmt(d.gpu_full_since)):T.gpuFree(k.gpu_total-k.gpu_assigned)):'';
+    const tiles=[
+      tile(T.k.vms,N(k.vms_running)+` <small class="u">/ ${N(k.vms_total)}</small>`,growVMs),
+      tile(T.k.groups,N(k.groups),growGrp),
+      tile(T.k.gpu,k.gpu_total?`${N(k.gpu_assigned)} <small class="u">/ ${N(k.gpu_total)}</small>`:'—',gpuSub,k.gpu_total&&k.gpu_assigned>=k.gpu_total),
+      tile(T.k.mem,k.mem_alloc_pct==null?'—':N(k.mem_alloc_pct,0)+'%',T.thr,k.mem_alloc_pct>=85),
+      tile(T.k.avail,k.availability_pct==null?'—':N(k.availability_pct,1)+'%',T.availSub,k.availability_pct!=null&&k.availability_pct<99),
+      tile(T.k.sto,k.storage_pct==null?'—':N(k.storage_pct,0)+'%',k.storage_total?T.stoSub(B(k.storage_used),B(k.storage_total)):'',k.storage_pct>=85),
+    ].join('');
+    const f=d.forecast, exh=(d85,d100)=>d85===0||d100===0?T.exh0:(d85!=null&&d85<=720)?T.exh(rptMonths(d85)):T.noTrend;
+    const card=(title,val,svg,note,hot)=>`<div class="rp-cc"><div class="rp-cch"><span>${esc(title)}</span><b>${val}</b></div>${svg}<small${hot?' class="hot"':''}>${esc(note)}</small></div>`;
+    const gpuPts=(inv.days||[]).filter(x=>x.gpu_total>0).map((x,i)=>({t:i,v:x.gpu_assigned}));
+    const cards=[
+      card(T.c.cpu,d.stats.cpu.n?N(d.stats.cpu.avg,0)+'%':'—',rptChart(d.series.cpu_pct,{thr:85,forecast:true,label:T.c.cpu}),T.avgSub),
+      card(T.c.mem,d.stats.mem.n?N(d.stats.mem.avg,0)+'%':'—',rptChart(d.series.mem_used_pct,{thr:85,forecast:true,label:T.c.mem,hot:f.mem_days_to_85!=null&&f.mem_days_to_85<=180}),exh(f.mem_days_to_85,f.mem_days_to_100),f.mem_days_to_85!=null&&f.mem_days_to_85<=180),
+      card(T.c.sto,k.storage_pct==null?'—':N(k.storage_pct,0)+'%',rptChart(d.series.storage_used_pct,{thr:85,forecast:true,label:T.c.sto,hot:f.storage_days_to_85!=null&&f.storage_days_to_85<=180}),exh(f.storage_days_to_85,f.storage_days_to_100),f.storage_days_to_85!=null&&f.storage_days_to_85<=180),
+      card(T.c.gpu,k.gpu_total?`${N(k.gpu_assigned)} / ${N(k.gpu_total)}`:'—',rptChart(gpuPts,{max:Math.max(1,k.gpu_total||1),thr:k.gpu_total,label:T.c.gpu,empty:inv.first_day?T.since(dateFmt(inv.first_day)):''}),k.gpu_total?T.gpuSub(k.gpu_total):''),
+    ].join('');
+    const gmax=Math.max(1,...d.top_groups.map(g=>g.mem_bytes));
+    const bars=d.top_groups.map(g=>`<div class="rp-br"><span>${esc(g.group)}</span><i><u style="width:${(g.mem_bytes/gmax*100).toFixed(1)}%"></u></i><em>${esc(B(g.mem_bytes))}</em></div>`).join('')||`<p class="rp-lead">${esc(T.since(inv.first_day?dateFmt(inv.first_day):'—'))}</p>`;
+    const need=(label,text,hot)=>`<tr><td>${esc(label)}</td><td${hot?' class="hot"':''}>${esc(text)}</td></tr>`;
+    const needs=[need(T.c.mem,exh(f.mem_days_to_85,f.mem_days_to_100),f.mem_days_to_85!=null&&f.mem_days_to_85<=180),need(T.c.sto,exh(f.storage_days_to_85,f.storage_days_to_100),f.storage_days_to_85!=null&&f.storage_days_to_85<=180),
+      need(T.c.gpu,k.gpu_total?`${N(k.gpu_assigned)} / ${N(k.gpu_total)}`+(d.gpu_full_since?` — ${T.gpuFull(dateFmt(d.gpu_full_since))}`:''):'—',k.gpu_total&&k.gpu_assigned>=k.gpu_total),
+      need(T.c.cpu,`${N(d.stats.cpu.avg,0)}% ${T.avgSub}`)].join('');
+    const e=eff&&eff.totals?{inactive:eff.totals.inactive,oversized:eff.totals.oversized,mem:B(eff.totals.reclaimable_mem_bytes),cores:N(eff.totals.reclaimable_cores)}:null;
+    const effHTML=e?`<p class="rp-eff">${esc(T.effLine(e))}</p><p class="rp-rule">${esc(T.effRule)}</p>`:`<p class="rp-rule">${esc(T.effNone)}</p>`;
+    const notes=[d.meta.notes.includes('inventory_since')&&inv.first_day?T.inv(dateFmt(inv.first_day)):'',T.method].filter(Boolean).join(' ');
+    return`
+<section class="rp-page rp-cover"><span class="rp-lang">${esc(T.lang)}</span><img src="${esc(RPT_ID.logo)}" class="rp-logo" alt="${esc(RPT_ID.name)}"><div class="rp-ct"><h1>${esc(T.title)}</h1><p class="rp-per">${esc(per.from)} – ${esc(per.to)}</p><p>${esc(T.sub)}<br>${esc(RPT_ID.org)}</p></div><div class="rp-cf">${esc(T.gen)} ${esc(new Date().toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'}))} · ${esc(RPT_ID.mail)}</div></section>
+<section class="rp-page"><h2>${esc(T.s1)}</h2><div class="rp-sum"><div><div class="rp-cond"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${d.condition.level}">${Dashboard.ICONS[d.condition.level==='ok'?'ok':d.condition.level==='bad'?'bad':'warn']}</svg><div><h3>${esc(T.lvl[d.condition.level])}</h3><p>${esc(T.intro(per,k))} ${esc(condP)}</p></div></div></div><div class="rp-kg">${tiles}</div></div>${foot(2)}</section>
+<section class="rp-page"><h2>${esc(T.s2)}</h2><p class="rp-lead">${esc(T.s2p)}</p><div class="rp-cg">${cards}</div>${foot(3)}</section>
+<section class="rp-page"><div class="rp-two"><div><h2>${esc(T.s3)}</h2><p class="rp-lead">${esc(T.s3p(d.group_count))}</p><div class="rp-bars">${bars}</div></div><div><h2>${esc(T.s4)}</h2><table class="rp-need">${needs}</table><h3 class="rp-h3">${esc(T.eff)}</h3>${effHTML}</div></div><p class="rp-meth">${esc(notes)}</p>${foot(4)}</section>`;
+  },
 };
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // SETTINGS

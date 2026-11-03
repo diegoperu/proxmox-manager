@@ -110,7 +110,7 @@ func TestIndexUsesOnlyEmbeddedAssets(t *testing.T) {
 		t.Errorf("external asset reference found: %q", m)
 	}
 
-	refs := regexp.MustCompile(`/static/[A-Za-z0-9._/-]+\.(?:js|css|woff2)`).FindAllString(page, -1)
+	refs := regexp.MustCompile(`/static/[A-Za-z0-9._/-]+\.(?:js|css|woff2|png)`).FindAllString(page, -1)
 	if len(refs) == 0 {
 		t.Fatal("index.html references no /static/ assets")
 	}

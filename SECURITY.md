@@ -70,6 +70,12 @@ and the VM's operating system through `guest-get-osinfo`.
 - On SELinux-enforcing guests this needs a third helper, `dmesg.sh`, in
   `/usr/local/libexec/pmgr/` with the same label as the others.
 
+## Reports
+
+`GET /api/reports/{model}` only reads (Proxmox RRD, tasks, GPU inventory, the inventory snapshot). Every parameter is whitelisted (dates `YYYY-MM-DD` within the 488 days Proxmox keeps, node names, type, group `[a-z0-9]{1,32}`, search text up to 64 characters without control characters, thresholds with bounds); a bad value is a 400 with a fixed message. Work against Proxmox is bounded: 8 parallel requests, at most 600 VMs per report, one report at a time per cluster (a second one gets 429). Results are cached for 60 s in a shared cache capped at 256 entries (least recently used dropped), so varying the filters cannot grow memory without limit.
+
+The manager report (`service`) carries only aggregates and groups: no VM names, IPs, node-level detail or task identifiers (UPID, user); the technical reports are for internal use. In the browser every value goes through `esc()`. CSV exports neutralise cells that a spreadsheet would read as a formula (text starting with `=`, `+`, `-`, `@`, tab or CR gets a leading apostrophe); the Excel export writes strings as strings (SheetJS never turns them into formulas). The PDF is produced by the browser's print dialog from a page built with the same escaping; the only image is the vendored PNG logo (no SVG, so no script).
+
 ## Daily inventory snapshot
 
 The server writes one small snapshot per cluster per day into the SQLite file (`inv_*` tables): counts and assignments per node and group (VMs, allocated cores/RAM/disk, GPU cards), never IPs, VM names, guest data or metrics; the group is the name prefix before the first `-`, validated as `[a-z0-9]{1,32}`, otherwise `altro`. Rows older than 5 years are deleted. The database file is as sensitive as `config.json`'s neighbours: it lives next to the binary with the process's umask. Keys written to SQL are validated and all statements are parameterised. A failed read stores nothing and is retried; unreadable GPU data is stored as "unknown", not as zero.
