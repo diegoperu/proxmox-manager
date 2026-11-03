@@ -36,7 +36,7 @@ var (
 // theme follows the OS, density is comfortable. Whitelists live here so that the
 // HTTP handler (on save) and the page renderer (on injection) cannot drift apart.
 var (
-	themes    = map[string]bool{"dark": true, "light": true, "eva01": true, "catppuccino": true}
+	themes    = map[string]bool{"dark": true, "light": true, "eva01": true, "catppuccino": true, "spiderman": true}
 	densities = map[string]bool{"compact": true}
 )
 

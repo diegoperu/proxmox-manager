@@ -3,7 +3,7 @@ package config
 import "testing"
 
 func TestValidTheme(t *testing.T) {
-	for _, ok := range []string{"", "dark", "light", "eva01", "catppuccino"} {
+	for _, ok := range []string{"", "dark", "light", "eva01", "catppuccino", "spiderman"} {
 		if !ValidTheme(ok) {
 			t.Errorf("theme %q should be valid", ok)
 		}
