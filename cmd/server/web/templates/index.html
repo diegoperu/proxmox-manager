@@ -703,7 +703,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.83.0 · 2026-11-03</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.84.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2456,10 +2456,6 @@ const Gpu={
   by:{},          // inventario per indice cluster
   availBy:{},     // true se il cluster ha almeno una scheda Nvidia
   seq:0, busy:false, ctx:null,
-  REASONS:{running:'La VM è accesa.',locked:'La VM è bloccata da un\'altra operazione.',template:'È un template.',other_node:'Il mapping non è su questo nodo.',
-    group:'Il mapping contiene più schede.',not_gpu:'Il mapping non punta a una scheda Nvidia.',busy:'La scheda è già in uso.',already:'La scheda è già di questa VM.',
-    no_slot:'Nessuno slot PCI libero.',cannot_check:'Non riesco a verificare le altre VM del nodo.',forbidden:'Permessi Proxmox insufficienti.',
-    plan_changed:'La situazione è cambiata: ricontrolla.',changed:'La VM è stata modificata nel frattempo.',direct:'Assegnazione diretta: si corregge in Proxmox.'},
   short(n){return String(n||'Scheda video').replace(/^NVIDIA Corporation\s+/i,'');},
   summary(d){
     if(!d)return null;
@@ -2578,7 +2574,7 @@ const Gpu={
     catch(e){
       const r=e.body&&e.body.reason;
       if(r==='running')Gpu.msg('La VM è accesa: per cambiare la scheda video va spenta.','err',{label:'Spegni la VM…',run:()=>Gpu.askShutdown(node,vmid,()=>Gpu.next())});
-      else Gpu.msg(e.message+(r&&Gpu.REASONS[r]&&!e.message.includes(Gpu.REASONS[r])?' ':''),'err');
+      else Gpu.msg(e.message,'err');
       return;
     }
     closeModal('mgpu');
@@ -2598,7 +2594,7 @@ const Gpu={
   // ── togli ──
   unassign(node,vmid,slot){
     if(Gpu.busy)return;
-    const d=Gpu.by[ClusterMgr.current]; let u=null;
+    const d=Gpu.by[ClusterMgr.current]; if(!d)return; let u=null;
     for(const n of d.nodes)if(n.node===node)for(const c of n.cards)for(const x of c.uses)if(x.vmid===vmid&&x.slot===slot)u=x;
     for(const p of d.problems)for(const x of p.uses)if(p.node===node&&x.vmid===vmid&&x.slot===slot&&!u)u=x;
     const label=u&&u.name?`${u.name} (${vmid})`:`VM ${vmid}`;
@@ -2629,13 +2625,14 @@ const Gpu={
     while(Date.now()<end){
       await new Promise(r=>setTimeout(r,3000));
       try{const r=await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/status`,{quiet:true,timeoutMs:15000});
-        if(r&&r.status&&r.status.status==='stopped'){dropVmCache(node,vmid);_tc.clear();toast(`VM ${vmid} spenta`,'ok');if(then)then();return;}}catch(e){}
+        if(r&&r.status&&r.status.status==='stopped'){dropVmCache(node,vmid);_tc.clear();toast(`VM ${vmid} spenta`,'ok');if(then&&App.cur==='gpu')then();return;}}catch(e){}
     }
+    if(App.cur!=='gpu'){toast(`La VM ${vmid} è ancora accesa dopo 2 minuti`,'err');return;}
     askConfirm({title:`La VM ${vmid} è ancora accesa`,lines:['Lo spegnimento ordinato non è riuscito entro 2 minuti.'],
       consequence:VM_ACTIONS.stop.cons,level:'danger',okLabel:'Stop forzato'},async()=>{
       try{await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/action/stop`,{method:'POST',body:'{}',quiet:true});}
       catch(e){toast(`Stop forzato non riuscito: ${e.message}`,'err');return;}
-      await new Promise(r=>setTimeout(r,3000)); dropVmCache(node,vmid); _tc.clear(); if(then)then();
+      await new Promise(r=>setTimeout(r,3000)); dropVmCache(node,vmid); _tc.clear(); if(then&&App.cur==='gpu')then();
     });
   },
   async refreshAll(){

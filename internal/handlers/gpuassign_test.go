@@ -303,3 +303,45 @@ func TestGPUHandlersRejectBadInput(t *testing.T) {
 		}
 	}
 }
+
+func TestUnassignOnlyGPUMappings(t *testing.T) {
+	f := newFakePVE()
+	f.mapsJSON = `[{"id":"g1","map":["node=n1,path=0000:01:00"]},{"id":"nic","map":["node=n1,path=0000:06:00"]},
+	 {"id":"gone-nv","map":["node=n2,path=0000:01:00,id=10de:20b0"]},{"id":"gone-other","map":["node=n2,path=0000:01:00,id=8086:1572"]},
+	 {"id":"gone-noid","map":["node=n2,path=0000:01:00"]}]`
+	f.cfg[100]["hostpci0"] = "mapping=nic"
+	f.cfg[100]["hostpci1"] = "mapping=gone-other"
+	f.cfg[100]["hostpci2"] = "mapping=gone-noid"
+	f.cfg[100]["hostpci3"] = "mapping=gone-nv"
+	f.cfg[100]["hostpci4"] = "mapping=g1"
+	f.cfg[100]["hostpci5"] = "mapping=unknown"
+	for _, slot := range []string{"hostpci0", "hostpci1", "hostpci2", "hostpci5"} {
+		if e := unassignGPU(f, 0, "n1", 100, slot); e == nil || e.Reason != "not_gpu" {
+			t.Fatalf("%s: want not_gpu, got %v", slot, e)
+		}
+	}
+	if len(f.writes) != 0 {
+		t.Fatalf("no write expected: %v", f.writes)
+	}
+	for _, slot := range []string{"hostpci3", "hostpci4"} { // NVIDIA entry elsewhere (to fix), NVIDIA card here
+		if e := unassignGPU(f, 0, "n1", 100, slot); e != nil {
+			t.Fatalf("%s: %v", slot, e)
+		}
+	}
+	if len(f.writes) != 2 {
+		t.Fatalf("writes %v", f.writes)
+	}
+}
+
+func TestGPULockIsStableAndBounded(t *testing.T) {
+	if gpuLock(1, "n1") != gpuLock(1, "n1") {
+		t.Fatal("same key must give the same lock")
+	}
+	seen := map[*sync.Mutex]bool{}
+	for i := 0; i < 5000; i++ {
+		seen[gpuLock(i, "node-"+strconv.Itoa(i))] = true
+	}
+	if len(seen) > len(gpuLocks) {
+		t.Fatalf("%d locks", len(seen))
+	}
+}

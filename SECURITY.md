@@ -70,6 +70,16 @@ and the VM's operating system through `guest-get-osinfo`.
 - On SELinux-enforcing guests this needs a third helper, `dmesg.sh`, in
   `/usr/local/libexec/pmgr/` with the same label as the others.
 
+## GPU assignment (PCI passthrough)
+
+The only hardware write the app performs. `GET /api/gpus` and `GET .../gpu/plan` only read; `POST .../gpu` and `DELETE .../gpu/{slot}` write the VM config.
+
+- Writes go through PCI resource mappings only: the app writes `hostpciN=mapping=<id>[,pcie|rombar|x-vga=0|1]` and removes only lines that currently are `mapping=...` of an NVIDIA video card (on the VM's node, or, when the card or the entry is missing there, a mapping whose entries are all NVIDIA). Direct `hostpciN: 0000:xx:yy` lines are never written or removed; NIC/NVMe mappings are refused.
+- Every write: whitelisted node, VMID, mapping id, slot (`hostpci0-15`) and options; a per-node lock (64 striped mutexes, bounded memory); a fresh read of the VM (must be stopped, unlocked, not a template) and of every VM config on the node (a single unreadable config aborts); the client must send back exactly the slot and options it was shown; the PUT carries the config `digest`, so Proxmox rejects it if the VM changed in between.
+- Permissions are Proxmox's: the token needs `VM.Config.HWType` on the VM and `Mapping.Use` on the mapping; a 403 is reported as such.
+- Residual risks, accepted: someone assigning the same card to another VM from the Proxmox UI between our check and our write (only the target VM's digest is checked; the next inventory shows the conflict); a VM started (by a person or HA) in the same instant (the change then waits for the next start). The app has no login: anyone who reaches it can do this, as for the other VM actions; the `/api` guard blocks other web pages.
+- Each change is logged (node, VMID, slot, mapping, card address); no secrets.
+
 ## Ceph status (read only)
 
 `GET /api/ceph` and `GET /api/ceph/summary` only read Proxmox (`/cluster/ceph/status`, `/cluster/ceph/flags`, `/nodes/{node}/ceph/{osd,pool,mon,mgr,mds}`); there is no Ceph write path. The token needs `Sys.Audit`; without it the page says so (`reason: forbidden`) instead of failing.

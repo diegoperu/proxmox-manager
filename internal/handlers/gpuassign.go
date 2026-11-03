@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net/http"
 	"net/url"
@@ -34,7 +35,7 @@ var (
 	vmidPattern       = regexp.MustCompile(`^[1-9][0-9]{0,8}$`)
 	hostpciSlotPat    = regexp.MustCompile(`^hostpci(\d|1[0-5])$`)
 	allowedPCIOpts    = map[string]bool{"pcie": true, "rombar": true, "x-vga": true}
-	gpuLocks          sync.Map // "cluster|node" -> *sync.Mutex
+	gpuLocks          [64]sync.Mutex // striped by cluster+node: bounded memory whatever node names are requested
 	errGPUCannotCheck = errors.New("impossibile verificare tutte le VM del nodo")
 )
 
@@ -80,9 +81,12 @@ func pickGPUOptions(inv GPUInventory, cardName string) string {
 	return best
 }
 
+// gpuLock serialises changes on one node of one cluster. Two nodes may share a stripe (they then wait for
+// each other): harmless, changes are rare and short.
 func gpuLock(cluster int, node string) *sync.Mutex {
-	m, _ := gpuLocks.LoadOrStore(strconv.Itoa(cluster)+"|"+node, &sync.Mutex{})
-	return m.(*sync.Mutex)
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strconv.Itoa(cluster) + "|" + node))
+	return &gpuLocks[h.Sum32()%uint32(len(gpuLocks))]
 }
 
 // gpuErr is a refusal the UI can act on: Reason is machine-readable (running, locked, busy...).
@@ -312,8 +316,13 @@ func unassignGPU(c gpuWriteAPI, cluster int, node string, vmid int, slot string)
 	if !ok {
 		return refuse(http.StatusNotFound, "no_slot", "Assegnazione non trovata (forse già tolta)")
 	}
-	if k, _, _ := strings.Cut(strings.SplitN(val, ",", 2)[0], "="); k != "mapping" {
+	k, mapping, _ := strings.Cut(strings.SplitN(val, ",", 2)[0], "=")
+	if k != "mapping" {
 		return refuse(http.StatusConflict, "direct", "Assegnazione diretta: l'app non la modifica, correggila in Proxmox")
+	}
+	// Only GPU mappings: a mapping of a NIC or an NVMe on the same VM is not this feature's to remove.
+	if e := checkGPUMapping(c, node, mapping); e != nil {
+		return e
 	}
 	params := url.Values{}
 	params.Set("delete", slot)
@@ -323,6 +332,39 @@ func unassignGPU(c gpuWriteAPI, cluster int, node string, vmid int, slot string)
 	}
 	log.Printf("gpu unassign: cluster=%d node=%s vmid=%d %s (was %s)", cluster, node, vmid, slot, clampText(val, 120))
 	return nil
+}
+
+// checkGPUMapping: the mapping is ours to remove if, on the VM's node, it points to an NVIDIA display card;
+// or, when the card or the entry is missing there (the "to fix" cases), if every entry is an NVIDIA device.
+func checkGPUMapping(c gpuWriteAPI, node, mapping string) *gpuErr {
+	if !mappingPat.MatchString(mapping) {
+		return refuse(http.StatusConflict, "not_gpu", "Mapping non riconosciuto: correggilo in Proxmox")
+	}
+	praw, err := c.GetNodePCI(node)
+	if err != nil {
+		return proxmoxRefusal(err, "elenco PCI del nodo non leggibile")
+	}
+	mraw, err := c.GetPCIMappings()
+	if err != nil {
+		return proxmoxRefusal(err, "mapping PCI non leggibili")
+	}
+	pci, entries := ParsePCIList(praw), ParsePCIMappingEntries(mraw)[mapping]
+	allNvidia := len(entries) > 0
+	for _, e := range entries {
+		if e.Node == node {
+			if info, ok := pci[e.Addr]; ok {
+				if info.IsNvidiaDisplay() {
+					return nil
+				}
+				return refuse(http.StatusConflict, "not_gpu", "Il mapping non è di una scheda video: l'app non lo modifica")
+			}
+		}
+		allNvidia = allNvidia && e.VendorID == "10de"
+	}
+	if allNvidia {
+		return nil
+	}
+	return refuse(http.StatusConflict, "not_gpu", "Non riesco a stabilire che il mapping sia di una scheda video: correggilo in Proxmox")
 }
 
 // ── HTTP ────────────────────────────────────────────────────────────────────

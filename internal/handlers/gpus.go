@@ -25,8 +25,9 @@ const (
 
 // MappingEntry is one `node=...,path=...` entry of a PCI resource mapping.
 type MappingEntry struct {
-	Node string
-	Addr string // normalised bus:dev
+	Node     string
+	Addr     string // normalised bus:dev
+	VendorID string // from the entry's "id=vvvv:dddd", lowercase; "" if absent
 }
 
 // MappingSet: mapping id -> its entries (all nodes).
@@ -47,7 +48,7 @@ func ParsePCIMappingEntries(raw json.RawMessage) MappingSet {
 			continue
 		}
 		for _, entry := range e.Map {
-			var n, path string
+			var n, path, vid string
 			for _, kv := range strings.Split(entry, ",") {
 				if k, v, ok := strings.Cut(kv, "="); ok {
 					switch strings.TrimSpace(k) {
@@ -55,12 +56,14 @@ func ParsePCIMappingEntries(raw json.RawMessage) MappingSet {
 						n = strings.TrimSpace(v)
 					case "path":
 						path = strings.TrimSpace(v)
+					case "id":
+						vid, _, _ = strings.Cut(strings.ToLower(strings.TrimSpace(v)), ":")
 					}
 				}
 			}
 			addr := normalizePCIAddr(path)
 			if n != "" && addr != "" && len(out[e.ID]) < 64 {
-				out[e.ID] = append(out[e.ID], MappingEntry{Node: n, Addr: addr})
+				out[e.ID] = append(out[e.ID], MappingEntry{Node: n, Addr: addr, VendorID: vid})
 			}
 		}
 	}
