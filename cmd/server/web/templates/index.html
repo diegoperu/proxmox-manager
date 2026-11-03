@@ -792,7 +792,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.99.0 · 2026-11-03</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.100.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -4248,7 +4248,7 @@ const Reports={
   kpi(label,val,sub,cls){return`<div class="kcell"><div class="kl">${esc(label)}</div><div class="kv ${cls||''}">${val}</div><div class="ks">${sub||''}</div></div>`;},
   notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n)).join('<br>')}</p>`:'';},
   cols(){
-    const n=(v,d)=>Reports.fmtNum(v,d), p=v=>Reports.pct(v), mb=v=>v==null?'—':fmtB(v);
+    const n=(v,d)=>Reports.fmtNum(v,d), p=v=>Reports.pct(v), mb=v=>v==null?'—':rptBytes(v);
     const C={
       nodes:[
         {k:'node',l:'Nodo'},{k:'online',l:'Stato',get:r=>r.online?'Operativo':'Non risponde'},
@@ -4288,8 +4288,8 @@ const Reports={
   paintTech(){
     const d=Reports.data, m=Reports.model, K=Reports.kpi;
     let k='';
-    if(m==='nodes')k=K('Nodi',d.totals.nodes,'')+K('Nodi saturi',d.totals.saturated,'p95 CPU o RAM ≥ 85%',d.totals.saturated?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to))+K('Risoluzione',esc(d.meta.timeframe),'passo '+Reports.fmtNum(d.meta.step_seconds/60,0)+' min o più');
-    if(m==='vms')k=K('VM nel report',d.totals.vms,d.totals.running+' accese')+K('Inattive',d.totals.inactive,'libererebbero '+fmtB(d.totals.reclaimable_mem_bytes)+' · '+d.totals.reclaimable_cores+' core',d.totals.inactive?'w':'')+K('Sovradimensionate',d.totals.oversized,'RAM p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedMem*100)+'% o CPU p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedCPU*100)+'%',d.totals.oversized?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
+    if(m==='nodes')k=K('Nodi',d.totals.nodes,'')+K('Nodi saturi',d.totals.saturated,'p95 CPU o RAM ≥ 85%',d.totals.saturated?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to))+K('Risoluzione dei dati',d.meta.timeframe==='year'?'6 h / 1 sett.':d.meta.timeframe==='day'?'1 min':'30 min',d.meta.timeframe==='year'?'6 ore negli ultimi ~90 giorni, poi settimanale':'passo di campionamento di Proxmox');
+    if(m==='vms')k=K('VM nel report',d.totals.vms,d.totals.running+' accese')+K('Inattive',d.totals.inactive,'libererebbero '+rptBytes(d.totals.reclaimable_mem_bytes)+' · '+d.totals.reclaimable_cores+' core',d.totals.inactive?'w':'')+K('Sovradimensionate',d.totals.oversized,'RAM p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedMem*100)+'% o CPU p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedCPU*100)+'%',d.totals.oversized?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     if(m==='storage'){const ceph=(d.rows||[]).filter(r=>r.type==='rbd');k=K('Storage',d.rows.length,ceph.length+' Ceph')+K('Più pieno',Reports.pct(Math.max(0,...d.rows.map(r=>r.used_pct))),'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));}
     if(m==='gpu')k=K('Schede',d.total,'')+K('Assegnate',d.assigned,d.total-d.assigned+' libere',d.total&&d.assigned>=d.total?'w':'')+K('Da correggere',d.problems,'conflitti e incoerenze',d.problems?'w':'')+K('Tutte assegnate dal',d.full_since?esc(d.full_since):'—','storico dal '+esc(d.snapshot_from||'—'));
     if(m==='reliability')k=K('Operazioni',Reports.fmtNum(d.totals.tasks),'copertura '+Reports.fmtNum(d.coverage_days,0)+' giorni')+K('Fallite',Reports.fmtNum(d.totals.failed),Reports.fmtNum(d.totals.fail_pct,1)+'%',d.totals.fail_pct>=5?'w':'')+K('Backup',Reports.fmtNum(d.totals.backups),Reports.fmtNum(d.totals.backups_failed)+' falliti',d.totals.backups_failed?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
