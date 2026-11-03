@@ -227,6 +227,7 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .kstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:16px 0 22px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden}
 .kcell{padding:var(--card-pad);border-left:1px solid var(--border);min-width:0}
 .kcell:first-child{border-left:0}
+.kstrip.k5{grid-template-columns:repeat(5,minmax(0,1fr))}
 .kcell .kl{font-size:12px;font-weight:500;color:var(--text3)}
 .kcell .kv{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:2px 0 4px}
 .kcell .kv small{font-size:13px;font-weight:500;color:var(--text3);letter-spacing:0}
@@ -367,7 +368,7 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 }
 @media(max-width:700px){
   .cond h2{font-size:22px}.cond-ico{width:36px;height:36px}
-  .kstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.kcell:nth-child(3){border-left:0}.kcell:nth-child(n+3){border-top:1px solid var(--border)}
+  .kstrip,.kstrip.k5{grid-template-columns:repeat(2,minmax(0,1fr))}.kcell:nth-child(2n+1){border-left:0}.kcell:nth-child(n+3){border-top:1px solid var(--border)}
   .nrow{grid-template-columns:minmax(0,1fr) auto;gap:10px 14px}.nrow .rb,.nrow .vdots{grid-column:1/-1}
 }
 
@@ -703,7 +704,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.84.0 · 2026-11-03</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.86.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2680,6 +2681,7 @@ const Dashboard={
     Dashboard.paintCondition(stats,[]);
     Gpu.fetch().then(()=>{if(seq===Dashboard._seq)Dashboard.paintGpu();});
     Dashboard.paintKpis(stats,live,null,null);
+    Dashboard.paintGpuKpi();
     Dashboard.paintNodes(stats);
     Dashboard.loadTop();
     const [metrics,tasks]=await Promise.all([
@@ -2694,6 +2696,7 @@ const Dashboard={
     Dashboard.paintCondition(stats,list||[]);
     Ceph.paintCard(Ceph.last[ClusterMgr.current]||null);
     Dashboard.paintKpis(stats,live,Array.isArray(metrics)?metrics:null,list);
+    Dashboard.paintGpuKpi();
     Dashboard.paintNodes(stats);
     Dashboard.paintTasks(list);
   },
@@ -2746,7 +2749,7 @@ const Dashboard={
     return tasks.filter(t=>t.starttime>=cutoff&&t.endtime&&t.status&&t.status!=='OK'&&!String(t.status).startsWith('WARNINGS'));
   },
 
-  paintGpu(){if(Dashboard._last&&App.cur==='dashboard')Dashboard.paintCondition(Dashboard._last.stats,Dashboard._last.tasks);},
+  paintGpu(){if(Dashboard._last&&App.cur==='dashboard'){Dashboard.paintCondition(Dashboard._last.stats,Dashboard._last.tasks);Dashboard.paintGpuKpi();}},
   // La frase riassume, non sostituisce: ogni voce rimanda a un numero che si legge sotto.
   paintCondition(stats,tasks){
     const total=stats.length, on=stats.filter(s=>s.online).length;
@@ -2792,6 +2795,19 @@ const Dashboard={
     return`<svg viewBox="0 0 200 28" preserveAspectRatio="none" aria-hidden="true" focusable="false">${counts.map((c,i)=>{const h=c?Math.max(3,c/mx*24):1;return`<rect class="sparkbar${errs[i]?' e':''}" x="${(i*16.6+1).toFixed(1)}" width="13" y="${(27-h).toFixed(1)}" height="${h.toFixed(1)}" rx="2"/>`;}).join('')}</svg>`;
   },
 
+  // Solo informativo: le GPU non entrano nella condizione meteo qui (i problemi si', da Gpu.summary).
+  paintGpuKpi(){
+    const strip=document.getElementById('dash-kpis'), el=document.getElementById('kpi-gpu');
+    if(!strip)return;
+    strip.classList.toggle('k5',!!el);
+    if(!el)return;
+    const d=Gpu.by[ClusterMgr.current], sm=Gpu.summary(d);
+    if(Gpu.availBy[ClusterMgr.current]===false){el.remove();strip.classList.remove('k5');return;}
+    if(!sm){el.innerHTML='<div class="kl">GPU</div><div class="kv">…</div><div class="ks">lettura in corso</div>';return;}
+    const assigned=sm.cards-sm.free;
+    el.innerHTML=`<div class="kl">GPU</div><div class="kv">${assigned} <small>/ ${sm.cards} assegnate</small></div><div class="ks">${sm.free} ${Dashboard.plural(sm.free,'libera','libere')} · ${sm.mapped} tramite mapping</div>`;
+    el.setAttribute('role','button');el.tabIndex=0;el.style.cursor='pointer';el.title='Apri la pagina GPU';el.onclick=()=>App.nav('gpu');
+  },
   paintKpis(stats,vms,metrics,tasks){
     const running=vms.filter(v=>v.status==='running').length;
     const on=stats.filter(s=>s.online);
@@ -2805,6 +2821,7 @@ const Dashboard={
       <div class="kcell"><div class="kl">VM in esecuzione</div><div class="kv">${running} <small>/ ${vms.length}</small></div><div class="ks">QEMU ${vms.filter(v=>v.type==='qemu').length} · LXC ${vms.filter(v=>v.type==='lxc').length} · ferme ${vms.length-running}</div></div>
       <div class="kcell"><div class="kl">CPU del cluster</div><div class="kv ${cls(cpu)}">${cpu}<small>%</small></div>${pts?Dashboard.spark(pts.map(p=>p.avg_cpu*100)):'<div class="ks">storico non disponibile</div>'}</div>
       <div class="kcell"><div class="kl">RAM del cluster</div><div class="kv ${cls(mem)}">${mem}<small>%</small></div>${pts?Dashboard.spark(pts.map(p=>p.avg_mem*100),mem>=65?'w':''):'<div class="ks">storico non disponibile</div>'}</div>
+      ${Gpu.availBy[ClusterMgr.current]===false?'':'<div class="kcell" id="kpi-gpu"></div>'}
       <div class="kcell"><div class="kl">Task nelle ultime 24 h</div><div class="kv ${failed?'w':''}">${day?day.length:'—'} <small>${day?(failed?`· ${failed} ${Dashboard.plural(failed,'fallito','falliti')}`:'· nessun errore'):''}</small></div>${day?Dashboard.bars(day):''}</div>`;
   },
 
