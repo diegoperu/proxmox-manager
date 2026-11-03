@@ -12,7 +12,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 |---|---|---|---|---|---|
 | 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | da fare |
 | 2 | Convertire le 22 assegnazioni GPU dirette ai mapping | l'app può gestire tutte le GPU | S (lavoro in Proxmox) | — | da fare |
-| 3 | Bilanciamento del cluster (proposte di spostamento VM) | uso migliore dei nodi, niente nodi scarichi | L | 1 (gruppi) utile, non bloccante | in discussione |
+| 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | in discussione |
 | 4 | Uso reale delle GPU (`nvidia-smi`) | report su GPU assegnate ma inutilizzate | M | helper nei guest | da fare |
 | 5 | Coda richieste dell'intranet per i report | domanda non soddisfatta nei report manageriali | M | accesso/API intranet | da fare |
 | 6 | Correggere `setup-disk` (usa il disco richiesto) | evita formattazioni/riavvii inutili | S | — | da fare |
@@ -38,7 +38,8 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Principi:** il sistema **propone, non esegue**: un piano ordinato di migrazioni con lo stato prima/dopo per nodo, da confermare passo per passo (come la pagina GPU); numero di migrazioni minimo; ogni VM bloccata mostra il motivo.
 - **Non spostabili:** VM con GPU (diretta o mapping), altri dispositivi PCI/USB legati al nodo, dischi locali non condivisi, VM con `lock`, template, VM con HA vincolata.
 - **Dati disponibili:** risorse assegnate (`/api/vms`), uso reale (RRD, p95 in `/api/reports/nodes` e `/vms`), inventario GPU, azione `migrate` già presente.
-- **Domande aperte:** obiettivo preciso (svuotare nodi per spegnerli o pareggiare?); riserva di RAM per host e Ceph; tetto di CPU; migrazione a caldo o a freddo e finestre di manutenzione; uso del reale (p95) oltre all'assegnato; simulazione "e se spengo il nodo X".
+- **Obiettivo (deciso 2026-11-03): pareggiare**, cioe' nodi caricati il piu' possibile in modo uguale (non svuotare nodi). Misura: % di RAM assegnata per nodo (priorita'), poi CPU; il piano minimizza lo scarto tra nodi con il minor numero di migrazioni. I nodi con VM bloccate (GPU) hanno un carico fisso intorno a cui si distribuisce il resto.
+- **Domande aperte:** riserva di RAM per host e Ceph; tetto di CPU; migrazione a caldo o a freddo e finestre di manutenzione; uso del reale (p95) oltre all'assegnato; simulazione "e se spengo il nodo X".
 - **Passi proposti:** (1) domande e specifiche, (2) algoritmo e simulatore con dati di prova e test dei casi limite (Opus alto), (3) endpoint del piano in sola lettura, (4) pagina con piano e conferma passo-passo (Sonnet alto), (5) revisione di sicurezza e prova reale su VM indicate dall'utente (Opus medio).
 - **Rischi:** una migrazione a caldo carica rete e storage; il piano non deve mai superare la RAM fisica; il piano si ricalcola subito prima di ogni passo (lo stato cambia).
 
