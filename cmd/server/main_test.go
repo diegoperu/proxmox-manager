@@ -11,7 +11,7 @@ import (
 
 func TestInjectRootClasses(t *testing.T) {
 	page := []byte(`<!DOCTYPE html><html lang="it"><head></head><body><html lang="it"></body></html>`)
-	for _, th := range []string{"dark", "light", "eva01", "catppuccino"} {
+	for _, th := range []string{"dark", "light", "eva01", "catppuccino", "spiderman"} {
 		got := string(injectRootClasses(page, th, ""))
 		if !strings.Contains(got, `<html lang="it" class="`+th+`">`) {
 			t.Errorf("theme %q not injected: %s", th, got)

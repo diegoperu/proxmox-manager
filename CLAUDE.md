@@ -69,7 +69,7 @@ SheetJS: usare >= 0.20.2 (le 0.18.x hanno CVE note); l'app lo usa solo per **scr
 
 ### Tema nel primo render
 
-`serveIndex` inserisce `class="<tema> <densita>"` nel tag `<html lang="it">` leggendo `theme` e `density` da `config.json` (`injectRootClasses`; whitelist in `config.ValidTheme`/`config.ValidDensity`: tema `dark|light|eva01|catppuccino`, densita' `compact`; vuoto = nessuna classe); niente lampeggio e nessun `localStorage`. La pagina ha `Cache-Control: no-cache` perché varia con tema e densita'. `POST /api/config` accetta `{theme, density}` (campo assente = invariato) e risponde 400 se un valore non e' in whitelist.
+`serveIndex` inserisce `class="<tema> <densita>"` nel tag `<html lang="it">` leggendo `theme` e `density` da `config.json` (`injectRootClasses`; whitelist in `config.ValidTheme`/`config.ValidDensity`: tema `dark|light|eva01|catppuccino|spiderman`, densita' `compact`; vuoto = nessuna classe); niente lampeggio e nessun `localStorage`. La pagina ha `Cache-Control: no-cache` perché varia con tema e densita'. `POST /api/config` accetta `{theme, density}` (campo assente = invariato) e risponde 400 se un valore non e' in whitelist.
 
 ## Config (config.json)
 
@@ -95,7 +95,7 @@ SheetJS: usare >= 0.20.2 (le 0.18.x hanno CVE note); l'app lo usa solo per **scr
 
 Autenticazione: **solo API Token**. Username/password rimossi.
 Token format Proxmox: `USER@REALM!TOKENID=UUID`.
-`theme`: `""` (segui OS), `"dark"`, `"light"`, `"eva01"`, `"catppuccino"`.
+`theme`: `""` (segui OS), `"dark"`, `"light"`, `"eva01"`, `"catppuccino"`, `"spiderman"`.
 
 ### Strutture Go
 
@@ -387,10 +387,11 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 - `html.light` → chiaro "alba" (`#eef2f8` bg, `#0d1b33` text, accento `#1d5fd1`)
 - `html.eva01` → Evangelion Unit 01 (viola scuro, verde lime `#7cc443`)
 - `html.catppuccino` → Catppuccin Mocha (Base `#1e1e2e`, Peach `#fab387`)
+- `html.spiderman` → blu del costume (`#070d1f`/`#0f1a3a`) con rosso come marchio (`--accent:#ff5c62`, riempimento `#d81f26`, testo bianco 5,1:1). Il rosso e' il colore del pericolo negli altri temi, quindi qui `--red` e' rosa acceso `#ff6fae` e `--warn` oro `#ffd23f` (stessa logica di eva01 col lime); contrasti verificati >= 4,9:1 su `--bg3`
 - `applyTheme(t)` aggiorna classi HTML + colori Chart.js `CD` object
 - Preferenza salvata in `config.json` campi `theme` e `density` (`html.compact` = densita' compatta: `--card-pad`, `--cell-y`, `--row-h`)
 - Token: `--accent*` e' il colore di marca; `--amber*` restano **alias** (JS usa `tk('--amber')`). Nuovi: `--on-accent`, `--on-danger`, `--hover`, `--scrim`, `--sky-glow`, `--shadow-pop`
-- Media query `@media(prefers-color-scheme:light)` usa `:not(.dark):not(.eva01):not(.catppuccino)` per non sovrascrivere temi scuri
+- Media query `@media(prefers-color-scheme:light)` usa `:not(.dark):not(.eva01):not(.catppuccino):not(.spiderman)` per non sovrascrivere temi scuri
 
 **Pattern sort tabelle**: `mkSorter(tbodyId, headId)` → `.sort(data, key)` con classi CSS `asc`/`desc`.
 
@@ -526,3 +527,4 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 - 2026-11-03 — prova reale assegnazione GPU (D26) su `gpu-test` (VMID 112, node-5) con il mapping HULK (A100 libera 0000:47:00), scelti dall'utente: VM accesa -> piano rifiutato `running`; spegnimento ordinato via app in ~6 s; piano ok (slot hostpci0, nessuna opzione, come le assegnazioni esistenti); scheda di un'altra VM (IRONMAN) rifiutata `busy`; conferma con slot sbagliato rifiutata `plan_changed`; assegna ok (`hostpci0: mapping=HULK`, resto del config intatto, inventario aggiornato, nessun problema); togli ok; togli di nuovo rifiutato `no_slot`; riassegnato HULK. La VM non e' stata riavviata. Tutti i 27 mapping delle schede esistono ora: 22 assegnazioni dirette da correggere/convertire, nessun conflitto — `CLAUDE.md`
 - 2026-11-03 — step 4 assegnazione GPU, revisione (Opus) e fix: lucchetti per nodo a strisce fisse (64, memoria limitata qualunque nome di nodo arrivi), `togli` solo per mapping di schede video Nvidia (sul nodo della VM, o voci tutte `10de` se la scheda/voce manca: niente rimozione di mapping di NIC/NVMe), `MappingEntry.VendorID`; UI: niente richieste di conferma dopo aver lasciato la pagina durante l'attesa di spegnimento, guardia su inventario assente, codice morto tolto. Test nuovi (`-race`), sezione GPU in SECURITY.md con i rischi residui accettati (assegnazione concorrente dalla UI di Proxmox su un'altra VM, VM avviata nello stesso istante) — `internal/handlers/gpuassign.go`, `gpus.go`, `gpuassign_test.go`, `cmd/server/web/templates/index.html`, `SECURITY.md`
 - 2026-11-03 — panoramica: cella KPI "GPU" (assegnate / totali, libere e tramite mapping) tra RAM e task, solo informativa (non entra nel meteo), cliccabile verso la pagina GPU, assente dove non ci sono schede; branch `feat/vm-gpu` e `feat/gpu-assign` cancellati — richiesta utente — `cmd/server/web/templates/index.html`, `CLAUDE.md`
+- 2026-11-03 — nuovo tema "spiderman" (blu del costume + rosso, pericolo rosa e attenzione oro per non confondere il marchio con gli stati): whitelist `config.themes`, CSS `html.spiderman`, tessera in Impostazioni, `applyTheme`, media query chiara, test — richiesta utente — `internal/config/config.go`, `config_test.go`, `cmd/server/main_test.go`, `cmd/server/web/templates/index.html`, `CLAUDE.md`

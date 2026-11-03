@@ -600,7 +600,7 @@ html.light{
   --shadow-pop:0 24px 60px -12px rgba(13,27,51,.28),0 2px 10px rgba(13,27,51,.12);
   color-scheme:light;
 }
-@media(prefers-color-scheme:light){html:not(.dark):not(.eva01):not(.catppuccino){
+@media(prefers-color-scheme:light){html:not(.dark):not(.eva01):not(.catppuccino):not(.spiderman){
   --bg:#eef2f8;--bg2:#ffffff;--bg3:#f3f6fb;--bg4:#e3e9f3;
   --border:rgba(13,27,51,.12);--border2:rgba(13,27,51,.22);
   --accent:#1d5fd1;--accent2:#174ca8;--accent-dim:rgba(29,95,209,.10);--accent-glow:rgba(29,95,209,.06);
@@ -641,6 +641,23 @@ html.catppuccino{
   --warn:#f9e2af;
   --text:#cdd6f4;--text2:#a6adc8;--text3:#979cb4;
   --sky-glow:#2a2a44;
+}
+
+/* ══ SPIDER-MAN ══ blu del costume come fondo, rosso come marchio. Il rosso e' anche il colore del pericolo negli altri temi:
+   qui il pericolo e' rosa acceso (--red) e l'attenzione oro (--warn), cosi' il marchio non si confonde con gli stati
+   (come in eva01 per il lime). Contrasti verificati >= 4.5:1 su --bg2/--bg3 per ogni colore usato come testo. */
+html.spiderman{
+  --bg:#070d1f;--bg2:#0f1a3a;--bg3:#16254f;--bg4:#1e3166;
+  --border:rgba(120,150,255,.24);--border2:rgba(120,150,255,.42);
+  --accent:#ff5c62;--accent2:#ff8a8f;--accent-dim:rgba(255,92,98,.16);--accent-glow:rgba(255,92,98,.08);
+  --accent-fill:#d81f26;--accent2-fill:#b81c22;--on-accent:#ffffff;
+  --red:#ff6fae;--red-dim:rgba(255,111,174,.16);
+  --green:#3be0a0;--green-dim:rgba(59,224,160,.15);
+  --blue:#5aa0ff;--blue-dim:rgba(90,160,255,.16);
+  --cyan:#4fd8ff;--purple:#b58cff;
+  --warn:#ffd23f;
+  --text:#f2f5ff;--text2:#b7c3e6;--text3:#8d9bc4;
+  --sky-glow:#1a2a66;
 }
 
 /* ── CHIP NODO (batch) ── */
@@ -704,7 +721,7 @@ html.catppuccino{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.86.0 · 2026-11-03</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.88.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1132,6 +1149,7 @@ html.catppuccino{
               <button type="button" class="tile" data-v="light" onclick="Settings.pickTheme('light')"><span class="sw"><i style="background:#eef2f8"></i><i style="background:#ffffff"></i><i style="background:#1d5fd1"></i><i style="background:#0d1b33"></i></span><b>Alba</b><span>chiaro</span></button>
               <button type="button" class="tile" data-v="eva01" onclick="Settings.pickTheme('eva01')"><span class="sw"><i style="background:#0d0617"></i><i style="background:#261540"></i><i style="background:#7cc443"></i><i style="background:#f0e6ff"></i></span><b>Eva 01</b><span>viola e lime</span></button>
               <button type="button" class="tile" data-v="catppuccino" onclick="Settings.pickTheme('catppuccino')"><span class="sw"><i style="background:#1e1e2e"></i><i style="background:#313244"></i><i style="background:#fab387"></i><i style="background:#cdd6f4"></i></span><b>Catppuccin</b><span>Mocha</span></button>
+              <button type="button" class="tile" data-v="spiderman" onclick="Settings.pickTheme('spiderman')"><span class="sw"><i style="background:#070d1f"></i><i style="background:#1d3fa0"></i><i style="background:#ff5c62"></i><i style="background:#f2f5ff"></i></span><b>Spider-Man</b><span>blu e rosso</span></button>
             </div>
             <div class="fl" id="lbl-dens" style="margin-top:18px">Densità</div>
             <div class="seg" id="dens-seg" role="group" aria-labelledby="lbl-dens">
@@ -4069,7 +4087,7 @@ function recolorCharts(){
 }
 function applyTheme(t){
   const h=document.documentElement;
-  h.classList.remove('dark','light','eva01','catppuccino');
+  h.classList.remove('dark','light','eva01','catppuccino','spiderman');
   if(t) h.classList.add(t);
   // Colori degli assi dai token del tema attivo (--border, --text3, --text2): niente copie hard-coded
   const cs=getComputedStyle(h), tok=n=>cs.getPropertyValue(n).trim();
