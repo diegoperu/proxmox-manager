@@ -48,7 +48,14 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Richiesta (2026-11-03), in cascata al bilanciamento:** in **Nuova VM**, dopo aver compilato i dati e scelto se la VM avra' o no una GPU (e quale modello), l'app propone il **nodo consigliato** (carico prima/dopo, motivazione, alternative); l'utente puo' cambiarlo.
 - **Regole:** stessi vincoli del bilanciamento (niente overbooking di RAM, riserva host/Ceph, RAM poi CPU, pareggio). Con GPU i candidati sono solo i nodi con una scheda libera del modello richiesto (da `/api/gpus`, con mapping).
 - **GPU nel deploy:** dopo il clone, a VM spenta, scrivere `hostpciN=mapping=<id>` con la logica di piano/conferma/lucchetto/digest gia' scritta per la pagina GPU. Se l'assegnazione fallisce dopo il clone: messaggio chiaro, la VM resta senza GPU (assegnabile dalla pagina GPU), nessuna cancellazione automatica.
-- **Punti da decidere:** clonare direttamente sul nodo scelto o clonare e migrare (oggi `ProvisionVM` clona sul nodo del template); prenotazione della scheda mentre si compila il modulo (due utenti insieme); avvio automatico dopo l'assegnazione; modello di GPU o scheda precisa; cosa mostrare se nessun nodo e' idoneo.
+- **Decisioni (2026-11-03):**
+  - **Clone sul nodo destinazione:** da testare se Proxmox lo permette (`clone` con `target`); se no, logica attuale (clone sul nodo del template, poi migrazione) e **GPU assegnata dopo la migrazione**.
+  - **Soft lock della scheda** durante la creazione: prenotazione con scadenza in memoria del server; la verifica vera resta quella a freddo prima di scrivere.
+  - **Avvio automatico** dopo l'assegnazione della GPU e in generale dopo la creazione (opzione, attiva di default; se la GPU fallisce la VM non parte e lo dice).
+  - **Elenco delle schede disponibili** mostrato nel modulo (per nodo: modello, mapping, libera/prenotata).
+  - **Utente aggiuntivo** nel modulo (nome + chiave SSH o password fissa, stessa logica del pulsante "Aggiungi utente" via guest agent e `adduser.sh`): fino a **due utenti al primo avvio** (uno da cloud-init, uno aggiunto dopo); serve attendere l'agent dopo l'avvio; se fallisce la VM resta creata e l'utente si aggiunge dal pulsante.
+- **Ancora da decidere:** modello di GPU o scheda precisa; cosa mostrare se nessun nodo e' idoneo.
+- **Primo passo utile:** prova in sola lettura/su VM di test del clone con `target` verso un altro nodo.
 - **Dipende da:** 3 (modello di carico) e dalla pagina GPU (gia' fatta). Si puo' partire con una versione senza GPU nel deploy (solo nodo consigliato) e aggiungere la GPU dopo.
 - **Modelli:** design Opus medio, implementazione Sonnet alto, revisione Opus medio (scrive configurazione hardware).
 
