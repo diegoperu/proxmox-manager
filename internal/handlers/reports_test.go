@@ -324,3 +324,17 @@ func TestReportHandlerRejectsBadRequests(t *testing.T) {
 	}
 	_ = fmt.Sprint()
 }
+
+func TestSharedCacheIsBounded(t *testing.T) {
+	for i := 0; i < maxCacheEntries+50; i++ {
+		_, _ = cephCached(fmt.Sprintf("bound-test-%d", i), time.Minute, func() (interface{}, error) { return i, nil })
+	}
+	cephCache.Lock()
+	n := len(cephCache.m)
+	_, recent := cephCache.m[fmt.Sprintf("bound-test-%d", maxCacheEntries+49)]
+	_, oldest := cephCache.m["bound-test-0"]
+	cephCache.Unlock()
+	if n > maxCacheEntries || !recent || oldest {
+		t.Fatalf("size %d recent %v oldest %v", n, recent, oldest)
+	}
+}

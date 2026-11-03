@@ -704,9 +704,10 @@ func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 // ── cache (per cluster, per view) with one fetch at a time per key ───────────
 
 type cephEntry struct {
-	mu  sync.Mutex
-	at  time.Time
-	val interface{}
+	used int64 // last lookup (UnixNano), guarded by cephCache's lock
+	mu   sync.Mutex
+	at   time.Time
+	val  interface{}
 }
 
 var cephCache = struct {
@@ -714,13 +715,28 @@ var cephCache = struct {
 	m map[string]*cephEntry
 }{m: map[string]*cephEntry{}}
 
+// maxCacheEntries bounds the shared cache: report keys include user-chosen filters, so without a cap every new
+// combination would stay in memory forever. The least recently used entry is dropped first.
+const maxCacheEntries = 256
+
 func cephCached(key string, ttl time.Duration, fn func() (interface{}, error)) (interface{}, error) {
 	cephCache.Lock()
 	e := cephCache.m[key]
 	if e == nil {
+		if len(cephCache.m) >= maxCacheEntries {
+			var oldK string
+			var oldT int64 = math.MaxInt64
+			for k, x := range cephCache.m {
+				if x.used < oldT {
+					oldK, oldT = k, x.used
+				}
+			}
+			delete(cephCache.m, oldK)
+		}
 		e = &cephEntry{}
 		cephCache.m[key] = e
 	}
+	e.used = time.Now().UnixNano()
 	cephCache.Unlock()
 	e.mu.Lock()
 	defer e.mu.Unlock()

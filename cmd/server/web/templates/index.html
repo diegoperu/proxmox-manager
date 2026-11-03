@@ -792,7 +792,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.101.0 · 2026-11-03</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.102.0 · 2026-11-03</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -4306,7 +4306,7 @@ const Reports={
     let rows=[...Reports.rows()];
     const s=Reports.sort, sc=cols.find(c=>c.k===s.k);
     if(sc)rows.sort((a,b)=>{const x=Reports.val(sc,a),y=Reports.val(sc,b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return-1;return(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),undefined,{numeric:true}))*s.dir;});
-    const head=cols.map(c=>`<th${c.num?' class="n"':''}>${c.noexp?esc(c.l):`<button type="button" class="thb${s.k===c.k?' on '+(s.dir>0?'asc':'desc'):''}" aria-sort="${s.k===c.k?(s.dir>0?'ascending':'descending'):'none'}" onclick="Reports.sortBy(${js(c.k)})">${esc(c.l)}</button>`}</th>`).join('');
+    const head=cols.map(c=>`<th${c.num?' class="n"':''}${c.noexp?'':` aria-sort="${s.k===c.k?(s.dir>0?'ascending':'descending'):'none'}"`}>${c.noexp?esc(c.l):`<button type="button" class="thb${s.k===c.k?' on '+(s.dir>0?'asc':'desc'):''}" onclick="Reports.sortBy(${js(c.k)})">${esc(c.l)}</button>`}</th>`).join('');
     const body=rows.map(r=>`<tr>${cols.map(c=>{
       if(c.spark)return`<td class="spk">${rptSpark(r[c.k],120,24)}</td>`;
       const v=Reports.val(c,r), t=c.fmt?c.fmt(v,r):(v==null||v===''?'—':typeof v==='number'?Reports.fmtNum(v,v%1?1:0):String(v));
@@ -4346,7 +4346,9 @@ const Reports={
     st.textContent=`@page{size:A4 ${Reports.orient};margin:0}`;
     const h=document.documentElement; h.classList.add('rp-printing');
     const done=()=>{h.classList.remove('rp-printing');window.removeEventListener('afterprint',done);};
-    window.addEventListener('afterprint',done); setTimeout(()=>window.print(),60);
+    window.addEventListener('afterprint',done);
+    // window.print() blocca finche' il dialogo e' aperto; se un browser non emette afterprint, la classe si toglie comunque
+    setTimeout(()=>{window.print();setTimeout(done,1000);},60);
   },
   // Stampa di un report tecnico: la tabella cosi' com'e', su A4 orizzontale, con intestazione "uso interno".
   printTech(){

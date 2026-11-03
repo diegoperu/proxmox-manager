@@ -510,10 +510,11 @@ func vmRow(c reportAPI, g resGuest, p reportParams) vmUsage {
 	row.NetOutBps = round2(statOf(avg.Cols["netout"], nil, p.Step, 1e18).Avg)
 	row.DataDays = round2(coverageDays(avg.T, cpu, avg.Step))
 	row.Spark = downsample(avg.T, cpu, sparkPoints)
-	// percentiles on long periods come from the last 28 days (30-minute resolution)
+	// percentiles on long periods come from the last 28 days of the period (30-minute resolution; Proxmox keeps
+	// them only for the last 30 days, so a period ending earlier has no percentile)
 	if p.Step > fineStepMax {
 		row.CPUP95, row.MemP95 = nil, nil
-		if m, ok := guestRRD(c, g, "month", "AVERAGE", time.Now().Unix()-p95WindowDays*86400, to); ok && len(m.T) > 0 {
+		if m, ok := guestRRD(c, g, "month", "AVERAGE", to-p95WindowDays*86400, to); ok && len(m.T) > 0 {
 			mn := len(m.T)
 			mc := scaleNaN(orNaN(m.Cols["cpu"], mn), 100)
 			mm := ratioNaN(orNaN(m.Cols["mem"], mn), orNaN(m.Cols["maxmem"], mn))
