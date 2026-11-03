@@ -13,9 +13,11 @@ Per aggiornare un file: scaricare la nuova versione, confrontarne l'hash con una
 | `xterm-addon-fit-0.8.0.js` | xterm-addon-fit 0.8.0 | MIT | https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js | hash verificato contro jsDelivr (sha256) | `10f3194c5f17c1786fb7d5db865c1ec8539b6736a318063fd38bdaaf7c46848f` |
 | `fonts/jetbrains-mono-latin-var.woff2` | JetBrains Mono (variabile 300-700, subset latin) | OFL-1.1 | https://fonts.googleapis.com/css2 (Google Fonts) | scaricato dal CSS ufficiale con User-Agent Chrome | `18be452724bfdc236c074ca94a249a7f41a86752c7d04ab258ce9ed5651f6a7e` |
 | `fonts/inter-latin-var.woff2` | Inter (variabile 100-900, subset latin) | OFL-1.1 | https://fonts.googleapis.com/css2?family=Inter:wght@100..900 (Google Fonts, v20) | scaricato con User-Agent Chrome; hash identico al pacchetto `@fontsource-variable/inter` su jsDelivr (`inter-latin-wght-normal.woff2`) | `3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62` |
+| `datacloud-logo.png` | Logo DataCloud / Politecnico di Milano (ritagliato e ridimensionato a 900 px, 16 colori) | marchio del Politecnico di Milano, uso interno al servizio | https://datacloud.polimi.it/wp-content/uploads/2025/12/DataCloud-01-1.png | scaricato dal sito del progetto via TLS; non ridistribuire fuori dal servizio | `7ae20a4a0b9ea7e3aabf34b717ee319fea33d0064437794a50b1e7b2ce1c6ab1` |
 
 ## Note
 - Le intestazioni di copyright e licenza dentro i file `.js` e `.css` sono lasciate intatte.
 - **SheetJS**: la versione 0.18.5 usata prima aveva CVE note (CVE-2023-30533, CVE-2024-22363, solo in lettura di file non fidati). Qui si usa 0.20.3, che le corregge. L'app usa SheetJS solo per scrivere l'export Excel.
 - **Font**: Inter e JetBrains Mono sono sotto SIL Open Font License 1.1, che consente la ridistribuzione con i font stessi.
+- **Logo**: PNG (non SVG: nessuno script possibile). Compare solo sulla copertina dei report manageriali.
 - Nessun file qui è codice dell'applicazione: il frontend dell'app resta `web/templates/index.html`.

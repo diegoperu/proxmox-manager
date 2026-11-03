@@ -125,7 +125,6 @@ func main() {
 		r.Get("/tasks", h.GetClusterTasks)
 
 		r.Get("/metrics", h.GetMetrics)
-		r.Get("/report", h.GetReportData)
 		r.Get("/top", h.GetTopVMs)
 		r.Get("/ceph/summary", h.GetCephSummary())
 		r.Get("/gpus", h.GetGPUs())
@@ -143,6 +142,7 @@ var staticTypes = map[string]string{
 	".js":    "text/javascript; charset=utf-8",
 	".css":   "text/css; charset=utf-8",
 	".woff2": "font/woff2",
+	".png":   "image/png",
 }
 
 func staticHandler() http.Handler {
