@@ -98,6 +98,9 @@ func (s *Store) migrate() error {
 	return err
 }
 
+// ValidDay reports whether s is a YYYY-MM-DD string.
+func ValidDay(s string) bool { return dayPattern.MatchString(s) }
+
 func validate(snap Snapshot) error {
 	if !dayPattern.MatchString(snap.Day) {
 		return errors.New("history: invalid day")
@@ -226,4 +229,94 @@ func (s *Store) Prune(now time.Time) error {
 		}
 	}
 	return nil
+}
+
+// DayTotals are the per-day sums of a cluster's snapshot (for trends in the reports).
+type DayTotals struct {
+	Day         string
+	VMs         int
+	Running     int
+	Groups      int // distinct groups, "altro" excluded
+	AllocCores  int64
+	AllocMem    int64
+	NodeCores   int64
+	NodeMem     int64
+	GPUKnown    bool
+	GPUTotal    int
+	GPUAssigned int
+}
+
+// Days returns the daily totals of cluster between from and to (inclusive, YYYY-MM-DD), oldest first.
+func (s *Store) Days(cluster, from, to string) ([]DayTotals, error) {
+	if !dayPattern.MatchString(from) || !dayPattern.MatchString(to) || !labelPattern.MatchString(cluster) {
+		return nil, errors.New("history: invalid arguments")
+	}
+	out := []DayTotals{}
+	idx := map[string]int{}
+	rows, err := s.db.Query(`SELECT day, gpu_known FROM inv_meta WHERE cluster=? AND day>=? AND day<=? ORDER BY day`, cluster, from, to)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var d DayTotals
+		var k int
+		if err := rows.Scan(&d.Day, &k); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		d.GPUKnown = k == 1
+		idx[d.Day] = len(out)
+		out = append(out, d)
+	}
+	rows.Close()
+	rows, err = s.db.Query(`SELECT day, SUM(vms), SUM(running), SUM(cores), SUM(mem_bytes), COUNT(DISTINCT CASE WHEN grp<>'altro' THEN grp END)
+		FROM inv_group WHERE cluster=? AND day>=? AND day<=? GROUP BY day`, cluster, from, to)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var day string
+		var vms, run, cores, mem, groups int64
+		if err := rows.Scan(&day, &vms, &run, &cores, &mem, &groups); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if i, ok := idx[day]; ok {
+			out[i].VMs, out[i].Running, out[i].AllocCores, out[i].AllocMem, out[i].Groups = int(vms), int(run), cores, mem, int(groups)
+		}
+	}
+	rows.Close()
+	rows, err = s.db.Query(`SELECT day, SUM(online*cores), SUM(online*mem_bytes) FROM inv_node WHERE cluster=? AND day>=? AND day<=? GROUP BY day`, cluster, from, to)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var day string
+		var cores, mem int64
+		if err := rows.Scan(&day, &cores, &mem); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if i, ok := idx[day]; ok {
+			out[i].NodeCores, out[i].NodeMem = cores, mem
+		}
+	}
+	rows.Close()
+	rows, err = s.db.Query(`SELECT day, SUM(cards), SUM(CASE WHEN grp<>'' THEN cards ELSE 0 END) FROM inv_gpu WHERE cluster=? AND day>=? AND day<=? GROUP BY day`, cluster, from, to)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var day string
+		var total, assigned int64
+		if err := rows.Scan(&day, &total, &assigned); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if i, ok := idx[day]; ok {
+			out[i].GPUTotal, out[i].GPUAssigned = int(total), int(assigned)
+		}
+	}
+	rows.Close()
+	return out, nil
 }

@@ -18,6 +18,7 @@ import (
 	"proxmox-manager/internal/api"
 	"proxmox-manager/internal/cache"
 	"proxmox-manager/internal/config"
+	"proxmox-manager/internal/history"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
@@ -25,7 +26,13 @@ import (
 
 type Handler struct {
 	store *cache.Store
+	hist  *history.Store // daily inventory snapshots (nil in tests)
 }
+
+// SetHistory gives the reports access to the daily inventory snapshots.
+func (h *Handler) SetHistory(s *history.Store) { h.hist = s }
+
+func chiParam(r *http.Request, k string) string { return chi.URLParam(r, k) }
 
 func New(store *cache.Store) *Handler { return &Handler{store: store} }
 

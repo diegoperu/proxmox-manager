@@ -47,6 +47,7 @@ func main() {
 		log.Fatalf("history db: %v", err)
 	}
 	defer hist.Close()
+	h.SetHistory(hist)
 	handlers.StartSnapshots(context.Background(), hist)
 
 	r := chi.NewRouter()
@@ -128,6 +129,7 @@ func main() {
 		r.Get("/top", h.GetTopVMs)
 		r.Get("/ceph/summary", h.GetCephSummary())
 		r.Get("/gpus", h.GetGPUs())
+		r.Get("/reports/{model}", h.GetReport)
 		r.Get("/ceph", h.GetCeph())
 	})
 

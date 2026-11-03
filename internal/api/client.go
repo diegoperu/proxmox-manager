@@ -335,6 +335,51 @@ func (c *Client) GetVMOSInfo(node string, vmid int) (json.RawMessage, error) {
 	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/get-osinfo", node, vmid))
 }
 
+// ── Report data (read only) ─────────────────────────────────────────────────
+
+var (
+	rrdTimeframes = map[string]bool{"hour": true, "day": true, "week": true, "month": true, "year": true}
+	rrdCFs        = map[string]bool{"AVERAGE": true, "MAX": true}
+)
+
+func rrdQuery(tf, cf string) (string, error) {
+	if !rrdTimeframes[tf] || !rrdCFs[cf] {
+		return "", fmt.Errorf("timeframe o funzione di consolidamento non validi")
+	}
+	return "?timeframe=" + tf + "&cf=" + cf, nil
+}
+
+// GetNodeRRDcf, GetGuestRRDcf and GetStorageRRD read Proxmox RRD with an explicit consolidation function.
+func (c *Client) GetNodeRRDcf(node, tf, cf string) (json.RawMessage, error) {
+	q, err := rrdQuery(tf, cf)
+	if err != nil {
+		return nil, err
+	}
+	return c.Get("/nodes/" + node + "/rrddata" + q)
+}
+
+// GetGuestRRDcf kind is "qemu" or "lxc".
+func (c *Client) GetGuestRRDcf(node, kind string, vmid int, tf, cf string) (json.RawMessage, error) {
+	q, err := rrdQuery(tf, cf)
+	if err != nil || (kind != "qemu" && kind != "lxc") {
+		return nil, fmt.Errorf("parametri RRD non validi")
+	}
+	return c.Get(fmt.Sprintf("/nodes/%s/%s/%d/rrddata%s", node, kind, vmid, q))
+}
+
+func (c *Client) GetStorageRRD(node, storage, tf, cf string) (json.RawMessage, error) {
+	q, err := rrdQuery(tf, cf)
+	if err != nil {
+		return nil, err
+	}
+	return c.Get("/nodes/" + node + "/storage/" + url.PathEscape(storage) + "/rrddata" + q)
+}
+
+// GetNodeTasks lists a node's task history (Proxmox keeps about two years); limit is capped by the caller.
+func (c *Client) GetNodeTasks(node string, limit int) (json.RawMessage, error) {
+	return c.Get(fmt.Sprintf("/nodes/%s/tasks?limit=%d", node, limit))
+}
+
 // ── PCI passthrough (read only) ─────────────────────────────────────────────
 
 func (c *Client) GetNodePCI(node string) (json.RawMessage, error) {
