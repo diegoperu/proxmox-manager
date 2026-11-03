@@ -35,6 +35,8 @@ proxmox-manager/
     │   └── store.go                # SQLite: solo api_cache (TTL)
     ├── config/
     │   └── config.go               # config.json, singleton con RWMutex
+    ├── history/
+    │   └── store.go                # SQLite: fotografia giornaliera dell'inventario (D28), 4 tabelle `inv_*`
     └── handlers/
         └── handlers.go             # tutti gli HTTP handler (proxy → Proxmox)
 ```
@@ -340,13 +342,17 @@ Note provisioning:
 - Default gateway: `10.75.4.254`, default IP prefix: `10.75.4.`
 - Frontend (2026-10-13): il gateway digitato a mano non viene sovrascritto dall'auto-calcolo (`gwManual`; svuotarlo o scegliere un template lo riattiva); il nome VM è validato (`^[A-Za-z0-9][A-Za-z0-9.-]*$`, max 253) prima della chiamata; `#pv-summary` mostra cosa verrà creato e si aggiorna mentre si compila (solo `textContent`).
 
+## Fotografia giornaliera dell'inventario (D28, 2026-11-03)
+
+`internal/history` + `internal/handlers/snapshot.go`. Il server, 30 s dopo l'avvio e poi ogni ora, controlla per ogni cluster configurato se esiste la fotografia di oggi (data locale del server); se manca la legge e la salva (`INSERT` in una transazione, una per cluster e giorno; se la lettura fallisce riprova all'ora dopo e non salva niente). Contenuto: `inv_node` (nodo, online, core, RAM), `inv_group` (nodo, **gruppo**, tipo qemu/lxc: n. VM, in esecuzione, core, RAM e disco assegnati; template esclusi), `inv_gpu` (nodo, modello, gruppo, n. schede; gruppo vuoto = libere), `inv_meta` (`gpu_known`: se l'inventario GPU non e' leggibile o e' parziale non si salvano righe GPU, cosi' l'assenza non diventa "zero GPU"). **Niente IP, nomi di VM, dati dei guest, metriche.** Gruppo = prefisso del nome VM prima del primo `-` (D27), `altro` se non e' `[a-z0-9]{1,32}`. Il cluster e' identificato dalla **label**: rinominarla in `config.json` interrompe la serie storica. Retention 5 anni (`history.Retention`, pulizia a ogni giro). Stessa base dati del file `db_path` (WAL, una connessione per ciascun `Store`). Verificato sul cluster reale il 2026-11-03: CALCOLO 11 nodi / 107 VM / 27 schede, HOSTING 2 nodi / 28 VM.
+
 ## SQLite schema (solo cache)
 
 ```sql
 api_cache(key TEXT PK, value TEXT, expires_at INTEGER)
 ```
 
-Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
+Nessuna tabella metrics — storico dei consumi delegato a Proxmox RRD. Report v2 (D28) aggiungera' una tabella di fotografie giornaliere dell'inventario (vedi "Report v2").
 
 ## Frontend (index.html — SPA vanilla)
 
@@ -465,7 +471,7 @@ Nessuna tabella metrics — storico completamente delegato a Proxmox RRD.
 - Non usare `localStorage`/`sessionStorage` — preferenze salvate in `config.json` via backend.
 - Non aggiungere `?ds=...` alle chiamate RRD — Proxmox 8 risponde 400.
 - Non usare `c.Post()` per endpoint agent read-only (`get-fsinfo`) — usare `c.Get()`.
-- Non reintrodurre collector SQLite — storico ora da RRD Proxmox.
+- Non reintrodurre collector SQLite per le metriche — lo storico dei consumi viene dall'RRD di Proxmox. **Eccezione decisa il 2026-11-03 (D28):** una fotografia giornaliera minima dell'inventario per i Report v2 (conteggi e assegnazioni per nodo/gruppo: VM, risorse assegnate, GPU; niente IP, niente dati dei guest, niente metriche), retention 5 anni; nient'altro va salvato senza una nuova decisione.
 - Non reintrodurre username/password — autenticazione solo via API Token.
 - Non usare "empty=all" per `selectedNodes` nei selettori nodi — modello esplicito, inizializzare con tutti i nodi al load.
 - Non mischiare selettori CSS con `@media` in liste comma — CSS non supporta quella sintassi (regole separate obbligatorie).
@@ -495,6 +501,46 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 2. Scrittura: assegna/togli con le misure sopra, test di concorrenza e di rifiuto — [Modello suggerito: Opus — ragionamento: medio — motivo: prima scrittura su config hardware, concorrenza e TOCTOU]
 3. Interfaccia: pagina GPU, pannello VM, panoramica, spegnimento (D23, D24) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: UI su componenti esistenti]
 4. Revisione di sicurezza e prova reale su VM e mapping indicati dall'utente (D26) — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione di una scrittura]
+
+## Report v2 (in progettazione, branch `feat/reports-v2`)
+
+**Obiettivo:** sostituire la pagina Report (oggi: periodo + tipo, qualche grafico, Excel) con due famiglie di report. **Tecnici** per chi gestisce il servizio: dettaglio per nodo/VM/GPU/storage, anomalie, capacita', export Excel/CSV/PDF. **Manageriali** per direttore e consiglio di dipartimento (valutazione del servizio, richieste di finanziamento): poche pagine A4 in PDF, KPI grandi, tendenze, saturazione e previsione, linguaggio del Bollettino. Generati a richiesta (nessuna programmazione). Storico = quello di Proxmox alle sue risoluzioni (fino a un anno, risoluzione via via piu' grossa; da misurare sul cluster: con Proxmox 9 il formato RRD e' cambiato). Domande D27-D34 in `DOMANDE.md`, risposte del 2026-11-03: gruppo = prefisso del nome VM prima del primo `-` (D27); fotografia giornaliera dell'inventario si' (D28); copertina con dati e loghi di DataCloud da https://datacloud.polimi.it/ (D29); manageriale solo aggregati, tecnico completo "uso interno" (D30); PDF dalla stampa del browser (D31); soglie proposte (D32); manageriale **bilingue: tutto in italiano e poi uguale in inglese nello stesso PDF**, tecnico solo italiano (D33); uso reale GPU fuori scope (D34).
+
+**Fonti dati gia' disponibili:** RRD di nodi e VM (CPU, RAM, rete, disco), RRD degli storage (`/nodes/{n}/storage/{s}/rrddata`: usato/totale nel tempo, anche per gli storage Ceph RBD), elenco VM con risorse assegnate, sistema operativo e GPU, inventario GPU, stato Ceph, task del cluster, pool e tag di Proxmox.
+
+**Cosa non c'e':** storico dell'inventario -> fotografia giornaliera (D28: la crescita si vedra' dal giorno di attivazione in poi); attribuzione ai gruppi -> prefisso del nome (D27); uso reale delle GPU -> rinviato (D34).
+
+**Misure sulle fonti (step 1, 2026-11-03, cluster CALCOLO, Proxmox VE 9.2.24, sola lettura):**
+- **RRD** di nodo, VM QEMU, LXC e storage (`.../rrddata?timeframe=&cf=AVERAGE|MAX`): `hour` 60 punti a 60 s; `day` 1440 a 60 s; `week` 336 a **30 min**; `month` 1440 a **30 min** (30 giorni); `year` 418 punti a **1 settimana** (604800 s) = **488 giorni (~16 mesi)**, il massimo. `decade` non esiste (500/400). Tra 30 giorni e 488 giorni non c'e' una risoluzione intermedia: per trimestre/semestre/anno si hanno punti **settimanali** (13/26/52). `cf=MAX` funziona su tutti: massimi settimanali sull'anno (utili per i picchi); il p95 vero esiste solo sulle finestre fino a 30 giorni (a 30 min): sull'anno si puo' dare media e massimo settimanali, **non** il p95 (da dichiarare nei report). L'ultimo punto o i primi possono essere vuoti (`null`: 409 su 418 con CPU sul nodo).
+- **Campi nodo** (19): `cpu`, `maxcpu`, `memused`, `memtotal`, `memavailable`, `netin`, `netout`, `loadavg`, `iowait`, `roottotal`, `rootused`, `swaptotal`, `swapused`, `arcsize`, pressioni PSI (`pressurecpusome`, `pressureiosome/full`, `pressurememorysome/full`). **Campi VM** (QEMU): `cpu`, `maxcpu`, `mem`, `maxmem`, `memhost`, `disk` (contatore I/O, non uso filesystem), `maxdisk`, `diskread`, `diskwrite`, `netin`, `netout`, pressioni PSI. LXC uguale senza `memhost`. Le pressioni PSI sono un indicatore di saturazione migliore della sola CPU/RAM.
+- **Storage** (`/nodes/{n}/storage/{s}/rrddata`): solo `total` e `used`, stesse risoluzioni e stessi 488 giorni, anche per gli storage `rbd` (Ceph): basta per l'andamento della capacita' e la previsione di esaurimento. Tipi presenti: 22 `rbd` (voci per nodo dello stesso storage), 11 `dir`, 11 `pbs`, 6 `zfspool`, 1 `lvmthin`.
+- **Costo**: una chiamata RRD costa 50-200 ms (day/month ~170 ms, week/year ~65 ms); per ~110 VM a concorrenza 8 sono 2-4 s per finestra: fattibile a richiesta, con cache.
+- **Task**: `/cluster/tasks` arriva a 17 giorni (275 voci), ma `/nodes/{n}/tasks?limit=5000` arriva a **592 giorni** (1092 voci su un nodo): base per "affidabilita'" (task falliti, backup, migrazioni) su tutto l'anno.
+- **Pool Proxmox**: 0 in uso. **Tag**: 113 VM ne hanno, ma sono tag di sistema (`cloudinit`, `ubuntu-template`, `24.04`, `gpu`, `windows`, `old-policloud`...), non di gruppo: conferma che il gruppo va dal nome (D27). Il tag `gpu` esiste su 9 VM (non coincide con le 22 VM con scheda).
+- **Cosa NON si puo' avere**: risoluzione sotto la settimana oltre i 30 giorni; metriche di VM cancellate (l'RRD sparisce con la VM, la fotografia giornaliera tiene solo i conteggi); p95 su finestre > 30 giorni; storico delle assegnazioni GPU prima del 2026-11-03.
+
+**Identita' (D29):** servizio **DataCloud**, laboratorio interdipartimentale del Politecnico di Milano (DEIB, DABC, DASTU, Matematica), IaaS per il personale di ricerca; contatto datacloud-lab@polimi.it. Loghi dal sito: `DataCloud-01-1.png` (blu, per fondo chiaro) e `Bandiera_Bianco.png` (bandiera Polimi bianca, per fondo scuro), da vendorizzare in `web/static/` come PNG (non SVG: niente script) con estensione `.png` aggiunta alla allowlist di `/static` e annotati in `THIRD_PARTY.md` (marchi del Politecnico, uso interno del servizio).
+
+**Proposta di architettura (da confermare con le risposte):**
+- Calcolo lato server in Go: un endpoint per modello di report (`/api/reports/<modello>?from=&to=&...`), aggregazioni (media, p95, massimo, tempo oltre soglia, tendenza lineare e previsione di esaurimento), concorrenza limitata verso Proxmox, cache breve, un report alla volta per cluster. Il browser non chiama piu' un RRD per VM.
+- Pagina Report nuova: scelta del modello (manageriali: "Stato del servizio", "Capacita' e fabbisogno"; tecnici: "Nodi e capacita'", "VM: consumi, inattive, sovradimensionate", "GPU", "Storage e Ceph", "Affidabilita'"), filtri (periodo con preset mese/trimestre/semestre/anno e intervallo libero, cluster, nodi, tipo, gruppo, stato, ricerca), anteprima nella pagina.
+- PDF: vista "documento" A4 con CSS di stampa e "Salva come PDF" del browser (D31 A): nessuna libreria nuova. Excel con SheetJS gia' vendorizzato, CSV.
+- Vincoli invariati: un solo `index.html`, vanilla JS, niente CDN, niente localStorage, Chart.js e SheetJS gia' presenti.
+
+**Threat model (minimo):** sola lettura verso Proxmox. Rischi: dati interni (IP, nomi VM, nomi di persona nei nomi VM) in un PDF che esce dal gruppo tecnico -> D30 (manageriale solo aggregati, tecnico marcato "uso interno"); **CSV/Excel formula injection** (nomi VM che iniziano con `= + - @`) -> neutralizzare ogni cella testuale; XSS nella vista documento -> `esc()`/`textContent` come ovunque; carico su Proxmox (anno x 115 VM) -> concorrenza 8, cache, un calcolo per cluster alla volta, tetti su periodo e numero di risorse; parametri validati a whitelist (date, modello, nodi). Con D28 A: la fotografia giornaliera contiene solo conteggi e assegnazioni, niente IP, niente dati dei guest, retention dichiarata.
+
+**Piano a step (proposto):**
+1. Misura delle fonti sul cluster (risoluzioni RRD per timeframe, RRD storage/Ceph, pool e tag usati), sola lettura — [Modello suggerito: Sonnet — ragionamento: medio — motivo: ricognizione su API note]
+2. Direzione visiva: schizzo del PDF manageriale (copertina + 3-4 pagine A4) e di un report tecnico, con dati finti — [Modello suggerito: Opus — ragionamento: medio — motivo: design e gerarchia dell'informazione per un pubblico non tecnico]
+3. Backend aggregati + fotografia giornaliera dell'inventario (tabella SQLite, scritta una volta al giorno dal server), test — [Modello suggerito: Sonnet — ragionamento: alto — motivo: calcoli ben specificati su dati noti]
+4. Pagina Report: modelli, filtri, anteprima, tabelle tecniche, export Excel/CSV sicuri — [Modello suggerito: Sonnet — ragionamento: alto — motivo: UI su componenti esistenti]
+5. Vista documento e PDF (manageriale bilingue IT poi EN, tecnico IT) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: CSS di stampa e grafici ad alta risoluzione]
+6. Revisione di sicurezza e di design, prova sui dati reali — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione]
+
+## Lavori da fare (non pianificati)
+
+- **Uso reale delle GPU nei guest** (D34): helper `nvidia-smi` in `/usr/local/libexec/pmgr/` (stesse regole degli altri helper: ASCII, argomenti posizionali, sola lettura) + raccolta; quando c'e', **estendere la reportistica** (Report v2: utilizzo GPU per VM/gruppo, GPU assegnate ma inutilizzate).
+- **Convertire le 22 assegnazioni GPU dirette ai mapping** (in Proxmox, a VM spenta): finche' restano dirette l'app le mostra ma non le modifica.
 
 ## Registro modifiche
 
@@ -528,3 +574,7 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 - 2026-11-03 — step 4 assegnazione GPU, revisione (Opus) e fix: lucchetti per nodo a strisce fisse (64, memoria limitata qualunque nome di nodo arrivi), `togli` solo per mapping di schede video Nvidia (sul nodo della VM, o voci tutte `10de` se la scheda/voce manca: niente rimozione di mapping di NIC/NVMe), `MappingEntry.VendorID`; UI: niente richieste di conferma dopo aver lasciato la pagina durante l'attesa di spegnimento, guardia su inventario assente, codice morto tolto. Test nuovi (`-race`), sezione GPU in SECURITY.md con i rischi residui accettati (assegnazione concorrente dalla UI di Proxmox su un'altra VM, VM avviata nello stesso istante) — `internal/handlers/gpuassign.go`, `gpus.go`, `gpuassign_test.go`, `cmd/server/web/templates/index.html`, `SECURITY.md`
 - 2026-11-03 — panoramica: cella KPI "GPU" (assegnate / totali, libere e tramite mapping) tra RAM e task, solo informativa (non entra nel meteo), cliccabile verso la pagina GPU, assente dove non ci sono schede; branch `feat/vm-gpu` e `feat/gpu-assign` cancellati — richiesta utente — `cmd/server/web/templates/index.html`, `CLAUDE.md`
 - 2026-11-03 — nuovo tema "spiderman" (blu del costume + rosso, pericolo rosa e attenzione oro per non confondere il marchio con gli stati): whitelist `config.themes`, CSS `html.spiderman`, tessera in Impostazioni, `applyTheme`, media query chiara, test — richiesta utente — `internal/config/config.go`, `config_test.go`, `cmd/server/main_test.go`, `cmd/server/web/templates/index.html`, `CLAUDE.md`
+- 2026-11-03 — avvio Report v2: branch `feat/reports-v2`, decisioni utente (pubblico manageriale = direttore e consiglio di dipartimento per valutazione e finanziamenti; PDF; a richiesta; storico massimo di Proxmox), proposta di architettura, threat model, piano a step, domande D27-D34 — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
+- 2026-11-03 — Report v2: risposte D27-D34 (gruppo dal prefisso del nome, fotografia giornaliera dell'inventario con eccezione alla regola "niente collector", identita' DataCloud e loghi dal sito, manageriale bilingue IT+EN, nvidia-smi tra i lavori da fare) — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
+- 2026-11-03 — fotografia giornaliera dell'inventario anticipata (D28): `internal/history` (4 tabelle, `Save` transazionale e sostitutivo, `Prune` a 5 anni, chiavi validate), `BuildSnapshot` puro e `StartSnapshots` (prima lettura dopo 30 s, poi ogni ora, una per cluster e giorno, riprova se fallisce), gruppo dal nome (D27); test con `-race` (conteggi, nessuna fuga di nomi/IP, GPU ignota, una sola lettura al giorno, retry, retention); provata sui cluster reali in una copia isolata (CALCOLO 107 VM, HOSTING 28, nessun dato personale salvato) — `internal/history/`, `internal/handlers/snapshot.go`, `snapshot_test.go`, `cmd/server/main.go`, `CLAUDE.md`
+- 2026-11-03 — Report v2 step 1: misura delle fonti sul cluster (risoluzioni RRD, campi, storage, task fino a 592 giorni, tag, costi), tutte annotate in "Report v2" — richiesta utente — `CLAUDE.md`
