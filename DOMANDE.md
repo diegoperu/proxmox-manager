@@ -222,3 +222,74 @@ Dati letti sul cluster CALCOLO (sola lettura, 2026-11-02): 22 assegnazioni, tutt
 **Perche' conta**: e' la prima funzione che scrive la configurazione hardware; la prova reale va fatta su oggetti indicati da te, mai su VM di altri.
 **Suggerimento**: una VM nuova vuota sullo stesso nodo di una scheda libera, e un mapping creato apposta.
 **Risposta utente**: 2026-11-02 — come suggerito.
+
+## Report v2 (2026-11-03, branch `feat/reports-v2`)
+
+Gia' deciso dall'utente (2026-11-03): la pagina Report attuale si scarta e si rifa'; due famiglie di report, **tecnici** (dettaglio per chi gestisce il servizio) e **manageriali** (per direttore e consiglio di dipartimento: valutazione del servizio ed eventuali finanziamenti aggiuntivi); come formato manageriale basta il **PDF**; nessuna programmazione (si generano a richiesta); storico = il massimo che Proxmox conserva, alle sue risoluzioni.
+
+### D27 — A chi appartengono le VM
+**Stato**: APERTA
+**Bloccante**: si' (per i KPI "gruppi serviti" e "risorse per gruppo")
+**Domanda**: Per il consiglio conta "quanti gruppi di ricerca/progetti usano il servizio e quanto". Oggi l'app non sa a chi appartiene una VM. Da dove lo ricavo?
+**Perche' conta**: e' probabilmente il KPI piu' forte per una richiesta di fondi; se la regola e' sbagliata i numeri sono sbagliati davanti al consiglio.
+**Opzioni**: A) pool di Proxmox; B) tag di Proxmox (es. `gruppo-rossi`); C) prefisso del nome (es. `dinitto-vm-gpu-1` -> `dinitto`), con una tabella di correzione; D) campo note della VM; E) niente gruppi, solo totali.
+**Suggerimento**: B se i tag sono usati o li potete mettere (esplicito, modificabile da Proxmox); altrimenti C come ripiego dichiarato nel report ("attribuzione dal nome della VM").
+**Risposta utente**:
+
+### D28 — Storico dell'inventario
+**Stato**: APERTA
+**Bloccante**: si' (architettura)
+**Domanda**: Proxmox conserva lo storico dei **consumi** (CPU, RAM, rete, disco, storage) fino a un anno, ma non lo storico dell'**inventario**: quante VM c'erano sei mesi fa, quante GPU erano assegnate, chi le usava. Le VM cancellate perdono anche i consumi. Per mostrare la crescita del servizio serve salvare una fotografia giornaliera (pochi numeri) nel database SQLite dell'app. `CLAUDE.md` oggi vieta di reintrodurre un "collector": va eccezione?
+**Perche' conta**: "siamo passati da 60 a 115 VM in un anno, le GPU sono tutte assegnate da marzo" e' l'argomento piu' convincente per i finanziamenti; senza fotografia si puo' mostrare solo lo stato di oggi piu' l'andamento dei consumi.
+**Opzioni**: A) fotografia giornaliera minima (conteggi e assegnazioni per nodo/gruppo, niente IP, niente dati dei guest), tenuta 5 anni, file SQLite gia' esistente, scritta dal server una volta al giorno; B) niente fotografia, solo RRD (la crescita partira' da zero il giorno in cui la attiviamo comunque in futuro); C) fotografia solo quando si genera un report (buchi se non se ne generano).
+**Suggerimento**: A: e' piccola (qualche KB al giorno), non tocca i guest e da' valore che cresce col tempo; va attivata presto perche' lo storico parte dal primo giorno.
+**Risposta utente**:
+
+### D29 — Copertina e intestazione del PDF
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Il PDF manageriale ha una copertina. Cosa ci va: nome del servizio, struttura (es. "DEIB — Politecnico di Milano"), autore, logo?
+**Perche' conta**: il logo va vendorizzato (file nel binario, nessun CDN); nome e struttura possono stare in `config.json` (campi validati).
+**Opzioni**: A) testi in `config.json` + logo SVG/PNG che mi dai tu; B) solo testi; C) niente copertina, titolo in cima alla prima pagina.
+**Suggerimento**: A se hai un logo utilizzabile, altrimenti B.
+**Risposta utente**:
+
+### D30 — Cosa compare nel PDF per il consiglio
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Nel report manageriale mostro solo aggregati (per servizio, nodo, gruppo) o anche nomi di VM, IP e nomi di persona contenuti nei nomi delle VM?
+**Perche' conta**: il PDF esce dal gruppo tecnico e puo' essere inoltrato; IP e nomi interni non servono a un consiglio.
+**Opzioni**: A) solo aggregati e gruppi (niente IP, niente nomi di VM); B) anche le prime N VM per consumo; C) tutto.
+**Suggerimento**: A per il manageriale; il tecnico mostra tutto ed e' marcato "uso interno".
+**Risposta utente**:
+
+### D31 — Generazione del PDF
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Come generare il PDF?
+**Perche' conta**: dipendenze, qualita' e peso.
+**Opzioni**: A) vista "documento" A4 dedicata nella pagina e stampa del browser ("Salva come PDF"): nessuna libreria nuova, testo vettoriale e selezionabile, grafici ridisegnati ad alta risoluzione per la stampa, intestazioni/pie' di pagina via CSS `@page`; B) libreria vendorizzata (jsPDF + html2canvas, ~600 KB): un clic produce il file, ma le pagine diventano immagini; C) PDF generato dal server Go (libreria nuova e Chrome headless o simili): pesante.
+**Suggerimento**: A. Unico compromesso: un passaggio in piu' (dialogo di stampa).
+**Risposta utente**:
+
+### D32 — Soglie dei report tecnici
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Proposta: VM **inattiva** = accesa con CPU media < 2% e rete < 1 KB/s per tutto il periodo (minimo 7 giorni); VM **sovradimensionata** = RAM usata (p95) < 25% di quella assegnata o CPU p95 < 10% dei core assegnati, per almeno 14 giorni; nodo **saturo** = RAM p95 >= 85% o CPU p95 >= 85% (soglia gia' usata dal Bollettino). Vanno bene?
+**Perche' conta**: sono gli elenchi "cosa recuperare" che giustificano o evitano acquisti.
+**Suggerimento**: queste, modificabili nella pagina per il singolo report (non salvate).
+**Risposta utente**:
+
+### D33 — Lingua
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Report solo in italiano o anche in inglese (es. per valutazioni esterne)?
+**Suggerimento**: solo italiano ora; testi raccolti in un punto per aggiungere l'inglese dopo.
+**Risposta utente**:
+
+### D34 — Utilizzo delle GPU nei guest
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Proxmox sa quale VM ha quale GPU, non quanto la usa. Misurare l'uso reale (es. `nvidia-smi` via guest agent) richiede un nuovo helper nei guest e un collector. Fuori scope per ora?
+**Suggerimento**: fuori scope; il report mostra GPU assegnate/libere (e, con D28 A, da quanto tempo), che e' gia' l'indicatore di domanda.
+**Risposta utente**:

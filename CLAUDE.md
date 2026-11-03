@@ -496,6 +496,30 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 3. Interfaccia: pagina GPU, pannello VM, panoramica, spegnimento (D23, D24) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: UI su componenti esistenti]
 4. Revisione di sicurezza e prova reale su VM e mapping indicati dall'utente (D26) — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione di una scrittura]
 
+## Report v2 (in progettazione, branch `feat/reports-v2`)
+
+**Obiettivo:** sostituire la pagina Report (oggi: periodo + tipo, qualche grafico, Excel) con due famiglie di report. **Tecnici** per chi gestisce il servizio: dettaglio per nodo/VM/GPU/storage, anomalie, capacita', export Excel/CSV/PDF. **Manageriali** per direttore e consiglio di dipartimento (valutazione del servizio, richieste di finanziamento): poche pagine A4 in PDF, KPI grandi, tendenze, saturazione e previsione, linguaggio del Bollettino. Generati a richiesta (nessuna programmazione). Storico = quello di Proxmox alle sue risoluzioni (fino a un anno, risoluzione via via piu' grossa; da misurare sul cluster: con Proxmox 9 il formato RRD e' cambiato). Domande D27-D34 in `DOMANDE.md`.
+
+**Fonti dati gia' disponibili:** RRD di nodi e VM (CPU, RAM, rete, disco), RRD degli storage (`/nodes/{n}/storage/{s}/rrddata`: usato/totale nel tempo, anche per gli storage Ceph RBD), elenco VM con risorse assegnate, sistema operativo e GPU, inventario GPU, stato Ceph, task del cluster, pool e tag di Proxmox.
+
+**Cosa non c'e' (e va deciso):** storico dell'inventario (quante VM/GPU assegnate nel passato, VM cancellate) -> D28; attribuzione delle VM ai gruppi -> D27; uso reale delle GPU -> D34.
+
+**Proposta di architettura (da confermare con le risposte):**
+- Calcolo lato server in Go: un endpoint per modello di report (`/api/reports/<modello>?from=&to=&...`), aggregazioni (media, p95, massimo, tempo oltre soglia, tendenza lineare e previsione di esaurimento), concorrenza limitata verso Proxmox, cache breve, un report alla volta per cluster. Il browser non chiama piu' un RRD per VM.
+- Pagina Report nuova: scelta del modello (manageriali: "Stato del servizio", "Capacita' e fabbisogno"; tecnici: "Nodi e capacita'", "VM: consumi, inattive, sovradimensionate", "GPU", "Storage e Ceph", "Affidabilita'"), filtri (periodo con preset mese/trimestre/semestre/anno e intervallo libero, cluster, nodi, tipo, gruppo, stato, ricerca), anteprima nella pagina.
+- PDF: vista "documento" A4 con CSS di stampa e "Salva come PDF" del browser (D31 A): nessuna libreria nuova. Excel con SheetJS gia' vendorizzato, CSV.
+- Vincoli invariati: un solo `index.html`, vanilla JS, niente CDN, niente localStorage, Chart.js e SheetJS gia' presenti.
+
+**Threat model (minimo):** sola lettura verso Proxmox. Rischi: dati interni (IP, nomi VM, nomi di persona nei nomi VM) in un PDF che esce dal gruppo tecnico -> D30 (manageriale solo aggregati, tecnico marcato "uso interno"); **CSV/Excel formula injection** (nomi VM che iniziano con `= + - @`) -> neutralizzare ogni cella testuale; XSS nella vista documento -> `esc()`/`textContent` come ovunque; carico su Proxmox (anno x 115 VM) -> concorrenza 8, cache, un calcolo per cluster alla volta, tetti su periodo e numero di risorse; parametri validati a whitelist (date, modello, nodi). Con D28 A: la fotografia giornaliera contiene solo conteggi e assegnazioni, niente IP, niente dati dei guest, retention dichiarata.
+
+**Piano a step (proposto):**
+1. Misura delle fonti sul cluster (risoluzioni RRD per timeframe, RRD storage/Ceph, pool e tag usati), sola lettura — [Modello suggerito: Sonnet — ragionamento: medio — motivo: ricognizione su API note]
+2. Direzione visiva: schizzo del PDF manageriale (copertina + 3-4 pagine A4) e di un report tecnico, con dati finti — [Modello suggerito: Opus — ragionamento: medio — motivo: design e gerarchia dell'informazione per un pubblico non tecnico]
+3. Backend aggregati + (se D28 A) fotografia giornaliera, test — [Modello suggerito: Sonnet — ragionamento: alto — motivo: calcoli ben specificati su dati noti]
+4. Pagina Report: modelli, filtri, anteprima, tabelle tecniche, export Excel/CSV sicuri — [Modello suggerito: Sonnet — ragionamento: alto — motivo: UI su componenti esistenti]
+5. Vista documento e PDF (manageriale e tecnico) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: CSS di stampa e grafici ad alta risoluzione]
+6. Revisione di sicurezza e di design, prova sui dati reali — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione]
+
 ## Registro modifiche
 
 - 2026-11-02 — creato branch `experiment/ui-redesign`, aggiunto `DOMANDE.md` (D1-D6) — avvio sperimentazione redesign UI/UX, discussione prima del codice — `CLAUDE.md`, `DOMANDE.md`
@@ -528,3 +552,4 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 - 2026-11-03 — step 4 assegnazione GPU, revisione (Opus) e fix: lucchetti per nodo a strisce fisse (64, memoria limitata qualunque nome di nodo arrivi), `togli` solo per mapping di schede video Nvidia (sul nodo della VM, o voci tutte `10de` se la scheda/voce manca: niente rimozione di mapping di NIC/NVMe), `MappingEntry.VendorID`; UI: niente richieste di conferma dopo aver lasciato la pagina durante l'attesa di spegnimento, guardia su inventario assente, codice morto tolto. Test nuovi (`-race`), sezione GPU in SECURITY.md con i rischi residui accettati (assegnazione concorrente dalla UI di Proxmox su un'altra VM, VM avviata nello stesso istante) — `internal/handlers/gpuassign.go`, `gpus.go`, `gpuassign_test.go`, `cmd/server/web/templates/index.html`, `SECURITY.md`
 - 2026-11-03 — panoramica: cella KPI "GPU" (assegnate / totali, libere e tramite mapping) tra RAM e task, solo informativa (non entra nel meteo), cliccabile verso la pagina GPU, assente dove non ci sono schede; branch `feat/vm-gpu` e `feat/gpu-assign` cancellati — richiesta utente — `cmd/server/web/templates/index.html`, `CLAUDE.md`
 - 2026-11-03 — nuovo tema "spiderman" (blu del costume + rosso, pericolo rosa e attenzione oro per non confondere il marchio con gli stati): whitelist `config.themes`, CSS `html.spiderman`, tessera in Impostazioni, `applyTheme`, media query chiara, test — richiesta utente — `internal/config/config.go`, `config_test.go`, `cmd/server/main_test.go`, `cmd/server/web/templates/index.html`, `CLAUDE.md`
+- 2026-11-03 — avvio Report v2: branch `feat/reports-v2`, decisioni utente (pubblico manageriale = direttore e consiglio di dipartimento per valutazione e finanziamenti; PDF; a richiesta; storico massimo di Proxmox), proposta di architettura, threat model, piano a step, domande D27-D34 — richiesta utente — `CLAUDE.md`, `DOMANDE.md`
