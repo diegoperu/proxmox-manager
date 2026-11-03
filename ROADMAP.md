@@ -12,7 +12,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 |---|---|---|---|---|---|
 | 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | da fare |
 | 2 | Convertire le 22 assegnazioni GPU dirette ai mapping | l'app può gestire tutte le GPU | S (lavoro in Proxmox) | — | da fare |
-| 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | in discussione |
+| 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | specifiche pronte, da progettare |
 | 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | da fare |
 | 4 | Uso reale delle GPU (`nvidia-smi`) | report su GPU assegnate ma inutilizzate | M | helper nei guest | da fare |
 | 5 | Coda richieste dell'intranet per i report | domanda non soddisfatta nei report manageriali | M | accesso/API intranet | da fare |
@@ -45,7 +45,8 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
   - **Riserva di RAM per nodo** = la memoria che non si puo' assegnare alle VM perche' serve all'host: sistema operativo e Proxmox (proposta 8 GB), **piu' i demoni Ceph** che girano sul nodo (ogni OSD usa circa 4 GB di memoria di default, piu' MON/MGR se presenti). Proposta: **calcolo automatico** = 8 GB + 4 GB per ogni OSD del nodo (il numero di OSD si legge da Ceph, gia' disponibile), con **valore modificabile** nella pagina (e per nodo, se servisse). RAM assegnabile = RAM fisica - riserva; **nessun overbooking** sopra questo valore.
   - **Tetto di CPU** = quanto si accetta di caricare i processori. Due misure: (a) **rapporto vCPU assegnate / core fisici** (overcommit di CPU, e' ammesso a differenza della RAM: proposta massimo **4 vCPU per core**), (b) **uso reale** (p95 sulle ultime 4 settimane): proposta **non portare un nodo oltre l'80% di CPU p95** dopo lo spostamento. La CPU e' secondaria alla RAM: serve solo a non creare un nodo saturo mentre si pareggia la RAM.
   - Da confermare o cambiare i tre numeri: **8 GB** per l'host, **4 GB per OSD**, **4 vCPU per core** e **80% di CPU p95**.
-- **Domande ancora aperte:** quanta riserva e quale tetto (sopra). di RAM per host e Ceph; tetto di CPU; migrazione a caldo o a freddo e finestre di manutenzione; uso del reale (p95) oltre all'assegnato; simulazione "e se spengo il nodo X".
+- **Approvato (2026-11-03):** riserva RAM = 8 GB + 4 GB per OSD (automatica, modificabile) come **blocco duro**; CPU 4 vCPU per core e 80% p95 come **avviso non bloccante** (il piano e il nodo consigliato possono superarli ma segnalano "attenzione CPU" con il motivo).
+- **Domande aperte:** nessuna sui parametri; resta il progetto dell'algoritmo e del simulatore (Opus) prima del codice. di RAM per host e Ceph; tetto di CPU; migrazione a caldo o a freddo e finestre di manutenzione; uso del reale (p95) oltre all'assegnato; simulazione "e se spengo il nodo X".
 - **Passi proposti:** (1) domande e specifiche, (2) algoritmo e simulatore con dati di prova e test dei casi limite (Opus alto), (3) endpoint del piano in sola lettura, (4) pagina con piano e conferma passo-passo (Sonnet alto), (5) revisione di sicurezza e prova reale su VM indicate dall'utente (Opus medio).
 - **Rischi:** una migrazione a caldo carica rete e storage; il piano non deve mai superare la RAM fisica; il piano si ricalcola subito prima di ogni passo (lo stato cambia).
 
