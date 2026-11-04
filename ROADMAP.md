@@ -10,7 +10,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 
 | # | Estensione | Valore | Dim. | Dipende da | Stato |
 |---|---|---|---|---|---|
-| 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | decisioni prese (D35-D42), piano in `CLAUDE.md`, step 1 da fare |
+| 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | fatto sul branch `feat/group-tags` (prova reale ok 2026-11-04), da rilasciare |
 | 2 | Convertire le 22 assegnazioni GPU dirette ai mapping | l'app può gestire tutte le GPU | S (lavoro in Proxmox) | — | da fare |
 | 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | specifiche pronte, da progettare |
 | 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | da fare |

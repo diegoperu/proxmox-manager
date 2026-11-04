@@ -84,7 +84,7 @@ The server writes one small snapshot per cluster per day into the SQLite file (`
 
 `GET /api/groups` reads; `PUT /api/nodes/{node}/{qemu|lxc}/{vmid}/groups` writes the `tags` field of one VM/container config, and nothing else.
 
-- Only `gruppo-<name>` tags are replaced; every other tag is re-sent as it was (text and order; separators normalised to `;`, as Proxmox stores them). A write never drops tags beyond the read limit.
+- Only `gruppo-<name>` tags are replaced; every other tag is re-sent as it was (text; separators normalised to `;`; Proxmox itself re-sorts the tags on save, verified 2026-11-04). A write never drops tags beyond the read limit.
 - Input: whitelisted node, kind (`qemu|lxc`), VMID, at most 4 groups `[a-z0-9]{1,32}` (not `altro`), unknown JSON fields refused, body capped at 4 KB. Group names are the only request data that reach the config, so no other tag can be injected.
 - Every write reads the config fresh, refuses templates (a clone copies tags, so a group on a template would spread) and locked VMs, and sends the config `digest`: a VM changed in between is refused, never overwritten.
 - A group that does not exist yet on any (non-template) VM is written only if the client names it in `confirm_new` (stops typos turning into fake groups in the reports); the page asks the user first.
