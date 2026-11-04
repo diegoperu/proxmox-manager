@@ -252,7 +252,7 @@ def route(path):
             v = next((x for x in VMS if x["vmid"] == int(seg[1])), None)
             if not v: return None
             if seg[2] == "status" and len(seg) > 3 and seg[3] == "current":
-                return dict(status=v["status"], mem=v["mem"], maxmem=v["maxmem"], cpu=v["cpu"], uptime=3600 * 30, name=v["name"], vmid=v["vmid"])
+                return dict(status=v["status"], mem=v["mem"], maxmem=v["maxmem"], cpu=v["cpu"], uptime=3600 * 30, cpus=v.get("maxcpu", 4), maxdisk=v.get("maxdisk", 0), name=v["name"], vmid=v["vmid"])
             if seg[2] == "config":
                 key = "ipconfig0" if seg[0] == "qemu" else "net0"
                 val = f"ip={v['ip']}/24,gw=10.75.4.254" if v["ip"] else ""
