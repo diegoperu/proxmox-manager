@@ -21,20 +21,21 @@ import (
 // "ceph" storage, a template 9000 on n1, two NVIDIA cards on n2 (g1 free, g2 used by VM 50 directly).
 // Cluster resources are derived from the VMs, so the RAM check sees what the procedure creates.
 type fakeProv struct {
-	mu        sync.Mutex
-	vms       map[int]*fvm
-	ver       map[int]int
-	writes    []string // "op vmid key=value..." (no secret values: they are recorded as ***)
-	cloudInit url.Values
-	execs     [][]string
-	agentUp   bool
-	agentFrom time.Time // agent answers only after this time
-	probes    int
-	userExit  int
-	failClone bool
-	failStart int // the next N start requests fail
-	onClone   func()
-	nextID    int
+	mu           sync.Mutex
+	vms          map[int]*fvm
+	ver          map[int]int
+	writes       []string // "op vmid key=value..." (no secret values: they are recorded as ***)
+	cloudInit    url.Values
+	execs        [][]string
+	agentUp      bool
+	agentFrom    time.Time // agent answers only after this time
+	probes       int
+	userExit     int
+	failClone    bool
+	failStart    int // the next N start requests fail
+	onClone      func()
+	nextID       int
+	extraStorage bool // a non shared "local" storage on n1
 }
 
 type fvm struct {
@@ -46,7 +47,7 @@ type fvm struct {
 func newFakeProv() *fakeProv {
 	return &fakeProv{
 		vms: map[int]*fvm{
-			9000: {node: "n1", name: "tpl", status: "stopped", template: true, cfg: map[string]string{"virtio0": "ceph:base-9000-disk-1,cache=writeback,size=32G", "memory": "1024", "cores": "1", "cpu": "host"}},
+			9000: {node: "n1", name: "tpl", status: "stopped", template: true, cfg: map[string]string{"virtio0": "ceph:base-9000-disk-1,cache=writeback,size=32G", "efidisk0": "ceph:base-9000-disk-0,size=1M", "ide2": "ceph:vm-9000-cloudinit,media=cdrom", "memory": "1024", "cores": "1", "cpu": "host"}},
 			50:   {node: "n2", name: "gpu-user", status: "running", cfg: map[string]string{"memory": "20480", "cores": "4", "hostpci0": "0000:02:00"}},
 			51:   {node: "n1", name: "app", status: "running", cfg: map[string]string{"memory": "10240", "cores": "2", "tags": "gruppo-rossi"}},
 		},
@@ -75,6 +76,9 @@ func (f *fakeProv) GetClusterResources(t string) (json.RawMessage, error) {
 			map[string]interface{}{"type": "node", "node": "n2", "status": "online", "maxmem": g(100), "maxcpu": 16},
 			map[string]interface{}{"type": "storage", "node": "n1", "storage": "ceph", "shared": 1, "status": "available", "content": "images"},
 			map[string]interface{}{"type": "storage", "node": "n2", "storage": "ceph", "shared": 1, "status": "available", "content": "images"})
+		if f.extraStorage {
+			list = append(list, map[string]interface{}{"type": "storage", "node": "n1", "storage": "local", "shared": 0, "status": "available", "content": "images"})
+		}
 	}
 	for id, v := range f.vms {
 		mem, _ := strconv.Atoi(v.cfg["memory"])
@@ -587,7 +591,7 @@ func TestProvisionConcurrentCreationsDoNotOverbook(t *testing.T) {
 				case err == nil:
 					ok++
 					jobs = append(jobs, j)
-				case errors.As(err, &ref) && ref.Reason == "node_not_eligible":
+				case errors.As(err, &ref) && (ref.Reason == "node_not_eligible" || ref.Reason == "busy"):
 					refused++
 				default:
 					t.Errorf("round %d: %v", round, err)
@@ -600,6 +604,12 @@ func TestProvisionConcurrentCreationsDoNotOverbook(t *testing.T) {
 		}
 		if ok != 1 || refused != 1 {
 			t.Fatalf("round %d: ok=%d refused=%d", round, ok, refused)
+		}
+		// once the first one has set its RAM, a new request is refused for RAM, not for being busy
+		_, err := startProv(f, 9, "C", mustPlanProv(t, r), noOpts, time.Now())
+		var ref *provRefusal
+		if !errors.As(err, &ref) || ref.Reason != "node_not_eligible" {
+			t.Fatalf("round %d: after the first: %v", round, err)
 		}
 	}
 }
@@ -714,4 +724,84 @@ func (l *lockedBuf) String() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.b.String()
+}
+
+func TestProvisionReviewRefusals(t *testing.T) {
+	provFast(t)
+	cases := map[string]struct {
+		mut    func(*fakeProv, *provReq)
+		reason string
+	}{
+		// a normal VM is not cloned (its data would end up in a VM with new users and keys)
+		"not a template": {func(f *fakeProv, r *provReq) {
+			r.TemplateNode, r.TemplateVMID = "n1", 51
+			f.vms[51].cfg["virtio0"] = "ceph:vm-51-disk-0,size=10G"
+		}, "not_template"},
+		// the cloud-init drive is not a disk to resize
+		"cdrom as disk": {func(f *fakeProv, r *provReq) { r.DiskDevice = "ide2" }, "template_disk"},
+		// an EFI disk on a storage the target cannot reach
+		"local EFI disk": {func(f *fakeProv, r *provReq) { f.vms[9000].cfg["efidisk0"] = "local:base-9000-disk-0,size=1M" }, "node_not_eligible"},
+	}
+	for name, c := range cases {
+		f := newFakeProv()
+		r := baseReq()
+		c.mut(f, &r)
+		_, err := startProv(f, 11, "C", mustPlanProv(t, r), noOpts, time.Now())
+		var ref *provRefusal
+		if !errors.As(err, &ref) || ref.Reason != c.reason {
+			t.Errorf("%s: %v", name, err)
+		}
+		if w := f.log(); w != "" {
+			t.Errorf("%s: written:\n%s", name, w)
+		}
+	}
+	// the local EFI disk is fine when the target IS the template's node
+	f := newFakeProv()
+	f.vms[9000].cfg["efidisk0"] = "local:base-9000-disk-0,size=1M"
+	f.mu.Lock()
+	f.extraStorage = true
+	f.mu.Unlock()
+	r := baseReq()
+	r.TargetNode = "n1"
+	j, err := startProv(f, 11, "C", mustPlanProv(t, r), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := waitProv(t, j); v.Result != provOK {
+		t.Fatalf("%+v", v)
+	}
+}
+
+func TestProvisionCloneRefusedIsNeverOurs(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.failClone = true // refused before starting, e.g. the VMID was just taken
+	f.vms[200] = &fvm{node: "n2", name: "someone-else", status: "running", cfg: map[string]string{"memory": "1024", "cores": "1"}}
+	j, err := startProv(f, 12, "C", mustPlanProv(t, baseReq()), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := waitProv(t, j); v.Result != provFailed || v.VMCreated {
+		t.Fatalf("someone else's VM reported as ours: %+v", v)
+	}
+}
+
+func TestValidateProvIPv4Mapped(t *testing.T) {
+	for _, ip := range []string{"::ffff:10.0.0.1/120", "10.0.0.1/0", "10.0.0.1/33"} {
+		r := baseReq()
+		r.IP = ip
+		if _, err := validateProvReq(r); err == nil {
+			t.Errorf("%s accepted", ip)
+		}
+	}
+}
+
+func TestTemplateStorages(t *testing.T) {
+	got := templateStorages(map[string]interface{}{
+		"virtio0": "ceph:base-1-disk-1,size=32G", "efidisk0": "ceph:base-1-disk-0", "ide2": "local:iso/x.iso,media=cdrom",
+		"tpmstate0": "fast:vm-1-tpm", "net0": "virtio=AA,bridge=vmbr0", "scsi1": "none,media=cdrom", "unused0": "other:vm-1-disk-9", "name": "x",
+	})
+	if strings.Join(got, ",") != "ceph,fast,local" {
+		t.Fatalf("%v", got)
+	}
 }

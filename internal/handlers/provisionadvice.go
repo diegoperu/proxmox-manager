@@ -52,13 +52,13 @@ type adviceQuery struct {
 	MemMB        int64
 	Cores        int
 	GPU          bool
-	Storage      string
+	Storages     []string // storages of the template's volumes: all must be reachable from the node
 	TemplateNode string
 	Group        string
 }
 
 func (q adviceQuery) key() string {
-	return fmt.Sprintf("%d|%d|%t|%s|%s|%s", q.MemMB, q.Cores, q.GPU, q.Storage, q.TemplateNode, q.Group)
+	return fmt.Sprintf("%d|%d|%t|%s|%s|%s", q.MemMB, q.Cores, q.GPU, strings.Join(q.Storages, ","), q.TemplateNode, q.Group)
 }
 
 func parseAdviceQuery(q func(string) string) (adviceQuery, error) {
@@ -75,11 +75,22 @@ func parseAdviceQuery(q func(string) string) (adviceQuery, error) {
 	if out.GPU, err = boolParam(q("gpu"), false); err != nil {
 		return out, errors.New("gpu non valido")
 	}
-	if s := q("storage"); s != "" {
-		if !storageNamePattern.MatchString(s) {
+	if s := q("storage"); s != "" { // one storage, or several separated by commas (at most 8)
+		parts := strings.Split(s, ",")
+		if len(parts) > 8 {
 			return out, errors.New("storage non valido")
 		}
-		out.Storage = s
+		seen := map[string]bool{}
+		for _, x := range parts {
+			if !storageNamePattern.MatchString(x) {
+				return out, errors.New("storage non valido")
+			}
+			if !seen[x] {
+				seen[x] = true
+				out.Storages = append(out.Storages, x)
+			}
+		}
+		sort.Strings(out.Storages)
 	}
 	if s := q("template_node"); s != "" {
 		if !nodeNamePattern.MatchString(s) {
@@ -226,16 +237,22 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 
 	// reasons known here, per node: storage, and a free card with a mapping when a GPU is wanted
 	extra := map[string][]string{}
-	if q.Storage != "" {
-		for _, n := range nodes {
-			st, ok := storages[q.Storage][n.name]
+	for _, n := range nodes {
+		seen := map[string]bool{}
+		for _, sid := range q.Storages {
+			st, ok := storages[sid][n.name]
+			code := ""
 			switch {
 			case !ok || !st.Online:
-				extra[n.name] = append(extra[n.name], adviceStorageUnavailable)
-			case !st.Images:
-				extra[n.name] = append(extra[n.name], adviceStorageNoImages)
+				code = adviceStorageUnavailable
+			case !st.Images && sid == q.Storages[0] && len(q.Storages) == 1:
+				code = adviceStorageNoImages
 			case !st.Shared && n.name != q.TemplateNode:
-				extra[n.name] = append(extra[n.name], adviceStorageNotShared)
+				code = adviceStorageNotShared
+			}
+			if code != "" && !seen[code] {
+				seen[code] = true
+				extra[n.name] = append(extra[n.name], code)
 			}
 		}
 	}

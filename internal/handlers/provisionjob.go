@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,7 +155,10 @@ func validateProvReq(r provReq) (provPlan, error) {
 		if err != nil || addr.To4() == nil {
 			return bad("IP (IPv4, es. 10.75.4.20/24)")
 		}
-		ones, _ := nw.Mask.Size()
+		ones, bits := nw.Mask.Size()
+		if bits != 32 || ones < 1 { // "::ffff:a.b.c.d/120" parses as IPv4 with a 128-bit mask
+			return bad("IP (IPv4 con prefisso 1-32, es. 10.75.4.20/24)")
+		}
 		p.ipcfg = "ip=" + addr.String() + "/" + strconv.Itoa(ones)
 		if r.Gateway != "" {
 			gw := net.ParseIP(r.Gateway)
@@ -483,12 +487,24 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 	if json.Unmarshal(raw, &tcfg) != nil {
 		return "", &provRefusal{Reason: "template", Msg: "template non leggibile"}
 	}
+	// only templates are cloned (same rule as the template list of the page): a normal VM would be copied
+	// with its data into a VM with new users and keys
+	tname, _ := tcfg["name"].(string)
+	if !isTemplateRes(map[string]interface{}{"template": tcfg["template"], "name": tname}) {
+		return "", &provRefusal{Reason: "not_template", Msg: "la sorgente non e' un template"}
+	}
 	disk, _ := tcfg[p.DiskDevice].(string)
 	i := strings.IndexByte(disk, ':')
-	if i <= 0 || !storageNamePattern.MatchString(disk[:i]) {
+	if i <= 0 || !storageNamePattern.MatchString(disk[:i]) || strings.Contains(disk, "media=cdrom") {
 		return "", &provRefusal{Reason: "template_disk", Msg: "il template non ha il disco " + p.DiskDevice}
 	}
 	p.storage = disk[:i]
+	// every volume of the template (disks, EFI, TPM, cloud-init drive, ISO) must be reachable from the target:
+	// a full clone with "target" copies all of them
+	storages := templateStorages(tcfg)
+	if len(storages) > 8 {
+		return "", &provRefusal{Reason: "template_disk", Msg: "il template usa troppi storage diversi"}
+	}
 	if gb, ok := diskSizeGB(disk); ok {
 		p.curDisk = gb
 	}
@@ -512,7 +528,7 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 		}
 		inv = &fresh
 	}
-	q := adviceQuery{MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storage: p.storage, TemplateNode: p.TemplateNode}
+	q := adviceQuery{MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storages: storages, TemplateNode: p.TemplateNode}
 	if len(p.groups) > 0 {
 		q.Group = p.groups[0]
 	}
@@ -545,6 +561,28 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 		return "", &provRefusal{Reason: "card_unavailable", Msg: "il mapping non punta a una scheda di questo nodo"}
 	}
 	return "", &provRefusal{Reason: "node_not_eligible", Msg: "nodo sconosciuto"}
+}
+
+var templateVolumeKey = regexp.MustCompile(`^((virtio|scsi|sata|ide)[0-9]{1,2}|efidisk[0-9]|tpmstate[0-9])$`)
+
+// templateStorages lists the storages of every volume of a template config ("storage:volume,..."), sorted.
+func templateStorages(cfg map[string]interface{}) []string {
+	set := map[string]bool{}
+	for k, v := range cfg {
+		s, _ := v.(string)
+		if !templateVolumeKey.MatchString(k) || s == "" || strings.HasPrefix(s, "none") {
+			continue
+		}
+		if i := strings.IndexByte(s, ':'); i > 0 && storageNamePattern.MatchString(s[:i]) {
+			set[s[:i]] = true
+		}
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func nextVMID(c provAPI) (int, error) {
@@ -585,6 +623,24 @@ func vmidInUse(c provAPI, vmid int) (bool, error) {
 	return false, nil
 }
 
+// vmNamed reports whether VMID exists in the cluster with exactly this name.
+func vmNamed(c provAPI, vmid int, name string) (bool, error) {
+	raw, err := c.GetClusterResources("vm")
+	if err != nil {
+		return false, err
+	}
+	var list []map[string]interface{}
+	if json.Unmarshal(raw, &list) != nil {
+		return false, errors.New("elenco delle VM non leggibile")
+	}
+	for _, r := range list {
+		if n, _ := r["name"].(string); int(intField(r, "vmid")) == vmid && n == name {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // runProv executes the procedure. createLock is held by the caller and released here once the RAM is set.
 func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsFor func(string) string) {
 	var once sync.Once
@@ -608,12 +664,14 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		params.Set("target", node)
 	}
 	raw, err := c.VMClone(p.TemplateNode, p.TemplateVMID, vmid, params)
-	if err == nil {
-		err = waitTask(c, raw, provTiming.Clone)
-	}
 	if err != nil {
-		// a failed clone task may still leave a VM: say so if it exists
-		if _, serr := coldVMState(c, node, vmid); serr == nil {
+		// refused before starting (e.g. the VMID was just taken by someone else): any VM with this id is not ours
+		j.fail(provPhClone, err)
+		return
+	}
+	if err = waitTask(c, raw, provTiming.Clone); err != nil {
+		// the clone started and failed: a leftover VM is ours only if it carries the name we gave it
+		if ours, _ := vmNamed(c, vmid, p.Name); ours {
 			j.mu.Lock()
 			j.vmCreated = true
 			j.mu.Unlock()
@@ -809,14 +867,19 @@ func (h *Handler) PostProvisionJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json") // before WriteHeader: headers set later are dropped
 	w.WriteHeader(http.StatusAccepted)
-	writeJSON(w, map[string]interface{}{"job": st.ID, "vmid": st.vmid})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"job": st.ID, "vmid": st.vmid})
 }
 
 // startProv runs the checks, reserves the card and starts the procedure. Testable without HTTP.
 func startProv(c provAPI, idx int, label string, plan provPlan, optionsFor func(string) string, now time.Time) (*provJob, error) {
 	lock := provCreateLock(idx)
-	lock.Lock()
+	if !lock.TryLock() {
+		// held from the check to the RAM setting, clone included (seconds, minutes for a big template):
+		// refuse rather than queue HTTP requests behind it
+		return nil, &provRefusal{Reason: "busy", Msg: "un'altra creazione sta partendo su questo cluster: riprova tra poco"}
+	}
 	release := true
 	defer func() {
 		if release {

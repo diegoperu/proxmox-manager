@@ -858,7 +858,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.137.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.138.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -4374,7 +4374,8 @@ const Provision=(()=>{
   const WARN={cpu_vcpu:'molte vCPU gia\' assegnate (oltre 4 per thread)',cpu_p95:'CPU reale gia\' alta (oltre l\'80%)'};
   const val=id=>document.getElementById(id).value.trim();
   const tplNow=()=>templates[parseInt(document.getElementById('tpl-select').value)];
-  const tplStorage=tpl=>{const d=tpl&&tpl.config&&tpl.config[val('pv-diskdev')||'scsi0'];const i=typeof d==='string'?d.indexOf(':'):-1;return i>0?d.slice(0,i):'';};
+  // storage di tutti i volumi del template (dischi, EFI, TPM, cloud-init, ISO): come il controllo del server
+  const tplStorages=tpl=>{const out=new Set();if(!tpl||!tpl.config)return[];for(const[k,v]of Object.entries(tpl.config)){if(!/^((virtio|scsi|sata|ide)\d{1,2}|efidisk\d|tpmstate\d)$/.test(k)||typeof v!=='string'||v.startsWith('none'))continue;const i=v.indexOf(':');if(i>0&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v.slice(0,i)))out.add(v.slice(0,i));}return[...out].sort().slice(0,8);};
 
   return{
     async load(){
@@ -4540,7 +4541,7 @@ const Provision=(()=>{
       const ram=parseFloat(val('pv-ram')), cores=parseInt(val('pv-cpu'));
       if(!tpl||!(ram>0)||!(cores>0)){adv=null;box.innerHTML='<span class="td">Scegli un template e indica core e RAM.</span>';Provision.summary();return;}
       const p=new URLSearchParams({memory_mb:String(Math.round(ram*1024)),cores:String(cores),template_node:tpl.node});
-      const st=tplStorage(tpl); if(st)p.set('storage',st);
+      const st=tplStorages(tpl); if(st.length)p.set('storage',st.join(','));
       if(document.getElementById('pv-gpu').checked)p.set('gpu','1');
       const gp=Groups.parse(val('pv-group')); if(gp.ok&&gp.groups.length===1)p.set('group',gp.groups[0]);
       box.innerHTML='<span class="td">Calcolo del nodo consigliato…</span>';
