@@ -113,30 +113,38 @@ type cephOverview struct {
 }
 
 type cephOSD struct {
-	ID        int     `json:"id"`
-	Name      string  `json:"name"`
-	Host      string  `json:"host"`
-	Class     string  `json:"class"`
-	Status    string  `json:"status"` // up | down
-	In        bool    `json:"in"`
-	Percent   float64 `json:"percent"`
-	Used      int64   `json:"used"`
-	Total     int64   `json:"total"`
-	PGs       int     `json:"pgs"`
-	LatencyMs float64 `json:"latency_ms"`
+	ID        int      `json:"id"`
+	Name      string   `json:"name"`
+	Host      string   `json:"host"`
+	Class     string   `json:"class"`
+	Status    string   `json:"status"` // up | down
+	In        bool     `json:"in"`
+	Percent   float64  `json:"percent"`
+	Used      int64    `json:"used"`
+	Total     int64    `json:"total"`
+	PGs       int      `json:"pgs"`
+	LatencyMs float64  `json:"latency_ms"`
+	Pools     []string `json:"pools"` // pools whose CRUSH rule places data on this OSD (empty if the map is unreadable)
+	Group     string   `json:"group"` // key of the cephOSDGroup it belongs to
+	buckets   []string // CRUSH ancestors (host, root, ...) from the OSD tree
+	group     int
 }
 
 type cephPool struct {
-	Name      string   `json:"name"`
-	Type      string   `json:"type"`
-	Size      int      `json:"size"`
-	MinSize   int      `json:"min_size"`
-	PGNum     int      `json:"pg_num"`
-	Used      int64    `json:"used"`
-	Percent   float64  `json:"percent"`
-	Rule      string   `json:"rule"`
-	Apps      []string `json:"apps"`
-	Autoscale string   `json:"autoscale"`
+	Name       string   `json:"name"`
+	Type       string   `json:"type"`
+	Size       int      `json:"size"`
+	MinSize    int      `json:"min_size"`
+	PGNum      int      `json:"pg_num"`
+	Used       int64    `json:"used"`
+	Percent    float64  `json:"percent"`
+	Rule       string   `json:"rule"`
+	Apps       []string `json:"apps"`
+	Autoscale  string   `json:"autoscale"`
+	OSDs       int      `json:"osds"`        // OSDs its rule selects
+	Classes    []string `json:"classes"`     // device classes of those OSDs
+	AllClasses bool     `json:"all_classes"` // the rule does not filter by device class
+	Mapped     bool     `json:"mapped"`      // false = rule unknown or matching no OSD
 }
 
 type cephService struct {
@@ -155,13 +163,14 @@ type cephFlag struct {
 
 type cephFull struct {
 	cephOverview
-	OSDs    []cephOSD     `json:"osds"`
-	Pools   []cephPool    `json:"pools"`
-	Mons    []cephService `json:"mons"`
-	Mgrs    []cephService `json:"mgrs"`
-	Mdss    []cephService `json:"mdss"`
-	Flags   []cephFlag    `json:"flags"`
-	Partial []string      `json:"partial"` // parts that could not be read (the rest is still valid)
+	OSDs    []cephOSD      `json:"osds"`
+	Pools   []cephPool     `json:"pools"`
+	Mons    []cephService  `json:"mons"`
+	Mgrs    []cephService  `json:"mgrs"`
+	Mdss    []cephService  `json:"mdss"`
+	Flags   []cephFlag     `json:"flags"`
+	Groups  []cephOSDGroup `json:"osd_groups"`
+	Partial []string       `json:"partial"` // parts that could not be read (the rest is still valid)
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -404,8 +413,8 @@ func normalizeCephOSDs(raw json.RawMessage) []cephOSD {
 		return out
 	}
 	seen := map[int]bool{}
-	var walk func(n map[string]interface{}, depth int)
-	walk = func(n map[string]interface{}, depth int) {
+	var walk func(n map[string]interface{}, depth int, path []string)
+	walk = func(n map[string]interface{}, depth int, path []string) {
 		if depth > 8 || len(out) >= cephMaxOSDs {
 			return
 		}
@@ -422,20 +431,24 @@ func normalizeCephOSDs(raw json.RawMessage) []cephOSD {
 			out = append(out, cephOSD{ID: id, Name: clampText(asString(n["name"]), 32), Host: clampText(asString(n["host"]), 64),
 				Class: clampText(asString(n["device_class"]), 16), Status: st, In: parseBoolish(n["in"]),
 				Percent: round1v(asFloat(n["percent_used"])), Used: i64(asFloat(n["bytes_used"])), Total: i64(asFloat(n["total_space"])),
-				PGs: int(num(asFloat(n["pgs"]))), LatencyMs: round1v(asFloat(n["apply_latency_ms"]))})
+				PGs: int(num(asFloat(n["pgs"]))), LatencyMs: round1v(asFloat(n["apply_latency_ms"])),
+				Pools: []string{}, buckets: append([]string(nil), path...)})
 			return
+		}
+		if name := asString(n["name"]); name != "" && len(path) < 16 {
+			path = append(path[:len(path):len(path)], clampText(name, 64))
 		}
 		if ch, ok := n["children"].([]interface{}); ok {
 			for _, c := range ch {
 				if m, ok := c.(map[string]interface{}); ok {
-					walk(m, depth+1)
+					walk(m, depth+1, path)
 				}
 			}
 		}
 	}
 	var root map[string]interface{}
 	if json.Unmarshal(tree.Root, &root) == nil {
-		walk(root, 0)
+		walk(root, 0, nil)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Host != out[j].Host {
@@ -500,7 +513,7 @@ func normalizeCephPools(raw json.RawMessage) []cephPool {
 		out = append(out, cephPool{Name: clampText(asString(p["pool_name"]), 64), Type: clampText(asString(p["type"]), 16),
 			Size: int(num(asFloat(p["size"]))), MinSize: int(num(asFloat(p["min_size"]))), PGNum: int(num(asFloat(p["pg_num"]))),
 			Used: i64(asFloat(p["bytes_used"])), Percent: round1v(asFloat(p["percent_used"]) * 100),
-			Rule: clampText(asString(p["crush_rule_name"]), 64), Apps: apps, Autoscale: clampText(asString(p["pg_autoscale_mode"]), 16)})
+			Rule: clampText(asString(p["crush_rule_name"]), 64), Apps: apps, Autoscale: clampText(asString(p["pg_autoscale_mode"]), 16), Classes: []string{}})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
@@ -579,6 +592,7 @@ type cephAPI interface {
 	GetCephPools(node string) (json.RawMessage, error)
 	GetCephServices(node, kind string) (json.RawMessage, error)
 	GetCephFlags() (json.RawMessage, error)
+	GetCephCrush(node string) (json.RawMessage, error)
 }
 
 var _ cephAPI = (*api.Client)(nil)
@@ -652,10 +666,10 @@ func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 	ov, err := fetchCephOverview(c, now)
 	if err != nil || !ov.Available {
 		return cephFull{cephOverview: ov, OSDs: []cephOSD{}, Pools: []cephPool{}, Mons: []cephService{}, Mgrs: []cephService{},
-			Mdss: []cephService{}, Flags: []cephFlag{}, Partial: []string{}}, err
+			Mdss: []cephService{}, Flags: []cephFlag{}, Groups: []cephOSDGroup{}, Partial: []string{}}, err
 	}
 	full := cephFull{cephOverview: ov, OSDs: []cephOSD{}, Pools: []cephPool{}, Mons: []cephService{}, Mgrs: []cephService{},
-		Mdss: []cephService{}, Flags: []cephFlag{}, Partial: []string{}}
+		Mdss: []cephService{}, Flags: []cephFlag{}, Groups: []cephOSDGroup{}, Partial: []string{}}
 	// The OSD tree decides the node: the first candidate that answers is used for the other per-node calls.
 	node := ""
 	if cands, err := cephNodeCandidates(c, ov.quorum); err == nil {
@@ -675,6 +689,7 @@ func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	var rules map[string][]crushTake
 	part := func(name string, fn func() (json.RawMessage, error), apply func(json.RawMessage)) {
 		wg.Add(1)
 		go func() {
@@ -693,10 +708,21 @@ func fetchCephFull(c cephAPI, now time.Time) (cephFull, error) {
 		part("pools", func() (json.RawMessage, error) { return c.GetCephPools(node) }, func(r json.RawMessage) { full.Pools = normalizeCephPools(r) })
 		part("mon", func() (json.RawMessage, error) { return c.GetCephServices(node, "mon") }, func(r json.RawMessage) { full.Mons = normalizeCephServices(r) })
 		part("mgr", func() (json.RawMessage, error) { return c.GetCephServices(node, "mgr") }, func(r json.RawMessage) { full.Mgrs = normalizeCephServices(r) })
+		part("crush", func() (json.RawMessage, error) { return c.GetCephCrush(node) }, func(r json.RawMessage) {
+			var text string
+			if json.Unmarshal(r, &text) == nil {
+				rules = parseCrushRules(text)
+			}
+		})
 		part("mds", func() (json.RawMessage, error) { return c.GetCephServices(node, "mds") }, func(r json.RawMessage) { full.Mdss = normalizeCephServices(r) })
 	}
 	part("flags", c.GetCephFlags, func(r json.RawMessage) { full.Flags = normalizeCephFlags(r) })
 	wg.Wait()
+	if len(rules) > 0 && len(full.Pools) > 0 && len(full.OSDs) > 0 {
+		full.Groups = mapPoolsToOSDs(full.OSDs, full.Pools, rules)
+	} else if node != "" && len(rules) == 0 && !containsStr(full.Partial, "crush") {
+		full.Partial = append(full.Partial, "crush")
+	}
 	sort.Strings(full.Partial)
 	return full, nil
 }

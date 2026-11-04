@@ -91,6 +91,7 @@ type fakeCeph struct {
 	noCeph    map[string]bool
 	mu        sync.Mutex // per-node calls run in parallel
 	calls     []string
+	crush     string // CRUSH map text; "" = unreadable map
 }
 
 func (f *fakeCeph) GetNodes() (json.RawMessage, error) {
@@ -114,6 +115,9 @@ func (f *fakeCeph) per(node, what string) (json.RawMessage, error) {
 		return json.RawMessage(`{"root":{"type":"root","children":[{"type":"osd","id":"0","name":"osd.0","host":"` + node + `","status":"up","in":1}]}}`), nil
 	case "pool":
 		return json.RawMessage(`[{"pool_name":"p","percent_used":0.1}]`), nil
+	case "crush":
+		b, _ := json.Marshal(f.crush)
+		return b, nil
 	}
 	return json.RawMessage(`[]`), nil
 }
@@ -122,10 +126,11 @@ func (f *fakeCeph) GetCephPools(n string) (json.RawMessage, error) { return f.pe
 func (f *fakeCeph) GetCephServices(n, k string) (json.RawMessage, error) {
 	return f.per(n, k)
 }
-func (f *fakeCeph) GetCephFlags() (json.RawMessage, error) { return json.RawMessage(`[]`), nil }
+func (f *fakeCeph) GetCephFlags() (json.RawMessage, error)         { return json.RawMessage(`[]`), nil }
+func (f *fakeCeph) GetCephCrush(n string) (json.RawMessage, error) { return f.per(n, "crush") }
 
 func TestFetchCephFullPrefersMonitorNodeAndFallsBack(t *testing.T) {
-	f := &fakeCeph{noCeph: map[string]bool{"pve2": true}}
+	f := &fakeCeph{noCeph: map[string]bool{"pve2": true}, crush: "rule r {\n step take default\n}\n"}
 	full, err := fetchCephFull(f, time.Now())
 	if err != nil {
 		t.Fatal(err)

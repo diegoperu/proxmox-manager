@@ -108,6 +108,7 @@ The only hardware write the app performs. `GET /api/gpus` and `GET .../gpu/plan`
 - Node names used in per-node paths come from `/nodes` (online only) and the monitor quorum, and must match `nodeNamePattern`; the service kind is a whitelist (`mon|mgr|mds`) in the client.
 - Every answer is normalised with caps (2000 OSD, 200 pools, 100 checks, 20 detail lines per check, 300 characters per text, control and bidi characters removed) on top of the 32 MiB response cap.
 - Server-side cache (4 s page, 10 s summary) with one Proxmox fetch at a time per cluster and view, so many open tabs polling every 5 s do not multiply the load on Proxmox. Failures are not cached, are logged with detail and answered with a generic 502.
+- Pools to OSDs (2026-11-04): the decompiled CRUSH map (`/nodes/{node}/ceph/crush`, plain text) is read only for its `rule NAME {` blocks and their `step take BUCKET [class CLASS]` lines; text over 1 MiB is ignored, at most 256 rules and 8 takes per rule, rule/bucket/class names must match `[A-Za-z0-9._-]{1,64}` (anything else is skipped, never guessed). An unreadable map is reported as `partial: crush` and the pools stay `mapped:false`.
 - A cluster without Ceph is recognised only by Proxmox's own 4xx/5xx "binary not installed / not initialized / not configured" answer; network errors stay errors.
 - In the browser every Ceph text (check messages, detail lines, names) goes through `esc()`; the Italian translations replace text only by code or anchored regular expressions on lines already capped at 300 characters.
 

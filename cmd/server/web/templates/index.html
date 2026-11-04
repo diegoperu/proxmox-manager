@@ -406,6 +406,22 @@ td.spk{width:130px}
 .osd span{position:absolute;left:0;right:0;top:2px;text-align:center;font:600 11px var(--mono);color:var(--text)}
 .osd.dn{border:1.5px dashed var(--red);background:transparent}.osd.dn span{color:var(--red)}.osd.dn i{opacity:.2}
 .osd.ot{border-style:dotted;background:transparent}.osd.ot i{display:none}
+.osd.og2{border-radius:15px}
+.osd.og3{border-radius:2px;border-top-width:4px}
+.osd.og4{border-radius:15px 15px 3px 3px}
+.osd.dim{opacity:.22}
+.ogrps{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.ogrp{display:flex;align-items:center;gap:10px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font:inherit;font-size:12px;cursor:pointer;min-width:0}
+.ogrp:hover{border-color:var(--border2)}
+.ogrp[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.ogrp b{display:block;font-size:13px}
+.ogrp small{display:block;color:var(--text3);font-size:12px;overflow-wrap:anywhere}
+.ogrp .osd{width:16px;height:22px;flex-shrink:0}
+.osub{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.osub+.osub{margin-top:6px}
+.otag{font-size:11px;font-weight:600;color:var(--text3);min-width:34px}
+.pbtn{background:none;border:0;padding:0;color:inherit;font:inherit;font-weight:700;cursor:pointer;text-align:left}
+.pbtn:hover{color:var(--accent)}.pbtn[aria-pressed=true]{color:var(--accent);text-decoration:underline}
 .olegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--text3);margin:0 0 8px}
 .olegend span{display:inline-flex;gap:6px;align-items:center}
 .olegend .osd{width:12px;height:16px;border-radius:3px}
@@ -811,7 +827,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.124.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.126.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2246,6 +2262,7 @@ const Palette={
 // la curva dell'I/O tiene 10 minuti in memoria del browser, nessun localStorage). Ogni testo esterno passa da esc().
 // ════════════════════════════════════════════════════════════════════════════
 const Ceph={
+  focus:null,       // null | {k:'g',v:chiave gruppo} | {k:'p',v:nome pool}: evidenzia gli OSD scelti, gli altri si attenuano
   POLL_MS:5000, HIST_MS:10*60*1000,
   last:{},          // ultimo riepilogo per indice cluster (panoramica)
   availBy:{},       // true/false per indice cluster, assente = non ancora noto
@@ -2486,7 +2503,7 @@ const Ceph={
     Ceph.put(Ceph.section('stations'),Ceph.stations(o));
     Ceph.put(Ceph.section('pgs'),Ceph.pgs(o));
     Ceph.put(Ceph.section('pools'),Ceph.poolsAndServices(o));
-    Ceph.put(Ceph.section('partial'),o.partial&&o.partial.length?`<p class="cnote" style="margin-top:12px">Non è stato possibile leggere: ${esc(o.partial.join(', '))}.</p>`:'');
+    Ceph.put(Ceph.section('partial'),o.partial&&o.partial.length?`<p class="cnote" style="margin-top:12px">Non è stato possibile leggere: ${esc(o.partial.map(x=>x==='crush'?'mappa CRUSH (quali OSD servono quali pool)':x).join(', '))}.</p>`:'');
     Ceph.paintStamp();
   },
 
@@ -2544,19 +2561,50 @@ const Ceph={
     return`<h2 class="sec" style="margin-top:22px">Avvisi meteo <small>controlli di salute di Ceph · ${cs.length}</small></h2><div class="panel calerts">${rows}</div>`;
   },
 
+  // Gruppi di OSD (stessi pool serviti) dalla mappa CRUSH: sigla = classe del dispositivo; se due gruppi hanno la stessa classe si aggiunge il primo pool.
+  groups(o){
+    const gs=Array.isArray(o.osd_groups)?o.osd_groups:[];
+    const base=gs.map(g=>(g.classes&&g.classes.length?g.classes.join('+').toUpperCase():'OSD'));
+    return gs.map((g,i)=>({...g,idx:i%4+1,label:base.filter(x=>x===base[i]).length>1?`${base[i]} · ${(g.pools||[])[0]||'?'}`:base[i]}));
+  },
+  isOn(x){
+    const f=Ceph.focus; if(!f)return true;
+    return f.k==='g'?x.group===f.v:(x.pools||[]).includes(f.v);
+  },
+  setFocus(k,v){
+    const f=Ceph.focus;
+    Ceph.focus=(!k||(f&&f.k===k&&f.v===v))?null:{k,v};
+    if(Ceph.data&&Ceph.data.available){Ceph.put(Ceph.section('stations'),Ceph.stations(Ceph.data));Ceph.put(Ceph.section('pools'),Ceph.poolsAndServices(Ceph.data));}
+  },
   stations(o){
     const osds=o.osds||[]; if(!osds.length)return'';
+    const gs=Ceph.groups(o), gmap={}; for(const g of gs)gmap[g.key]=g;
+    // un focus su un gruppo/pool che non esiste piu' (cluster cambiato) non deve attenuare tutto
+    if(Ceph.focus&&!osds.some(Ceph.isOn))Ceph.focus=null;
     const hosts=[]; const by={};
     for(const x of osds){if(!by[x.host]){by[x.host]=[];hosts.push(x.host);}by[x.host].push(x);}
     const tile=x=>{
-      const cls=x.status==='down'?'dn':!x.in?'ot':'', fill=x.percent>=85?'r':x.percent>=75?'w':'';
+      const g=gmap[x.group], cls=x.status==='down'?'dn':!x.in?'ot':'', fill=x.percent>=85?'r':x.percent>=75?'w':'';
       const word=x.status==='down'?'giù':!x.in?'fuori dal cluster':'attivo';
-      const t=`${x.name} · ${x.class||'?'} · ${Math.round(x.percent)}% usato · ${word}`;
-      return`<div class="osd ${cls}" role="img" aria-label="${esc(t)}" title="${esc(t)}"><i class="${fill}" style="height:${Math.min(100,Math.max(0,x.percent))}%"></i><span>${esc(x.id)}</span></div>`;
+      const pl=(x.pools||[]).length?` · pool: ${x.pools.join(', ')}`:'';
+      const t=`${x.name} · ${g?g.label:(x.class||'?')} · ${Math.round(x.percent)}% usato · ${word}${pl}`;
+      return`<div class="osd ${cls}${g?' og'+g.idx:''}${Ceph.isOn(x)?'':' dim'}" role="img" aria-label="${esc(t)}" title="${esc(t)}"><i class="${fill}" style="height:${Math.min(100,Math.max(0,x.percent))}%"></i><span>${esc(x.id)}</span></div>`;
     };
     const rows=hosts.map(h=>{const l=by[h], up=l.filter(x=>x.status==='up').length;
-      return`<div class="srow"><div class="sn">${esc(h)}<small>${up}/${l.length} OSD attivi</small></div><div class="otiles">${l.map(tile).join('')}</div></div>`;}).join('');
-    return`<h2 class="sec" style="margin-top:22px">Stazioni OSD <small>un nodo per riga, una tessera per OSD: il riempimento è lo spazio usato</small></h2>
+      let tiles;
+      if(gs.length>1){
+        const order=[...new Set(l.map(x=>x.group))].sort();
+        tiles=order.map(k=>`<div class="osub"><span class="otag">${esc(gmap[k]?gmap[k].label:'—')}</span>${l.filter(x=>x.group===k).map(tile).join('')}</div>`).join('');
+      }else tiles=`<div class="otiles">${l.map(tile).join('')}</div>`;
+      return`<div class="srow"><div class="sn">${esc(h)}<small>${up}/${l.length} OSD attivi</small></div><div>${tiles}</div></div>`;}).join('');
+    const f=Ceph.focus;
+    const gbtn=gs.length?`<div class="ogrps" role="group" aria-label="Gruppi di OSD per pool serviti">
+        <button type="button" class="ogrp" aria-pressed="${f?'false':'true'}" onclick="Ceph.setFocus()"><span><b>Tutti</b><small>${osds.length} OSD</small></span></button>
+        ${gs.map(g=>`<button type="button" class="ogrp" aria-pressed="${f&&f.k==='g'&&f.v===g.key?'true':'false'}" onclick="Ceph.setFocus('g',${js(g.key)})"><span class="osd og${g.idx}" aria-hidden="true"><i style="height:${Math.round(g.percent)}%"></i></span><span><b>${esc(g.label)} · ${g.osds} OSD</b><small>${(g.pools||[]).length?'pool: '+esc(g.pools.join(', ')):'nessun pool'} · ${g.percent}% usato</small></span></button>`).join('')}
+      </div>`:'';
+    const focusNote=f?`<p class="cnote" style="margin:0 0 8px" role="status">${f.k==='p'?`Evidenziati gli OSD che servono il pool ${esc(f.v)}`:'Evidenziato un gruppo di OSD'} · gli altri sono attenuati. <button type="button" class="pbtn" onclick="Ceph.setFocus()">Mostra tutti</button></p>`:'';
+    return`<h2 class="sec" style="margin-top:22px">Stazioni OSD <small>un nodo per riga, una tessera per OSD: il riempimento è lo spazio usato${gs.length>1?'; la forma indica il gruppo di pool servito':''}</small></h2>
+      ${gbtn}${focusNote}
       <div class="olegend"><span><span class="osd"><i style="height:60%"></i></span>attivo</span><span><span class="osd dn"></span>giù</span><span><span class="osd ot"></span>fuori dal cluster</span><span>riempimento: normale &lt; 75%, ambra &lt; 85%, rosso oltre</span></div>
       <div class="panel stations">${rows}</div>`;
   },
@@ -2577,7 +2625,9 @@ const Ceph={
   poolsAndServices(o){
     const th=o.thresholds||{nearfull:85,full:95};
     const pools=(o.pools||[]).map(p=>{const c=p.percent>=th.full?'crit2':p.percent>=th.nearfull?'warn2':'';
-      return`<tr><td><b>${esc(p.name)}</b></td><td>${p.size} / ${p.min_size}</td><td>${p.pg_num}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="bw" style="width:110px"><div class="bf2 ${c}" style="width:${Math.min(100,p.percent)}%"></div></div>${p.percent}%</div></td><td>${esc(fmtB(p.used))}</td></tr>`;}).join('');
+      const fo=Ceph.focus&&Ceph.focus.k==='p'&&Ceph.focus.v===p.name;
+      const srv=!p.mapped?'<span class="cnote" title="Regola CRUSH sconosciuta o nessun OSD selezionato">n/d</span>':p.all_classes?`<span title="La regola CRUSH non filtra per classe di dispositivo">${p.osds} · tutti</span>`:`${p.osds} <span class="cnote">· ${esc((p.classes||[]).join(', '))}</span>`;
+      return`<tr><td><button type="button" class="pbtn" aria-pressed="${fo}" title="Evidenzia gli OSD di questo pool" onclick="Ceph.setFocus('p',${js(p.name)})">${esc(p.name)}</button></td><td>${srv}</td><td>${p.size} / ${p.min_size}</td><td>${p.pg_num}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="bw" style="width:110px"><div class="bf2 ${c}" style="width:${Math.min(100,p.percent)}%"></div></div>${p.percent}%</div></td><td>${esc(fmtB(p.used))}</td></tr>`;}).join('');
     const mons=o.mons||[], mgrs=o.mgrs||[], mdss=o.mdss||[];
     const q=o.mon_quorum, qOk=q.total&&q.in===q.total;
     const mgrAct=mgrs.filter(m=>m.state==='active').length;
@@ -2586,7 +2636,7 @@ const Ceph={
     const help=(o.flags||[]).map(f=>`<p class="cnote"><b>${esc(f.name)}</b>: ${esc(Object.prototype.hasOwnProperty.call(Ceph.FLAG_HELP,f.name)?Ceph.FLAG_HELP[f.name]:f.description)}</p>`).join('');
     return`<div class="ctwo" style="margin-top:22px">
       <div><h2 class="sec">Pool <small>${(o.pools||[]).length} · % di spazio usato nel pool</small></h2>
-        <div class="panel"><div class="tw"><table><thead><tr><th>Pool</th><th>Repliche / minime</th><th>PG</th><th>Usato</th><th>Dati</th></tr></thead><tbody>${pools||'<tr><td colspan="5" class="empty">Nessun pool</td></tr>'}</tbody></table></div></div></div>
+        <div class="panel"><div class="tw"><table><thead><tr><th>Pool</th><th>OSD serviti</th><th>Repliche / minime</th><th>PG</th><th>Usato</th><th>Dati</th></tr></thead><tbody>${pools||'<tr><td colspan="6" class="empty">Nessun pool</td></tr>'}</tbody></table></div></div></div>
       <div><h2 class="sec">Servizi e flag</h2><div class="panel"><div class="panel-b csvc">
         <div><span>Monitor (MON)</span><span class="st ${qOk?'ok':'warn'}">${q.in} su ${q.total} in quorum</span></div>
         <div><span>Manager (MGR)</span><span class="st ${mgrAct?'ok':'off'}">${mgrAct} attivo${mgrs.length>mgrAct?` · ${mgrs.length-mgrAct} di riserva`:''}</span></div>

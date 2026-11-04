@@ -409,6 +409,10 @@ func (c *Client) GetCephFlags() (json.RawMessage, error)  { return c.Get("/clust
 func (c *Client) GetCephOSD(node string) (json.RawMessage, error) {
 	return c.Get("/nodes/" + node + "/ceph/osd")
 }
+// GetCephCrush returns the decompiled CRUSH map (a JSON string with the text).
+func (c *Client) GetCephCrush(node string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/ceph/crush")
+}
 func (c *Client) GetCephPools(node string) (json.RawMessage, error) {
 	return c.Get("/nodes/" + node + "/ceph/pool")
 }

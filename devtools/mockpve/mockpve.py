@@ -153,12 +153,12 @@ def ceph_osds():
     r = random.Random(7)
     out, oid = [], 0
     for n in CEPH_NODES:
-        for _ in range(6):
+        for k in range(6):
             st = "up"
             if SCEN in ("down", "recovery", "error") and n == CEPH_NODES[4] and oid in (24, 25): st = "down"
             used = r.uniform(.55, .88) * 7680873725952
             out.append(dict(id=str(oid), name="osd.%d" % oid, type="osd", leaf=1, host=n, status=st, **{"in": 0 if st == "down" and SCEN == "error" else 1},
-                            device_class="ssd", percent_used=used / 7680873725952 * 100, bytes_used=int(used), total_space=7680873725952,
+                            device_class="hdd" if k >= 4 else "ssd", percent_used=used / 7680873725952 * 100, bytes_used=int(used), total_space=7680873725952,
                             pgs=34, apply_latency_ms=1))
             oid += 1
     return out
@@ -203,8 +203,12 @@ def ceph_route(rest):
         for o in ceph_osds(): hosts.setdefault(o["host"], []).append(o)
         return dict(flags="sortbitwise", root=dict(type="root", name="default", children=[dict(type="host", name=h, children=v) for h, v in hosts.items()]))
     if rest == "pool":
-        return [dict(pool_name=n, type="replicated", size=3, min_size=2, pg_num=128, bytes_used=int(2e13 * f), percent_used=f * .4, crush_rule_name="replicated_ssd", application_metadata=dict(rbd={}), pg_autoscale_mode="on")
-                for n, f in (("datacloud-ssd", 1.0), ("datacloud-hdd", .6), (".mgr", .01))]
+        return [dict(pool_name=n, type="replicated", size=3, min_size=2, pg_num=128, bytes_used=int(2e13 * f), percent_used=f * .4, crush_rule_name=r, application_metadata=dict(rbd={}), pg_autoscale_mode="on")
+                for n, f, r in (("datacloud-ssd", 1.0, "replicated_ssd"), ("datacloud-hdd", .6, "replicated_hdd"), (".mgr", .01, "replicated_ssd"), ("archivio", .2, "replicated_rule"))]
+    if rest == "crush":
+        rules = "".join("rule %s {\n\tid %d\n\ttype replicated\n\tstep take default%s\n\tstep chooseleaf firstn 0 type host\n\tstep emit\n}\n" % (n, i, c)
+                        for i, (n, c) in enumerate((("replicated_rule", ""), ("replicated_ssd", " class ssd"), ("replicated_hdd", " class hdd"))))
+        return "# begin crush map\ntunable choose_total_tries 50\n\n# rules\n" + rules + "\n# end crush map\n"
     if rest in ("mon", "mgr", "mds"):
         if rest == "mds": return []
         return [dict(name=n, host=n, state="running" if rest == "mon" else ("active" if i == 0 else "standby"), quorum=1, rank=i, ceph_version_short="20.2.4") for i, n in enumerate(CEPH_NODES[:3])]
