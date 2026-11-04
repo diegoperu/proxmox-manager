@@ -795,7 +795,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.118.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.120.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -939,6 +939,7 @@ html.spiderman{
           <th class="s" onclick="VMs.sort('vmid')">VMID</th>
           <th class="s" onclick="VMs.sort('name')">Nome</th>
           <th class="s" onclick="VMs.sort('node')">Nodo</th>
+          <th class="s" onclick="VMs.sort('group')">Gruppo</th>
           <th class="s" onclick="VMs.sort('ip')">IP</th>
           <th class="s" onclick="VMs.sort('os')">Sistema</th>
           <th class="s" onclick="VMs.sort('status')">Stato</th>
@@ -947,7 +948,7 @@ html.spiderman{
           <th class="s" onclick="VMs.sort('disk')">Disco</th>
           <th>Azioni</th>
         </tr></thead>
-        <tbody id="vmtbody"><tr><td colspan="12" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
+        <tbody id="vmtbody"><tr><td colspan="13" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
       </table></div>
       <div class="selbar" id="selbar" role="region" aria-label="Azioni sulla selezione" hidden>
         <span class="sb-n" id="sb-n" aria-live="polite"></span>
@@ -2958,6 +2959,28 @@ const Groups={
     Groups.msg('');
     openModal('mgrp'); setTimeout(()=>document.getElementById('grp-in').focus(),100);
   },
+  // Modifica diretta nel pannello VM: stessa regola e stessa PUT del modale.
+  saveInline(node,vmid,kind,clear){
+    const v=Groups.d&&Groups.d.vms.find(x=>x.node===node&&String(x.vmid)===String(vmid)&&x.kind===kind);
+    const msg=(t,err)=>{const el=document.getElementById('grp-inline-msg');if(el){el.textContent=t||'';el.style.color=err?'var(--red)':'';}};
+    if(!v||Groups.busy)return;
+    const p=clear?{ok:true,groups:[]}:Groups.parse(document.getElementById('grp-inline').value);
+    if(!p.ok){msg(p.err,true);return;}
+    if(!p.groups.length&&!clear){msg('Scrivi un gruppo, oppure usa "Togli".',true);return;}
+    const fresh=p.groups.filter(g=>!Groups.existing().has(g));
+    const go=async()=>{
+      Groups.busy=true; msg('Salvataggio…');
+      try{
+        await api(`/nodes/${encodeURIComponent(v.node)}/${v.kind}/${encodeURIComponent(v.vmid)}/groups`,{method:'PUT',quiet:true,timeoutMs:30000,body:JSON.stringify({groups:p.groups,confirm_new:fresh})});
+        Groups.busy=false; _tc.clear();
+        toast(p.groups.length?`Gruppo di ${v.name||v.vmid}: ${p.groups.join(', ')}`:`Gruppo tolto da ${v.name||v.vmid}`,'ok');
+        if(App.cur==='groups')Groups.load(true);
+        VMs.detail(v.node,v.vmid,v.kind); VMs.regroup();
+      }catch(e){Groups.busy=false;msg(e.body&&e.body.reason==='new_group'?'Il server non conosce ancora questo gruppo: riprova.':e.message,true);}
+    };
+    if(fresh.length)askConfirm({title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
+    else go();
+  },
   msg(t,err){const el=document.getElementById('grp-msg');el.textContent=t||'';el.style.color=err?'var(--red)':'';},
   save(clear){
     const v=Groups.edit_; if(!v||Groups.busy)return;
@@ -3399,6 +3422,26 @@ const VMs=(()=>{
   let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[], picked=new Set();
   const keyOf=v=>`${v.type}:${v.node}:${v.vmid}`;
 
+  // Gruppo dai tag di Proxmox (stessa lettura della pagina Gruppi); v.group serve all'ordinamento.
+  function groupCell(v){
+    if(v.grp===undefined)return'<span class="td">···</span>';
+    if(v.grp.source==='tag')return v.grp.groups.map(g=>`<span class="badge bn">${esc(g)}</span>`).join(' ');
+    if(v.grp.source==='name')return`<span class="badge" title="Dal nome: la VM non ha il tag">${esc(v.grp.groups[0])}</span>`;
+    return'<span class="td">—</span>';
+  }
+  async function loadGroups(){
+    const d=await Groups.fetch().catch(()=>null);
+    if(!d||!Array.isArray(d.vms))return;
+    const m=new Map(d.vms.map(x=>[x.node+'/'+x.kind+'/'+x.vmid,x]));
+    for(const v of all){
+      const g=m.get(v.node+'/'+v.type+'/'+v.vmid);
+      v.grp=g||{source:'none',groups:[]};
+      v.group=v.grp.source==='none'?'\uffff':v.grp.groups.join(' ');
+      const el=document.getElementById(`gp-${v.node}-${v.vmid}`);
+      if(el)el.innerHTML=groupCell(v);
+    }
+  }
+
   function allNodes(){return[...new Set(all.map(v=>v.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));}
 
   function renderNodePicker(){
@@ -3427,7 +3470,7 @@ const VMs=(()=>{
       if(status&&v.status!==status)return false;
       if(gpuF==='1'&&!hasGpu(v))return false;
       if(gpuF==='0'&&hasGpu(v))return false;
-      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search)&&!(hasGpu(v)&&v.gpus.some(g=>String(g&&g.name||'').toLowerCase().includes(search))))return false;
+      if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search)&&!(v.grp&&v.grp.groups.some(g=>g.includes(search)))&&!(hasGpu(v)&&v.gpus.some(g=>String(g&&g.name||'').toLowerCase().includes(search))))return false;
       return true;
     });
     sortedData=[...filtered];
@@ -3446,7 +3489,7 @@ const VMs=(()=>{
       <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
       <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button>${gpuBadge(v)}</td>
-      <td>${nodeCell(v)}</td><td class="tm" id="${esc(`ip-${v.node}-${v.vmid}`)}">${ipCell(v)}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
+      <td>${nodeCell(v)}</td><td id="${esc(`gp-${v.node}-${v.vmid}`)}">${groupCell(v)}</td><td class="tm" id="${esc(`ip-${v.node}-${v.vmid}`)}">${ipCell(v)}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
       <td>${((v.cpu||0)*100).toFixed(1)}%</td>
       <td>${bar(pct(v.mem,v.maxmem))}</td>
       <td id="${esc(`dk-${v.node}-${v.vmid}`)}">${diskCell}</td>
@@ -3458,7 +3501,7 @@ const VMs=(()=>{
              ${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bg2 sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">Console</button>`:''}`
           :`<button class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
       </div></td>
-    </tr>`;}).join('')||'<tr><td colspan="12" class="empty">Nessuna VM con questi filtri</td></tr>';
+    </tr>`;}).join('')||'<tr><td colspan="13" class="empty">Nessuna VM con questi filtri</td></tr>';
     updateBar();
   }
 
@@ -3527,6 +3570,7 @@ const VMs=(()=>{
     pickAll(cb){sortedData.forEach(v=>cb.checked?picked.add(keyOf(v)):picked.delete(keyOf(v)));renderRows(sortedData);},
     clearPick(){picked.clear();renderRows(sortedData);},
     hasPick(){return picked.size>0;},
+    regroup(){loadGroups();},
     // Variante B: la barra non esegue nulla, apre Batch con selezione (e azione) gia' impostate; li' si conferma e si legge il log.
     toBatch(action){
       const vms=all.filter(v=>picked.has(keyOf(v)));
@@ -3557,6 +3601,7 @@ const VMs=(()=>{
       loadFsinfo();
       loadOsinfo();
       loadAgentIps();
+      loadGroups();
     },
     toggleNodePicker(){
       const p=document.getElementById('vm-node-picker');
@@ -3638,7 +3683,12 @@ const VMs=(()=>{
             ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
             ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
-            ${grow?`<dt>Gruppo</dt><dd>${Groups.label(grow)} <button type="button" class="btn bg2 sm" onclick="Groups.edit(${n},${id},${t})">Cambia</button></dd>`:''}
+            ${grow?`<dt>Gruppo</dt><dd>${Groups.label(grow)}
+              <div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
+                <input class="inp" id="grp-inline" type="text" list="grp-dl" maxlength="140" autocomplete="off" spellcheck="false" aria-label="Gruppo (più gruppi separati da spazio)" placeholder="es. rossi" value="${esc(grow.source==='tag'?grow.groups.join(' '):(grow.proposal||''))}" style="max-width:220px">
+                <button type="button" class="btn bg2 sm" onclick="Groups.saveInline(${n},${id},${t})">Salva</button>
+                ${grow.source==='tag'?`<button type="button" class="btn bg2 sm" onclick="Groups.saveInline(${n},${id},${t},true)">Togli</button>`:''}
+              </div><div class="hint" id="grp-inline-msg" role="status"></div></dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
