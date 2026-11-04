@@ -10,11 +10,13 @@ NOW = int(time.time())
 GB = 1024 ** 3
 
 NODES = {
-    "datacloud-node-1": dict(maxmem=64 * GB, cores=32, status="online", mem=0.58, cpu=0.31, disk=0.46),
-    "datacloud-node-2": dict(maxmem=128 * GB, cores=48, status="online", mem=0.63, cpu=0.44, disk=0.52),
-    "datacloud-node-3": dict(maxmem=64 * GB, cores=32, status="online", mem=0.92, cpu=0.37, disk=0.71),
-    "datacloud-node-4": dict(maxmem=64 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
+    "datacloud-node-1": dict(maxmem=256 * GB, cores=32, status="online", mem=0.58, cpu=0.31, disk=0.46),
+    "datacloud-node-2": dict(maxmem=384 * GB, cores=48, status="online", mem=0.63, cpu=0.44, disk=0.52),
+    "datacloud-node-3": dict(maxmem=256 * GB, cores=32, status="online", mem=0.92, cpu=0.37, disk=0.71),
+    "datacloud-node-4": dict(maxmem=256 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
 }
+# processori diversi come nel cluster reale: le VM con cpu=host si spostano a caldo solo tra node-1 e node-3
+CPU_MODELS = {"datacloud-node-1": "AMD EPYC 7313", "datacloud-node-2": "Intel Xeon E5-2640 v4", "datacloud-node-3": "AMD EPYC 7313"}
 OSES = [
     {"id": "ubuntu", "name": "Ubuntu", "pretty-name": "Ubuntu 24.04.1 LTS", "version": "24.04.1 LTS (Noble Numbat)", "version-id": "24.04", "kernel-release": "6.8.0-45-generic", "machine": "x86_64"},
     {"id": "rocky", "name": "Rocky Linux", "pretty-name": "Rocky Linux 8.10 (Green Obsidian)", "version": "8.10 (Green Obsidian)", "version-id": "8.10", "kernel-release": "4.18.0-553.el8_10.x86_64", "machine": "x86_64"},
@@ -226,6 +228,7 @@ def route(path):
     if p == "/cluster/mapping/pci": return [dict(id="gpu-a100", map=[f"node={n},path=0000:02:00,id=10de:20f1" for n in NODES]), dict(id="gpu-3090", map=["node=datacloud-node-1,path=0000:01:00"])]
     if p == "/cluster/tasks": return tasks()
     if p == "/cluster/nextid": return "214"
+    if p == "/cluster/ha/resources": return []
     if p == "/nodes":
         return [dict(node=n, status=b["status"], maxmem=b["maxmem"], mem=int(b["maxmem"] * b["mem"]), cpu=b["cpu"],
                      maxcpu=b["cores"], uptime=86400 * 12 if b["mem"] else 0, maxdisk=1000 * GB, disk=int(1000 * GB * b["disk"]))
@@ -240,12 +243,16 @@ def route(path):
         if rest == "status":
             return dict(cpu=b["cpu"], memory=dict(used=int(b["maxmem"] * b["mem"]), total=b["maxmem"]), uptime=86400 * 12,
                         loadavg=["1.2", "1.1", "0.9"], pveversion="pve-manager/8.2.4", kversion="Linux 6.8.8-2-pve",
-                        cpuinfo=dict(cpus=b["cores"], model="AMD EPYC 7313"))
+                        cpuinfo=dict(cpus=b["cores"], model=CPU_MODELS.get(node, "AMD EPYC 7313")))
         if rest == "hardware/pci":
             return [dict(id="0000:01:00.0", **{"class": "0x030000"}, vendor="0x10de", iommugroup=12, vendor_name="NVIDIA Corporation", device_name="GA102 [GeForce RTX 3090]"),
                     dict(id="0000:01:00.1", **{"class": "0x040300"}, vendor_name="NVIDIA Corporation", device_name="GA102 High Definition Audio"),
                     dict(id="0000:02:00.0", **{"class": "0x030200"}, vendor="0x10de", iommugroup=13, vendor_name="NVIDIA Corporation", device_name="A100 PCIe 80GB"),
                     dict(id="0000:03:00.0", **{"class": "0x020000"}, vendor_name="Intel Corporation", device_name="Ethernet X710")]
+        if rest.startswith("tasks/") and rest.endswith("/status"):  # migrazione finta: "running" per le prime 2 letture, poi OK
+            from urllib.parse import unquote
+            up = unquote(rest[len("tasks/"):-len("/status")]); MIG_TASKS[up] = MIG_TASKS.get(up, 0) + 1
+            return dict(status="running") if MIG_TASKS[up] <= 2 else dict(status="stopped", exitstatus="OK")
         if rest == "qemu": return [x for x in VMS if x["node"] == node and x["type"] == "qemu"]
         if rest == "lxc": return [x for x in VMS if x["node"] == node and x["type"] == "lxc"]
         if rest == "storage":
@@ -257,6 +264,9 @@ def route(path):
             if not v: return None
             if seg[2] == "status" and len(seg) > 3 and seg[3] == "current":
                 return dict(status=v["status"], mem=v["mem"], maxmem=v["maxmem"], cpu=v["cpu"], uptime=3600 * 30, cpus=v.get("maxcpu", 4), maxdisk=v.get("maxdisk", 0), name=v["name"], vmid=v["vmid"])
+            if seg[2] == "migrate":  # controllo prima della migrazione (sola lettura)
+                lr = ["hostpci0"] if (seg[0] == "qemu" and v["vmid"] % 11 == 0 or v["vmid"] % 13 == 0) else []
+                return dict(allowed_nodes=[n for n, b in NODES.items() if b["status"] == "online" and n != v["node"]], not_allowed_nodes={}, local_disks=[], local_resources=lr, running=1 if v["status"] == "running" else 0)
             if seg[2] == "config":
                 key = "ipconfig0" if seg[0] == "qemu" else "net0"
                 val = f"ip={v['ip']}/24,gw=10.75.4.254" if v["ip"] else ""
@@ -265,6 +275,7 @@ def route(path):
                 if v.get("template"): cfg["template"] = 1
                 if val: cfg[key] = val
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
+                if seg[0] == "qemu" and v["vmid"] % 2 == 0: cfg["cpu"] = "host"  # meta' delle VM con la CPU del nodo
                 if seg[0] == "qemu" and v["vmid"] % 11 == 0: cfg["hostpci0"] = "0000:01:00,pcie=1,x-vga=1"  # GPU diretta
                 if seg[0] == "qemu" and v["vmid"] % 13 == 0: cfg["hostpci0"] = "mapping=gpu-a100,pcie=1"      # GPU da mapping
                 if seg[0] == "qemu" and v["vmid"] % 19 == 0: cfg["hostpci0"] = "0000:02:00"                       # diretta sulla stessa A100 del mapping: doppione
@@ -293,6 +304,10 @@ def route(path):
                     pt["cpu"] = round(min(.95, v["cpu"] * (0.6 + pt["cpu"])), 4)
                 return pts
     return None
+
+
+MIG_TASKS = {}
+NOSHUTDOWN = set(x for x in os.environ.get("NOSHUTDOWN_VMIDS", "").split(",") if x.strip().isdigit())
 
 
 class H(BaseHTTPRequestHandler):
@@ -358,12 +373,28 @@ class H(BaseHTTPRequestHandler):
                 elif k == "tags": vm["tags"] = val[0]
                 else: ed[k] = val[0]
             return self._json({"data": None}, 200)
-        # spegnimento: POST /nodes/{n}/qemu/{id}/status/{shutdown|stop}
-        if self.command == "POST" and len(parts) == 6 and parts[2] == "qemu" and parts[4] == "status" and parts[5] in ("shutdown", "stop") and parts[3].isdigit():
+        # spegnimento/accensione: POST /nodes/{n}/qemu/{id}/status/{shutdown|stop|start}
+        # le VM in NOSHUTDOWN_VMIDS (env, es. "105,110") ignorano lo spegnimento ordinato: serve a provare lo stop forzato
+        if self.command == "POST" and len(parts) == 6 and parts[2] == "qemu" and parts[4] == "status" and parts[5] in ("shutdown", "stop", "start") and parts[3].isdigit():
+            vmid = int(parts[3])
             for v in VMS:
-                if v["vmid"] == int(parts[3]): v["status"] = "stopped"
-            return self._json({"data": "UPID:mock:0000"}, 200)
-        self.send_error(405, "anteprima in sola lettura (tranne config QEMU/LXC e spegnimento, solo in memoria)")
+                if v["vmid"] != vmid: continue
+                if parts[5] == "start": v["status"] = "running"
+                elif parts[5] == "stop" or str(vmid) not in NOSHUTDOWN: v["status"] = "stopped"
+            up = "UPID:%s:0000ABCD:00123456:65F0A1B2:qm%s:%d:root@pam!mock:" % (parts[1], parts[5], vmid)
+            MIG_TASKS[up] = 2  # gia' "finito" alla prossima lettura
+            return self._json({"data": up}, 200)
+        # migrazione: POST /nodes/{n}/{qemu|lxc}/{id}/migrate target=<nodo> (sposta la VM solo in memoria)
+        if self.command == "POST" and len(parts) == 5 and parts[0] == "nodes" and parts[2] in ("qemu", "lxc") and parts[4] == "migrate" and parts[3].isdigit():
+            vm = next((x for x in VMS if x["vmid"] == int(parts[3])), None)
+            tgt = form.get("target", [""])[0]
+            if vm is None or tgt not in NODES or NODES[tgt]["status"] != "online" or tgt == vm["node"]:
+                return self._json({"data": None, "message": "invalid target"}, 500)
+            src = vm["node"]; vm["node"] = tgt
+            up = "UPID:%s:0000ABCD:00123456:65F0A1B2:%s:%s:root@pam!mock:" % (src, "qmigrate" if parts[2] == "qemu" else "vzmigrate", parts[3])
+            MIG_TASKS.pop(up, None)
+            return self._json({"data": up}, 200)
+        self.send_error(405, "anteprima in sola lettura (tranne config QEMU/LXC, spegnimento/accensione e migrazione, solo in memoria)")
     do_PUT = do_DELETE = do_POST
 
     def _json(self, obj, code):

@@ -597,24 +597,47 @@ func (h *Handler) VMSnapshot(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, data)
 }
 
+// VMMigrate: POST /api/nodes/{node}/qemu/{vmid}/migrate  body {"target": "<node>", "online": bool}
+// Everything is validated before any Proxmox call (it used to pass target and decode errors through unchecked).
+// It does not apply the planner's rules (RAM limit, CPU vendor for cpu: host): that is what /api/balance/step is for.
 func (h *Handler) VMMigrate(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
-	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
+	vmid, err := strconv.Atoi(chi.URLParam(r, "vmid"))
+	if !nodeNamePattern.MatchString(node) || err != nil || vmid <= 0 || vmid > 999999999 {
+		writeError(w, errors.New("nodo o VMID non validi"), http.StatusBadRequest)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<10)
 	var body struct {
 		Target string `json:"target"`
 		Online bool   `json:"online"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil || dec.More() {
+		writeError(w, errors.New("richiesta non valida"), http.StatusBadRequest)
+		return
+	}
+	if !nodeNamePattern.MatchString(body.Target) || body.Target == node {
+		writeError(w, errors.New("nodo di destinazione non valido"), http.StatusBadRequest)
+		return
+	}
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
-		writeError(w, err, 400)
+		writeError(w, err, http.StatusBadRequest)
 		return
 	}
 	data, err := client.VMMigrate(node, vmid, body.Target, body.Online)
 	if err != nil {
-		writeError(w, err, 502)
+		log.Printf("migrate qemu=%d %s -> %s: %v", vmid, node, body.Target, err)
+		if isForbidden(err) {
+			writeError(w, errors.New("permessi Proxmox insufficienti per migrare (serve VM.Migrate)"), http.StatusForbidden)
+		} else {
+			writeError(w, errors.New("migrazione non avviata"), http.StatusBadGateway)
+		}
 		return
 	}
+	log.Printf("migrate qemu=%d %s -> %s (online=%v)", vmid, node, body.Target, body.Online)
 	writeJSON(w, data)
 }
 

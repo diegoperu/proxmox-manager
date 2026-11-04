@@ -621,7 +621,9 @@ func fetchCephOverview(c cephAPI, now time.Time) (cephOverview, error) {
 
 // cephNodeCandidates lists the online nodes the per-node Ceph calls may go to, monitor hosts first:
 // a node of a Ceph cluster without the Ceph packages answers 500 to /nodes/{n}/ceph/*.
-func cephNodeCandidates(c cephAPI, prefer []string) ([]string, error) {
+func cephNodeCandidates(c interface {
+	GetNodes() (json.RawMessage, error)
+}, prefer []string) ([]string, error) {
 	raw, err := c.GetNodes()
 	if err != nil {
 		return nil, err

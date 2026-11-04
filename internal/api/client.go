@@ -218,6 +218,29 @@ func (c *Client) VMMigrate(node string, vmid int, target string, online bool) (j
 	}
 	return c.Post(fmt.Sprintf("/nodes/%s/qemu/%d/migrate", node, vmid), v)
 }
+// GetMigratePrecheck is Proxmox's own check before a QEMU migration (read only): allowed_nodes, local_disks,
+// local_resources, mapped-resources.
+func (c *Client) GetMigratePrecheck(node string, vmid int) (json.RawMessage, error) {
+	return c.Get(fmt.Sprintf("/nodes/%s/qemu/%d/migrate", node, vmid))
+}
+
+// GetHAResources lists the guests managed by HA (read only).
+func (c *Client) GetHAResources() (json.RawMessage, error) { return c.Get("/cluster/ha/resources") }
+
+// LXCMigrate migrates a container; Proxmox moves a running container only in restart mode (short downtime).
+func (c *Client) LXCMigrate(node string, vmid int, target string, restart bool) (json.RawMessage, error) {
+	v := url.Values{"target": {target}}
+	if restart {
+		v.Set("restart", "1")
+	}
+	return c.Post(fmt.Sprintf("/nodes/%s/lxc/%d/migrate", node, vmid), v)
+}
+
+// GetTaskStatus reads a task (read only): status running|stopped and exitstatus when stopped.
+func (c *Client) GetTaskStatus(node, upid string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/tasks/" + url.PathEscape(upid) + "/status")
+}
+
 func (c *Client) VMSnapshot(node string, vmid int, name, desc string) (json.RawMessage, error) {
 	v := url.Values{"snapname": {name}}
 	if desc != "" {
