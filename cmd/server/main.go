@@ -118,7 +118,6 @@ func main() {
 		// Provisioning
 		r.Get("/templates", h.GetTemplates)
 		r.Get("/nextid", h.GetNextVMID)
-		r.Post("/provision", h.ProvisionVM)
 		r.Get("/groups", h.GetGroups)
 		r.Put("/nodes/{node}/{kind}/{vmid}/groups", h.SetGroups)
 
