@@ -563,3 +563,11 @@ Fatti letti in sola lettura su CALCOLO: 8 template, tutti su `datacloud-node-1` 
 **Opzioni**: A) per **modello** (stringa che Proxmox riporta, es. `GA107GL [A2 / A16]`): una voce `gpu_models` in `config.json` con nome mostrato e GB, valida per tutte le schede di quel modello e per tutti i cluster; salvataggio da una finestra "Modifica modello" nella pagina GPU, validato (nome <= 64 caratteri, GB intero 1-512), la tabella di D60 resta il valore predefinito; B) come A ma separata per cluster; C) per singola scheda (indirizzo + nodo).
 **Suggerimento**: A: la memoria e il nome sono proprieta' del modello, non della scheda; poche voci, nessun nuovo file.
 **Risposta utente**: 2026-11-04 — A
+
+### D63 — Migrazione a caldo con `cpu: host` tra generazioni dello stesso produttore
+**Stato**: APERTA
+**Bloccante**: si' (il Bilanciamento oggi propone passi che falliscono)
+**Domanda**: Le VM 133 e 198 (`cpu: host`) migrate a caldo da `node-10` (AMD EPYC 7713, Zen 3) a `node-5` (AMD EPYC 7302, Zen 2) hanno trasferito tutta la memoria e poi sono fallite alla ripresa (`resume failed`), come la 109 (AMD -> Intel). La regola "stesso produttore" (D55 corretta) non basta: verso una generazione piu' VECCHIA il guest perde istruzioni. La prova riuscita della 174 (Intel piu' nuovo -> piu' vecchio) e' stata fortunata. Che regola usare?
+**Opzioni**: A) stesso **modello** di CPU (la D55 originale), verso gli altri solo a freddo; B) stesso produttore e generazione di destinazione **uguale o piu' nuova** della sorgente, con una tabella modello -> generazione per le CPU del cluster (EPYC 7302 Zen2 < 7453/7713/7763 Zen3; Xeon E5 v4 Broadwell < Silver 4114 / Gold 5120 Skylake) e modello non in tabella = solo stesso modello; C) a caldo solo per VM con tipo di CPU generico, `cpu: host` sempre a freddo.
+**Suggerimento**: B: e' la regola che segue cosa vede il guest; A e' la piu' semplice e sicura se la tabella sembra fragile.
+**Risposta utente**:
