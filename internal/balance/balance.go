@@ -53,6 +53,9 @@ const (
 	// 2026-11-04: AMD -> Intel live migration, the VM died at resume). Set when no such node can take it.
 	BlockCPUHost = "cpu_host"
 	BlockPinned  = "pinned" // not in the "only these VMs" filter (D54 A): stays where it is
+	// BlockVCPU: the VM has more vCPUs than the threads of every node that could receive it. Proxmox refuses to
+	// run a VM with more vCPUs than the host has (found on 2026-11-04: an 80-vCPU VM planned to a 64-thread node).
+	BlockVCPU = "vcpu_over_threads"
 )
 
 // Node is one node of the cluster as seen now.
@@ -358,6 +361,9 @@ func (st *state) blockersOf(r *vmRT, nd *nodeRT) []string {
 	if r.needsSameCPU() && !st.sameCPUExists(r, nd) {
 		set[BlockCPUHost] = true
 	}
+	if !st.enoughThreadsExists(r, nd) {
+		set[BlockVCPU] = true
+	}
 	for _, b := range v.Blockers {
 		set[b] = true
 	}
@@ -383,6 +389,24 @@ func (st *state) sameCPUExists(r *vmRT, from *nodeRT) bool {
 	for _, name := range st.names {
 		n := st.nodes[name]
 		if n == from || !st.dest(n) || !sameCPU(from, n) {
+			continue
+		}
+		if r.in.Allowed == nil || contains(r.in.Allowed, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// enoughThreads: hard rule, a node runs a VM only if it has at least as many threads as the VM has vCPUs.
+// A node whose thread count is unknown (0) is never a destination: it cannot be checked.
+func enoughThreads(v *VM, n *nodeRT) bool { return n.in.Cores > 0 && v.VCPU <= n.in.Cores }
+
+// enoughThreadsExists: another destination node with enough threads that Proxmox allows.
+func (st *state) enoughThreadsExists(r *vmRT, from *nodeRT) bool {
+	for _, name := range st.names {
+		n := st.nodes[name]
+		if n == from || !st.dest(n) || !enoughThreads(r.in, n) {
 			continue
 		}
 		if r.in.Allowed == nil || contains(r.in.Allowed, name) {
@@ -471,6 +495,9 @@ func (st *state) fits(v *vmRT, n *nodeRT) bool {
 		return false
 	}
 	if v.needsSameCPU() && !sameCPU(st.nodes[v.at], n) {
+		return false
+	}
+	if !enoughThreads(v.in, n) {
 		return false
 	}
 	if v.counted && n.load+v.in.Mem > n.assign {
