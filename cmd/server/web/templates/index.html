@@ -445,7 +445,7 @@ td.spk{width:130px}
 
 /* ══ PANNELLO LATERALE (dettaglio VM) ══ */
 .ov.sheet{justify-content:flex-end;align-items:stretch}
-.ov.sheet .modal{width:min(460px,100vw);max-width:100vw;min-width:0;height:100%;max-height:none;border-radius:var(--r-modal) 0 0 var(--r-modal);border-right:0;padding:0;display:flex;flex-direction:column;transform:translateX(28px);transition:transform .24s var(--ease)}
+.ov.sheet .modal{width:min(500px,100vw);max-width:100vw;min-width:0;height:100%;max-height:none;border-radius:var(--r-modal) 0 0 var(--r-modal);border-right:0;padding:0;display:flex;flex-direction:column;transform:translateX(28px);transition:transform .24s var(--ease)}
 .ov.sheet.open .modal{transform:none}
 .sh-h{display:flex;align-items:flex-start;gap:12px;padding:20px 22px 14px;border-bottom:1px solid var(--border)}
 .sh-h .mt{margin:0;overflow-wrap:anywhere}
@@ -453,7 +453,23 @@ td.spk{width:130px}
 .sh-x{margin-left:auto;flex-shrink:0}
 .ic{width:14px;height:14px;flex-shrink:0}
 #vm-node-btn::after{content:'';display:inline-block;margin-left:8px;border:4px solid transparent;border-top-color:currentColor;border-bottom-width:0;vertical-align:2px}
-.sh-b{flex:1;overflow-y:auto;padding:18px 22px 24px}
+.sh-a{padding:12px 22px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.sh-a:empty{display:none}
+.sh-a .sh-st{display:flex;align-items:center;gap:8px;margin-right:auto;font-size:12px;color:var(--text3)}
+.sh-b{flex:1;overflow-y:auto;padding:6px 22px 24px}
+.sh-sec{margin-top:18px}
+.sh-sec>h3{margin:0 0 8px}
+.sh-use{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sh-use .mb2 .mv{font-size:18px}
+.sh-use .bw{margin-top:6px}
+.sh-use .sub{font-size:11px;color:var(--text3);margin-top:4px;overflow-wrap:anywhere}
+.sh-net{font-size:12px;color:var(--text3);margin-top:8px;font-variant-numeric:tabular-nums}
+.sh-sec .dl{margin-top:0}
+.sh-det{margin-top:14px}
+.sh-det>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--text3);padding:4px 0;list-style:none}
+.sh-det>summary::before{content:'\25B8';display:inline-block;width:14px}
+.sh-det[open]>summary::before{content:'\25BE'}
+.sh-det>summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px;border-radius:4px}
 .sh-b h3{font-size:12px;font-weight:600;color:var(--text3);margin:20px 0 8px}
 .dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 18px;font-size:12px;margin-top:14px}
 .dl dt{color:var(--text3)}.dl dd{color:var(--text);margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
@@ -795,7 +811,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.122.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.124.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1278,6 +1294,7 @@ html.spiderman{
     <div><h2 class="mt" id="movT">VM</h2><small id="movS"></small></div>
     <button type="button" class="btn bg2 sm sh-x" onclick="closeModal('mov')">Chiudi</button>
   </div>
+  <div class="sh-a" id="movA"></div>
   <div class="sh-b" id="movB"></div>
 </div></div>
 
@@ -2962,12 +2979,16 @@ const Groups={
   // Modifica nel pannello VM: gruppi scelti da un elenco (quelli esistenti) oppure creati col pulsante "Nuovo gruppo".
   inl:null,
   inlInit(v){
-    Groups.inl={v,sel:v.source==='tag'?[...v.groups]:[],adding:false,dirty:false};
+    Groups.inl={v,sel:v.source==='tag'?[...v.groups]:[],adding:false,dirty:false,editing:false};
     Groups.inlPaint();
   },
   inlMsg(t,err){const el=document.getElementById('grp-inline-msg');if(el){el.textContent=t||'';el.style.color=err?'var(--red)':'';}},
   inlPaint(){
     const box=document.getElementById('grp-inl'), st=Groups.inl; if(!box||!st)return;
+    if(!st.editing){
+      box.innerHTML=`<div class="flex g8" style="flex-wrap:wrap;align-items:center">${Groups.label(st.v)} <button type="button" class="btn bg2 sm" onclick="Groups.inlEdit()">Modifica</button></div><div class="hint" id="grp-inline-msg" role="status"></div>`;
+      return;
+    }
     const left=[...Groups.existing()].filter(g=>!st.sel.includes(g)).sort();
     const full=st.sel.length>=4;
     box.innerHTML=`<div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
@@ -2979,12 +3000,14 @@ const Groups={
         </select>
         <button type="button" class="btn bg2 sm" ${full?'disabled':''} onclick="Groups.inlNew()">Nuovo gruppo</button>
         <button type="button" class="btn bsuc sm" ${st.dirty?'':'disabled'} onclick="Groups.saveInline()">Salva</button>
+        <button type="button" class="btn bg2 sm" onclick="Groups.inlInit(Groups.inl.v)">Annulla</button>
       </div>
       ${st.adding?`<div class="flex g8" style="margin-top:6px"><input class="inp" id="grp-inl-new" type="text" maxlength="32" autocomplete="off" spellcheck="false" aria-label="Nome del nuovo gruppo" placeholder="nuovo gruppo, es. rossi" style="max-width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();Groups.inlNewOk()}">
         <button type="button" class="btn bg2 sm" onclick="Groups.inlNewOk()">Aggiungi</button></div>`:''}
       <div class="hint" id="grp-inline-msg" role="status"></div>`;
     if(st.adding)document.getElementById('grp-inl-new').focus();
   },
+  inlEdit(){const st=Groups.inl;if(!st)return;st.editing=true;Groups.inlPaint();},
   inlAdd(g){const st=Groups.inl;if(!st||!g||st.sel.includes(g)||st.sel.length>=4)return;st.sel.push(g);st.sel.sort();st.dirty=true;Groups.inlPaint();},
   inlDel(g){const st=Groups.inl;if(!st)return;st.sel=st.sel.filter(x=>x!==g);st.dirty=true;Groups.inlPaint();},
   inlNew(){const st=Groups.inl;if(!st)return;st.adding=true;Groups.inlPaint();},
@@ -3671,6 +3694,7 @@ const VMs=(()=>{
       const v0=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
       document.getElementById('movT').textContent=v0?.name||`VM ${vmid}`;
       document.getElementById('movS').textContent=`${kind==='lxc'?'LXC':'QEMU'} · ${vmid} · ${node}`;
+      document.getElementById('movA').replaceChildren();
       document.getElementById('movB').innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></div>';
       Route.replace(`#/vm/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${kind}`);
       openModal('mov');
@@ -3689,12 +3713,6 @@ const VMs=(()=>{
         const s=r?.status||{},snaps=r?.snapshots||[];
         if(s.name) document.getElementById('movT').textContent=s.name;
         const c=Math.round((s.cpu||0)*100),m=pct(s.mem,s.maxmem);
-        const fsRows=Array.isArray(fsinfo)&&fsinfo.length
-          ? fsinfo.filter(f=>f.mountpoint).map(f=>{
-              const used=f['used-bytes']||0, total=f['total-bytes']||f['disk-size']||0;
-              return `<dt>Disco ${esc(f.mountpoint)}</dt><dd>${bar(total?Math.round(used/total*100):0)}${fmtB(used)} / ${fmtB(total)}</dd>`;
-            }).join('')||`<dt>Disco</dt><dd>${fmtB(s.maxdisk||0)}</dd>`
-          : `<dt>Disco</dt><dd>${fmtB(s.maxdisk||0)} <span class="td">(guest agent non disponibile)</span></dd>`;
         const st=s.status||v0?.status||'';
         const canConsole=kind==='qemu'&&r?.config?.serial0&&st==='running'&&ClusterMgr.hasConsole;
         // Solo le azioni valide per lo stato: una VM ferma non offre spegnimento, una in esecuzione non offre Start.
@@ -3703,37 +3721,54 @@ const VMs=(()=>{
           :st==='paused'?[['bsuc','Riprendi','resume']]
           :[['bsuc','Start','start'],['bg2','Shutdown','shutdown'],['bg2','Reboot','reboot']];
         const canForce=st!=='stopped';
+        const up=s.uptime?Math.floor(s.uptime/3600)+' h '+Math.floor((s.uptime%3600)/60)+' min':'';
+        const root=Array.isArray(fsinfo)?(fsinfo.find(f=>f.mountpoint==='/')||fsinfo.find(f=>f.mountpoint)):null;
+        const dTot=root?(root['total-bytes']||root['disk-size']||0):0, dUsed=root?(root['used-bytes']||0):0;
+        const lxcDisk=kind==='lxc'&&s.maxdisk>0;
+        const dPct=lxcDisk?pct(s.disk,s.maxdisk):(dTot?Math.round(dUsed/dTot*100):null);
+        const use=(l,v,sub)=>`<div class="mb2"><div class="ml">${l}</div><div class="mv">${v==null?'—':v+'%'}</div>${v==null?'':'<div class="bw"><div class="bf2 '+(v>85?'crit2':v>65?'warn2':'ok2')+'" style="width:'+v+'%"></div></div>'}<div class="sub">${sub}</div></div>`;
+        const ipTxt=v0?.ip||netinfo.primary_ipv4||'';
+        const osTxt=osLabel(osinfo)||osFromType(v0?.ostype);
+        const resTxt=[s.cpus?esc(s.cpus)+' core':'',s.maxmem?fmtB(s.maxmem)+' RAM':'',s.maxdisk?'disco '+fmtB(s.maxdisk):''].filter(Boolean).join(' · ')||'—';
+        document.getElementById('movA').innerHTML=`
+          <div class="sh-st">${sbadge(st)}${up?`<span>${esc(up)}</span>`:''}</div>
+          ${power.map(([c,l,a])=>`<button class="btn ${c} sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'${a}')">${l}</button>`).join('')}
+          ${canConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">Console</button>`:''}`;
         document.getElementById('movB').innerHTML=`
-          <div class="mg mb12">
-            <div class="mb2"><div class="ml">Stato</div>${sbadge(st)}</div>
-            <div class="mb2"><div class="ml">CPU</div><div class="mv">${c}%</div>${bar(c)}</div>
-            <div class="mb2"><div class="ml">RAM</div><div class="mv">${m}%</div>${bar(m)}</div>
-          </div>
-          <dl class="dl">
-            <dt>Uptime</dt><dd>${s.uptime?Math.floor(s.uptime/3600)+' h '+Math.floor((s.uptime%3600)/60)+' min':'—'}</dd>
-            <dt>CPU</dt><dd>${esc(s.cpus||'—')} core</dd>
-            <dt>RAM assegnata</dt><dd>${fmtB(s.maxmem)}</dd>
-            ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
-            ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
-            ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
-            ${grow?`<dt>Gruppo</dt><dd>${Groups.label(grow)}<div id="grp-inl" data-n="${esc(node)}" data-i="${esc(vmid)}" data-k="${esc(kind)}"></div></dd>`:''}
-            ${fsRows}
-            <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
-            ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
-          </dl>
-          <h3>Alimentazione</h3>
-          <div class="sh-act">
-            ${power.map(([c,l,a])=>`<button class="btn ${c} sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'${a}')">${l}</button>`).join('')}
-          </div>
-          ${kind==='qemu'?`<h3>Strumenti</h3>
-          <div class="sh-act">
-            ${st==='running'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.addUser(${n},${id})">+ Utente</button>`:''}
-            <button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>
-            <button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>
-            ${canConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">Console</button>`:''}
-          </div>`:''}
-          <h3>Log del kernel</h3>
-          <div id="dm-inline"></div>
+          <section class="sh-sec" aria-label="Uso adesso">
+            <h3>Uso adesso</h3>
+            <div class="sh-use">
+              ${use('CPU',c,s.cpus?esc(s.cpus)+' core':'')}
+              ${use('RAM',m,s.maxmem?fmtB(s.mem||0)+' / '+fmtB(s.maxmem):'')}
+              ${use('Disco /',dPct,lxcDisk?fmtB(s.disk||0)+' / '+fmtB(s.maxdisk):dTot?fmtB(dUsed)+' / '+fmtB(dTot):(kind==='qemu'?'guest agent non disponibile':fmtB(s.maxdisk||0)))}
+            </div>
+            <div class="sh-net">Rete: in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</div>
+          </section>
+          <section class="sh-sec" aria-label="Identità">
+            <h3>Identità</h3>
+            <dl class="dl">
+              <dt>IP</dt><dd>${ipTxt?`<span class="tm">${esc(ipTxt)}</span>${(v0?.ip?v0.ipSrc==='agent':!!ipTxt)?' <span class="td">· dal guest agent</span>':''}`:'—'}</dd>
+              ${osTxt?`<dt>Sistema</dt><dd>${esc(osTxt)}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
+            </dl>
+          </section>
+          <section class="sh-sec" aria-label="Configurazione">
+            <h3>Configurazione</h3>
+            <dl class="dl">
+              <dt>Risorse</dt><dd>${resTxt}</dd>
+              ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
+              ${grow?`<dt>Gruppo</dt><dd><div id="grp-inl"></div></dd>`:''}
+              ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
+            </dl>
+          </section>
+          ${kind==='qemu'?`<section class="sh-sec" aria-label="Strumenti">
+            <h3>Strumenti</h3>
+            <div class="sh-act">
+              ${st==='running'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.addUser(${n},${id})">+ Utente</button>`:''}
+              <button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>
+              <button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>
+            </div>
+          </section>`:''}
+          <details class="sh-det"><summary>Log del kernel</summary><div id="dm-inline"></div></details>
           ${canForce?`<div class="sh-danger">
             <p>Lo stop forzato interrompe subito la VM senza spegnere il sistema operativo: i dati non salvati si perdono.</p>
             <button class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
