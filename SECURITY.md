@@ -78,7 +78,18 @@ The manager report (`service`) carries only aggregates and groups: no VM names, 
 
 ## Daily inventory snapshot
 
-The server writes one small snapshot per cluster per day into the SQLite file (`inv_*` tables): counts and assignments per node and group (VMs, allocated cores/RAM/disk, GPU cards), never IPs, VM names, guest data or metrics; the group is the name prefix before the first `-`, validated as `[a-z0-9]{1,32}`, otherwise `altro`. Rows older than 5 years are deleted. The database file is as sensitive as `config.json`'s neighbours: it lives next to the binary with the process's umask. Keys written to SQL are validated and all statements are parameterised. A failed read stores nothing and is retried; unreadable GPU data is stored as "unknown", not as zero.
+The server writes one small snapshot per cluster per day into the SQLite file (`inv_*` tables): counts and assignments per node and group (VMs, allocated cores/RAM/disk, GPU cards), never IPs, VM names, guest data or metrics; the group comes from the VM's `gruppo-<name>` tag (see below; before 2026-11-04 from the name prefix, recorded per day as `group_rule`), validated as `[a-z0-9]{1,32}`, otherwise `altro`. Rows older than 5 years are deleted. The database file is as sensitive as `config.json`'s neighbours: it lives next to the binary with the process's umask. Keys written to SQL are validated and all statements are parameterised. A failed read stores nothing and is retried; unreadable GPU data is stored as "unknown", not as zero.
+
+## Group tags
+
+`GET /api/groups` reads; `PUT /api/nodes/{node}/{qemu|lxc}/{vmid}/groups` writes the `tags` field of one VM/container config, and nothing else.
+
+- Only `gruppo-<name>` tags are replaced; every other tag is re-sent as it was (text and order; separators normalised to `;`, as Proxmox stores them). A write never drops tags beyond the read limit.
+- Input: whitelisted node, kind (`qemu|lxc`), VMID, at most 4 groups `[a-z0-9]{1,32}` (not `altro`), unknown JSON fields refused, body capped at 4 KB. Group names are the only request data that reach the config, so no other tag can be injected.
+- Every write reads the config fresh, refuses templates (a clone copies tags, so a group on a template would spread) and locked VMs, and sends the config `digest`: a VM changed in between is refused, never overwritten.
+- A group that does not exist yet on any (non-template) VM is written only if the client names it in `confirm_new` (stops typos turning into fake groups in the reports); the page asks the user first.
+- Proxmox errors are mapped to short messages (403 = missing `VM.Config.Options`); bodies stay in the log. Each change is logged (node, VMID, old and new groups).
+- The groups page writes one VM per request, in sequence, and stops at the first 403. Accepted: the app has no login (as for the other VM actions); VMs whose name contains "template"/"cloudinit" are treated as templates (same rule as everywhere in the app) and do not appear in the page, though they can still be tagged in Proxmox.
 
 ## GPU assignment (PCI passthrough)
 

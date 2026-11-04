@@ -795,7 +795,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.114.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.115.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2858,8 +2858,10 @@ const Groups={
   resHTML(r){return r.state==='ok'?'<span class="st ok">Fatto</span>':r.state==='run'?'<span class="td">…</span>':`<span class="st off" title="${esc(r.msg||'')}">${esc(r.msg||'Errore')}</span>`;},
   find(k){return Groups.d&&Groups.d.vms.find(v=>Groups.key(v)===k);},
   tick(k,on){(Groups.draft[k]=Groups.draft[k]||{}).on=on;Groups.sync();},
+  // spunta solo le righe visibili; "Togli le spunte" toglie tutto, anche quelle nascoste dal filtro
   tickAll(on){
-    for(const v of Groups.rows())if(!on||(Groups.parse(Groups.text(v)).ok&&Groups.parse(Groups.text(v)).groups.length))(Groups.draft[Groups.key(v)]=Groups.draft[Groups.key(v)]||{}).on=on;
+    if(!on){for(const k in Groups.draft)Groups.draft[k].on=false;Groups.paintRows();return;}
+    for(const v of Groups.rows()){const p=Groups.parse(Groups.text(v));if(p.ok&&p.groups.length)(Groups.draft[Groups.key(v)]=Groups.draft[Groups.key(v)]||{}).on=true;}
     Groups.paintRows();
   },
   type(k,el){
@@ -2895,6 +2897,8 @@ const Groups={
     for(const o of out)for(const g of o.groups)if(!ex.has(g))fresh.add(g);
     const removing=out.filter(o=>!o.groups.length).length;
     const lines=[`${out.length} ${Dashboard.plural(out.length,'VM','VM')}: ${out.length-removing} con un gruppo scritto${removing?`, ${removing} a cui viene tolto il gruppo`:''}.`];
+    const vis=new Set(Groups.rows().map(Groups.key)), hidden=out.filter(o=>!vis.has(Groups.key(o.v))).length;
+    if(hidden)lines.push(`Di queste, ${hidden} non sono visibili con il filtro o la ricerca attuali.`);
     if(fresh.size)lines.push(`Gruppi NUOVI (non esistono ancora su nessuna VM): ${[...fresh].sort().join(', ')}. Controlla che non siano refusi o prefissi che non sono gruppi.`);
     askConfirm({title:'Applica i gruppi',lines,
       items:out.map(o=>`${o.v.name||'VM '+o.v.vmid} (${o.v.vmid}) → ${o.groups.length?o.groups.join(', '):'nessun gruppo'}`),
