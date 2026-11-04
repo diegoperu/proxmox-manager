@@ -193,6 +193,8 @@ type resGuest struct {
 	Node, Kind, Name, Status string
 	VMID                     int
 	Cores, Mem, Disk         int64
+	Groups                   []string // D35-D37: from tags, see groups.go
+	GroupSource              string
 }
 type resStorage struct {
 	Name, Node, Type string
@@ -215,6 +217,14 @@ func loadResources(c reportAPI, p reportParams) (resources, error) {
 	if err := json.Unmarshal(raw, &list); err != nil {
 		return resources{}, err
 	}
+	var tagStrs []string
+	for _, r := range list {
+		if typ, _ := r["type"].(string); (typ == "qemu" || typ == "lxc") && !isTemplateRes(r) {
+			ts, _ := r["tags"].(string)
+			tagStrs = append(tagStrs, ts)
+		}
+	}
+	resolver := newGroupResolver(tagStrs) // built on the whole cluster, before node/type filters
 	var out resources
 	for _, r := range list {
 		typ, _ := r["type"].(string)
@@ -231,7 +241,9 @@ func loadResources(c reportAPI, p reportParams) (resources, error) {
 				continue
 			}
 			name, _ := r["name"].(string)
-			if p.Group != "" && vmGroup(name) != p.Group {
+			ts, _ := r["tags"].(string)
+			as := resolver.resolve(name, ts)
+			if p.Group != "" && !as.has(p.Group) {
 				continue
 			}
 			if p.Query != "" && !strings.Contains(strings.ToLower(name), p.Query) {
@@ -242,7 +254,7 @@ func loadResources(c reportAPI, p reportParams) (resources, error) {
 				continue
 			}
 			out.Guests = append(out.Guests, resGuest{Node: node, Kind: typ, Name: clampText(name, 64), Status: status, VMID: vmid,
-				Cores: intField(r, "maxcpu"), Mem: intField(r, "maxmem"), Disk: intField(r, "maxdisk")})
+				Cores: intField(r, "maxcpu"), Mem: intField(r, "maxmem"), Disk: intField(r, "maxdisk"), Groups: as.Groups, GroupSource: as.Source})
 		case "storage":
 			sn, _ := r["storage"].(string)
 			pt, _ := r["plugintype"].(string)
@@ -446,7 +458,9 @@ type vmUsage struct {
 	VMID      int      `json:"vmid"`
 	Kind      string   `json:"kind"`
 	Name      string   `json:"name"`
-	Group     string   `json:"group"`
+	Group     string   `json:"group"`        // first group (alphabetical), for older clients
+	Groups    []string `json:"groups"`       // all groups: more than one = shared VM (D37)
+	GroupSrc  string   `json:"group_source"` // tag | name | none
 	Status    string   `json:"status"`
 	Cores     int64    `json:"cores"`
 	MaxMem    int64    `json:"max_mem"`
@@ -490,8 +504,15 @@ func guestRRD(c reportAPI, g resGuest, tf, cf string, from, to int64) (rrdSeries
 	return s.clip(from, to), true
 }
 
+func firstGroup(g []string) string {
+	if len(g) == 0 {
+		return otherGroup
+	}
+	return g[0]
+}
+
 func vmRow(c reportAPI, g resGuest, p reportParams) vmUsage {
-	row := vmUsage{Node: g.Node, VMID: g.VMID, Kind: g.Kind, Name: g.Name, Group: vmGroup(g.Name), Status: g.Status, Cores: g.Cores, MaxMem: g.Mem, MaxDisk: g.Disk, Spark: []Point{}}
+	row := vmUsage{Node: g.Node, VMID: g.VMID, Kind: g.Kind, Name: g.Name, Group: firstGroup(g.Groups), Groups: g.Groups, GroupSrc: g.GroupSource, Status: g.Status, Cores: g.Cores, MaxMem: g.Mem, MaxDisk: g.Disk, Spark: []Point{}}
 	from, to := p.From.Unix(), p.To.Unix()
 	avg, ok := guestRRD(c, g, p.TF, "AVERAGE", from, to)
 	if !ok || len(avg.T) == 0 {
@@ -793,15 +814,15 @@ type gpuModelRow struct {
 	Assigned int    `json:"assigned"`
 }
 type gpuReport struct {
-	Meta         reportMeta     `json:"meta"`
-	Total        int            `json:"total"`
-	Assigned     int            `json:"assigned"`
-	Problems     int            `json:"problems"`
-	Models       []gpuModelRow  `json:"models"`
-	ByGroup      map[string]int `json:"by_group"`
-	Days         []gpuDay       `json:"days"`
-	FullSince    string         `json:"full_since"` // first day of the current streak with every card assigned
-	SnapshotFrom string         `json:"snapshot_from"`
+	Meta         reportMeta         `json:"meta"`
+	Total        int                `json:"total"`
+	Assigned     int                `json:"assigned"`
+	Problems     int                `json:"problems"`
+	Models       []gpuModelRow      `json:"models"`
+	ByGroup      map[string]float64 `json:"by_group"`
+	Days         []gpuDay           `json:"days"`
+	FullSince    string             `json:"full_since"` // first day of the current streak with every card assigned
+	SnapshotFrom string             `json:"snapshot_from"`
 }
 type gpuDay struct {
 	Day      string `json:"day"`
@@ -827,7 +848,15 @@ func buildGPUReport(c reportAPI, hist *history.Store, cluster string, p reportPa
 	if err != nil {
 		return gpuReport{}, err
 	}
-	rep := gpuReport{Meta: metaFor(cluster, p, now), ByGroup: map[string]int{}, Models: []gpuModelRow{}, Days: []gpuDay{}, Problems: len(inv.Problems)}
+	rawRes, err := c.GetClusterResources("")
+	if err != nil {
+		return gpuReport{}, err
+	}
+	byVM, err := groupsByVMID(rawRes)
+	if err != nil {
+		return gpuReport{}, err
+	}
+	rep := gpuReport{Meta: metaFor(cluster, p, now), ByGroup: map[string]float64{}, Models: []gpuModelRow{}, Days: []gpuDay{}, Problems: len(inv.Problems)}
 	type k struct{ node, model string }
 	agg := map[k]*gpuModelRow{}
 	for _, n := range inv.Nodes {
@@ -845,7 +874,13 @@ func buildGPUReport(c reportAPI, hist *history.Store, cluster string, p reportPa
 			if len(cd.Uses) > 0 {
 				m.Assigned++
 				rep.Assigned++
-				rep.ByGroup[vmGroup(cd.Uses[0].Name)]++
+				as, ok := byVM[cd.Uses[0].VMID]
+				if !ok {
+					as = groupAssign{Groups: []string{otherGroup}}
+				}
+				for i, share := range splitEven(1000, len(as.Groups)) {
+					rep.ByGroup[as.Groups[i]] += float64(share) / 1000 // a shared VM's card counts for each group
+				}
 			}
 		}
 	}

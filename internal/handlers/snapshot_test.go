@@ -29,10 +29,10 @@ const snapRes = `[
  {"type":"node","node":"n1","status":"online","maxcpu":64,"maxmem":1099511627776},
  {"type":"node","node":"n2","status":"offline","maxcpu":0,"maxmem":0},
  {"type":"node","node":"bad name","status":"online","maxcpu":1,"maxmem":1},
- {"type":"qemu","node":"n1","vmid":1,"name":"rossi-vm-1","status":"running","maxcpu":4,"maxmem":8589934592,"maxdisk":107374182400},
+ {"type":"qemu","node":"n1","vmid":1,"name":"rossi-vm-1","tags":"gruppo-rossi","status":"running","maxcpu":4,"maxmem":8589934592,"maxdisk":107374182400},
  {"type":"qemu","node":"n1","vmid":2,"name":"rossi-vm-2","status":"stopped","maxcpu":2,"maxmem":4294967296,"maxdisk":53687091200},
  {"type":"lxc","node":"n1","vmid":3,"name":"rossi-ct","status":"running","maxcpu":1,"maxmem":1073741824,"maxdisk":10737418240},
- {"type":"qemu","node":"n1","vmid":4,"name":"bianchi-gpu-1","status":"running","maxcpu":8,"maxmem":17179869184,"maxdisk":0},
+ {"type":"qemu","node":"n1","vmid":4,"name":"bianchi-gpu-1","tags":"gpu;gruppo-bianchi","status":"running","maxcpu":8,"maxmem":17179869184,"maxdisk":0},
  {"type":"qemu","node":"n1","vmid":5,"name":"rocky-template","status":"stopped","template":1,"maxcpu":2,"maxmem":1,"maxdisk":1},
  {"type":"qemu","node":"n1","vmid":6,"name":"misc","status":"running","maxcpu":1,"maxmem":1,"maxdisk":1},
  {"type":"storage","node":"n1","storage":"local","status":"available"}]`
