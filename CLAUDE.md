@@ -553,6 +553,16 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 5. Vista documento e PDF (manageriale bilingue IT poi EN, tecnico IT) — [Modello suggerito: Sonnet — ragionamento: alto — motivo: CSS di stampa e grafici ad alta risoluzione]
 6. Revisione di sicurezza e di design, prova sui dati reali — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione]
 
+## Gruppi dai tag di Proxmox (in corso, branch `feat/group-tags`)
+
+Decisioni D35-D42 (2026-11-04): tag `gruppo-<nome>`, `<nome>` `[a-z0-9]{1,32}` (D35); VM senza tag -> prefisso del nome solo se `gruppo-<prefisso>` esiste su almeno una VM, altrimenti "senza gruppo" (D36); piu' tag di gruppo -> VM ripartita in parti uguali (D37): RAM/disco in byte (resto al primo gruppo alfabetico), core e schede GPU in millesimi, conteggio VM pieno in ogni gruppo + `shared_vms`, totale VM dal cluster (D42); elenco gruppi = tag presenti, gruppo nuovo con conferma esplicita (D38); pagina "Gruppi" con proposta dal nome e revisione riga per riga (D39); "Cambia" nel pannello VM (D40); fotografie vecchie invariate, nuove con `group_source` (D41). Lettura del tag senza distinzione di maiuscole; scrittura sempre minuscola, altri tag preservati, un solo tag di gruppo scritto dall'app (sostituisce). I tag arrivano da `/cluster/resources` (campo `tags`, `;`). Il clone copia i tag: i template non devono avere tag di gruppo.
+
+**Piano a step:**
+1. Backend lettura: parsing dei tag, gruppi di una VM (D36/D37/D42) al posto di `vmGroup` in fotografia e report, schema `inv_group` con millesimi/`shared_vms`/`group_source` (migrazione compatibile), test — [Modello suggerito: Sonnet — ragionamento: alto — motivo: logica ben specificata, migrazione SQLite semplice]
+2. Backend scrittura: `GET /api/groups`, `PUT .../tags` del gruppo (whitelist, preserva altri tag, `digest`, conferma gruppo nuovo), applicazione in blocco per la pagina Gruppi (una alla volta, esito per VM), gruppo nel provisioning, test — [Modello suggerito: Sonnet — ragionamento: alto — motivo: scrittura di un solo campo non hardware, schema gia' usato nella pagina GPU]
+3. Interfaccia: pagina Gruppi (proposta dal nome, revisione, applica), campo gruppo in Nuova VM, riga nel pannello VM, origine del gruppo e data del cambio nei report — [Modello suggerito: Sonnet — ragionamento: alto — motivo: UI su componenti esistenti]
+4. Revisione di sicurezza e prova reale (etichettare poche VM indicate dall'utente) — [Modello suggerito: Opus — ragionamento: medio — motivo: revisione di una scrittura in blocco]
+
 ## Lavori da fare (non pianificati)
 
 - **Uso reale delle GPU nei guest** (D34): helper `nvidia-smi` in `/usr/local/libexec/pmgr/` (stesse regole degli altri helper: ASCII, argomenti posizionali, sola lettura) + raccolta; quando c'e', **estendere la reportistica** (Report v2: utilizzo GPU per VM/gruppo, GPU assegnate ma inutilizzate).
@@ -612,3 +622,6 @@ Fonte di verita': la configurazione delle VM in Proxmox (righe `hostpciN`) + `/n
 - 2026-11-03 — creazione VM: scheda precisa raggruppata per memoria, schede in uso in grigio con il nome della VM, motivi di non idoneita' per nodo — richiesta utente — `CLAUDE.md`, `ROADMAP.md`
 - 2026-11-03 — bilanciamento: migrazione a caldo o a freddo a scelta, simulazione approvata; restano riserva RAM e tetto CPU (proposte preparate) — richiesta utente — `CLAUDE.md`, `ROADMAP.md`
 - 2026-11-03 — bilanciamento: parametri approvati (riserva RAM 8 GB + 4 GB/OSD modificabile, blocco duro; CPU 4 vCPU/core e 80% p95 solo come avviso non bloccante) — richiesta utente — `CLAUDE.md`, `ROADMAP.md`
+- 2026-11-04 — avvio ROADMAP 1 (gruppi dai tag di Proxmox): branch `feat/group-tags`, domande D35-D41 (formato `gruppo-<nome>` proposto, ripiego sul nome solo per gruppi gia' esistenti, pagina di etichettatura con proposta dal nome) — richiesta utente — `DOMANDE.md`, `ROADMAP.md`, `CLAUDE.md`
+- 2026-11-04 — risposte D35-D41: tag `gruppo-<nome>` (D35 A); senza tag ripiego sul nome solo per gruppi gia' esistenti, altrimenti "senza gruppo" (D36 C); VM con piu' gruppi ripartita in parti uguali (D37 C, diverso dal suggerimento: aperta D42 su cosa si divide e schema delle fotografie); elenco gruppi dai tag presenti con conferma per i nuovi (D38 A); pagina Gruppi con proposta dal nome (D39 B); cambio dal pannello VM (D40); fotografie vecchie invariate + `group_source` (D41 A) — richiesta utente — `DOMANDE.md`, `CLAUDE.md`
+- 2026-11-04 — D42 B (VM condivisa: risorse divise, conteggio pieno + `shared_vms`); verifica tag in sola lettura sui due cluster: tag liberi (`user-tag-access` default), token con `VM.Config.Options`, nessun `gruppo-*` esistente — richiesta utente — `DOMANDE.md`, `CLAUDE.md`

@@ -10,7 +10,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 
 | # | Estensione | Valore | Dim. | Dipende da | Stato |
 |---|---|---|---|---|---|
-| 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | da fare |
+| 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | decisioni prese (D35-D42), piano in `CLAUDE.md`, step 1 da fare |
 | 2 | Convertire le 22 assegnazioni GPU dirette ai mapping | l'app può gestire tutte le GPU | S (lavoro in Proxmox) | — | da fare |
 | 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | specifiche pronte, da progettare |
 | 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | da fare |
@@ -26,7 +26,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Perché:** oggi il gruppo è il prefisso del nome VM (D27) e i report contano prefissi che non sono gruppi (`ubuntu`, `poli`, `blm`, `carlo`…).
 - **Cosa:** campo "gruppo" in **Nuova VM** che scrive il tag (formato da definire, es. `gruppo-rossi`; validazione `[a-z0-9]{1,32}`); `vmGroup` e `BuildSnapshot` leggono il tag con ripiego sul nome; azione in blocco per etichettare le 107 VM esistenti; nota nei report sull'origine del gruppo.
 - **Attenzione:** le fotografie già accumulate restano con il gruppo da nome (dichiararlo).
-- **Prima del codice:** formato del tag, chi può assegnarlo, cosa fare delle VM senza tag.
+- **Prima del codice:** domande D35-D41 in `DOMANDE.md` (formato tag, VM senza tag, doppi tag, elenco gruppi, etichettatura delle esistenti, cambio dal pannello, storico). Da leggere in sola lettura: `user-tag-access`/`registered-tags` del datacenter.
 - **Modelli:** progetto breve Opus medio, implementazione Sonnet alto.
 
 ### 2. Convertire le assegnazioni GPU dirette ai mapping

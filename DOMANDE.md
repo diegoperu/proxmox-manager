@@ -293,3 +293,77 @@ Gia' deciso dall'utente (2026-11-03): la pagina Report attuale si scarta e si ri
 **Domanda**: Proxmox sa quale VM ha quale GPU, non quanto la usa. Misurare l'uso reale (es. `nvidia-smi` via guest agent) richiede un nuovo helper nei guest e un collector. Fuori scope per ora?
 **Suggerimento**: fuori scope; il report mostra GPU assegnate/libere (e, con D28 A, da quanto tempo), che e' gia' l'indicatore di domanda.
 **Risposta utente**: 2026-11-03 — fuori scope per ora; da riprendere quando si aggiunge l'helper `nvidia-smi` (segnato tra i lavori da fare in `CLAUDE.md`).
+
+## Gruppi dai tag di Proxmox (ROADMAP 1, branch `feat/group-tags`, 2026-11-04)
+
+Contesto: oggi il gruppo e' il prefisso del nome VM (D27) e i report contano "gruppi" che non lo sono (`ubuntu`, `poli`, `blm`, `carlo`...). I tag di Proxmox arrivano gia' in `/cluster/resources` (campo `tags`, separati da `;`): leggerli non costa chiamate in piu'. Oggi sulle VM ci sono solo tag di sistema (`cloudinit`, `gpu`, `24.04`...). Proxmox ammette nei tag `[a-z0-9_][a-z0-9_.+-]*`; il datacenter puo' limitare chi crea tag nuovi (`user-tag-access`, `registered-tags`): da leggere in sola lettura prima del codice.
+
+### D35 — Formato del tag di gruppo
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Come si scrive il gruppo nel tag, per distinguerlo dai tag di sistema?
+**Perche' conta**: senza un prefisso riconoscibile `ubuntu` o `gpu` diventerebbero gruppi, cioe' lo stesso errore di oggi. Il formato e' un contratto: cambiarlo dopo significa rietichettare tutto.
+**Opzioni**: A) `gruppo-<nome>` (es. `gruppo-rossi`): leggibile anche nella UI di Proxmox; B) `g-<nome>`: corto, meno chiaro a chi non conosce la convenzione; C) `<nome>` nudo: ambiguo con i tag di sistema.
+**Suggerimento**: A. `<nome>` validato `[a-z0-9]{1,32}` come oggi (D27), quindi tag lungo al massimo 39 caratteri, compatibile con Proxmox.
+**Risposta utente**: 2026-11-04 — A: `gruppo-<nome>`
+
+### D36 — VM senza tag di gruppo
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: A quale gruppo va una VM senza tag `gruppo-*`?
+**Perche' conta**: finche' le 107 VM non sono etichettate i report dipendono da questa regola; e' anche la regola per le VM create fuori dall'app (da Proxmox).
+**Opzioni**: A) ripiego sul prefisso del nome, come oggi (restano i gruppi finti finche' non si etichetta); B) "senza gruppo" (report onesti ma vuoti all'inizio); C) ripiego sul prefisso **solo se** e' un gruppo che esiste gia' come tag su almeno un'altra VM, altrimenti "senza gruppo".
+**Suggerimento**: C: `rossi-vm2` senza tag finisce in `rossi` se `gruppo-rossi` esiste, `ubuntu-test` finisce in "senza gruppo". Nei report tecnici si vede l'origine (tag / nome / nessuno) per riga.
+**Risposta utente**: 2026-11-04 — C: ripiego sul prefisso del nome solo se il gruppo esiste gia' come tag, altrimenti "senza gruppo"
+
+### D37 — Piu' tag di gruppo sulla stessa VM
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Se una VM ha due tag `gruppo-*` (errore o VM condivisa), come la conto?
+**Opzioni**: A) gruppo "da verificare" + segnalazione nel report tecnico; B) il primo in ordine alfabetico; C) ripartita a meta' tra i gruppi.
+**Suggerimento**: A: nessuna scelta silenziosa; l'app non scrive mai due tag di gruppo (sostituisce).
+**Risposta utente**: 2026-11-04 — C: ripartita in parti uguali tra i gruppi (diverso dal suggerimento; dettagli in D42)
+
+### D38 — Elenco dei gruppi validi
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Da dove viene l'elenco dei gruppi proposto nella creazione VM?
+**Perche' conta**: un refuso (`gruppo-rosi`) crea un gruppo finto nei report del consiglio.
+**Opzioni**: A) dai tag gia' presenti sulle VM; un gruppo nuovo si crea scrivendolo, con conferma esplicita "nuovo gruppo"; B) lista in `config.json` gestita da Impostazioni (solo quelli ammessi); C) tag registrati di Proxmox (`registered-tags` del datacenter).
+**Suggerimento**: A: nessuna configurazione in piu', e la conferma "stai creando il gruppo X" ferma i refusi. B se volete un controllo rigido.
+**Risposta utente**: 2026-11-04 — A: elenco dai tag presenti, gruppo nuovo con conferma esplicita
+
+### D39 — Etichettare le VM esistenti
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Come si mettono i tag alle ~107 VM gia' presenti?
+**Perche' conta**: e' una scrittura in blocco sulla configurazione delle VM (solo il campo `tags`, a VM accesa va bene: non richiede riavvio).
+**Opzioni**: A) nuova azione in Batch "Imposta gruppo": selezioni le VM (anche filtrando per prefisso del nome), scegli il gruppo, conferma; B) pagina "Gruppi" con una proposta automatica per ogni VM (dal prefisso del nome) da accettare o correggere riga per riga e poi applicare; C) a mano in Proxmox / script esterno.
+**Suggerimento**: B: con 107 VM la proposta dal nome fa il grosso del lavoro e la revisione riga per riga toglie i finti (`ubuntu`). La scrittura preserva gli altri tag e usa il `digest` (come la pagina GPU). A si puo' aggiungere dopo.
+**Risposta utente**: 2026-11-04 — B: pagina "Gruppi" con proposta dal nome, revisione riga per riga
+
+### D40 — Cambiare il gruppo di una VM
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Oltre alla creazione, si puo' cambiare o togliere il gruppo dal pannello VM?
+**Suggerimento**: si': riga "Gruppo: rossi (tag) · Cambia" nel pannello VM, con conferma; stessa scrittura di D39.
+**Risposta utente**: 2026-11-04 — si': "Cambia" nel pannello VM, con conferma
+
+### D41 — Storico delle fotografie
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Le fotografie giornaliere dal 2026-11-03 usano il gruppo dal nome. Cosa ne facciamo dopo il passaggio ai tag?
+**Opzioni**: A) restano come sono; i report mostrano la data del cambio di regola e non confrontano gruppi prima/dopo; B) si ricalcolano (impossibile in modo esatto: le fotografie non contengono i nomi delle VM, per scelta D28).
+**Suggerimento**: A, con una colonna `group_source` nelle nuove fotografie per sapere quale regola era in vigore.
+**Risposta utente**: 2026-11-04 — A: fotografie vecchie invariate, data del cambio dichiarata, `group_source` nelle nuove
+
+### D42 — Come si ripartisce una VM condivisa (segue D37 C)
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Con D37 C una VM con tag `gruppo-a` e `gruppo-b` vale meta' per ciascuno. Cosa si divide esattamente?
+**Perche' conta**: la fotografia giornaliera oggi salva numeri interi (VM, core, RAM, disco, schede GPU per gruppo): va cambiato lo schema (`internal/history`). E i totali dei report devono tornare: la somma dei gruppi deve dare il totale del cluster.
+**Opzioni**: A) tutto in parti uguali, anche il conteggio (2 gruppi = 0,5 VM ciascuno; 3 gruppi = 0,33): i totali tornano sempre, ma compaiono "VM" con decimali; B) risorse (RAM, disco, core, GPU) in parti uguali, conteggio VM pieno per ogni gruppo (la VM compare in entrambi) + numero di VM condivise accanto: leggibile, ma la somma delle VM per gruppo supera il totale (il totale si prende dal cluster, non dalla somma); C) come B, ma la GPU (scheda intera, non divisibile) va a un "condiviso" invece che a meta'.
+**Suggerimento**: B. Schema: RAM e disco restano in byte (divisione intera, il resto al primo gruppo in ordine alfabetico per non perdere byte), core e schede in millesimi (colonne nuove), colonna `shared_vms`; le righe vecchie si leggono come prima. Il report tecnico mostra la VM con tutti i suoi gruppi; il manageriale scrive "di cui N condivise".
+**Risposta utente**: 2026-11-04 — B: risorse in parti uguali (byte con resto al primo gruppo alfabetico, core e schede in millesimi), conteggio VM pieno per gruppo + `shared_vms`; totale VM dal cluster.
+
+**Verifica in sola lettura (2026-11-04, entrambi i cluster):** `user-tag-access` e `registered-tags` non impostati = default Proxmox `free` (chi ha `VM.Config.Options` puo' creare tag nuovi); il token ha `VM.Config.Options` su `/vms` (e `Sys.Modify`): le scritture dei tag sono permesse. Nessun tag `gruppo-*` presente (CALCOLO 115 VM/25 tag distinti, HOSTING 29/7). Tag esistenti tutti di sistema (`cloudinit`, `ubuntu-template`, `24.04`, `gpu`, `a100`...), uno maiuscolo (`LTSC`): la lettura deve confrontare `gruppo-` senza distinzione di maiuscole e preservare gli altri tag cosi' come sono. Attenzione: il clone copia i tag del template/VM sorgente (un template non deve mai avere un tag di gruppo).
