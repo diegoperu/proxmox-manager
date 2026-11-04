@@ -106,7 +106,8 @@ type GPUCard struct {
 	Group    int      `json:"iommu_group"`
 	Status   string   `json:"status"` // free | assigned | conflict
 	Uses     []GPUUse `json:"uses"`
-	Mappings []string `json:"mappings"` // mapping ids that point to this card on this node
+	Mappings []string `json:"mappings"`  // mapping ids that point to this card on this node
+	MemoryGB int      `json:"memory_gb"` // video memory from the model name or the confirmed table; 0 = unknown
 }
 
 type GPUGroupMapping struct {
@@ -171,7 +172,7 @@ func BuildGPUInventory(nodes []GPUNodeInput, maps MappingSet, now time.Time) GPU
 		for addr, info := range n.PCI {
 			if info.IsNvidiaDisplay() {
 				name := strings.TrimSpace(strings.TrimSpace(info.Vendor) + " " + strings.TrimSpace(info.Device))
-				cards[addr] = &GPUCard{Addr: fullAddr(addr), Name: name, Group: info.Group, Status: "free", Uses: []GPUUse{}, Mappings: []string{}}
+				cards[addr] = &GPUCard{Addr: fullAddr(addr), Name: name, Group: info.Group, Status: "free", Uses: []GPUUse{}, Mappings: []string{}, MemoryGB: gpuMemoryGB(name)}
 			}
 		}
 		// mappings pointing to this node's cards; group mappings (several cards on this node) are tracked apart

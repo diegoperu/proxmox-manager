@@ -495,3 +495,71 @@ Contesto: oggi il gruppo e' il prefisso del nome VM (D27) e i report contano "gr
 **Suggerimento**: A: e' l'unica regola sicura con `cpu: host`; lo stesso modello esiste gia' a coppie/gruppi nel cluster (es. node-2/3/4 E5-2698 v4, node-1/8 Silver 4114).
 **Risposta utente**: 2026-11-04 — A
 **Modifica dell'utente (2026-11-04)**: il vincolo e' sul **produttore** (AMD/Intel), non sul modello (di fatto opzione B): l'utente ha migrato a mano a caldo la VM 174 (`cpu: host`) da `node-6` (Intel Xeon E5-2640 v4) a `node-1` (Intel Xeon Silver 4114) e ha funzionato. Rischio residuo segnalato all'utente: quella prova va da una generazione piu' vecchia (Broadwell) a una piu' nuova (Skylake); il verso opposto (es. `node-11` Gold 5120 -> `node-2` E5-2698 v4, o EPYC 7713 Milan -> EPYC 7302 Rome) toglie istruzioni al guest e non e' stato provato. **Provato poi (2026-11-04, VM 174):** Silver 4114 -> E5-2640 v4 a caldo ok; resta non provato solo tra generazioni AMD.
+
+## ROADMAP 3b — Nodo consigliato alla creazione VM + GPU nel deploy (2026-11-04)
+
+Fatti letti in sola lettura su CALCOLO: 8 template, tutti su `datacloud-node-1` tranne il Windows 130 (`node-11`); i template Linux hanno `cpu: host`, `q35`, dischi su `datacloud-ssd` (Ceph, condiviso). Schede: 27, 22 assegnate, 5 libere (A100 40GB su node-5 `HULK`; RTX PRO 6000 Blackwell e 2 H100L 94GB su node-10; A2/A16 su node-11), tutte con un mapping. Oggi `POST /api/provision` e' una richiesta sincrona che clona sul nodo del template.
+
+### D56 — Clone direttamente sul nodo scelto: prova reale
+**Stato**: RISPOSTA
+**Bloccante**: si' (decide il flusso di creazione)
+**Domanda**: Posso provare il clone con `target` (Proxmox lo ammette solo se il template e' su storage condiviso, come i vostri) creando una VM di prova e poi cancellandola?
+**Perche' conta**: se funziona, la VM nasce gia' sul nodo giusto (niente migrazione, GPU assegnata subito); se no, si clona sul nodo del template e si migra a freddo prima di assegnare la GPU (decisione del 2026-11-03).
+**Opzioni**: A) prova: clone completo del template 1003 (Ubuntu 24.04) come VM `test-clone-target` su un nodo diverso da `node-1` scelto da te, verifica (nodo, dischi su `datacloud-ssd`, config), poi cancellazione; la VM non viene mai avviata; B) niente prova: si usa subito clone + migrazione; C) prova su un altro template/nodo indicato da te.
+**Suggerimento**: A, con nodo di arrivo `datacloud-node-6` (nessuna GPU, nessun impatto).
+**Risposta utente**: 2026-11-04 — A
+**Esito della prova (2026-11-04)**: clone completo del template 1003 (`node-1`) con `target=datacloud-node-6`: OK in 9 s, VM 108 `test-clone-target` creata direttamente su `node-6`, dischi (`virtio0`, `efidisk0`, cloud-init) su `datacloud-ssd` (Ceph condiviso), `cpu: host`; mai avviata; cancellata con `purge=1&destroy-unreferenced-disks=1` (OK, nessun volume rimasto). Quindi: **si clona direttamente sul nodo scelto**, niente migrazione. Nota: per DELETE i parametri vanno nell'indirizzo, non nel corpo (con il corpo Proxmox risponde 501).
+
+### D57 — Chi guida la creazione
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: La creazione diventa una sequenza lunga (clone, risorse, disco, cloud-init, eventuale migrazione, GPU, avvio, attesa dell'agent, utente aggiuntivo). Chi la porta avanti?
+**Perche' conta**: oggi e' una sola richiesta HTTP che resta aperta fino a 10 minuti; se la pagina si chiude a meta' non si sa cosa e' stato fatto.
+**Opzioni**: A) il server, come la migrazione a freddo: una richiesta avvia la procedura, la pagina mostra le fasi (con esito per ognuna) e si puo' chiudere; procedura in memoria, piu' creazioni in parallelo ammesse (una per scheda GPU); B) resta una richiesta sincrona, allungata; C) la pagina chiama in sequenza le azioni esistenti.
+**Suggerimento**: A: stessa struttura gia' provata sulla migrazione a freddo, errori a meta' gestiti in un solo punto.
+**Risposta utente**: 2026-11-04 — A
+
+### D58 — Nodo scelto a mano oltre il limite di RAM
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: L'utente puo' cambiare il nodo consigliato. Se sceglie un nodo dove la VM supera la RAM assegnabile (fisica - riserva), cosa succede?
+**Perche' conta**: nel bilanciamento il limite e' un blocco duro (D43); alla creazione un amministratore potrebbe volerlo superare consapevolmente.
+**Opzioni**: A) blocco duro come nel bilanciamento: il nodo appare non idoneo con il motivo ("mancano 12 GB"); B) consentito con conferma di pericolo che dice di quanto si supera; C) consentito con un avviso semplice.
+**Suggerimento**: A: coerente con il bilanciamento, che altrimenti proporrebbe subito di spostarla.
+**Risposta utente**: 2026-11-04 — A
+
+### D59 — Nodo consigliato con GPU
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Con una GPU l'utente sceglie la scheda precisa (decisione 2026-11-03), quindi il nodo e' quello della scheda. Come entra il "consigliato"?
+**Perche' conta**: senza regola il consiglio sul nodo e quello sulla scheda possono contraddirsi.
+**Opzioni**: A) nell'elenco delle schede libere (raggruppate per memoria) la scheda il cui nodo e' piu' adatto (RAM dopo, pareggio) e' marcata "consigliata"; le schede su nodi dove la VM non entra sono in grigio con il motivo; B) prima si sceglie il nodo consigliato, poi solo le schede di quel nodo.
+**Suggerimento**: A.
+**Risposta utente**: 2026-11-04 — A
+
+### D60 — Memoria delle schede (raggruppamento)
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Proxmox non dice la memoria della scheda. Va bene questa tabella, ricavata dai nomi delle schede del cluster?
+**Perche' conta**: l'elenco delle schede e' raggruppato per memoria (decisione 2026-11-03); un valore sbagliato porta a scegliere la scheda sbagliata.
+**Opzioni**: A) se il nome contiene "NNGB" si usa quello, altrimenti tabella: A2/A16 16 GB (A16 = 4 GPU da 16 GB, ogni funzione PCI e' una GPU da 16), T4 16 GB, A10 24 GB, L4 24 GB, A100 SXM4 40GB 40 GB, H100L 94GB 94 GB, RTX PRO 6000 Blackwell Max-Q 96 GB; modello non in tabella = gruppo "memoria non nota"; B) tabella da correggere (scrivere i valori giusti).
+**Suggerimento**: A, da confermare in particolare per A2/A16 (le schede di node-1/7/11 sono A2 o A16?).
+**Risposta utente**: 2026-11-04 — A (le schede A2/A16 sono A2); tabella confermata. In piu': nella pagina GPU aggiungere un modo per correggere o modificare i nomi e le dimensioni di RAM delle GPU identificate (vedi D62)
+
+### D61 — Utente aggiuntivo e avvio
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Dopo l'avvio quanto si aspetta il guest agent prima di aggiungere l'utente, e cosa si fa se non risponde?
+**Perche' conta**: al primo avvio cloud-init installa pacchetti e puo' metterci minuti; l'agent potrebbe non esserci (template senza agent).
+**Opzioni**: A) attesa fino a 5 minuti; se l'agent non risponde la creazione termina "con avviso": VM creata e accesa, utente aggiuntivo non creato, da aggiungere col pulsante; B) attesa 10 minuti; C) come A ma con un secondo tentativo dopo altri 5 minuti.
+**Suggerimento**: A.
+**Risposta utente**: 2026-11-04 — C: attesa fino a 5 minuti, secondo tentativo dopo altri 5; se fallisce anche il secondo, la creazione termina con avviso (VM creata e accesa, utente aggiuntivo da aggiungere col pulsante)
+
+### D62 — Correggere nome e memoria delle schede dalla pagina GPU
+**Stato**: RISPOSTA
+**Bloccante**: no (per il consiglio si parte dalla tabella confermata in D60)
+**Domanda**: Nella pagina GPU si vogliono poter correggere il nome mostrato e la memoria (GB) di un modello di scheda. Dove si salvano queste correzioni e a chi valgono?
+**Perche' conta**: oggi non si salva niente di questo tipo; la memoria serve a raggruppare le schede nella creazione VM e nei report. Le regole dicono niente `localStorage` e preferenze nel `config.json` via backend.
+**Opzioni**: A) per **modello** (stringa che Proxmox riporta, es. `GA107GL [A2 / A16]`): una voce `gpu_models` in `config.json` con nome mostrato e GB, valida per tutte le schede di quel modello e per tutti i cluster; salvataggio da una finestra "Modifica modello" nella pagina GPU, validato (nome <= 64 caratteri, GB intero 1-512), la tabella di D60 resta il valore predefinito; B) come A ma separata per cluster; C) per singola scheda (indirizzo + nodo).
+**Suggerimento**: A: la memoria e il nome sono proprieta' del modello, non della scheda; poche voci, nessun nuovo file.
+**Risposta utente**: 2026-11-04 — A
