@@ -422,6 +422,25 @@ td.spk{width:130px}
 .otag{font-size:11px;font-weight:600;color:var(--text3);min-width:34px}
 .pbtn{background:none;border:0;padding:0;color:inherit;font:inherit;font-weight:700;cursor:pointer;text-align:left}
 .pbtn:hover{color:var(--accent)}.pbtn[aria-pressed=true]{color:var(--accent);text-decoration:underline}
+.bal-opt{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.bal-params{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin:10px 0}
+.bal-params label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text3)}
+.bal-n{display:grid;grid-template-columns:minmax(140px,190px) minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center;padding:10px var(--card-pad);border-top:1px solid var(--border)}
+.bal-n:first-child{border-top:0}
+.bal-n .sn{font-weight:600;overflow-wrap:anywhere}.bal-n .sn small{display:block;font-weight:400;font-size:12px;color:var(--text3)}
+.bal-m .lb{display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:3px}
+.bal-m .lb b{color:var(--text);font-variant-numeric:tabular-nums}
+.bal-m .bw{position:relative}
+.bal-m .bw .tick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
+.bal-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.bal-flag{font-size:11px;border:1px dashed var(--border2);border-radius:6px;padding:1px 6px;color:var(--text2)}
+.bal-flag.r{border-color:var(--red);color:var(--red)}.bal-flag.w{border-color:var(--warn);color:var(--warn)}
+.bal-steps td.bst{white-space:nowrap}
+.bal-run{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);margin:0 0 12px;font-size:13px}
+.bal-run.ask{border-color:var(--warn);flex-wrap:wrap}.bal-run.ask .bal-act{display:flex;gap:8px;margin-left:auto}
+.bal-run.bad{border-color:var(--red)}
+.bal-mode{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+@media(max-width:850px){.bal-n{grid-template-columns:1fr}}
 .olegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--text3);margin:0 0 8px}
 .olegend span{display:inline-flex;gap:6px;align-items:center}
 .olegend .osd{width:12px;height:16px;border-radius:3px}
@@ -818,6 +837,9 @@ html.spiderman{
     <button type="button" class="ni" data-page="cluster">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Cluster
     </button>
+    <button type="button" class="ni" data-page="balance">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></svg>Bilanciamento
+    </button>
     <div class="nav-sec">Analisi</div>
     <button type="button" class="ni" data-page="reports">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
@@ -827,7 +849,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.126.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.128.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -896,6 +918,32 @@ html.spiderman{
       <p class="cnote" style="margin:-4px 0 12px">Il gruppo e' il tag <span class="tm">gruppo-nome</span> della VM in Proxmox. Per le VM senza tag il campo propone il prefisso del nome: controllalo (non tutti i prefissi sono gruppi) e spunta solo le righe giuste. Nessuna VM viene riavviata; gli altri tag restano.</p>
       <div id="grp-body"></div>
       <datalist id="grp-dl"></datalist>
+    </div>
+
+    <!-- ██ BILANCIAMENTO ██ -->
+    <div class="page" id="page-balance">
+      <div class="cond" id="bal-cond" aria-live="polite"></div>
+      <div class="toolbar" style="margin-top:18px">
+        <label class="bal-opt"><input type="checkbox" class="chk" id="bal-stopped" checked onchange="Balance.changed()"> Le VM spente contano</label>
+        <label class="bal-opt"><input type="checkbox" class="chk" id="bal-cold" onchange="Balance.changed()"> Includi i container (riavvio breve)</label>
+        <label class="bal-opt">Simula lo spegnimento di <select class="inp" id="bal-evac" onchange="Balance.changed()"><option value="">nessun nodo</option></select></label>
+        <label class="bal-opt">Solo queste VM <input class="inp" type="text" id="bal-only" inputmode="numeric" maxlength="400" placeholder="VMID, es. 174 180" style="width:150px" onchange="Balance.changed()" aria-describedby="bal-only-h"></label>
+        <span class="sr" id="bal-only-h">Numeri delle VM separati da spazio o virgola: tutte le altre restano ferme. Vuoto = tutte.</span>
+        <span class="sp"></span>
+        <button type="button" class="btn bg2 sm" onclick="Balance.load(true)" id="bal-reload">Ricalcola</button>
+      </div>
+      <details class="sh-det" id="bal-adv" style="margin:0 0 12px">
+        <summary>Parametri del piano</summary>
+        <div class="bal-params">
+          <label>Passi al massimo<input class="inp" type="number" id="bal-steps" min="1" max="50" value="10" onchange="Balance.changed()"></label>
+          <label>Riserva host (GB)<input class="inp" type="number" id="bal-host" min="0" max="512" step="1" value="8" onchange="Balance.changed()"></label>
+          <label>Riserva per OSD Ceph (GB)<input class="inp" type="number" id="bal-osd" min="0" max="64" step="0.5" value="4" onchange="Balance.changed()"></label>
+          <label>vCPU per core (avviso)<input class="inp" type="number" id="bal-vcpu" min="0.5" max="64" step="0.5" value="4" onchange="Balance.changed()"></label>
+          <label>CPU p95 oltre il (%, avviso)<input class="inp" type="number" id="bal-cpu" min="1" max="100" step="1" value="80" onchange="Balance.changed()"></label>
+        </div>
+        <p class="cnote">Il blocco duro e' solo la RAM: un nodo non riceve mai VM oltre la sua RAM fisica meno la riserva. Gli avvisi di CPU non bloccano nulla.</p>
+      </details>
+      <div id="bal-body"></div>
     </div>
 
     <!-- ██ NODES ██ -->
@@ -1941,7 +1989,7 @@ const ClusterMgr={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',reports:'Report',settings:'Impostazioni'};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',reports:'Report',settings:'Impostazioni'};
 // Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
@@ -1993,6 +2041,7 @@ const App={
     if(p==='ceph')      Ceph.load();
     else                Ceph.probe();
     if(p==='groups')    Groups.load();
+    if(p==='balance')   Balance.load();
     if(p==='gpu')       Gpu.load();
     else                Gpu.probe();
     if(p==='settings')  Settings.load();
@@ -2184,6 +2233,7 @@ const Palette={
   base(){
     const KW={dashboard:'home panoramica stato salute',nodes:'nodi server host hardware',vms:'virtual machine container lxc qemu kvm',
       provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',ceph:'ceph storage osd pool rbd salute capacita meteo',gpu:'gpu scheda video nvidia assegna passthrough pci mapping',
+      balance:'bilanciamento pareggio carico ram migrazione sposta vm nodo simulazione spegni nodo',
       groups:'gruppo gruppi tag etichetta progetto laboratorio proprietario',
       reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
     const items=Object.entries(PMETA).filter(([k])=>(k!=='ceph'||Ceph.isAvail())&&(k!=='gpu'||Gpu.isAvail())).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
@@ -3104,6 +3154,233 @@ const Groups={
     };
     if(fresh.length)askConfirm({title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
     else go();
+  },
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// BILANCIAMENTO (ROADMAP 3, D43-D49): propone migrazioni per pareggiare la RAM dei nodi. Il piano lo calcola il server
+// (GET /api/balance, sola lettura); si esegue UN passo alla volta (POST /api/balance/step): il server ricalcola il piano
+// e migra solo se il primo passo e' ancora quello mostrato qui. Ogni testo esterno (nomi VM e nodi) passa da esc().
+// ════════════════════════════════════════════════════════════════════════════
+const Balance={
+  d:null, seq:0, busy:false, run:null, timer:null, cold:new Set(), notice:null,
+  // procedura a freddo (D50-D53): fasi e esiti arrivano come codici dal server
+  PHASE:{shutdown:'spegnimento ordinato in corso (fino a 3 minuti)',stopping:'stop forzato in corso',migrating:'spostamento a VM spenta',starting:'riaccensione sul nodo di arrivo',need_force:'la VM non si e\' spenta'},
+  BLOCK:{gpu:'Ha una scheda PCI (GPU): resta sul suo nodo',local_resource:'Ha risorse legate al nodo (PCI/USB)',local_disk:'Ha un disco su uno storage non condiviso',
+    lock:'Ha un\'operazione in corso (lock)',ha:'E\' gestita dall\'HA di Proxmox',lxc_restart:'Container: si sposta solo con riavvio (attiva "Includi i container")',
+    no_target:'Proxmox non consente nessun altro nodo',node_offline:'Il suo nodo e\' fuori linea',not_counted:'Spenta e non conteggiata: spostarla non cambia il carico',
+    unverified:'Non e\' stato possibile verificarla: non si sposta',
+    cpu_host:'CPU "host": a caldo solo verso un nodo dello stesso produttore (AMD o Intel), e non ce n\'e\' uno libero (spunta "a freddo" per spostarla spegnendola)'},
+  WHY:{evacuate:'Svuotamento del nodo',over_limit:'Il nodo supera la RAM assegnabile',balance:'Pareggio del carico'},
+  gb(b){return Math.round((b||0)/1073741824);},
+  warnTxt(w,p){return w==='cpu_vcpu'?`oltre ${p.vcpu} vCPU per core`:w==='cpu_p95'?`CPU reale oltre il ${p.cpu}%`:String(w);},
+  params(){
+    const g=id=>document.getElementById(id), num=(id,lo,hi,def)=>{const v=parseFloat(g(id).value);return Number.isFinite(v)&&v>=lo&&v<=hi?v:def;};
+    const p={host_reserve_gb:num('bal-host',0,512,8),per_osd_gb:num('bal-osd',0,64,4),max_steps:Math.round(num('bal-steps',1,50,10)),
+      vcpu_per_core:num('bal-vcpu',0.5,64,4),cpu_warn:num('bal-cpu',1,100,80),count_stopped:g('bal-stopped').checked?1:0,cold:g('bal-cold').checked?1:0};
+    const ev=g('bal-evac').value; if(/^[A-Za-z0-9.-]{1,64}$/.test(ev))p.evacuate=ev;
+    const only=Balance.onlyIds(); if(only.length)p.only=only.join(',');
+    if(Balance.cold.size)p.cold_vms=[...Balance.cold].sort((a,b)=>a-b).slice(0,64).join(',');
+    return p;
+  },
+  // "Solo queste VM": VMID validi (1-999999999), al massimo 64; il resto del testo si ignora e si segnala
+  onlyIds(){
+    const raw=document.getElementById('bal-only').value.split(/[\s,;]+/).filter(Boolean);
+    const ok=[...new Set(raw.filter(x=>/^[1-9][0-9]{0,8}$/.test(x)).map(Number))].slice(0,64);
+    Balance.onlyBad=raw.length-raw.filter(x=>/^[1-9][0-9]{0,8}$/.test(x)).length;
+    return ok;
+  },
+  qs(fresh){const p=Balance.params();if(fresh)p.fresh=1;return Object.entries(p).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');},
+  changed(){if(Balance.busy||Balance.run)return;Balance.load(false);},
+  async load(fresh){
+    const seq=++Balance.seq, body=document.getElementById('bal-body');
+    if(!Balance.d)body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo del piano (la prima volta puo\' richiedere qualche secondo)…</div>';
+    const btn=document.getElementById('bal-reload'); btn.disabled=true;
+    let d;
+    try{d=await api('/balance?'+Balance.qs(fresh),{quiet:true,timeoutMs:120000});}
+    catch(e){btn.disabled=false;if(seq===Balance.seq)body.innerHTML=e.status===429?errBox('Un altro calcolo e\' in corso su questo cluster.','Balance.load()'):errBox(e.message,'Balance.load()');return;}
+    btn.disabled=false;
+    if(seq!==Balance.seq)return;
+    Balance.d=d; Balance.fillNodes(); Balance.paint();
+  },
+  fillNodes(){
+    const sel=document.getElementById('bal-evac'), cur=sel.value; sel.replaceChildren(new Option('nessun nodo',''));
+    for(const n of Balance.d.nodes){if(n.online)sel.append(new Option(n.name,n.name));}
+    sel.value=[...sel.options].some(o=>o.value===cur)?cur:'';
+  },
+  paint(){
+    const d=Balance.d, p=Balance.params(), body=document.getElementById('bal-body');
+    const over=d.nodes.filter(n=>n.over_before).length, evac=d.nodes.some(n=>n.evacuated);
+    const level=over?'bad':(d.steps.length||d.unplaced.length)?'warn':'ok';
+    const title=over?`Attenzione · ${over} ${Dashboard.plural(over,'nodo oltre','nodi oltre')} il limite di RAM`:d.steps.length?`Quasi sereno · scarto di ${d.spread_before} punti tra i nodi`:`Sereno · nodi in equilibrio (scarto ${d.spread_before} punti)`;
+    const sub=evac?`Svuotando ${esc(d.nodes.filter(n=>n.evacuated).map(n=>n.name).join(', '))} servono ${d.steps.length} ${Dashboard.plural(d.steps.length,'passo','passi')}${d.unplaced.length?`, ${d.unplaced.length} ${Dashboard.plural(d.unplaced.length,'VM non trova','VM non trovano')} posto`:''}. Il piano e' una simulazione finche' non esegui un passo: i passi eseguiti spostano davvero le VM.`
+      :d.steps.length?`${d.steps.length} ${Dashboard.plural(d.steps.length,'passo proposto','passi proposti')}: lo scarto scende a ${d.spread_after} punti spostando ${this.gb(d.moved_bytes)} GB. Carico di riferimento ${d.target_pct}% della RAM assegnabile.`
+      :d.stop==='no_move'?'Lo scarto c\'e\' ma nessuna VM spostabile lo riduce (vedi le VM bloccate).':'Nessuno spostamento utile.';
+    document.getElementById('bal-cond').innerHTML=`<svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg><div><h2>${esc(title)}</h2><p>${sub}</p></div>`;
+    const m=d.meta, notes=[];
+    if(!m.ceph_known)notes.push('Ceph non letto: la riserva per gli OSD non e\' applicata.');
+    if(!m.ha_known)notes.push('HA non letta: le VM gestite dall\'HA potrebbero non risultare bloccate.');
+    if(!m.cpu_known)notes.push('CPU storica non letta: gli avvisi di CPU reale mancano.');
+    if((m.partial||[]).includes('cpu_vendor'))notes.push('Produttore del processore (AMD/Intel) di qualche nodo non letto: quei nodi non ricevono a caldo le VM con CPU "host".');
+    if(Balance.onlyBad)notes.push('Nel filtro "Solo queste VM" ci sono valori che non sono VMID: ignorati.');
+    if(p.only)notes.push(`Filtro attivo: si spostano solo le VM ${p.only.split(',').join(', ')}.`);
+    if(m.unverified)notes.push(`${m.unverified} ${Dashboard.plural(m.unverified,'VM non verificabile','VM non verificabili')}: non si spostano.`);
+    body.innerHTML=`${Balance.runHTML()}${notes.length?`<p class="cnote" style="margin:12px 0">${notes.map(esc).join(' ')}</p>`:''}
+      <h2 class="sec" style="margin-top:22px">Nodi <small>percentuale di RAM assegnabile (fisica meno riserva) occupata dalle VM, prima e dopo il piano</small></h2>
+      <div class="panel stations">${d.nodes.map(n=>Balance.nodeRow(n,p)).join('')}</div>
+      ${Balance.steps(d,p)}${Balance.unplaced(d)}${Balance.blocked(d)}`;
+  },
+  nodeRow(n,p){
+    const bar=(pct)=>{const c=pct>100?'crit2':pct>=85?'warn2':'ok2';return`<div class="bw"><div class="bf2 ${c}" style="width:${Math.min(100,pct)}%"></div></div>`;};
+    const flags=[];
+    if(!n.online)flags.push('<span class="bal-flag r">fuori linea</span>');
+    if(n.evacuated)flags.push('<span class="bal-flag w">da svuotare</span>');
+    if(n.over_before)flags.push(`<span class="bal-flag r">oltre il limite di RAM${n.over_after?' anche dopo':''}</span>`);
+    for(const w of n.warnings||[])flags.push(`<span class="bal-flag w">${esc(Balance.warnTxt(w,p))}${(n.warnings_before||[]).includes(w)?'':' (dopo)'}</span>`);
+    const dv=n.pct_after-n.pct_before, arrow=Math.abs(dv)<0.05?'':dv>0?' ▲':' ▼';
+    return`<div class="bal-n">
+      <div class="sn">${esc(n.name)}<small>${n.vms_before} → ${n.vms_after} VM · ${this.gb(n.assignable)} GB assegnabili (riserva ${this.gb(n.reserve)} GB${n.osds?`, ${n.osds} OSD`:''})</small><div class="bal-tags">${flags.join('')}</div></div>
+      <div class="bal-m"><div class="lb"><span>Prima</span><b>${n.pct_before}%</b></div>${bar(n.pct_before)}<div class="lb" style="margin-top:2px"><span>${this.gb(n.load_before)} GB</span><span>CPU reale ${n.cpu_p95_before>=0?n.cpu_p95_before+'%':'n/d'}</span></div></div>
+      <div class="bal-m"><div class="lb"><span>Dopo</span><b>${n.pct_after}%${arrow}</b></div>${bar(n.pct_after)}<div class="lb" style="margin-top:2px"><span>${this.gb(n.load_after)} GB</span><span>CPU reale ${n.cpu_p95_after>=0?n.cpu_p95_after+'%':'n/d'}</span></div></div>
+    </div>`;
+  },
+  coldBox(vmid,name,on){
+    return`<label class="bal-mode"><input type="checkbox" ${on?'checked':''} ${Balance.run||Balance.busy?'disabled':''} onchange="Balance.setCold(${js(vmid)},this.checked)" aria-label="${esc('Sposta '+name+' a freddo')}"> a freddo</label>`;
+  },
+  modeCell(s){
+    if(s.kind==='lxc')return`<span class="td">${s.running?'riavvio breve':'container spento'}</span>`;
+    if(!s.running)return'<span class="td">a freddo (spenta)</span>';
+    return Balance.coldBox(s.vmid,s.name||s.vmid,s.cold)+(s.same_vendor?' <span class="td" title="La VM usa la CPU host: a caldo va solo su un nodo dello stesso produttore (AMD o Intel)">· stesso produttore CPU</span>':'');
+  },
+  // la scelta a caldo/a freddo fa parte del piano (D55: a freddo si puo' cambiare processore), quindi si ricalcola
+  setCold(vmid,on){vmid=Number(vmid);if(!Number.isInteger(vmid)||vmid<1)return;if(on)Balance.cold.add(vmid);else Balance.cold.delete(vmid);Balance.changed();},
+  steps(d,p){
+    if(!d.steps.length)return'';
+    const rows=d.steps.map((s,i)=>`<tr>
+      <td>${s.n}</td>
+      <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${js(s.from)},${js(s.vmid)},${js(s.kind)})"><span class="nm">${esc(s.name||('VM '+s.vmid))}</span></button> <span class="td">${tbadge(s.kind)} ${esc(s.vmid)}</span></td>
+      <td class="bst">${esc(s.from)} → <b>${esc(s.to)}</b></td><td>${this.gb(s.mem)} GB</td>
+      <td>${esc(Balance.WHY[s.why]||s.why)}</td>
+      <td>${Balance.modeCell(s)}</td>
+      <td>${(s.warnings||[]).map(w=>`<span class="bal-flag w">${esc(Balance.warnTxt(w,p))}</span>`).join(' ')||'<span class="td">—</span>'}</td>
+      <td>${s.spread_after}</td>
+      <td>${i!==0?'<span class="td">dopo il passo '+(i)+'</span>':!d.meta.exec_allowed?'<span class="td">solo simulazione</span>':`<button type="button" class="btn ba sm" onclick="Balance.exec(0)" ${Balance.run||Balance.busy?'disabled':''}>Esegui</button>`}</td></tr>`).join('');
+    const sim=d.meta.exec_allowed?'':`<p class="cnote" style="margin:8px 0 0"><b>Solo simulazione:</b> con una riserva sotto ${esc(d.meta.exec_min_reserve_gb)} GB per nodo il piano si puo' guardare ma non eseguire (un nodo potrebbe riempirsi fino alla RAM fisica). Riporta la riserva host ad almeno ${esc(d.meta.exec_min_reserve_gb)} GB per eseguire.</p>`;
+    return`<h2 class="sec" style="margin-top:22px">Piano <small>si esegue un passo alla volta: dopo ogni migrazione il piano si ricalcola da zero</small></h2>
+      <div class="panel"><div class="tw"><table class="bal-steps"><thead><tr><th>#</th><th>VM</th><th>Da → a</th><th>RAM</th><th>Perche'</th><th>Modo</th><th>Avvisi sul nodo di arrivo</th><th>Scarto dopo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>${sim}
+      <p class="cnote" style="margin-top:8px">Una VM accesa si sposta a caldo (resta in funzione, carica rete e storage) oppure, con la spunta "a freddo", viene spenta, spostata e riaccesa (resta ferma per tutta la durata); un container acceso si sposta sempre con un riavvio breve; una VM spenta si sposta a freddo. Il server riverifica tutte le regole (RAM, VM bloccate, nodi consentiti) subito prima di migrare.</p>`;
+  },
+  unplaced(d){
+    if(!d.unplaced.length)return'';
+    const rows=d.unplaced.map(u=>`<tr><td class="tn">${esc(u.name||('VM '+u.vmid))} <span class="td">${esc(u.vmid)}</span></td><td>${esc(u.node)}</td><td>${this.gb(u.mem)} GB</td><td>${u.reason==='pinned'?'Fuori dal filtro "Solo queste VM": resta sul nodo':u.reason==='blocked'?'E\' bloccata (vedi sotto): resta sul nodo':`Non entra in nessun altro nodo: il piu' libero ha ${this.gb(u.best_free)} GB`}</td></tr>`).join('');
+    return`<h2 class="sec" style="margin-top:22px">VM che restano sul nodo da svuotare <small>${d.unplaced.length}</small></h2>
+      <div class="panel"><div class="tw"><table><thead><tr><th>VM</th><th>Nodo</th><th>RAM</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  },
+  blocked(d){
+    if(!d.blocked.length)return'';
+    const rows=d.blocked.map(b=>`<tr><td class="tn"><button type="button" class="nm-btn" onclick="VMs.detail(${js(b.node)},${js(b.vmid)},${js(b.kind)})"><span class="nm">${esc(b.name||('VM '+b.vmid))}</span></button> <span class="td">${tbadge(b.kind)} ${esc(b.vmid)}</span></td><td>${esc(b.node)}</td><td>${this.gb(b.mem)} GB</td><td>${b.reasons.map(r=>esc(Object.hasOwn(Balance.BLOCK,r)?Balance.BLOCK[r]:r)).join('; ')}${b.reasons.length===1&&b.reasons[0]==='cpu_host'?' '+Balance.coldBox(b.vmid,b.name||b.vmid,false):''}</td></tr>`).join('');
+    return`<details class="sh-det" style="margin-top:22px"><summary>VM che non si spostano (${d.blocked.length})</summary>
+      <div class="panel" style="margin-top:8px"><div class="tw"><table><thead><tr><th>VM</th><th>Nodo</th><th>RAM</th><th>Perche'</th></tr></thead><tbody>${rows}</tbody></table></div></div></details>`;
+  },
+  runHTML(){
+    const r=Balance.run;
+    if(!r){
+      const n=Balance.notice; if(!n)return'';
+      return`<div class="bal-run ${n.bad?'bad':''}" id="bal-run" role="status"><div>${esc(n.text)}</div><div class="bal-act" style="margin-left:auto"><button type="button" class="btn bg2 sm" onclick="Balance.notice=null;Balance.paint()">Chiudi</button></div></div>`;
+    }
+    if(!r.job)return`<div class="bal-run" id="bal-run" role="status"><div class="spin"></div><div>Migrazione in corso: <b>${esc(r.name)}</b> ${esc(r.from)} → ${esc(r.to)}. ${r.running?'La VM resta accesa.':''} Non chiudere la pagina: il passo successivo si abilita alla fine.</div></div>`;
+    if(r.phase==='need_force'){
+      const by=r.decideBy?new Date(r.decideBy*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
+      return`<div class="bal-run ask" id="bal-run" role="alert"><div><b>${esc(r.name)}</b> non si e' spenta entro 3 minuti. Forzare lo stop (come staccare la corrente: i dati non salvati nella VM si perdono)? ${by?`Senza risposta entro le ${esc(by)} lo spostamento si annulla e la VM resta accesa.`:''}</div>
+        <div class="bal-act"><button type="button" class="btn bg2 sm" onclick="Balance.decide(false)" ${r.deciding?'disabled':''}>Annulla, resta accesa</button><button type="button" class="btn bx sm" onclick="Balance.askForce()" ${r.deciding?'disabled':''}>Stop forzato…</button></div></div>`;
+    }
+    return`<div class="bal-run" id="bal-run" role="status"><div class="spin"></div><div>Spostamento a freddo: <b>${esc(r.name)}</b> ${esc(r.from)} → ${esc(r.to)} · ${esc(Balance.PHASE[r.phase]||'in corso')}. La procedura continua sul server anche se chiudi la pagina.</div></div>`;
+  },
+  repaintRun(){const el=document.getElementById('bal-run'), h=Balance.runHTML();if(el){if(h)el.outerHTML=h;else el.remove();}else if(App.cur==='balance'&&Balance.d)Balance.paint();},
+  askForce(){
+    const r=Balance.run; if(!r||!r.job)return;
+    askConfirm({title:`Stop forzato di ${r.name}`,lines:[`La VM ${r.name} su ${r.from} non ha completato lo spegnimento ordinato.`,`Dopo lo stop verra' spostata su ${r.to} e riaccesa.`],
+      consequence:'Lo stop forzato equivale a staccare la corrente: i dati non salvati nella VM vanno persi.',level:'danger',okLabel:'Stop forzato'},()=>Balance.decide(true));
+  },
+  async decide(force){
+    const r=Balance.run; if(!r||!r.job||r.deciding)return;
+    r.deciding=true; Balance.repaintRun();
+    try{await api('/balance/job/decide?id='+encodeURIComponent(r.job),{method:'POST',quiet:true,body:JSON.stringify({force})});}
+    catch(e){toast(e.body&&e.body.reason==='not_waiting'?'La procedura non aspettava piu\' una risposta':e.message,'err');}
+    r.deciding=false; Balance.poll();
+  },
+  coldEnd(r,v){
+    const n=r.name, d=v.detail?` (${v.detail})`:'';
+    const T={ok:[`${n} spostata a freddo su ${r.to} e riaccesa`,0],cancelled:[`Spostamento annullato: ${n} resta accesa su ${r.from}`,0],
+      cancel_restarted:[`Spostamento annullato: ${n} si era spenta nel frattempo ed e' stata riaccesa su ${r.from}`,0],
+      shutdown_failed:[`${n} non si e' fermata${d}: niente e' stato spostato`,1],
+      migrate_failed_restarted:[`Migrazione di ${n} non riuscita${d}: la VM e' stata riaccesa su ${r.from}`,1],
+      migrate_failed:[`Migrazione di ${n} non riuscita${d} e la riaccensione e' fallita: la VM e' SPENTA, controlla in Proxmox`,2],
+      start_failed:[`${n} e' stata spostata su ${r.to} ma non si riaccende${d}: la VM e' SPENTA su ${r.to}`,2]};
+    const [text,sev]=T[v.result]||[`Spostamento di ${n} terminato: ${v.result}`,1];
+    toast(text,sev?'err':'ok');
+    if(sev)Balance.notice={text,bad:sev===2};
+  },
+
+  // ── esecuzione di UN passo ──
+  exec(i){
+    const d=Balance.d; if(!d||Balance.run||Balance.busy||!d.meta.exec_allowed)return;
+    const s=d.steps[i]; if(!s||i!==0)return;
+    const p=Balance.params();
+    const lines=[`VM: ${s.name||s.vmid} (${s.kind==='lxc'?'LXC':'QEMU'} ${s.vmid}) · ${this.gb(s.mem)} GB di RAM`,`Da ${s.from} a ${s.to}`,`Perche': ${Balance.WHY[s.why]||s.why}`];
+    if(s.warnings&&s.warnings.length)lines.push('Attenzione sul nodo di arrivo: '+s.warnings.map(w=>Balance.warnTxt(w,p)).join(', '));
+    const cold=!!s.cold;
+    lines.push(`Modo: ${s.kind==='lxc'?(s.running?'riavvio breve del container':'container spento'):!s.running?'a freddo (la VM e\' spenta)':cold?'a freddo (spegni, sposta, riaccendi)':'a caldo'}`);
+    const cons=s.kind==='lxc'&&s.running?'Il container viene riavviato durante lo spostamento (interruzione breve).'
+      :cold?`La VM viene spenta in modo ordinato (fino a 3 minuti), spostata e riaccesa su ${s.to}: resta ferma per tutta la durata. Se non si spegne ti verra' chiesto se forzare lo stop.`
+      :s.running?'Migrazione a caldo: la VM resta accesa, ma carica rete e storage per tutta la durata.':'La VM e\' spenta: viene spostata a freddo.';
+    askConfirm({title:`Sposta ${s.name||('VM '+s.vmid)} su ${s.to}`,lines,consequence:cons,level:s.running?'warn':'safe',okLabel:'Sposta'},()=>Balance.go(s,cold));
+  },
+  async go(s,cold){
+    Balance.busy=true; Balance.notice=null;
+    try{
+      const r=await api('/balance/step?'+Balance.qs(true),{method:'POST',quiet:true,timeoutMs:120000,body:JSON.stringify({node:s.from,kind:s.kind,vmid:s.vmid,target:s.to,mode:cold?'cold':'live'})});
+      Balance.busy=false; _tc.clear();
+      if(r.job){Balance.cold.delete(s.vmid);Balance.run={name:s.name||('VM '+s.vmid),from:s.from,to:s.to,running:true,job:r.job,phase:'shutdown',cluster:ClusterMgr.current??0,errs:0};Balance.paint();Balance.poll();return;}
+      if(!r.upid){toast(`Migrazione di ${s.name||s.vmid} avviata: seguila nell'attivita' del cluster, poi ricalcola`,'ok');Balance.load(true);return;}
+      Balance.run={name:s.name||('VM '+s.vmid),from:s.from,to:s.to,running:s.running,upid:r.upid,cluster:ClusterMgr.current??0,errs:0};
+      Balance.paint(); Balance.poll();
+    }catch(e){
+      Balance.busy=false;
+      const why=e.body&&e.body.reason;
+      toast(why==='plan_changed'?'Il piano e\' cambiato nel frattempo: niente e\' stato spostato, ecco il nuovo piano':why==='busy'?'C\'e\' ancora una migrazione in corso su questo cluster':why==='reserve_too_low'?'Riserva sotto il minimo: il piano e\' solo una simulazione, niente e\' stato spostato':e.message,'err');
+      Balance.load(true);
+    }
+  },
+  poll(){
+    clearTimeout(Balance.timer);
+    Balance.timer=setTimeout(async()=>{
+      const r=Balance.run; if(!r)return;
+      // cambiato cluster: lo stato del task va letto sul cluster giusto, quindi qui si smette di seguirlo
+      if((ClusterMgr.current??0)!==r.cluster){Balance.run=null;toast(`Hai cambiato cluster: la migrazione di ${r.name} continua, seguila nell'attivita' del cluster`,'ok');return;}
+      if(App.cur!=='balance'){Balance.poll();return;} // la migrazione continua sul server; si riprende a controllare tornando sulla pagina
+      if(r.job){
+        let v;
+        try{v=await api('/balance/job?id='+encodeURIComponent(r.job),{quiet:true});r.errs=0;}
+        catch(e){
+          if(e.status===404||++r.errs>=40){Balance.run=null;toast(`Stato dello spostamento di ${r.name} non leggibile: controlla la VM in Proxmox`,'err');Balance.load(true);return;}
+          Balance.poll();return;
+        }
+        if(Balance.run!==r)return;
+        if(v.phase!=='done'){const ch=v.phase!==r.phase;r.phase=v.phase;r.decideBy=v.decide_by||0;if(ch&&!r.deciding)Balance.repaintRun();Balance.poll();return;}
+        Balance.run=null; _tc.clear(); Balance.coldEnd(r,v); Balance.load(true); return;
+      }
+      let t;
+      try{t=await api('/balance/task?upid='+encodeURIComponent(r.upid),{quiet:true});r.errs=0;}
+      catch(e){
+        if(++r.errs>=40){Balance.run=null;toast(`Stato della migrazione di ${r.name} non leggibile: controlla l'attivita' del cluster`,'err');Balance.load(true);return;}
+        Balance.poll();return;
+      }
+      if(t.status!=='stopped'){Balance.poll();return;}
+      Balance.run=null; _tc.clear();
+      toast(t.ok?`${r.name} spostata su ${r.to}`:`Migrazione di ${r.name} non riuscita: ${t.exitstatus||'errore'}`,t.ok?'ok':'err');
+      Balance.load(true);
+    },3000);
   },
 };
 

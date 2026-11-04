@@ -367,3 +367,131 @@ Contesto: oggi il gruppo e' il prefisso del nome VM (D27) e i report contano "gr
 **Risposta utente**: 2026-11-04 — B: risorse in parti uguali (byte con resto al primo gruppo alfabetico, core e schede in millesimi), conteggio VM pieno per gruppo + `shared_vms`; totale VM dal cluster.
 
 **Verifica in sola lettura (2026-11-04, entrambi i cluster):** `user-tag-access` e `registered-tags` non impostati = default Proxmox `free` (chi ha `VM.Config.Options` puo' creare tag nuovi); il token ha `VM.Config.Options` su `/vms` (e `Sys.Modify`): le scritture dei tag sono permesse. Nessun tag `gruppo-*` presente (CALCOLO 115 VM/25 tag distinti, HOSTING 29/7). Tag esistenti tutti di sistema (`cloudinit`, `ubuntu-template`, `24.04`, `gpu`, `a100`...), uno maiuscolo (`LTSC`): la lettura deve confrontare `gruppo-` senza distinzione di maiuscole e preservare gli altri tag cosi' come sono. Attenzione: il clone copia i tag del template/VM sorgente (un template non deve mai avere un tag di gruppo).
+
+## Bilanciamento del cluster (ROADMAP 3) — domande del 2026-11-04
+
+**Misure in sola lettura su CALCOLO (2026-11-04):**
+- 11 nodi molto diversi: RAM da 252 GB a 2 TB, da 40 a 256 core. Il pareggio va fatto in **percentuale**, non in GB.
+- **Un nodo supera gia' il limite di RAM assegnata:** `datacloud-node-10` ha 1216 GB assegnati alle VM su 1007 GB fisici (tutte accese, RAM usata realmente 960 GB). Altri nodi sono vicini (node-5: 1281 su 2004; node-11: 1200 su 1511). Il blocco duro "mai oltre fisica - riserva" e' quindi **gia' violato** all'inizio.
+- Molte VM hanno RAM assegnata molto piu' alta di quella usata (es. 128 GB assegnati, 2 GB usati).
+- **Nessuna risorsa HA, nessun `lock`.** 22 VM hanno GPU (`hostpci`), 1 ha un ISO locale. Tutti gli storage delle VM (ssd, hdd, backup) sono condivisi (Ceph/PBS).
+- L'API di Proxmox `GET /nodes/{n}/qemu/{id}/migrate` dice per ogni VM i **dischi locali**, le **risorse locali** (es. `hostpci0`) e i **nodi consentiti** (`allowed_nodes`); `not_allowed_nodes` non da' i motivi (oggetti vuoti), quindi i motivi li ricava l'app.
+
+### D43 — Nodi che partono gia' oltre il limite di RAM
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Come tratta il piano un nodo gia' oltre RAM fisica - riserva (oggi `node-10`)?
+**Perche' conta**: la regola approvata dice "mai superare"; se vale anche per i nodi di partenza, nessun piano sarebbe valido finche' quel nodo esiste.
+**Opzioni**: A) il limite e' un blocco duro **solo per i nodi di destinazione**: una migrazione non puo' portare un nodo oltre il limite ne' peggiorare uno che lo supera gia'; i nodi che lo superano diventano le **sorgenti prioritarie** e il piano li segnala in rosso come "da alleggerire"; B) il piano non si genera finche' un nodo viola il limite (si risolve prima a mano); C) il limite vale solo come avviso.
+**Suggerimento**: A: tiene il blocco duro dove protegge davvero (destinazioni) e rende utile il piano proprio sul caso che c'e' oggi.
+**Risposta utente**: 2026-11-04 — A: blocco duro solo sui nodi di destinazione; i nodi gia' oltre il limite sono sorgenti prioritarie, segnalati in rosso
+
+### D44 — Misura della RAM per il pareggio
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Il pareggio si calcola sulla RAM **assegnata** alle VM o sulla RAM **realmente usata**?
+**Perche' conta**: assegnata e usata divergono molto (128 GB assegnati, 2 GB usati). Sull'assegnata il piano e' stabile e prudente (nessun overbooking); sull'usata sfrutta meglio il cluster ma una VM puo' crescere e saturare un nodo.
+**Opzioni**: A) pareggio sulla **% di RAM assegnata** sul totale assegnabile (fisica - riserva), come gia' deciso; l'uso reale (p95 delle 4 settimane) resta come **avviso** sul nodo di destinazione ("attenzione RAM reale"); B) pareggio sull'uso reale (p95), con l'assegnata solo come tetto; C) misura mista (media pesata).
+**Suggerimento**: A, coerente con la regola "niente overbooking" e con le decisioni del 2026-11-03.
+**Risposta utente**: 2026-11-04 — A: pareggio sulla % di RAM assegnata su (fisica - riserva); uso reale come avviso
+
+### D45 — VM spente: contano nel carico?
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Le VM spente occupano RAM assegnata nel calcolo del nodo?
+**Perche' conta**: se non contano, un nodo sembra libero ma all'avvio di quelle VM puo' superare il limite; se contano, il carico e' sovrastimato.
+**Opzioni**: A) contano per intero (potrebbero accendersi in qualsiasi momento); B) non contano ma il piano le elenca e avvisa; C) a scelta con un interruttore nella pagina (default: contano).
+**Suggerimento**: C con default A: prudente, e l'utente puo' vedere cosa cambia.
+**Risposta utente**: 2026-11-04 — C: interruttore nella pagina, default: le VM spente contano
+
+### D46 — Container LXC
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: I container LXC rientrano nel piano?
+**Perche' conta**: Proxmox non migra gli LXC a caldo (serve un riavvio breve del container): "a caldo" per un LXC non esiste.
+**Opzioni**: A) solo VM QEMU; gli LXC contano nel carico ma sono "non spostabili: richiede riavvio"; B) LXC spostabili solo quando l'utente sceglie la migrazione "a freddo/riavvio" per il piano; C) LXC sempre spostabili con riavvio, con avviso.
+**Suggerimento**: B (a CALCOLO ci sono pochi LXC, 1 di 107).
+**Risposta utente**: 2026-11-04 — B: LXC spostabili solo con migrazione a freddo/riavvio scelta per il piano
+
+### D47 — Limiti del piano e ordine dei passi
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Quanto grande puo' essere un piano e come si ordinano i passi?
+**Perche' conta**: ogni migrazione a caldo carica rete e storage Ceph; una VM da 128 GB si sposta piu' lentamente di una da 4 GB. Un piano lungo dopo un po' non e' piu' valido (lo stato cambia).
+**Opzioni**: A) massimo **10 passi** per piano (modificabile), a parita' di risultato si preferisce spostare **meno GB**; si fa un passo alla volta con ricalcolo prima di ciascuno e conferma; B) piano completo senza tetto con tutti i passi; C) tetto in GB totali spostati (es. 500 GB) invece che in numero di passi.
+**Suggerimento**: A.
+**Risposta utente**: 2026-11-04 — A: massimo 10 passi (modificabile), a parita' meno GB spostati, un passo alla volta con ricalcolo e conferma
+
+### D48 — Dove vive la funzione
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Dove compare il bilanciamento nell'interfaccia?
+**Perche' conta**: UX e navigazione.
+**Opzioni**: A) nuova pagina "Bilanciamento" nel menu (sotto Operazioni, accanto a Cluster): stato dei nodi prima/dopo, piano, simulazione "e se spengo il nodo X", esecuzione passo per passo; B) sezione dentro la pagina Cluster.
+**Suggerimento**: A: la pagina Cluster contiene gia' le azioni distruttive sui nodi e il piano ha una interfaccia propria.
+**Risposta utente**: 2026-11-04 — A: nuova pagina Bilanciamento sotto Operazioni
+
+### D49 — Peso dei gruppi
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Il piano deve tenere conto dei gruppi (es. non concentrare tutte le VM di uno stesso gruppo su un nodo)?
+**Perche' conta**: un nodo che si ferma porterebbe giu' tutte le VM di un gruppo; ma complica l'algoritmo.
+**Opzioni**: A) per ora no (rinviato); B) preferenza morbida: a parita' di risultato si preferisce distribuire le VM dello stesso gruppo; C) vincolo: al massimo N VM dello stesso gruppo per nodo.
+**Suggerimento**: A, da riprendere dopo la prima versione.
+**Risposta utente**: 2026-11-04 — B: preferenza morbida, a parita' di risultato si distribuiscono le VM dello stesso gruppo
+
+### D50 — Migrazione a freddo delle VM QEMU accese: dove si sceglie
+**Stato**: RISPOSTA
+**Bloccante**: si' (per la migrazione a freddo)
+**Domanda**: L'utente vuole poter spostare a freddo anche le VM QEMU accese (spegni, sposta, riaccendi). Dove si sceglie a caldo o a freddo?
+**Perche' conta**: a freddo la VM e' ferma per tutta la migrazione (minuti); a caldo resta accesa ma carica rete e storage. Oggi l'interruttore "Includi i container (riavvio breve)" vale solo per gli LXC (D46).
+**Opzioni**: A) un solo interruttore per il piano, "Migrazione a freddo", che vale per VM e container (decisione del 2026-11-03: "a caldo o a freddo a scelta per ogni piano"); B) due interruttori separati, uno per i container (riavvio breve) e uno per le VM QEMU (spegnimento); C) scelta nel passo: nella conferma di ogni passo "a caldo" (predefinito) o "a freddo".
+**Suggerimento**: B: un container si riavvia in pochi secondi, una VM spenta resta ferma per minuti; tenerli separati evita di spegnere VM quando si voleva solo includere i container. La conferma del passo dice sempre in parole cosa succedera'.
+**Risposta utente**: 2026-11-04 — Posso scegliere con una spunta quali migrare a caldo e quali a freddo (container a freddo senza possibilitá di scelta)
+**Interpretazione (dichiarata)**: spunta "a freddo" per ogni VM QEMU accesa nella tabella del piano (predefinito: a caldo), la scelta vale al momento dell'esecuzione del passo e non cambia il piano; i container accesi si spostano sempre con riavvio, senza spunta; l'interruttore "Includi i container" (D46) resta com'e' (decide solo se i container entrano nel piano)
+
+### D51 — Migrazione a freddo: se la VM non si spegne
+**Stato**: RISPOSTA
+**Bloccante**: si' (per la migrazione a freddo)
+**Domanda**: Lo spegnimento ordinato (ACPI o guest agent) puo' non completarsi. Cosa si fa dopo l'attesa?
+**Perche' conta**: uno stop forzato e' come staccare la corrente: rischio di dati persi nel guest.
+**Opzioni**: A) attesa di 3 minuti, poi si rinuncia: la VM resta accesa sul suo nodo e nulla si sposta; B) attesa di 3 minuti, poi la pagina chiede conferma (livello pericolo) per uno stop forzato, come nella pagina GPU (D24); C) stop forzato automatico dopo l'attesa.
+**Suggerimento**: B, coerente con D24; senza conferma entro qualche minuto la procedura si annulla e la VM resta accesa.
+**Risposta utente**: 2026-11-04 — B
+
+### D52 — Migrazione a freddo: errori a meta'
+**Stato**: RISPOSTA
+**Bloccante**: si' (per la migrazione a freddo)
+**Domanda**: Se la migrazione fallisce quando la VM e' gia' spenta, o se la VM non riparte sul nodo di arrivo, cosa si fa?
+**Perche' conta**: una VM lasciata spenta per errore e' un disservizio per chi la usa.
+**Opzioni**: A) migrazione fallita = la VM viene riaccesa sul nodo d'origine e la pagina lo dice; avvio fallito sul nodo di arrivo = un solo nuovo tentativo, poi la VM resta spenta li' con un messaggio chiaro (niente ritorno automatico al nodo d'origine); B) in entrambi i casi la VM resta spenta e la pagina lo dice, l'utente decide; C) come A, ma se l'avvio fallisce sul nodo d'arrivo la si riporta al nodo d'origine e la si riaccende.
+**Suggerimento**: A: riporta subito in servizio la VM nel caso piu' comune (migrazione rifiutata) senza nascondere un problema del nodo di arrivo dietro una seconda migrazione automatica.
+**Risposta utente**: 2026-11-04 — A
+
+### D53 — Migrazione a freddo: chi guida la procedura
+**Stato**: RISPOSTA
+**Bloccante**: si' (per la migrazione a freddo)
+**Domanda**: La sequenza spegni -> migra -> riaccendi la guida il server o la pagina?
+**Perche' conta**: la procedura dura minuti; se si interrompe a meta' la VM puo' restare spenta.
+**Opzioni**: A) il server: una richiesta avvia la procedura (con lo stesso ricontrollo del piano di oggi), il server la porta avanti da solo e la pagina ne legge lo stato (spegnimento, migrazione, avvio, finita/errore); una procedura alla volta per cluster, stato in memoria; se il server si riavvia a meta' la procedura si ferma e la VM puo' restare spenta (lo dice il log del server); B) la pagina: chiama in sequenza le azioni gia' esistenti (shutdown, migrate, start); se si chiude la scheda a meta' la VM resta spenta.
+**Suggerimento**: A: non dipende dalla scheda del browser aperta e tiene in un solo punto i controlli (lucchetto per cluster, ricontrollo del piano, conferma dello stop forzato di D51 come domanda che la procedura aspetta).
+**Risposta utente**: 2026-11-04 — A
+
+### D54 — Spostare una VM scelta (prova reale a freddo sulla VM 174)
+**Stato**: RISPOSTA
+**Bloccante**: si' (per provare la migrazione a freddo su una VM scelta)
+**Domanda**: L'utente ha indicato la VM 174 (`santoro-vm-1`, 32 GB, `datacloud-node-6`) per la prova reale a freddo, ma il server esegue solo il primo passo del piano e la 174 non c'e' (neanche svuotando `node-6`: prima vengono 104 e, dopo la migrazione in corso, 109). Come si sposta una VM scelta?
+**Perche' conta**: oggi il server non esegue niente che il piano non proponga: e' la garanzia che le regole (RAM, VM bloccate, nodi consentiti) valgano anche in scrittura.
+**Opzioni**: A) parametro del piano "sposta solo queste VM" (es. `only=qemu:174`): tutte le altre restano ferme, il piano e il ricontrollo del server restano identici, la destinazione la sceglie il piano; se spostarla non migliora il pareggio il piano non propone nulla; B) pulsante "Sposta…" su una singola VM con nodo di arrivo scelto dall'utente: il server controlla i vincoli duri (RAM della destinazione, blocchi, nodi consentiti) ma non l'obiettivo del pareggio; C) nessuna aggiunta: la prima prova a freddo reale si fa su un passo del piano spuntando "a freddo".
+**Suggerimento**: A: aggiunta piccola, nessuna nuova via di scrittura, utile anche dopo (es. "sposta solo le VM del gruppo X").
+**Risposta utente**: 2026-11-04 — A
+
+### D55 — Compatibilita' della CPU nella migrazione a caldo (incidente VM 109)
+**Stato**: RISPOSTA
+**Bloccante**: si' (nessun rilascio ne' altro passo reale prima della risposta)
+**Domanda**: La migrazione a caldo della VM 109 (`cpu: host`) da `datacloud-node-10` (AMD EPYC 7713) a `datacloud-node-6` (Intel Xeon E5-2640 v4) ha trasferito tutta la memoria e poi e' fallita alla ripresa (`kvm: Restoring registers after init: Failed to set special registers: Invalid argument`): la VM e' rimasta SPENTA sul nodo di arrivo. Proxmox non lo impedisce e il precheck non lo segnala. Il cluster mescola 3 famiglie AMD EPYC e 5 Intel Xeon. Come deve tenerne conto il piano?
+**Perche' conta**: con `cpu: host` (o `max`) la CPU vista dal guest e' quella del nodo: a caldo si puo' andare solo verso un nodo con la stessa CPU. A freddo (VM spenta e riaccesa) non c'e' il problema.
+**Opzioni**: A) vincolo duro: una VM accesa con `cpu: host|max` si sposta a caldo solo verso nodi con lo **stesso modello di CPU** (letto da `/nodes/{n}/status`); verso gli altri solo a freddo. La spunta "a freddo" entra nel calcolo del piano (`cold_vms=...`), cosi' il piano propone destinazioni valide per il modo scelto. Le VM con modelli generici (`x86-64-v2-AES`, `kvm64`...) restano libere. B) come A ma "stessa marca" (AMD con AMD, Intel con Intel) invece dello stesso modello: piu' possibilita', rischio residuo tra generazioni diverse; C) tutte le VM accese con `cpu: host|max` solo a freddo.
+**Suggerimento**: A: e' l'unica regola sicura con `cpu: host`; lo stesso modello esiste gia' a coppie/gruppi nel cluster (es. node-2/3/4 E5-2698 v4, node-1/8 Silver 4114).
+**Risposta utente**: 2026-11-04 — A
+**Modifica dell'utente (2026-11-04)**: il vincolo e' sul **produttore** (AMD/Intel), non sul modello (di fatto opzione B): l'utente ha migrato a mano a caldo la VM 174 (`cpu: host`) da `node-6` (Intel Xeon E5-2640 v4) a `node-1` (Intel Xeon Silver 4114) e ha funzionato. Rischio residuo segnalato all'utente: quella prova va da una generazione piu' vecchia (Broadwell) a una piu' nuova (Skylake); il verso opposto (es. `node-11` Gold 5120 -> `node-2` E5-2698 v4, o EPYC 7713 Milan -> EPYC 7302 Rome) toglie istruzioni al guest e non e' stato provato. **Provato poi (2026-11-04, VM 174):** Silver 4114 -> E5-2640 v4 a caldo ok; resta non provato solo tra generazioni AMD.

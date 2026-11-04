@@ -131,6 +131,11 @@ func main() {
 		r.Get("/ceph/summary", h.GetCephSummary())
 		r.Get("/gpus", h.GetGPUs())
 		r.Get("/reports/{model}", h.GetReport)
+		r.Get("/balance", h.GetBalance)
+		r.Post("/balance/step", h.PostBalanceStep)
+		r.Get("/balance/task", h.GetBalanceTask)
+		r.Get("/balance/job", h.GetBalanceJob)
+		r.Post("/balance/job/decide", h.PostBalanceJobDecide)
 		r.Get("/ceph", h.GetCeph())
 	})
 
