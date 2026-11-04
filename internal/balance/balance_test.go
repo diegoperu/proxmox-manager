@@ -226,9 +226,13 @@ func TestEvacuateNode(t *testing.T) {
 }
 
 func TestCPUWarningsDoNotBlockButBreakTies(t *testing.T) {
-	// b and c are equally good for RAM; c would go beyond 4 vCPU per core
-	nodes := []Node{node("a", 100, 4, 0), node("b", 100, 4, 0), node("c", 100, 4, 0)}
-	vms := []VM{vm("a", 1, 30, 8), vm("a", 2, 30, 1), vm("c", 3, 0, 15)}
+	// b and c are equally good for RAM; c would go beyond 4 vCPU per thread (8 threads: warning above 32 vCPU).
+	// c already has 31 vCPU in four small VMs (each one fits the 8 threads).
+	onC := func() []VM {
+		return []VM{vm("c", 3, 0, 8), vm("c", 4, 0, 8), vm("c", 5, 0, 8), vm("c", 6, 0, 7)}
+	}
+	nodes := []Node{node("a", 100, 8, 0), node("b", 100, 8, 0), node("c", 100, 8, 0)}
+	vms := append([]VM{vm("a", 1, 30, 8), vm("a", 2, 30, 1)}, onC()...)
 	pl := mustPlan(t, nodes, vms, noReserve())
 	if len(pl.Steps) == 0 || pl.Steps[0].To != "b" {
 		t.Fatalf("%#v", pl.Steps)
@@ -236,9 +240,9 @@ func TestCPUWarningsDoNotBlockButBreakTies(t *testing.T) {
 	// only c can receive: the move happens anyway, with the warning
 	fixed := vm("a", 2, 20, 0)
 	fixed.Blockers = []string{BlockGPU}
-	nodes = []Node{node("a", 100, 4, 0), node("c", 100, 4, 0)}
-	pl = mustPlan(t, nodes, []VM{vm("a", 1, 40, 8), fixed, vm("c", 3, 0, 15)}, noReserve())
-	if len(pl.Steps) != 1 || !reflect.DeepEqual(pl.Steps[0].Warnings, []string{"cpu_vcpu"}) {
+	nodes = []Node{node("a", 100, 8, 0), node("c", 100, 8, 0)}
+	pl = mustPlan(t, nodes, append([]VM{vm("a", 1, 40, 8), fixed}, onC()...), noReserve())
+	if len(pl.Steps) != 1 || pl.Steps[0].VMID != 1 || !reflect.DeepEqual(pl.Steps[0].Warnings, []string{"cpu_vcpu"}) {
 		t.Fatalf("%#v", pl.Steps)
 	}
 	if c := nodeState(pl, "c"); !reflect.DeepEqual(c.Warnings, []string{"cpu_vcpu"}) || len(c.WarningsBefore) != 0 {
@@ -366,6 +370,9 @@ func TestInvariantsRandomClusters(t *testing.T) {
 				v.Kind = "lxc"
 			}
 			v.HostCPU = r.Intn(2) == 0
+			if r.Intn(8) == 0 {
+				v.VCPU = 32 + r.Intn(300) // wider than many nodes
+			}
 			vms = append(vms, v)
 		}
 		p := DefaultParams()
@@ -428,9 +435,16 @@ func checkInvariants(t *testing.T, round int, nodes []Node, vms []VM, p Params, 
 	for _, id := range p.ColdVMs {
 		coldSet[id] = true
 	}
+	threads := map[string]int{}
+	for _, n := range nodes {
+		threads[n.Name] = n.Cores
+	}
 	balancing := 0
 	for _, s := range pl.Steps {
 		v := byKey[s.Key]
+		if v.VCPU > threads[s.To] || threads[s.To] <= 0 {
+			t.Fatalf("round %d: %d vCPU sent to %s with %d threads %#v", round, v.VCPU, s.To, threads[s.To], s)
+		}
 		live := v.Kind == "qemu" && v.Running && !coldSet[v.VMID]
 		if live && v.HostCPU && (model[s.From] == "" || model[s.From] != model[s.To]) {
 			t.Fatalf("round %d: live move of a host-CPU VM across CPU vendors %#v", round, s)
@@ -558,5 +572,41 @@ func TestOnlyFilter(t *testing.T) {
 	p.Only = make([]int, 65)
 	if _, err := Compute(nodes, vms, p); err == nil {
 		t.Fatal("65 VMIDs accepted")
+	}
+}
+
+func TestVCPUsNeverBeyondTheThreadsOfTheDestination(t *testing.T) {
+	// the real case: an 80-vCPU VM on an overloaded 256-thread node, a 64-thread node with room
+	big, small, other := node("n10", 1000, 256, 0), node("n5", 1000, 64, 0), node("n4", 300, 80, 0)
+	wide := vm("n10", 177, 160, 80)
+	vms := []VM{wide, vm("n10", 1, 600, 8), vm("n4", 2, 250, 8)}
+	pl := mustPlan(t, []Node{big, small, other}, vms, noReserve())
+	for _, s := range pl.Steps {
+		if s.VMID == 177 && s.To == "n5" {
+			t.Fatalf("80 vCPU planned on 64 threads: %#v", s)
+		}
+	}
+	// no node with enough threads apart from its own: blocked with the reason
+	pl = mustPlan(t, []Node{big, small}, []VM{wide, vm("n10", 1, 600, 8)}, noReserve())
+	found := false
+	for _, b := range pl.Blocked {
+		if b.VMID == 177 {
+			found = contains(b.Reasons, BlockVCPU)
+		}
+	}
+	if !found {
+		t.Fatalf("not blocked: %#v", pl.Blocked)
+	}
+	// exactly as many vCPUs as threads is fine
+	eq := vm("n10", 300, 400, 64)
+	pl = mustPlan(t, []Node{big, small}, []VM{eq, vm("n10", 1, 400, 8)}, noReserve())
+	if len(pl.Steps) == 0 || pl.Steps[0].To != "n5" {
+		t.Fatalf("64 vCPU on 64 threads refused: %#v", pl.Steps)
+	}
+	// unknown thread count: never a destination
+	unk := node("unk", 1000, 0, 0)
+	pl = mustPlan(t, []Node{big, unk}, []VM{vm("n10", 5, 400, 2), vm("n10", 6, 400, 2)}, noReserve())
+	if len(pl.Steps) != 0 {
+		t.Fatalf("moved to a node with unknown threads: %#v", pl.Steps)
 	}
 }

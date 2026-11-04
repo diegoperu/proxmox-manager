@@ -849,7 +849,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.130.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.132.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -3170,6 +3170,7 @@ const Balance={
     lock:'Ha un\'operazione in corso (lock)',ha:'E\' gestita dall\'HA di Proxmox',lxc_restart:'Container: si sposta solo con riavvio (attiva "Includi i container")',
     no_target:'Proxmox non consente nessun altro nodo',node_offline:'Il suo nodo e\' fuori linea',not_counted:'Spenta e non conteggiata: spostarla non cambia il carico',
     unverified:'Non e\' stato possibile verificarla: non si sposta',
+    vcpu_over_threads:'Ha piu\' vCPU dei thread di ogni altro nodo che potrebbe riceverla: Proxmox non la avvierebbe',
     cpu_host:'CPU "host": a caldo solo verso un nodo dello stesso produttore (AMD o Intel), e non ce n\'e\' uno libero (spunta "spegni e sposta" per spostarla a freddo)'},
   WHY:{evacuate:'Svuotamento del nodo',over_limit:'Il nodo supera la RAM assegnabile',balance:'Pareggio del carico'},
   gb(b){return Math.round((b||0)/1073741824);},
