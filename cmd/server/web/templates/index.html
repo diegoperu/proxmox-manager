@@ -773,6 +773,9 @@ html.spiderman{
     <button type="button" class="ni" data-page="gpu" hidden>
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="18" height="11" rx="2"/><path d="M20 9h2v5h-2M6 17v3M10 17v3M14 17v3"/><circle cx="11" cy="11.5" r="2.5"/></svg>GPU
     </button>
+    <button type="button" class="ni" data-page="groups">
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Gruppi
+    </button>
     <div class="nav-sec">Operazioni</div>
     <button type="button" class="ni" data-page="provision">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
@@ -792,7 +795,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.113.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.114.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -840,6 +843,27 @@ html.spiderman{
     <div class="page" id="page-gpu">
       <div class="cond" id="gpu-cond" aria-live="polite"></div>
       <div id="gpu-body" style="margin-top:18px"></div>
+    </div>
+
+    <!-- ██ GRUPPI ██ -->
+    <div class="page" id="page-groups">
+      <div class="cond" id="grp-cond" aria-live="polite"></div>
+      <div id="grp-tpl" style="margin-top:18px"></div>
+      <div class="toolbar" style="margin-top:18px">
+        <div class="seg" role="tablist" aria-label="Quali VM mostrare">
+          <button type="button" class="tab active" role="tab" aria-selected="true" id="grp-t-todo" onclick="Groups.setView('todo')">Da assegnare</button>
+          <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" id="grp-t-tag" onclick="Groups.setView('tag')">Con gruppo</button>
+          <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1" id="grp-t-all" onclick="Groups.setView('all')">Tutte</button>
+        </div>
+        <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="search" id="grp-q" placeholder="Cerca VM, nodo, gruppo" aria-label="Cerca" maxlength="64" oninput="Groups.setQuery(this.value)"></div>
+        <span class="sp"></span>
+        <button type="button" class="btn bg2 sm" onclick="Groups.tickAll(true)">Spunta le righe visibili con un gruppo scritto</button>
+        <button type="button" class="btn bg2 sm" onclick="Groups.tickAll(false)">Togli le spunte</button>
+        <button type="button" class="btn ba" id="grp-apply" onclick="Groups.apply()" disabled>Applica</button>
+      </div>
+      <p class="cnote" style="margin:-4px 0 12px">Il gruppo e' il tag <span class="tm">gruppo-nome</span> della VM in Proxmox. Per le VM senza tag il campo propone il prefisso del nome: controllalo (non tutti i prefissi sono gruppi) e spunta solo le righe giuste. Nessuna VM viene riavviata; gli altri tag restano.</p>
+      <div id="grp-body"></div>
+      <datalist id="grp-dl"></datalist>
     </div>
 
     <!-- ██ NODES ██ -->
@@ -996,6 +1020,11 @@ html.spiderman{
             <div class="fr">
               <label class="fl" for="pv-node">Nodo target</label>
               <select class="inp w" id="pv-node"><option value="">— stesso del template —</option></select>
+            </div>
+            <div class="fr" style="margin-top:12px">
+              <label class="fl" for="pv-group">Gruppo <span class="td">(opzionale)</span></label>
+              <input class="inp w" id="pv-group" type="text" list="grp-dl" maxlength="32" autocomplete="off" spellcheck="false" placeholder="es. rossi" oninput="Provision.summary()">
+              <div class="hint" id="pv-group-hint">Scrive il tag gruppo-nome sulla VM: i report la contano in quel gruppo.</div>
             </div>
           </div>
         </div>
@@ -1281,6 +1310,21 @@ html.spiderman{
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('mgpu')">Annulla</button>
     <button class="btn ba" onclick="Gpu.next()">Continua</button>
+  </div>
+</div></div>
+
+<!-- MODAL GRUPPO DI UNA VM -->
+<div class="ov" id="mgrp"><div class="modal" style="min-width:min(480px,calc(100vw - 24px))">
+  <div class="mt" id="mgrpT">Gruppo</div>
+  <div class="td" id="mgrpS" style="margin-bottom:12px"></div>
+  <div class="fr mb12"><label class="fl" for="grp-in">Gruppo <span class="td">(piu' gruppi separati da spazio: la VM e' condivisa)</span></label>
+    <input class="inp w" id="grp-in" type="text" list="grp-dl" autocomplete="off" spellcheck="false" maxlength="200" placeholder="es. rossi" oninput="Groups.msg('')"></div>
+  <p class="cnote">Lettere minuscole e cifre, fino a 32 caratteri. Scrive solo il tag <span class="tm">gruppo-nome</span>: gli altri tag non cambiano e la VM non viene riavviata.</p>
+  <div id="grp-msg" role="status" style="margin-top:10px"></div>
+  <div class="mf">
+    <button class="btn bg2" onclick="closeModal('mgrp')">Annulla</button>
+    <button class="btn bg2" id="grp-clear" onclick="Groups.save(true)">Togli il gruppo</button>
+    <button class="btn ba" onclick="Groups.save(false)">Salva</button>
   </div>
 </div></div>
 
@@ -1863,7 +1907,7 @@ const ClusterMgr={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',reports:'Report',settings:'Impostazioni'};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',reports:'Report',settings:'Impostazioni'};
 // Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
@@ -1914,6 +1958,7 @@ const App={
     if(p==='cluster')   Cluster.load();
     if(p==='ceph')      Ceph.load();
     else                Ceph.probe();
+    if(p==='groups')    Groups.load();
     if(p==='gpu')       Gpu.load();
     else                Gpu.probe();
     if(p==='settings')  Settings.load();
@@ -2105,6 +2150,7 @@ const Palette={
   base(){
     const KW={dashboard:'home panoramica stato salute',nodes:'nodi server host hardware',vms:'virtual machine container lxc qemu kvm',
       provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',ceph:'ceph storage osd pool rbd salute capacita meteo',gpu:'gpu scheda video nvidia assegna passthrough pci mapping',
+      groups:'gruppo gruppi tag etichetta progetto laboratorio proprietario',
       reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
     const items=Object.entries(PMETA).filter(([k])=>(k!=='ceph'||Ceph.isAvail())&&(k!=='gpu'||Gpu.isAvail())).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
     items.push({group:'Azioni',label:'Aggiorna i dati',sub:'',run:()=>App.refresh()});
@@ -2728,6 +2774,191 @@ const Gpu={
   },
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// GRUPPI (D35-D42): il gruppo di una VM e' il tag Proxmox `gruppo-<nome>`. Pagina di revisione con proposta dal nome,
+// "Cambia" nel pannello VM, campo in Nuova VM. Il server ricontrolla tutto; la pagina guida soltanto.
+// Ogni testo esterno (nomi VM, tag) entra nel DOM con esc()/textContent.
+// ════════════════════════════════════════════════════════════════════════════
+const Groups={
+  d:null, seq:0, view:'todo', q:'', draft:{}, res:{}, busy:false, edit_:null,
+  key(v){return v.node+'/'+v.kind+'/'+v.vmid;},
+  // "rossi bianchi" -> {ok, groups:['bianchi','rossi']}; stessa regola del server ([a-z0-9]{1,32}, non "altro", max 4)
+  parse(txt){
+    const parts=String(txt||'').toLowerCase().split(/[\s,;]+/).filter(Boolean);
+    if(parts.length>4)return{ok:false,err:'al massimo 4 gruppi per VM'};
+    for(const g of parts)if(!/^[a-z0-9]{1,32}$/.test(g)||g==='altro')return{ok:false,err:`"${g.slice(0,40)}": solo lettere minuscole e cifre, da 1 a 32 caratteri`};
+    return{ok:true,groups:[...new Set(parts)].sort()};
+  },
+  existing(){return new Set(((Groups.d&&Groups.d.groups)||[]).map(g=>g.name));},
+  fill(){
+    const dl=document.getElementById('grp-dl'); if(!dl)return; dl.replaceChildren();
+    for(const g of (Groups.d&&Groups.d.groups)||[]){const o=document.createElement('option');o.value=g.name;dl.append(o);}
+  },
+  // lettura per pannello VM e Nuova VM (cache breve; dopo una scrittura _tc.clear())
+  async fetch(){const d=await apiCached('/groups',15000);Groups.d=d;Groups.fill();return d;},
+  label(v){
+    if(v.source==='tag')return v.groups.map(g=>`<span class="badge bn">${esc(g)}</span>`).join(' ')+(v.groups.length>1?' <span class="td">· VM condivisa</span>':'');
+    if(v.source==='name')return`<span class="badge">${esc(v.groups[0])}</span> <span class="td">· dal nome, la VM non ha il tag</span>`;
+    return'<span class="td">senza gruppo</span>';
+  },
+  text(v){const dr=Groups.draft[Groups.key(v)];return dr&&dr.text!=null?dr.text:(v.source==='tag'?v.groups.join(' '):(v.proposal||''));},
+  ticked(v){const dr=Groups.draft[Groups.key(v)];return!!(dr&&dr.on);},
+
+  async load(force){
+    const seq=++Groups.seq, body=document.getElementById('grp-body');
+    if(!Groups.d)body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura dei gruppi…</div>';
+    if(force)_tc.clear();
+    let d;
+    try{d=await api('/groups',{quiet:true,timeoutMs:30000});}
+    catch(e){if(seq===Groups.seq&&!Groups.d)body.innerHTML=errBox(e.message,'Groups.load()');return;}
+    if(seq!==Groups.seq)return;
+    Groups.d=d; Groups.fill(); Groups.paint();
+  },
+  setView(v){
+    Groups.view=v;
+    for(const k of ['todo','tag','all']){const b=document.getElementById('grp-t-'+k);b.classList.toggle('active',k===v);b.setAttribute('aria-selected',String(k===v));b.tabIndex=k===v?0:-1;}
+    Groups.paintRows();
+  },
+  setQuery(q){Groups.q=String(q||'').trim().toLowerCase().slice(0,64);Groups.paintRows();},
+
+  paint(){
+    const d=Groups.d, cond=document.getElementById('grp-cond');
+    const todo=d.vms.filter(v=>v.source!=='tag').length, tagged=d.vms.length-todo;
+    const shared=d.vms.filter(v=>v.groups.length>1&&v.source==='tag').length;
+    const level=todo?'warn':'ok';
+    const title=todo?`Quasi sereno · ${todo} ${Dashboard.plural(todo,'VM senza gruppo','VM senza gruppo')}`:`Sereno · tutte le VM hanno un gruppo`;
+    const sub=`${d.groups.length} ${Dashboard.plural(d.groups.length,'gruppo','gruppi')} · ${tagged} ${Dashboard.plural(tagged,'VM con il tag','VM con il tag')}${shared?` · ${shared} condivise`:''}`;
+    cond.innerHTML=`<svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg><div><h2>${esc(title)}</h2><p>${esc(sub)}</p></div>`;
+    const tp=document.getElementById('grp-tpl');
+    tp.innerHTML=d.templates_with_group.length?`<h2 class="sec">Template con un gruppo <small>${d.templates_with_group.length}</small></h2><div class="panel calerts">${d.templates_with_group.map(t=>`<div class="calert"><span class="sev w">Da correggere</span><span class="ccode">${esc(t.node)} · ${esc(t.vmid)}</span><div class="cmsg">${esc(t.name)} ha il tag ${esc(t.groups.map(g=>'gruppo-'+g).join(', '))}: ogni VM clonata da qui lo eredita. Toglilo in Proxmox (l'app non modifica i template).</div></div>`).join('')}</div>`:'';
+    Groups.paintRows();
+  },
+  rows(){
+    const d=Groups.d; if(!d)return[];
+    let r=d.vms;
+    if(Groups.view==='todo')r=r.filter(v=>v.source!=='tag'); else if(Groups.view==='tag')r=r.filter(v=>v.source==='tag');
+    if(Groups.q){const q=Groups.q;r=r.filter(v=>(v.name+' '+v.vmid+' '+v.node+' '+v.groups.join(' ')+' '+(v.proposal||'')).toLowerCase().includes(q));}
+    return r;
+  },
+  paintRows(){
+    const body=document.getElementById('grp-body'), d=Groups.d; if(!d)return;
+    const r=Groups.rows(), MAX=400;
+    if(!r.length){body.innerHTML=`<div class="panel"><div class="empty">${Groups.view==='todo'&&!Groups.q?'Nessuna VM da assegnare.':'Nessuna VM corrisponde.'}</div></div>`;Groups.sync();return;}
+    const rows=r.slice(0,MAX).map(v=>{
+      const k=Groups.key(v), bad=!Groups.parse(Groups.text(v)).ok, res=Groups.res[k];
+      return`<tr data-k="${esc(k)}"><td><input type="checkbox" class="chk" aria-label="${esc('Applica a '+v.name)}" ${Groups.ticked(v)?'checked':''} onchange="Groups.tick(${js(k)},this.checked)"></td>
+        <td><button type="button" class="nm-btn" onclick="VMs.detail(${js(v.node)},${js(v.vmid)},${js(v.kind)})"><span class="nm" title="${esc(v.name)}">${esc(v.name||'VM '+v.vmid)}</span></button> <span class="tm">${esc(v.vmid)}</span></td>
+        <td>${esc(v.node)}</td><td>${v.kind==='lxc'?'LXC':'QEMU'}</td><td>${Groups.label(v)}</td>
+        <td><input class="inp" style="width:170px" type="text" list="grp-dl" autocomplete="off" spellcheck="false" maxlength="200" value="${esc(Groups.text(v))}" placeholder="nessun gruppo" aria-label="${esc('Nuovo gruppo di '+v.name)}" ${bad?'aria-invalid="true"':''} oninput="Groups.type(${js(k)},this)"></td>
+        <td class="grp-res" data-k="${esc(k)}">${res?Groups.resHTML(res):''}</td></tr>`;
+    }).join('');
+    body.innerHTML=`<div class="tw"><table><thead><tr><th></th><th>VM</th><th>Nodo</th><th>Tipo</th><th>Gruppo attuale</th><th>Nuovo gruppo</th><th>Esito</th></tr></thead><tbody>${rows}</tbody></table></div>${r.length>MAX?`<p class="cnote" style="margin-top:8px">Mostrate le prime ${MAX} su ${r.length}: restringi la ricerca.</p>`:''}`;
+    Groups.sync();
+  },
+  resHTML(r){return r.state==='ok'?'<span class="st ok">Fatto</span>':r.state==='run'?'<span class="td">…</span>':`<span class="st off" title="${esc(r.msg||'')}">${esc(r.msg||'Errore')}</span>`;},
+  find(k){return Groups.d&&Groups.d.vms.find(v=>Groups.key(v)===k);},
+  tick(k,on){(Groups.draft[k]=Groups.draft[k]||{}).on=on;Groups.sync();},
+  tickAll(on){
+    for(const v of Groups.rows())if(!on||(Groups.parse(Groups.text(v)).ok&&Groups.parse(Groups.text(v)).groups.length))(Groups.draft[Groups.key(v)]=Groups.draft[Groups.key(v)]||{}).on=on;
+    Groups.paintRows();
+  },
+  type(k,el){
+    const dr=Groups.draft[k]=Groups.draft[k]||{}; dr.text=el.value;
+    const p=Groups.parse(el.value); if(p.ok)el.removeAttribute('aria-invalid'); else el.setAttribute('aria-invalid','true');
+    el.title=p.ok?'':p.err; Groups.sync();
+  },
+  // le righe spuntate che si applicano davvero: scritte bene e diverse da quanto c'e' gia'
+  selected(){
+    const out=[],bad=[];
+    for(const v of Groups.d?Groups.d.vms:[]){
+      if(!Groups.ticked(v))continue;
+      const p=Groups.parse(Groups.text(v));
+      if(!p.ok){bad.push(v);continue;}
+      const same=v.source==='tag'?JSON.stringify(p.groups)===JSON.stringify(v.groups):p.groups.length===0;
+      if(!same)out.push({v,groups:p.groups});
+    }
+    return{out,bad};
+  },
+  sync(){
+    const {out,bad}=Groups.selected(), b=document.getElementById('grp-apply');
+    b.disabled=Groups.busy||!out.length||bad.length>0;
+    b.textContent=Groups.busy?b.textContent:(out.length?`Applica a ${out.length} ${Dashboard.plural(out.length,'VM','VM')}`:'Applica');
+    b.title=bad.length?`${bad.length} righe spuntate hanno un nome di gruppo non valido`:'';
+  },
+
+  apply(){
+    if(Groups.busy)return;
+    const {out,bad}=Groups.selected();
+    if(bad.length){toast('Correggi i nomi di gruppo non validi prima di applicare','err');return;}
+    if(!out.length)return;
+    const ex=Groups.existing(), fresh=new Set();
+    for(const o of out)for(const g of o.groups)if(!ex.has(g))fresh.add(g);
+    const removing=out.filter(o=>!o.groups.length).length;
+    const lines=[`${out.length} ${Dashboard.plural(out.length,'VM','VM')}: ${out.length-removing} con un gruppo scritto${removing?`, ${removing} a cui viene tolto il gruppo`:''}.`];
+    if(fresh.size)lines.push(`Gruppi NUOVI (non esistono ancora su nessuna VM): ${[...fresh].sort().join(', ')}. Controlla che non siano refusi o prefissi che non sono gruppi.`);
+    askConfirm({title:'Applica i gruppi',lines,
+      items:out.map(o=>`${o.v.name||'VM '+o.v.vmid} (${o.v.vmid}) → ${o.groups.length?o.groups.join(', '):'nessun gruppo'}`),
+      consequence:'Viene scritto solo il tag gruppo-… di ogni VM, una alla volta; gli altri tag restano. Nessun riavvio. Se una VM e\' cambiata nel frattempo viene saltata.',
+      level:'warn',okLabel:`Applica a ${out.length}`},()=>Groups.run(out,ex));
+  },
+  async run(list,ex){
+    Groups.busy=true; const b=document.getElementById('grp-apply'); b.disabled=true;
+    let ok=0,fail=0,aborted=false;
+    for(let i=0;i<list.length;i++){
+      const {v,groups}=list[i], k=Groups.key(v);
+      b.textContent=`Applico ${i+1}/${list.length}…`;
+      Groups.res[k]={state:'run'}; Groups.cell(k);
+      try{
+        await api(`/nodes/${encodeURIComponent(v.node)}/${v.kind}/${encodeURIComponent(v.vmid)}/groups`,{method:'PUT',quiet:true,timeoutMs:30000,
+          body:JSON.stringify({groups,confirm_new:groups.filter(g=>!ex.has(g))})});
+        Groups.res[k]={state:'ok'}; ok++; delete Groups.draft[k];
+        groups.forEach(g=>ex.add(g)); // da qui il gruppo esiste: il server lo vedra' nei tag
+      }catch(e){
+        Groups.res[k]={state:'err',msg:e.message}; fail++;
+        if(e.status===403){aborted=true;Groups.cell(k);break;}
+      }
+      Groups.cell(k);
+    }
+    Groups.busy=false; _tc.clear();
+    toast(`${ok} ${Dashboard.plural(ok,'VM aggiornata','VM aggiornate')}${fail?`, ${fail} non riuscite`:''}${aborted?' — interrotto: permessi Proxmox insufficienti':''}`,fail?'err':'ok');
+    const keep=Groups.res; await Groups.load(true); Groups.res=keep;
+    Groups.paintRows();
+  },
+  cell(k){const el=document.querySelector(`.grp-res[data-k="${CSS.escape(k)}"]`);if(el)el.innerHTML=Groups.resHTML(Groups.res[k]);},
+
+  // ── Cambia (pannello VM) ──
+  edit(node,vmid,kind){
+    const v=Groups.d&&Groups.d.vms.find(x=>x.node===node&&String(x.vmid)===String(vmid)&&x.kind===kind);
+    if(!v)return;
+    Groups.edit_=v;
+    document.getElementById('mgrpT').textContent=`Gruppo di ${v.name||'VM '+v.vmid}`;
+    document.getElementById('mgrpS').textContent=`${kind==='lxc'?'LXC':'QEMU'} · ${vmid} · ${node}`;
+    document.getElementById('grp-in').value=v.source==='tag'?v.groups.join(' '):(v.proposal||'');
+    document.getElementById('grp-clear').hidden=v.source!=='tag';
+    Groups.msg('');
+    openModal('mgrp'); setTimeout(()=>document.getElementById('grp-in').focus(),100);
+  },
+  msg(t,err){const el=document.getElementById('grp-msg');el.textContent=t||'';el.style.color=err?'var(--red)':'';},
+  save(clear){
+    const v=Groups.edit_; if(!v||Groups.busy)return;
+    const p=clear?{ok:true,groups:[]}:Groups.parse(document.getElementById('grp-in').value);
+    if(!p.ok){Groups.msg(p.err,true);return;}
+    if(!p.groups.length&&!clear){Groups.msg('Scrivi un gruppo, oppure usa "Togli il gruppo".',true);return;}
+    const fresh=p.groups.filter(g=>!Groups.existing().has(g));
+    const go=async()=>{
+      Groups.busy=true; Groups.msg('Salvataggio…');
+      try{
+        await api(`/nodes/${encodeURIComponent(v.node)}/${v.kind}/${encodeURIComponent(v.vmid)}/groups`,{method:'PUT',quiet:true,timeoutMs:30000,body:JSON.stringify({groups:p.groups,confirm_new:fresh})});
+        Groups.busy=false; _tc.clear(); closeModal('mgrp'); toast(p.groups.length?`Gruppo di ${v.name||v.vmid}: ${p.groups.join(', ')}`:`Gruppo tolto da ${v.name||v.vmid}`,'ok');
+        if(App.cur==='groups')Groups.load(true);
+        VMs.detail(v.node,v.vmid,v.kind);
+      }catch(e){Groups.busy=false;Groups.msg(e.body&&e.body.reason==='new_group'?'Il server non conosce ancora questo gruppo: riprova.':e.message,true);}
+    };
+    if(fresh.length)askConfirm({title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
+    else go();
+  },
+};
+
 const Dashboard={
   CRIT:85,                                   // % oltre cui un valore è critico (stessa soglia di bar())
   WARN:65,                                   // % oltre cui un valore chiede attenzione
@@ -3347,13 +3578,15 @@ const VMs=(()=>{
       Route.replace(`#/vm/${encodeURIComponent(node)}/${encodeURIComponent(vmid)}/${kind}`);
       openModal('mov');
       try{
-        const [r, fsinfo, osinfo, netinfo] = await Promise.all([
+        const [r, fsinfo, osinfo, netinfo, gdata] = await Promise.all([
           // tollerante: per gli LXC questo endpoint QEMU può fallire, il pannello resta usabile con le azioni
           api(`/nodes/${node}/qemu/${vmid}/status`,{quiet:true}).catch(()=>null),
           kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/fsinfo`,{quiet:true}).catch(()=>[]) : Promise.resolve([]),
           kind==='qemu' ? api(`/nodes/${node}/qemu/${vmid}/osinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({}),
-          kind==='qemu'&&!v0?.ip ? api(`/nodes/${node}/qemu/${vmid}/netinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({})
+          kind==='qemu'&&!v0?.ip ? api(`/nodes/${node}/qemu/${vmid}/netinfo`,{quiet:true}).catch(()=>({})) : Promise.resolve({}),
+          Groups.fetch().catch(()=>null)
         ]);
+        const grow=gdata&&gdata.vms.find(x=>x.node===node&&String(x.vmid)===String(vmid));
         const n=js(node), id=js(vmid), t=js(kind);
         const s=r?.status||{},snaps=r?.snapshots||[];
         if(s.name) document.getElementById('movT').textContent=s.name;
@@ -3385,6 +3618,7 @@ const VMs=(()=>{
             ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
             ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
+            ${grow?`<dt>Gruppo</dt><dd>${Groups.label(grow)} <button type="button" class="btn bg2 sm" onclick="Groups.edit(${n},${id},${t})">Cambia</button></dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
@@ -3593,6 +3827,7 @@ const Provision=(()=>{
 
   return{
     async load(){
+      Groups.fetch().catch(()=>{}); // riempie l'elenco dei gruppi esistenti (suggerimenti del campo Gruppo)
       // Load nodes for target selector
       if(!nodes.length){
         const ns=await api('/nodes',{quiet:true}).catch(()=>[]);
@@ -3700,6 +3935,7 @@ const Provision=(()=>{
       line(`Clona ${tpl.name} (${tpl.vmid}, ${tpl.node}) in ${g('pv-name')||'— nome mancante —'} sul nodo ${g('pv-node')||tpl.node}`);
       line(`VMID ${g('pv-vmid')&&g('pv-vmid')!=='0'?g('pv-vmid'):'automatico'} · ${g('pv-cpu')||'?'} CPU · ${g('pv-ram')||'?'} GB RAM · disco ${g('pv-disk')?g('pv-disk')+' GB':'come il template'}`);
       line(`Rete: ${g('pv-ip')||'IP non impostato'}${g('pv-gw')?' via '+g('pv-gw'):''}`);
+      if(g('pv-group'))line(`Gruppo: ${g('pv-group')}`);
     },
 
     // Avanzamento: un passo e' completo quando i suoi campi obbligatori sono validi (stessa validazione del nome di run()).
@@ -3737,7 +3973,9 @@ const Provision=(()=>{
       document.getElementById('pv-gw').value=[(gw>>>24)&255,(gw>>>16)&255,(gw>>>8)&255,gw&255].join('.');
     },
 
+    _grpOk:false,
     async run(){
+      const grpConfirmed=Provision._grpOk; Provision._grpOk=false;
       const idx=parseInt(document.getElementById('tpl-select').value);
       const tpl=templates[idx];
       if(!tpl){toast('Seleziona un template','err');return;}
@@ -3747,6 +3985,13 @@ const Provision=(()=>{
         document.getElementById('pv-name').focus(); return;
       }
 
+      const gp=Groups.parse(document.getElementById('pv-group').value);
+      if(!gp.ok||gp.groups.length>1){toast(gp.ok?'In creazione si sceglie un solo gruppo':'Gruppo non valido: '+gp.err,'err');document.getElementById('pv-group').focus();return;}
+      const grp=gp.groups[0]||'', grpNew=!!grp&&!Groups.existing().has(grp);
+      if(grpNew&&!grpConfirmed){
+        askConfirm({title:`Nuovo gruppo: ${grp}`,lines:[`Il gruppo "${grp}" non esiste ancora su nessuna VM.`],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\': controlla il nome prima di continuare.',level:'warn',okLabel:'Crea il gruppo e provisiona'},()=>{Provision._grpOk=true;Provision.run();});
+        return;
+      }
       const payload={
         template_node: tpl.node,
         template_vmid: tpl.vmid,
@@ -3763,6 +4008,8 @@ const Provision=(()=>{
         ciuser:        document.getElementById('pv-user').value,
         cipassword:    document.getElementById('pv-pass').value,
         ssh_keys:      document.getElementById('pv-ssh').value,
+        group:         grp,
+        group_new:     grpNew,
       };
 
       const btn=document.getElementById('pv-btn');
@@ -4086,6 +4333,7 @@ const RPT_TXT={
     effRule:'Inattiva: accesa ma con CPU media sotto il 2% e rete sotto 1 KB/s per almeno 7 giorni. Sovradimensionata: memoria usata (95° percentile) sotto il 25% di quella assegnata, oppure CPU (95° percentile) sotto il 10%, per almeno 14 giorni.',
     effNone:'Il dato di efficienza non è disponibile per questo periodo.',
     inv:(d)=>`Lo storico dell'inventario (numero di VM, gruppi, GPU) è disponibile dal ${d}: le variazioni nel tempo si completeranno col passare dei mesi.`,
+    rule:(d)=>`Dal ${d} i gruppi di ricerca sono quelli indicati nell'inventario del servizio; prima erano dedotti dal nome delle macchine: il confronto tra gruppi a cavallo di quella data è indicativo.`,
     method:'Fonti: statistiche di Proxmox VE e fotografia giornaliera dell\'inventario. Previsioni lineari sulle medie settimanali. Nessun dato personale.',
     land:'orizzontale',port:'verticale',lang:'Italiano'},
   en:{loc:'en-GB',title:'Service report',sub:'IaaS cloud infrastructure for research',gen:'Generated on',s1:'Summary',
@@ -4107,6 +4355,7 @@ const RPT_TXT={
     effRule:'Idle: running with average CPU below 2% and network below 1 KB/s for at least 7 days. Oversized: memory used (95th percentile) below 25% of the assigned amount, or CPU (95th percentile) below 10%, for at least 14 days.',
     effNone:'Efficiency data is not available for this period.',
     inv:(d)=>`Inventory history (number of VMs, groups, GPUs) is available since ${d}: changes over time will fill in as months go by.`,
+    rule:(d)=>`From ${d} research groups come from the service inventory; before that they were inferred from machine names: comparing groups across that date is indicative only.`,
     method:'Sources: Proxmox VE statistics and the daily inventory snapshot. Linear forecasts on weekly averages. No personal data.',
     land:'landscape',port:'portrait',lang:'English'},
 };
@@ -4246,7 +4495,7 @@ const Reports={
 
   // ── tecnici ──
   kpi(label,val,sub,cls){return`<div class="kcell"><div class="kl">${esc(label)}</div><div class="kv ${cls||''}">${val}</div><div class="ks">${sub||''}</div></div>`;},
-  notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n)).join('<br>')}</p>`:'';},
+  notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n==='group_rule_changed'?`Dal ${d.inventory&&d.inventory.group_rule_change?dateFmt(d.inventory.group_rule_change):'—'} i gruppi sono presi dai tag di Proxmox; prima dal nome della VM: il confronto tra gruppi a cavallo di quella data non e' esatto.`:n)).join('<br>')}</p>`:'';},
   cols(){
     const n=(v,d)=>Reports.fmtNum(v,d), p=v=>Reports.pct(v), mb=v=>v==null?'—':rptBytes(v);
     const C={
@@ -4260,7 +4509,7 @@ const Reports={
         {k:'mem_days_to_85',l:'Giorni a RAM 85%',num:1,fmt:v=>v==null?'—':n(v)},{k:'saturated',l:'Segnalazione',get:r=>r.saturated?'satura':'',flag:1},
         {k:'coverage_pct',l:'Copertura',num:1,fmt:p},{k:'spark',l:'Andamento CPU',spark:1,noexp:1}],
       vms:[
-        {k:'name',l:'VM'},{k:'vmid',l:'VMID',num:1},{k:'group',l:'Gruppo'},{k:'node',l:'Nodo'},{k:'kind',l:'Tipo',get:r=>r.kind==='lxc'?'LXC':'QEMU'},{k:'status',l:'Stato'},
+        {k:'name',l:'VM'},{k:'vmid',l:'VMID',num:1},{k:'group',l:'Gruppo',get:r=>Array.isArray(r.groups)&&r.groups.length?r.groups.map(g=>g==='altro'?'senza gruppo':g).join(' + '):(r.group==='altro'?'senza gruppo':r.group)},{k:'node',l:'Nodo'},{k:'kind',l:'Tipo',get:r=>r.kind==='lxc'?'LXC':'QEMU'},{k:'status',l:'Stato'},
         {k:'cores',l:'vCPU',num:1},{k:'max_mem',l:'RAM',num:1,fmt:mb},
         {k:'cpu_avg',l:'CPU media',num:1,fmt:p},{k:'cpu_p95',l:'CPU p95',num:1,fmt:p},{k:'cpu_max',l:'CPU picco',num:1,fmt:p},
         {k:'mem_avg',l:'RAM media',num:1,fmt:p},{k:'mem_p95',l:'RAM p95',num:1,fmt:p},
@@ -4405,7 +4654,7 @@ const Reports={
       need(T.c.cpu,`${N(d.stats.cpu.avg,0)}% ${T.avgSub}`)].join('');
     const e=eff&&eff.totals?{inactive:eff.totals.inactive,oversized:eff.totals.oversized,mem:B(eff.totals.reclaimable_mem_bytes),cores:N(eff.totals.reclaimable_cores)}:null;
     const effHTML=e?`<p class="rp-eff">${esc(T.effLine(e))}</p><p class="rp-rule">${esc(T.effRule)}</p>`:`<p class="rp-rule">${esc(T.effNone)}</p>`;
-    const notes=[d.meta.notes.includes('inventory_since')&&inv.first_day?T.inv(dateFmt(inv.first_day)):'',T.method].filter(Boolean).join(' ');
+    const notes=[d.meta.notes.includes('inventory_since')&&inv.first_day?T.inv(dateFmt(inv.first_day)):'',d.meta.notes.includes('group_rule_changed')&&inv.group_rule_change?T.rule(dateFmt(inv.group_rule_change)):'',T.method].filter(Boolean).join(' ');
     return`
 <section class="rp-page rp-cover"><span class="rp-lang">${esc(T.lang)}</span><img src="${esc(RPT_ID.logo)}" class="rp-logo" alt="${esc(RPT_ID.name)}"><div class="rp-ct"><h1>${esc(T.title)}</h1><p class="rp-per">${esc(per.from)} – ${esc(per.to)}</p><p>${esc(T.sub)}<br>${esc(RPT_ID.org)}</p></div><div class="rp-cf">${esc(T.gen)} ${esc(new Date().toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'}))} · ${esc(RPT_ID.mail)}</div></section>
 <section class="rp-page"><h2>${esc(T.s1)}</h2><div class="rp-sum"><div><div class="rp-cond"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${d.condition.level}">${Dashboard.ICONS[d.condition.level==='ok'?'ok':d.condition.level==='bad'?'bad':'warn']}</svg><div><h3>${esc(T.lvl[d.condition.level])}</h3><p>${esc(T.intro(per,k))} ${esc(condP)}</p></div></div></div><div class="rp-kg">${tiles}</div></div>${foot(2)}</section>
