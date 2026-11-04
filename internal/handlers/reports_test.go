@@ -54,9 +54,9 @@ func (f fakeRpt) GetClusterResources(string) (json.RawMessage, error) {
 	 {"type":"node","node":"n1","status":"online","maxcpu":64,"maxmem":1099511627776},
 	 {"type":"node","node":"n2","status":"online","maxcpu":32,"maxmem":549755813888},
 	 {"type":"node","node":"n3","status":"offline","maxcpu":0,"maxmem":0},
-	 {"type":"qemu","node":"n1","vmid":101,"name":"rossi-idle","status":"running","maxcpu":4,"maxmem":8589934592,"maxdisk":1},
+	 {"type":"qemu","node":"n1","vmid":101,"name":"rossi-idle","tags":"cloudinit;gruppo-rossi","status":"running","maxcpu":4,"maxmem":8589934592,"maxdisk":1},
 	 {"type":"qemu","node":"n1","vmid":102,"name":"rossi-big","status":"running","maxcpu":16,"maxmem":68719476736,"maxdisk":1},
-	 {"type":"qemu","node":"n1","vmid":103,"name":"bianchi-busy","status":"running","maxcpu":8,"maxmem":17179869184,"maxdisk":1},
+	 {"type":"qemu","node":"n1","vmid":103,"name":"bianchi-busy","tags":"Gruppo-Bianchi","status":"running","maxcpu":8,"maxmem":17179869184,"maxdisk":1},
 	 {"type":"lxc","node":"n2","vmid":104,"name":"bianchi-ct","status":"stopped","maxcpu":2,"maxmem":2147483648,"maxdisk":1},
 	 {"type":"qemu","node":"n2","vmid":105,"name":"tmpl","status":"stopped","template":1,"maxcpu":2,"maxmem":1,"maxdisk":1},
 	 {"type":"storage","node":"n1","storage":"ceph","plugintype":"rbd","shared":1,"status":"available","maxdisk":1000000,"disk":400000},
@@ -336,5 +336,46 @@ func TestSharedCacheIsBounded(t *testing.T) {
 	cephCache.Unlock()
 	if n > maxCacheEntries || !recent || oldest {
 		t.Fatalf("size %d recent %v oldest %v", n, recent, oldest)
+	}
+}
+
+func TestServiceReportGroupRuleChangeAndSharedVMs(t *testing.T) {
+	hist, err := history.New(filepath.Join(t.TempDir(), "r.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer hist.Close()
+	for i := 0; i < 4; i++ {
+		day := time.Now().AddDate(0, 0, -3+i)
+		s := history.Snapshot{Day: day.Format("2006-01-02"), Cluster: "C", TakenAt: day,
+			Nodes:  []history.NodeRow{{Node: "n1", Online: true, Cores: 64, MemBytes: 100 * gib}},
+			Groups: []history.GroupRow{{Node: "n1", Group: "rossi", Kind: "qemu", VMs: 2, Running: 2, Cores: 4, MemBytes: 20 * gib}}}
+		if i >= 2 { // from the third day: tags, one VM shared between rossi and bianchi, 3 VMs in the cluster
+			s.GroupRule, s.HasTotals, s.TotalVMs, s.TotalRunning, s.SharedVMs = history.RuleTags, true, 3, 3, 1
+			s.Groups = []history.GroupRow{
+				{Node: "n1", Group: "bianchi", Kind: "qemu", VMs: 1, Running: 1, SharedVMs: 1, CoresMilli: 1500, MemBytes: 5 * gib},
+				{Node: "n1", Group: "rossi", Kind: "qemu", VMs: 3, Running: 3, SharedVMs: 1, CoresMilli: 4500, MemBytes: 25 * gib}}
+		}
+		if err := hist.Save(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rep, err := buildServiceReport(newRpt(), hist, "C", yearParams(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantChange := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	if rep.Inventory.RuleChange != wantChange || rep.Inventory.GroupRule != "tags" || rep.Inventory.SharedVMs != 1 {
+		t.Fatalf("%+v", rep.Inventory)
+	}
+	noted := false
+	for _, n := range rep.Meta.Notes {
+		noted = noted || n == "group_rule_changed"
+	}
+	if !noted || rep.KPI.VMsTotal != 3 { // 3 from the cluster total, not 1+3 from the group rows
+		t.Fatalf("notes %v vms %d", rep.Meta.Notes, rep.KPI.VMsTotal)
+	}
+	if len(rep.TopGroups) != 2 || rep.TopGroups[0].Group != "rossi" || rep.TopGroups[0].Shared != 1 || rep.TopGroups[1].Cores != 2 {
+		t.Fatalf("%+v", rep.TopGroups)
 	}
 }

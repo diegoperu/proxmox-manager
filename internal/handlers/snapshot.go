@@ -63,6 +63,17 @@ func BuildSnapshot(resources json.RawMessage, gpu *GPUInventory, cluster string,
 	if err := json.Unmarshal(resources, &res); err != nil {
 		return snap, err
 	}
+	// first pass: which groups exist as tags (D36 C); templates never count
+	var tagStrs []string
+	for _, r := range res {
+		if typ, _ := r["type"].(string); (typ == "qemu" || typ == "lxc") && !isTemplateRes(r) {
+			ts, _ := r["tags"].(string)
+			tagStrs = append(tagStrs, ts)
+		}
+	}
+	resolver := newGroupResolver(tagStrs)
+	snap.GroupRule, snap.HasTotals = history.RuleTags, true
+	byVM := map[int]groupAssign{} // VMID -> groups, for the GPU rows (VMIDs are unique in a cluster)
 	type key struct{ node, grp, kind string }
 	groups := map[key]*history.GroupRow{}
 	for _, r := range res {
@@ -80,22 +91,48 @@ func BuildSnapshot(resources json.RawMessage, gpu *GPUInventory, cluster string,
 				continue
 			}
 			name, _ := r["name"].(string)
-			k := key{node, vmGroup(name), typ}
-			g := groups[k]
-			if g == nil {
-				g = &history.GroupRow{Node: node, Group: k.grp, Kind: typ}
-				groups[k] = g
+			ts, _ := r["tags"].(string)
+			as := resolver.resolve(name, ts)
+			if vmid := int(intField(r, "vmid")); vmid > 0 {
+				byVM[vmid] = as
 			}
-			g.VMs++
+			running := false
 			if st, _ := r["status"].(string); st == "running" {
-				g.Running++
+				running = true
 			}
-			g.Cores += int(intField(r, "maxcpu"))
-			g.MemBytes += intField(r, "maxmem")
-			g.DiskBytes += intField(r, "maxdisk")
+			snap.TotalVMs++
+			if running {
+				snap.TotalRunning++
+			}
+			if as.Shared() {
+				snap.SharedVMs++
+			}
+			n := len(as.Groups)
+			mem := splitEven(intField(r, "maxmem"), n)
+			disk := splitEven(intField(r, "maxdisk"), n)
+			cores := splitEven(intField(r, "maxcpu")*1000, n)
+			for i, grp := range as.Groups {
+				k := key{node, grp, typ}
+				g := groups[k]
+				if g == nil {
+					g = &history.GroupRow{Node: node, Group: grp, Kind: typ}
+					groups[k] = g
+				}
+				g.VMs++ // a shared VM counts whole in each group (D42 B)
+				if running {
+					g.Running++
+				}
+				if as.Shared() {
+					g.SharedVMs++
+				}
+				g.CoresMilli += int(cores[i])
+				g.MemBytes += mem[i]
+				g.DiskBytes += disk[i]
+			}
 		}
 	}
 	for _, g := range groups {
+		g.Cores = g.CoresMilli / 1000
 		snap.Groups = append(snap.Groups, *g)
 	}
 	sort.Slice(snap.Nodes, func(i, j int) bool { return snap.Nodes[i].Node < snap.Nodes[j].Node })
@@ -111,18 +148,26 @@ func BuildSnapshot(resources json.RawMessage, gpu *GPUInventory, cluster string,
 	})
 	if gpu != nil {
 		type gk struct{ node, model, grp string }
-		cards := map[gk]int{}
+		cards := map[gk]int{} // thousandths
 		for _, n := range gpu.Nodes {
 			for _, c := range n.Cards {
-				grp := "" // free
-				if len(c.Uses) > 0 {
-					grp = vmGroup(c.Uses[0].Name) // uses are sorted by VMID: stable
+				model := clampText(c.Name, 80)
+				if len(c.Uses) == 0 {
+					cards[gk{n.Node, model, ""}] += 1000 // free
+					continue
 				}
-				cards[gk{n.Node, clampText(c.Name, 80), grp}]++
+				// uses are sorted by VMID: stable. A card of a shared VM is split like the VM's resources.
+				as, ok := byVM[c.Uses[0].VMID]
+				if !ok {
+					as = groupAssign{Groups: []string{otherGroup}, Source: groupSrcNone}
+				}
+				for i, share := range splitEven(1000, len(as.Groups)) {
+					cards[gk{n.Node, model, as.Groups[i]}] += int(share)
+				}
 			}
 		}
 		for k, v := range cards {
-			snap.GPUs = append(snap.GPUs, history.GPURow{Node: k.node, Model: k.model, Group: k.grp, Cards: v})
+			snap.GPUs = append(snap.GPUs, history.GPURow{Node: k.node, Model: k.model, Group: k.grp, Cards: v / 1000, CardsMilli: v})
 		}
 		sort.Slice(snap.GPUs, func(i, j int) bool {
 			a, b := snap.GPUs[i], snap.GPUs[j]

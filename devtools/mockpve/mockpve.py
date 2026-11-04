@@ -78,6 +78,16 @@ for v in VMS:  # VMID univoci: la VM di prova 151 non deve avere omonimi
     seen.add(v["vmid"])
 for v in VMS:
     v["disk"] = int(v["maxdisk"] * rnd.uniform(.15, .8)) if v["status"] == "running" else 0
+# tag come sul cluster reale: di sistema per tutte; `gruppo-<prefisso>` su una VM ogni tre (le altre restano senza gruppo e
+# la pagina Gruppi propone il prefisso del nome); una VM con due gruppi (condivisa), un tag maiuscolo e un template con un
+# tag di gruppo per provare l'avviso
+for v in VMS:
+    t = ["cloudinit"] if v["vmid"] % 2 else ["ubuntu-template", "24.04"]
+    if v["vmid"] % 3 == 0 and not v.get("template"): t.append("gruppo-" + v["name"].split("-")[0].lower())
+    if v["vmid"] % 31 == 0: t.append("LTSC")
+    v["tags"] = ";".join(t) if not v.get("template") else "ubuntu-template;gruppo-ghost"
+shared = next(v for v in VMS if v["type"] == "qemu" and not v.get("template") and v["vmid"] % 3 != 0)
+shared["tags"] += ";gruppo-condivisa;gruppo-secondo"
 
 
 def rrd(node, tf):
@@ -111,7 +121,7 @@ def resources():
                         mem=int(b["maxmem"] * b["mem"]), maxcpu=b["cores"], cpu=b["cpu"],
                         maxdisk=1000 * GB, disk=int(1000 * GB * b["disk"]), uptime=86400 * 12 if b["mem"] else 0))
     for v in VMS:
-        r = {k: v[k] for k in ("type", "node", "vmid", "name", "status", "maxmem", "mem", "cpu", "maxdisk", "disk", "template")}
+        r = {k: v[k] for k in ("type", "node", "vmid", "name", "status", "maxmem", "mem", "cpu", "maxdisk", "disk", "template", "tags")}
         r["id"] = f"{v['type']}/{v['vmid']}"
         r["maxcpu"] = 2
         res.append(r)
@@ -247,6 +257,8 @@ def route(path):
                 key = "ipconfig0" if seg[0] == "qemu" else "net0"
                 val = f"ip={v['ip']}/24,gw=10.75.4.254" if v["ip"] else ""
                 cfg = {"name": v["name"], "cores": 2, "memory": v["maxmem"] // (1024 * 1024)}
+                if v.get("tags"): cfg["tags"] = v["tags"]
+                if v.get("template"): cfg["template"] = 1
                 if val: cfg[key] = val
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
                 if seg[0] == "qemu" and v["vmid"] % 11 == 0: cfg["hostpci0"] = "0000:01:00,pcie=1,x-vga=1"  # GPU diretta
@@ -326,16 +338,20 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", "0") or 0)
         form = parse_qs(self.rfile.read(min(n, 65536)).decode()) if n else {}
         # config QEMU: PUT /nodes/{n}/qemu/{id}/config (con digest, come Proxmox)
-        if self.command == "PUT" and len(parts) == 5 and parts[0] == "nodes" and parts[2] == "qemu" and parts[4] == "config" and parts[3].isdigit():
+        if self.command == "PUT" and len(parts) == 5 and parts[0] == "nodes" and parts[2] in ("qemu", "lxc") and parts[4] == "config" and parts[3].isdigit():
             vmid = int(parts[3]); cur = route("/" + "/".join(parts))
             if cur is None: return self.send_error(404)
             if form.get("digest", [""])[0] != cur["digest"]:
                 return self._json({"data": None, "message": "detected modified configuration - file changed by other user? Try again"}, 500)
             ed = CFG_EDITS.setdefault(vmid, {})
+            vm = next(x for x in VMS if x["vmid"] == vmid)
             for k, val in form.items():
                 if k == "digest": continue
                 if k == "delete":
-                    for d in val[0].split(","): ed[d] = None
+                    for d in val[0].split(","):
+                        if d == "tags": vm["tags"] = ""
+                        else: ed[d] = None
+                elif k == "tags": vm["tags"] = val[0]
                 else: ed[k] = val[0]
             return self._json({"data": None}, 200)
         # spegnimento: POST /nodes/{n}/qemu/{id}/status/{shutdown|stop}
@@ -343,7 +359,7 @@ class H(BaseHTTPRequestHandler):
             for v in VMS:
                 if v["vmid"] == int(parts[3]): v["status"] = "stopped"
             return self._json({"data": "UPID:mock:0000"}, 200)
-        self.send_error(405, "anteprima in sola lettura (tranne config QEMU e spegnimento, solo in memoria)")
+        self.send_error(405, "anteprima in sola lettura (tranne config QEMU/LXC e spegnimento, solo in memoria)")
     do_PUT = do_DELETE = do_POST
 
     def _json(self, obj, code):

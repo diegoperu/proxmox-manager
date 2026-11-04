@@ -119,6 +119,8 @@ func main() {
 		r.Get("/templates", h.GetTemplates)
 		r.Get("/nextid", h.GetNextVMID)
 		r.Post("/provision", h.ProvisionVM)
+		r.Get("/groups", h.GetGroups)
+		r.Put("/nodes/{node}/{kind}/{vmid}/groups", h.SetGroups)
 
 		r.Get("/storage", h.GetStorage)
 		r.Get("/pools", h.GetPools)

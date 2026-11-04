@@ -28,6 +28,7 @@ type groupUse struct {
 	VMs      int    `json:"vms"`
 	Cores    int64  `json:"cores"`
 	MemBytes int64  `json:"mem_bytes"`
+	Shared   int    `json:"shared_vms"` // of the VMs, how many also belong to another group
 }
 
 type invDay struct {
@@ -83,6 +84,11 @@ type serviceReport struct {
 		GrpFirst int      `json:"groups_first"`
 		GrpLast  int      `json:"groups_last"`
 		SpanDays int      `json:"span_days"`
+		// D37/D42: distinct VMs in more than one group on the last day; D41: first day of the tag rule when the period
+		// also contains days grouped by name (the two are not comparable group by group).
+		SharedVMs  int    `json:"shared_vms"`
+		RuleChange string `json:"group_rule_change"`
+		GroupRule  string `json:"group_rule"`
 	} `json:"inventory"`
 	TopGroups    []groupUse `json:"top_groups"`
 	GroupCount   int        `json:"group_count"`
@@ -248,6 +254,15 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 				}
 			}
 			rep.KPI.VMsRunning, rep.KPI.VMsTotal, rep.KPI.Groups = last.Running, last.VMs, last.Groups
+			rep.Inventory.SharedVMs, rep.Inventory.GroupRule = last.SharedVMs, last.GroupRule
+			if first.GroupRule == history.RuleName {
+				for _, d := range days {
+					if d.GroupRule == history.RuleTags {
+						rep.Inventory.RuleChange = d.Day
+						break
+					}
+				}
+			}
 			if last.NodeMem > 0 {
 				v := round2(float64(last.AllocMem) / float64(last.NodeMem) * 100)
 				rep.KPI.MemAllocPct = &v
@@ -257,6 +272,7 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 			}
 			if snap, ok, _ := hist.Load(last.Day, cluster); ok {
 				byGroup := map[string]*groupUse{}
+				milli := map[string]int64{}
 				for _, g := range snap.Groups {
 					if g.Group == otherGroup {
 						continue
@@ -267,10 +283,12 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 						byGroup[g.Group] = u
 					}
 					u.VMs += g.VMs
-					u.Cores += int64(g.Cores)
+					u.Shared += g.SharedVMs
+					milli[g.Group] += int64(g.CoresMilli)
 					u.MemBytes += g.MemBytes
 				}
-				for _, u := range byGroup {
+				for k, u := range byGroup {
+					u.Cores = (milli[k] + 500) / 1000
 					rep.TopGroups = append(rep.TopGroups, *u)
 				}
 				sort.Slice(rep.TopGroups, func(i, j int) bool {
@@ -288,6 +306,9 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 		if all, err := hist.Days(cluster, "2000-01-01", now.Format("2006-01-02")); err == nil {
 			rep.GPUFullSince = gpuStreak(all)
 		}
+	}
+	if rep.Inventory.RuleChange != "" {
+		rep.Meta.Notes = append(rep.Meta.Notes, "group_rule_changed")
 	}
 	if rep.Inventory.FirstDay == "" || rep.Inventory.FirstDay > rep.Meta.From {
 		rep.Meta.Notes = append(rep.Meta.Notes, "inventory_since")
