@@ -246,6 +246,21 @@ func (c *Client) VMSetConfig(node string, vmid int, params url.Values) (json.Raw
 	return c.Put(fmt.Sprintf("/nodes/%s/qemu/%d/config", node, vmid), params)
 }
 
+// GetGuestConfig / SetGuestConfig read and write the config of a QEMU VM or LXC container. kind must be "qemu" or
+// "lxc" (validated by the caller; anything else is refused here too).
+func (c *Client) GetGuestConfig(node, kind string, vmid int) (json.RawMessage, error) {
+	if kind != "qemu" && kind != "lxc" {
+		return nil, fmt.Errorf("tipo non valido")
+	}
+	return c.Get(fmt.Sprintf("/nodes/%s/%s/%d/config", node, kind, vmid))
+}
+func (c *Client) SetGuestConfig(node, kind string, vmid int, params url.Values) (json.RawMessage, error) {
+	if kind != "qemu" && kind != "lxc" {
+		return nil, fmt.Errorf("tipo non valido")
+	}
+	return c.Put(fmt.Sprintf("/nodes/%s/%s/%d/config", node, kind, vmid), params)
+}
+
 // VMResizeDisk resizes a VM disk. size is the NEW total size e.g. "+10G" or "50G"
 func (c *Client) VMResizeDisk(node string, vmid int, disk, size string) (json.RawMessage, error) {
 	return c.Put(fmt.Sprintf("/nodes/%s/qemu/%d/resize", node, vmid),

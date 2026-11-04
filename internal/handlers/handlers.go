@@ -743,10 +743,21 @@ func (h *Handler) ProvisionVM(w http.ResponseWriter, r *http.Request) {
 		SSHKeys      string `json:"ssh_keys"`
 		CIUser       string `json:"ciuser"`
 		CIPassword   string `json:"cipassword"`
+		Group        string `json:"group"`     // optional: tag gruppo-<group> on the new VM (D35)
+		GroupNew     bool   `json:"group_new"` // the user confirmed a group that does not exist yet (D38)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, err, 400)
 		return
+	}
+	var groups []string
+	if strings.TrimSpace(body.Group) != "" {
+		g, err := normalizeGroups([]string{body.Group})
+		if err != nil {
+			writeError(w, err, 400)
+			return
+		}
+		groups = g
 	}
 	if body.TemplateNode == "" || body.TemplateVMID == 0 {
 		writeError(w, fmt.Errorf("template_node e template_vmid richiesti"), 400)
@@ -763,6 +774,18 @@ func (h *Handler) ProvisionVM(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, err, 400)
 		return
+	}
+	// The group is checked before cloning: a refusal must not leave a half-made VM.
+	if len(groups) > 0 && !body.GroupNew {
+		known, err := knownGroups(client)
+		if err != nil {
+			writeError(w, fmt.Errorf("elenco dei gruppi non leggibile"), 502)
+			return
+		}
+		if known[groups[0]] == 0 {
+			writeGPUErr(w, refuse(http.StatusConflict, "new_group", "Gruppo nuovo, va confermato: "+groups[0]))
+			return
+		}
 	}
 
 	// Step 1: get next VMID if not provided
@@ -923,6 +946,19 @@ func (h *Handler) ProvisionVM(w http.ResponseWriter, r *http.Request) {
 			log = append(log, fmt.Sprintf("⚠ Cloud-init: %v", err))
 		} else {
 			log = append(log, fmt.Sprintf("✓ Cloud-init: IP=%s GW=%s DNS=%s", body.IP, body.Gateway, body.DNS))
+		}
+	}
+
+	// Step 8: group tag (D35). A failure does not undo the VM: the group can be set later from the VM panel.
+	if len(groups) > 0 {
+		var confirm []string
+		if body.GroupNew {
+			confirm = groups
+		}
+		if _, e := setVMGroups(client, clusterIdx(r), body.TargetNode, "qemu", body.NewVMID, groups, confirm); e != nil {
+			log = append(log, fmt.Sprintf("⚠ Gruppo %s non impostato: %s (si imposta dal pannello della VM)", groups[0], e.Msg))
+		} else {
+			log = append(log, fmt.Sprintf("✓ Gruppo: %s", groups[0]))
 		}
 	}
 
