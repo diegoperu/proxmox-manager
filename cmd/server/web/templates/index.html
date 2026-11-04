@@ -849,7 +849,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.128.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.130.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -3170,10 +3170,10 @@ const Balance={
     lock:'Ha un\'operazione in corso (lock)',ha:'E\' gestita dall\'HA di Proxmox',lxc_restart:'Container: si sposta solo con riavvio (attiva "Includi i container")',
     no_target:'Proxmox non consente nessun altro nodo',node_offline:'Il suo nodo e\' fuori linea',not_counted:'Spenta e non conteggiata: spostarla non cambia il carico',
     unverified:'Non e\' stato possibile verificarla: non si sposta',
-    cpu_host:'CPU "host": a caldo solo verso un nodo dello stesso produttore (AMD o Intel), e non ce n\'e\' uno libero (spunta "a freddo" per spostarla spegnendola)'},
+    cpu_host:'CPU "host": a caldo solo verso un nodo dello stesso produttore (AMD o Intel), e non ce n\'e\' uno libero (spunta "spegni e sposta" per spostarla a freddo)'},
   WHY:{evacuate:'Svuotamento del nodo',over_limit:'Il nodo supera la RAM assegnabile',balance:'Pareggio del carico'},
   gb(b){return Math.round((b||0)/1073741824);},
-  warnTxt(w,p){return w==='cpu_vcpu'?`oltre ${p.vcpu} vCPU per core`:w==='cpu_p95'?`CPU reale oltre il ${p.cpu}%`:String(w);},
+  warnTxt(w,p){return w==='cpu_vcpu'?`oltre ${p.vcpu_per_core} vCPU per core`:w==='cpu_p95'?`CPU reale oltre il ${p.cpu_warn}%`:String(w);},
   params(){
     const g=id=>document.getElementById(id), num=(id,lo,hi,def)=>{const v=parseFloat(g(id).value);return Number.isFinite(v)&&v>=lo&&v<=hi?v:def;};
     const p={host_reserve_gb:num('bal-host',0,512,8),per_osd_gb:num('bal-osd',0,64,4),max_steps:Math.round(num('bal-steps',1,50,10)),
@@ -3245,12 +3245,13 @@ const Balance={
     </div>`;
   },
   coldBox(vmid,name,on){
-    return`<label class="bal-mode"><input type="checkbox" ${on?'checked':''} ${Balance.run||Balance.busy?'disabled':''} onchange="Balance.setCold(${js(vmid)},this.checked)" aria-label="${esc('Sposta '+name+' a freddo')}"> a freddo</label>`;
+    return`<label class="bal-mode"><input type="checkbox" ${on?'checked':''} ${Balance.run||Balance.busy?'disabled':''} onchange="Balance.setCold(${js(vmid)},this.checked)" aria-label="${esc('Sposta '+name+' a freddo (spegni, sposta, riaccendi)')}"> spegni e sposta</label>`;
   },
   modeCell(s){
     if(s.kind==='lxc')return`<span class="td">${s.running?'riavvio breve':'container spento'}</span>`;
     if(!s.running)return'<span class="td">a freddo (spenta)</span>';
-    return Balance.coldBox(s.vmid,s.name||s.vmid,s.cold)+(s.same_vendor?' <span class="td" title="La VM usa la CPU host: a caldo va solo su un nodo dello stesso produttore (AMD o Intel)">· stesso produttore CPU</span>':'');
+    // modo attuale in parole, poi la spunta per cambiarlo (il testo dell'etichetta da solo non dice se e' spuntata)
+    return`<b>${s.cold?'a freddo':'a caldo'}</b>${s.same_vendor&&!s.cold?' <span class="td" title="La VM usa la CPU host: a caldo va solo su un nodo dello stesso produttore (AMD o Intel)">(stesso produttore CPU)</span>':''} · `+Balance.coldBox(s.vmid,s.name||s.vmid,s.cold);
   },
   // la scelta a caldo/a freddo fa parte del piano (D55: a freddo si puo' cambiare processore), quindi si ricalcola
   setCold(vmid,on){vmid=Number(vmid);if(!Number.isInteger(vmid)||vmid<1)return;if(on)Balance.cold.add(vmid);else Balance.cold.delete(vmid);Balance.changed();},
@@ -3268,7 +3269,7 @@ const Balance={
     const sim=d.meta.exec_allowed?'':`<p class="cnote" style="margin:8px 0 0"><b>Solo simulazione:</b> con una riserva sotto ${esc(d.meta.exec_min_reserve_gb)} GB per nodo il piano si puo' guardare ma non eseguire (un nodo potrebbe riempirsi fino alla RAM fisica). Riporta la riserva host ad almeno ${esc(d.meta.exec_min_reserve_gb)} GB per eseguire.</p>`;
     return`<h2 class="sec" style="margin-top:22px">Piano <small>si esegue un passo alla volta: dopo ogni migrazione il piano si ricalcola da zero</small></h2>
       <div class="panel"><div class="tw"><table class="bal-steps"><thead><tr><th>#</th><th>VM</th><th>Da → a</th><th>RAM</th><th>Perche'</th><th>Modo</th><th>Avvisi sul nodo di arrivo</th><th>Scarto dopo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>${sim}
-      <p class="cnote" style="margin-top:8px">Una VM accesa si sposta a caldo (resta in funzione, carica rete e storage) oppure, con la spunta "a freddo", viene spenta, spostata e riaccesa (resta ferma per tutta la durata); un container acceso si sposta sempre con un riavvio breve; una VM spenta si sposta a freddo. Il server riverifica tutte le regole (RAM, VM bloccate, nodi consentiti) subito prima di migrare.</p>`;
+      <p class="cnote" style="margin-top:8px">Una VM accesa si sposta a caldo (resta in funzione, carica rete e storage) oppure, con la spunta "spegni e sposta" (a freddo), viene spenta, spostata e riaccesa (resta ferma per tutta la durata); un container acceso si sposta sempre con un riavvio breve; una VM spenta si sposta a freddo. Il server riverifica tutte le regole (RAM, VM bloccate, nodi consentiti) subito prima di migrare.</p>`;
   },
   unplaced(d){
     if(!d.unplaced.length)return'';
