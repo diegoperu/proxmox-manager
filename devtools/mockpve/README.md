@@ -29,4 +29,4 @@ Il token e' finto: non usarlo contro un Proxmox vero e non copiare qui il `confi
 
 ## Ceph finto
 
-`CEPH_SCENARIO=healthy|warn|error|recovery|down|none python3 devtools/mockpve/mockpve.py` (default `recovery`): 36 OSD su 6 nodi, 3 pool, 3 MON. `error` = capacita' 97% + `OSD_FULL`; `recovery` = OSD giu', fronte di recupero e flag `noout`; `none` = come un cluster senza Ceph (500 "binary not installed").
+`CEPH_SCENARIO=healthy|warn|error|recovery|down|none python3 devtools/mockpve/mockpve.py` (default `recovery`): 36 OSD su 6 nodi (4 ssd + 2 hdd per nodo), 4 pool (`archivio` con `replicated_rule` su tutte le classi), mappa CRUSH con 3 regole, 3 MON. `error` = capacita' 97% + `OSD_FULL`; `recovery` = OSD giu', fronte di recupero e flag `noout`; `none` = come un cluster senza Ceph (500 "binary not installed").
