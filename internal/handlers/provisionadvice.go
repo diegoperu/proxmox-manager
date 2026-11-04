@@ -319,7 +319,11 @@ func adviceCards(inv *GPUInventory, reserved map[string]bool) []adviceCard {
 			continue
 		}
 		for _, cd := range n.Cards {
-			c := adviceCard{Node: n.Node, Addr: cd.Addr, Name: clampText(cd.Name, 120), MemoryGB: cd.MemoryGB, Status: cd.Status,
+			shown := cd.Name
+			if cd.DisplayName != "" {
+				shown = cd.DisplayName
+			}
+			c := adviceCard{Node: n.Node, Addr: cd.Addr, Name: clampText(shown, 120), MemoryGB: cd.MemoryGB, Status: cd.Status,
 				Uses: []adviceUse{}, Mappings: append([]string{}, cd.Mappings...), Reasons: []string{}}
 			for _, u := range cd.Uses {
 				c.Uses = append(c.Uses, adviceUse{VMID: u.VMID, Name: clampText(u.Name, 64), Status: u.Status})
@@ -366,7 +370,7 @@ func (h *Handler) GetProvisionAdvice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer g.Unlock()
-	v, err := cephCached("advice|"+strconv.Itoa(idx)+"|"+q.key()+"|"+reservedKey(idx), adviceCacheTTL, func() (interface{}, error) {
+	v, err := cephCached("advice|"+strconv.Itoa(idx)+"|"+q.key()+"|"+reservedKey(idx)+"|"+gpuModelsKey(), adviceCacheTTL, func() (interface{}, error) {
 		var inv *GPUInventory
 		if q.GPU {
 			gv, gerr := cephCached("gpus|"+strconv.Itoa(idx), gpuCacheTTL, func() (interface{}, error) {
@@ -377,6 +381,7 @@ func (h *Handler) GetProvisionAdvice(w http.ResponseWriter, r *http.Request) {
 				return nil, errors.New("inventario delle schede non disponibile")
 			}
 			if x, ok := gv.(GPUInventory); ok {
+				x = withGPUModels(x, config.GPUModels())
 				inv = &x
 			}
 		}

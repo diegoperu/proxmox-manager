@@ -858,7 +858,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.135.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.136.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1417,6 +1417,21 @@ html.spiderman{
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('mgpu')">Annulla</button>
     <button class="btn ba" onclick="Gpu.next()">Continua</button>
+  </div>
+</div></div>
+
+<!-- MODAL: NOME E MEMORIA DI UN MODELLO DI SCHEDA (D62) -->
+<div class="ov" id="mgm"><div class="modal" style="min-width:min(500px,calc(100vw - 24px))">
+  <div class="mt">Nome e memoria del modello</div>
+  <div class="td" id="mgm-model" style="margin-bottom:12px;word-break:break-word"></div>
+  <div class="fr mb12"><label class="fl" for="mgm-name">Nome mostrato <span class="td">(vuoto = quello di Proxmox)</span></label><input class="inp w" id="mgm-name" type="text" maxlength="64" autocomplete="off"></div>
+  <div class="fr mb12"><label class="fl" for="mgm-gb">Memoria (GB) <span class="td">(0 = <span id="mgm-def"></span>)</span></label><input class="inp w" id="mgm-gb" type="number" min="0" max="512" step="1" value="0"></div>
+  <p class="cnote" id="mgm-note"></p>
+  <div id="mgm-msg" role="status" style="margin-top:10px"></div>
+  <div class="mf">
+    <button class="btn bg2" onclick="closeModal('mgm')">Annulla</button>
+    <button class="btn bg2" id="mgm-reset" onclick="Gpu.modelSave(true)">Ripristina</button>
+    <button class="btn ba" id="mgm-ok" onclick="Gpu.modelSave(false)">Salva</button>
   </div>
 </div></div>
 
@@ -2805,11 +2820,42 @@ const Gpu={
       const uses=c.uses.map(u=>`<div>${Gpu.vmBtn(n.node,u)} ${Gpu.useBadge(u)}${u.status==='running'?' <span class="td">· accesa</span>':''}</div>`).join('')||'<span class="td">—</span>';
       const acts=c.uses.filter(u=>u.editable).map(u=>`<button type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(n.node)},${js(u.vmid)},${js(u.slot)})">Togli</button>`).join(' ')
         ||(c.status==='free'?(c.mappings.length?`<button type="button" class="btn ba sm" onclick="Gpu.assign(${js(n.node)},${js(c.addr)})">Assegna…</button>`:'<span class="td" title="In Proxmox: Datacenter › Resource Mappings › PCI">serve un mapping</span>'):'');
-      return`<tr><td><b>${esc(Gpu.short(c.name))}</b></td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td><td>${acts}</td></tr>`;
+      const mem=c.memory_gb?`${c.memory_gb} GB${c.memory_custom?' (corretta)':''}`:'memoria non nota';
+      const model=`<b>${esc(c.display_name||Gpu.short(c.name))}</b><div class="td">${esc(mem)} <button type="button" class="btn bg2 sm" style="margin-left:4px" aria-label="${esc('Modifica nome e memoria del modello '+(c.display_name||Gpu.short(c.name)))}" onclick="Gpu.modelEdit(${js(n.node)},${js(c.addr)})">Modifica</button></div>`;
+      return`<tr><td>${model}</td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td><td>${acts}</td></tr>`;
     }).join('');
     const groups=n.groups.length?`<p class="cnote" style="padding:0 var(--card-pad) 12px">Mapping a gruppo (sola lettura): ${n.groups.map(g=>esc(`${g.id} · ${g.cards} schede · ${new Set(g.uses.map(u=>u.vmid)).size} VM`)).join(' · ')}</p>`:'';
     return`<div class="panel"><div class="panel-h"><h2>${esc(n.node)}</h2><small>${n.cards.length} ${Dashboard.plural(n.cards.length,'scheda','schede')} · ${free} ${Dashboard.plural(free,'libera','libere')}</small></div>
       <div class="tw"><table><thead><tr><th>Scheda</th><th>Indirizzo</th><th>Stato</th><th>VM</th><th>Mapping</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${groups}</div>`;
+  },
+
+  // ── nome e memoria di un modello (D62): vale per tutte le schede di quel modello e per tutti i cluster ──
+  modelCtx:null,
+  modelEdit(node,addr){
+    const d=Gpu.by[ClusterMgr.current], n=d&&d.nodes.find(x=>x.node===node), c=n&&n.cards.find(x=>x.addr===addr);
+    if(!c)return;
+    const same=d.nodes.reduce((a,x)=>a+x.cards.filter(y=>y.model===c.model).length,0);
+    Gpu.modelCtx={model:c.model,custom:!!(c.display_name||c.memory_custom)};
+    document.getElementById('mgm-model').textContent=c.model;
+    document.getElementById('mgm-name').value=c.display_name||'';
+    document.getElementById('mgm-gb').value=c.memory_custom?c.memory_gb:0;
+    document.getElementById('mgm-def').textContent=c.default_memory_gb?`predefinita: ${c.default_memory_gb} GB`:'memoria non nota';
+    document.getElementById('mgm-note').textContent=`Vale per le ${same} ${Dashboard.plural(same,'scheda','schede')} di questo modello in questo cluster e per ogni cluster che ne ha. Serve a leggere meglio l'elenco e a raggruppare le schede per memoria nella creazione di una VM.`;
+    document.getElementById('mgm-msg').replaceChildren();
+    document.getElementById('mgm-reset').hidden=!Gpu.modelCtx.custom;
+    openModal('mgm');
+  },
+  async modelSave(reset){
+    const ctx=Gpu.modelCtx, msg=document.getElementById('mgm-msg'); if(!ctx||Gpu.busy)return;
+    const name=reset?'':document.getElementById('mgm-name').value.trim(), gb=reset?0:parseInt(document.getElementById('mgm-gb').value||'0',10);
+    if(!Number.isInteger(gb)||gb<0||gb>512){msg.textContent='La memoria deve essere un numero tra 0 e 512.';return;}
+    if(name.length>64){msg.textContent='Il nome puo\' avere al massimo 64 caratteri.';return;}
+    Gpu.busy=true; msg.textContent='Salvataggio…';
+    try{
+      await api('/gpu-models',{method:'PUT',body:JSON.stringify({model:ctx.model,name,memory_gb:gb}),quiet:true});
+      Gpu.busy=false; closeModal('mgm'); toast(reset?'Valori predefiniti ripristinati':'Modello aggiornato','ok'); _tc.clear();
+      Gpu.load(true);
+    }catch(e){Gpu.busy=false;msg.textContent=e.message;}
   },
 
   // ── assegna ──

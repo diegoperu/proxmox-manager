@@ -131,6 +131,7 @@ func main() {
 		r.Get("/gpus", h.GetGPUs())
 		r.Get("/reports/{model}", h.GetReport)
 		r.Get("/provision/advice", h.GetProvisionAdvice)
+		r.Put("/gpu-models", h.PutGPUModel)
 		r.Post("/provision/job", h.PostProvisionJob)
 		r.Get("/provision/job", h.GetProvisionJob)
 		r.Get("/balance", h.GetBalance)
