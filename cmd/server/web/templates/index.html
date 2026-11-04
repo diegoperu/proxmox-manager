@@ -795,7 +795,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.116.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.118.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2780,7 +2780,7 @@ const Gpu={
 // Ogni testo esterno (nomi VM, tag) entra nel DOM con esc()/textContent.
 // ════════════════════════════════════════════════════════════════════════════
 const Groups={
-  d:null, seq:0, view:'todo', q:'', draft:{}, res:{}, busy:false, edit_:null,
+  d:null, seq:0, view:'todo', q:'', sk:'', sa:true, draft:{}, res:{}, busy:false, edit_:null,
   key(v){return v.node+'/'+v.kind+'/'+v.vmid;},
   // "rossi bianchi" -> {ok, groups:['bianchi','rossi']}; stessa regola del server ([a-z0-9]{1,32}, non "altro", max 4)
   parse(txt){
@@ -2833,11 +2833,27 @@ const Groups={
     tp.innerHTML=d.templates_with_group.length?`<h2 class="sec">Template con un gruppo <small>${d.templates_with_group.length}</small></h2><div class="panel calerts">${d.templates_with_group.map(t=>`<div class="calert"><span class="sev w">Da correggere</span><span class="ccode">${esc(t.node)} · ${esc(t.vmid)}</span><div class="cmsg">${esc(t.name)} ha il tag ${esc(t.groups.map(g=>'gruppo-'+g).join(', '))}: ogni VM clonata da qui lo eredita. Toglilo in Proxmox (l'app non modifica i template).</div></div>`).join('')}</div>`:'';
     Groups.paintRows();
   },
+  // Ordinamento (come le altre tabelle): clic sull'intestazione, di nuovo per invertire; senza scelta, per VMID.
+  SORT:{
+    vm:v=>v.name||'', vmid:v=>v.vmid, node:v=>v.node, kind:v=>v.kind,
+    cur:v=>v.source==='none'?'\uffff':v.groups.join(' '),   // senza gruppo in fondo
+    new:v=>Groups.text(v)||'\uffff', tick:v=>Groups.ticked(v)?0:1,
+  },
+  sort(k){
+    if(Groups.sk===k)Groups.sa=!Groups.sa; else{Groups.sk=k;Groups.sa=true;}
+    Groups.paintRows();
+  },
+  th(k,label){
+    const on=Groups.sk===k;
+    return`<th class="s${on?(Groups.sa?' asc':' desc'):''}" tabindex="0" aria-sort="${on?(Groups.sa?'ascending':'descending'):'none'}" onclick="Groups.sort('${k}')">${label}</th>`;
+  },
   rows(){
     const d=Groups.d; if(!d)return[];
     let r=d.vms;
     if(Groups.view==='todo')r=r.filter(v=>v.source!=='tag'); else if(Groups.view==='tag')r=r.filter(v=>v.source==='tag');
     if(Groups.q){const q=Groups.q;r=r.filter(v=>(v.name+' '+v.vmid+' '+v.node+' '+v.groups.join(' ')+' '+(v.proposal||'')).toLowerCase().includes(q));}
+    const f=Groups.SORT[Groups.sk];
+    if(f){const m=Groups.sa?1:-1;r=[...r].sort((a,b)=>{const x=f(a),y=f(b);return(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'it',{numeric:true,sensitivity:'base'}))*m||a.vmid-b.vmid;});}
     return r;
   },
   paintRows(){
@@ -2852,7 +2868,7 @@ const Groups={
         <td><input class="inp" style="width:170px" type="text" list="grp-dl" autocomplete="off" spellcheck="false" maxlength="200" value="${esc(Groups.text(v))}" placeholder="nessun gruppo" aria-label="${esc('Nuovo gruppo di '+v.name)}" ${bad?'aria-invalid="true"':''} oninput="Groups.type(${js(k)},this)"></td>
         <td class="grp-res" data-k="${esc(k)}">${res?Groups.resHTML(res):''}</td></tr>`;
     }).join('');
-    body.innerHTML=`<div class="tw"><table><thead><tr><th></th><th>VM</th><th>Nodo</th><th>Tipo</th><th>Gruppo attuale</th><th>Nuovo gruppo</th><th>Esito</th></tr></thead><tbody>${rows}</tbody></table></div>${r.length>MAX?`<p class="cnote" style="margin-top:8px">Mostrate le prime ${MAX} su ${r.length}: restringi la ricerca.</p>`:''}`;
+    body.innerHTML=`<div class="tw"><table><thead><tr>${Groups.th('tick','<span class="sr">Spuntate</span>')}${Groups.th('vm','VM')}${Groups.th('node','Nodo')}${Groups.th('kind','Tipo')}${Groups.th('cur','Gruppo attuale')}${Groups.th('new','Nuovo gruppo')}<th>Esito</th></tr></thead><tbody>${rows}</tbody></table></div>${r.length>MAX?`<p class="cnote" style="margin-top:8px">Mostrate le prime ${MAX} su ${r.length}: restringi la ricerca.</p>`:''}`;
     Groups.sync();
   },
   resHTML(r){return r.state==='ok'?'<span class="st ok">Fatto</span>':r.state==='run'?'<span class="td">…</span>':`<span class="st off" title="${esc(r.msg||'')}">${esc(r.msg||'Errore')}</span>`;},
