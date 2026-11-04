@@ -795,7 +795,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.120.0 · 2026-11-04</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.122.0 · 2026-11-04</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2959,24 +2959,56 @@ const Groups={
     Groups.msg('');
     openModal('mgrp'); setTimeout(()=>document.getElementById('grp-in').focus(),100);
   },
-  // Modifica diretta nel pannello VM: stessa regola e stessa PUT del modale.
-  saveInline(node,vmid,kind,clear){
-    const v=Groups.d&&Groups.d.vms.find(x=>x.node===node&&String(x.vmid)===String(vmid)&&x.kind===kind);
-    const msg=(t,err)=>{const el=document.getElementById('grp-inline-msg');if(el){el.textContent=t||'';el.style.color=err?'var(--red)':'';}};
-    if(!v||Groups.busy)return;
-    const p=clear?{ok:true,groups:[]}:Groups.parse(document.getElementById('grp-inline').value);
-    if(!p.ok){msg(p.err,true);return;}
-    if(!p.groups.length&&!clear){msg('Scrivi un gruppo, oppure usa "Togli".',true);return;}
-    const fresh=p.groups.filter(g=>!Groups.existing().has(g));
+  // Modifica nel pannello VM: gruppi scelti da un elenco (quelli esistenti) oppure creati col pulsante "Nuovo gruppo".
+  inl:null,
+  inlInit(v){
+    Groups.inl={v,sel:v.source==='tag'?[...v.groups]:[],adding:false,dirty:false};
+    Groups.inlPaint();
+  },
+  inlMsg(t,err){const el=document.getElementById('grp-inline-msg');if(el){el.textContent=t||'';el.style.color=err?'var(--red)':'';}},
+  inlPaint(){
+    const box=document.getElementById('grp-inl'), st=Groups.inl; if(!box||!st)return;
+    const left=[...Groups.existing()].filter(g=>!st.sel.includes(g)).sort();
+    const full=st.sel.length>=4;
+    box.innerHTML=`<div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
+        ${st.sel.map(g=>`<span class="badge bn">${esc(g)} <button type="button" class="btn bg2 sm" style="padding:0 6px" aria-label="${esc('Togli il gruppo '+g)}" onclick="Groups.inlDel(${js(g)})">×</button></span>`).join('')||'<span class="td">nessun gruppo scelto</span>'}
+      </div>
+      <div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
+        <select class="inp" id="grp-inl-sel" aria-label="Aggiungi un gruppo esistente" ${full||!left.length?'disabled':''} onchange="Groups.inlAdd(this.value)">
+          <option value="">Aggiungi un gruppo…</option>${left.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('')}
+        </select>
+        <button type="button" class="btn bg2 sm" ${full?'disabled':''} onclick="Groups.inlNew()">Nuovo gruppo</button>
+        <button type="button" class="btn bsuc sm" ${st.dirty?'':'disabled'} onclick="Groups.saveInline()">Salva</button>
+      </div>
+      ${st.adding?`<div class="flex g8" style="margin-top:6px"><input class="inp" id="grp-inl-new" type="text" maxlength="32" autocomplete="off" spellcheck="false" aria-label="Nome del nuovo gruppo" placeholder="nuovo gruppo, es. rossi" style="max-width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();Groups.inlNewOk()}">
+        <button type="button" class="btn bg2 sm" onclick="Groups.inlNewOk()">Aggiungi</button></div>`:''}
+      <div class="hint" id="grp-inline-msg" role="status"></div>`;
+    if(st.adding)document.getElementById('grp-inl-new').focus();
+  },
+  inlAdd(g){const st=Groups.inl;if(!st||!g||st.sel.includes(g)||st.sel.length>=4)return;st.sel.push(g);st.sel.sort();st.dirty=true;Groups.inlPaint();},
+  inlDel(g){const st=Groups.inl;if(!st)return;st.sel=st.sel.filter(x=>x!==g);st.dirty=true;Groups.inlPaint();},
+  inlNew(){const st=Groups.inl;if(!st)return;st.adding=true;Groups.inlPaint();},
+  inlNewOk(){
+    const st=Groups.inl, el=document.getElementById('grp-inl-new'); if(!st||!el)return;
+    const p=Groups.parse(el.value);
+    if(!p.ok||p.groups.length!==1){Groups.inlMsg(p.ok?'Scrivi un solo nome':p.err,true);return;}
+    if(st.sel.length>=4){Groups.inlMsg('Al massimo 4 gruppi per VM',true);return;}
+    st.adding=false; Groups.inlAdd(p.groups[0]);
+  },
+  // Scrive la selezione: stessa PUT del modale. Selezione vuota = toglie i gruppi. Un gruppo che non esiste ancora chiede conferma.
+  saveInline(){
+    const st=Groups.inl; if(!st||Groups.busy)return;
+    const v=st.v, groups=[...st.sel];
+    const fresh=groups.filter(g=>!Groups.existing().has(g));
     const go=async()=>{
-      Groups.busy=true; msg('Salvataggio…');
+      Groups.busy=true; Groups.inlMsg('Salvataggio…');
       try{
-        await api(`/nodes/${encodeURIComponent(v.node)}/${v.kind}/${encodeURIComponent(v.vmid)}/groups`,{method:'PUT',quiet:true,timeoutMs:30000,body:JSON.stringify({groups:p.groups,confirm_new:fresh})});
+        await api(`/nodes/${encodeURIComponent(v.node)}/${v.kind}/${encodeURIComponent(v.vmid)}/groups`,{method:'PUT',quiet:true,timeoutMs:30000,body:JSON.stringify({groups,confirm_new:fresh})});
         Groups.busy=false; _tc.clear();
-        toast(p.groups.length?`Gruppo di ${v.name||v.vmid}: ${p.groups.join(', ')}`:`Gruppo tolto da ${v.name||v.vmid}`,'ok');
+        toast(groups.length?`Gruppo di ${v.name||v.vmid}: ${groups.join(', ')}`:`Gruppo tolto da ${v.name||v.vmid}`,'ok');
         if(App.cur==='groups')Groups.load(true);
         VMs.detail(v.node,v.vmid,v.kind); VMs.regroup();
-      }catch(e){Groups.busy=false;msg(e.body&&e.body.reason==='new_group'?'Il server non conosce ancora questo gruppo: riprova.':e.message,true);}
+      }catch(e){Groups.busy=false;Groups.inlMsg(e.body&&e.body.reason==='new_group'?'Il server non conosce ancora questo gruppo: riprova.':e.message,true);}
     };
     if(fresh.length)askConfirm({title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
     else go();
@@ -3652,6 +3684,7 @@ const VMs=(()=>{
           Groups.fetch().catch(()=>null)
         ]);
         const grow=gdata&&gdata.vms.find(x=>x.node===node&&String(x.vmid)===String(vmid));
+        if(grow)setTimeout(()=>Groups.inlInit(grow),0);
         const n=js(node), id=js(vmid), t=js(kind);
         const s=r?.status||{},snaps=r?.snapshots||[];
         if(s.name) document.getElementById('movT').textContent=s.name;
@@ -3683,12 +3716,7 @@ const VMs=(()=>{
             ${v0?.ip?`<dt>IP</dt><dd><span class="tm">${esc(v0.ip)}</span>${v0.ipSrc==='agent'?' <span class="td">· dal guest agent</span>':''}</dd>`:netinfo.primary_ipv4?`<dt>IP</dt><dd><span class="tm">${esc(netinfo.primary_ipv4)}</span> <span class="td">· dal guest agent</span></dd>`:''}
             ${(osLabel(osinfo)||osFromType(v0?.ostype))?`<dt>Sistema</dt><dd>${esc(osLabel(osinfo)||osFromType(v0?.ostype))}${osinfo.kernel_release?` <span class="td">· kernel ${esc(osinfo.kernel_release)}</span>`:''}</dd>`:''}
             ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
-            ${grow?`<dt>Gruppo</dt><dd>${Groups.label(grow)}
-              <div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
-                <input class="inp" id="grp-inline" type="text" list="grp-dl" maxlength="140" autocomplete="off" spellcheck="false" aria-label="Gruppo (più gruppi separati da spazio)" placeholder="es. rossi" value="${esc(grow.source==='tag'?grow.groups.join(' '):(grow.proposal||''))}" style="max-width:220px">
-                <button type="button" class="btn bg2 sm" onclick="Groups.saveInline(${n},${id},${t})">Salva</button>
-                ${grow.source==='tag'?`<button type="button" class="btn bg2 sm" onclick="Groups.saveInline(${n},${id},${t},true)">Togli</button>`:''}
-              </div><div class="hint" id="grp-inline-msg" role="status"></div></dd>`:''}
+            ${grow?`<dt>Gruppo</dt><dd>${Groups.label(grow)}<div id="grp-inl" data-n="${esc(node)}" data-i="${esc(vmid)}" data-k="${esc(kind)}"></div></dd>`:''}
             ${fsRows}
             <dt>Rete</dt><dd>in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</dd>
             ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
