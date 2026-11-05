@@ -1,4 +1,4 @@
-# ProxmoxManager — Roadmap delle estensioni
+tato # ProxmoxManager — Roadmap delle estensioni
 
 Elenco unico dei lavori da fare, per poterli priorizzare e gestire. Le decisioni e la storia stanno in `CLAUDE.md` (sezioni "Lavori da fare" e "Registro modifiche") e `DOMANDE.md`; qui c'è solo cosa resta, in che ordine e cosa serve per partire.
 
