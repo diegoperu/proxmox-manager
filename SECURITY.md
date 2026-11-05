@@ -175,3 +175,5 @@ A live migration of a QEMU VM with `cpu: host` (or `max`, `custom-*`) from an AM
 ### Start check (RAM)
 
 Starting a stopped VM or container (single action, container action, Batch `start`) first checks, under a per-node lock, that the RAM of the running guests of the node plus the guest's own fits the assignable RAM; otherwise 409 `not_enough_ram` and nothing is started. The check reads cluster resources only and uses no request text in the answer except Proxmox names clamped to 64 characters. It fails open (the start goes on, logged) when the cluster cannot be read: it is a safeguard against overbooking, not an access control.
+
+The advice for a new VM counts the RAM of the guests that use it now (running, started a moment ago, or being created and promised to the node), not stopped ones; creations in progress are tracked in memory per cluster and released on every exit of the procedure, so two creations in a row cannot both be given the same room.
