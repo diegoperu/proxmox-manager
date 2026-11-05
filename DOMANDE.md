@@ -571,3 +571,43 @@ Fatti letti in sola lettura su CALCOLO: 8 template, tutti su `datacloud-node-1` 
 **Opzioni**: A) stesso **modello** di CPU (la D55 originale), verso gli altri solo a freddo; B) stesso produttore e generazione di destinazione **uguale o piu' nuova** della sorgente, con una tabella modello -> generazione per le CPU del cluster (EPYC 7302 Zen2 < 7453/7713/7763 Zen3; Xeon E5 v4 Broadwell < Silver 4114 / Gold 5120 Skylake) e modello non in tabella = solo stesso modello; C) a caldo solo per VM con tipo di CPU generico, `cpu: host` sempre a freddo.
 **Suggerimento**: B: e' la regola che segue cosa vede il guest; A e' la piu' semplice e sicura se la tabella sembra fragile.
 **Risposta utente**: 2026-11-05 — B (realizzata con i flag CPU di Proxmox: la destinazione deve avere tutte le istruzioni della sorgente; verificata con la prova di tutte le coppie sulla VM 108 `moving-test`)
+
+## Disco aggiuntivo alla creazione della VM (richiesta utente 2026-11-05)
+
+Richiesta: sotto "Utente aggiuntivo" della pagina Nuova VM, una sezione "Disco aggiuntivo" per creare direttamente un secondo disco. Oggi il pannello VM ha gia' "Aggiungi disco" in due fasi: (1) collega un volume nuovo alla VM (`adddisk`: storage, GB, bus, primo slot libero), (2) lo formatta ext4 e lo monta nel guest (`setup-disk`: guest agent, mount point validato, sceglie l'unico disco vuoto e rifiuta se ce ne sono piu' di uno).
+
+### D64 — Fino a dove arriva il disco aggiuntivo
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Il disco aggiuntivo deve solo essere collegato alla VM o anche formattato e montato?
+**Perche' conta**: collegarlo e' una sola scrittura su Proxmox; formattarlo e montarlo scrive dentro il guest (serve la VM accesa e il guest agent) e, sbagliando disco, distrugge dati. Su una VM appena clonata l'unico disco vuoto e' il nuovo, quindi la scelta del disco e' sicura.
+**Opzioni**: A) solo collegato: il disco compare nella VM vuoto, si formatta dopo con il pulsante del pannello; B) collegato, formattato ext4 e montato in una cartella scelta nel modulo (come "Aggiungi disco" del pannello), dopo l'avvio e l'attesa dell'agent come per l'utente aggiuntivo; se l'agent non risponde la VM resta creata con il disco collegato e un avviso; nessun riavvio forzato per far comparire il disco (diverso dal pulsante del pannello); con "Avvia al termine" spento resta collegato e basta.
+**Suggerimento**: B: "creare direttamente un secondo disco" vuol dire averlo utilizzabile; il ripiego sull'avviso e' lo stesso dell'utente aggiuntivo.
+**Risposta utente**:
+
+### D65 — Su quale storage
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Dove si crea il volume del secondo disco?
+**Perche' conta**: lo storage deve essere raggiungibile dal nodo scelto e avere spazio; la scelta del nodo consigliato deve tenerne conto.
+**Opzioni**: A) predefinito lo stesso storage del disco del template, ma si puo' scegliere tra gli storage del nodo scelto che accettano dischi di VM e hanno spazio libero per la dimensione richiesta (il consiglio dei nodi esclude quelli che non lo hanno, con il motivo e i GB mancanti); B) sempre e solo lo storage del template; C) campo libero.
+**Suggerimento**: A: coerente con il resto del consiglio (motivi in parole, quantita' mancanti).
+**Risposta utente**:
+
+### D66 — Bus, slot e quanti dischi
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Bus (virtio/scsi/sata) e slot li sceglie l'utente? Si puo' aggiungere piu' di un disco?
+**Perche' conta**: semplicita' del modulo contro flessibilita'.
+**Opzioni**: A) un solo disco aggiuntivo, stesso bus del disco principale del template, primo slot libero (nessuna scelta nel modulo); B) un solo disco, bus scelto nel modulo; C) piu' dischi (fino a 4) con "Aggiungi un altro disco", ognuno con storage, GB, bus e cartella.
+**Suggerimento**: A per ora: e' quello che hai chiesto ("un secondo disco"); C si puo' aggiungere dopo senza rifare il resto.
+**Risposta utente**:
+
+### D67 — Cartella di montaggio e permessi
+**Stato**: APERTA
+**Bloccante**: no (solo con D64 B)
+**Domanda**: Quale cartella e quali permessi nel guest?
+**Perche' conta**: il pulsante del pannello rifiuta cartelle di sistema (`/etc`, `/var`, `/home`, `/tmp`...) e crea la cartella con permessi 1777 (sticky) o 0777.
+**Opzioni**: A) campo "Cartella di montaggio" con predefinito `/data`, stesse regole e stessi controlli del pulsante, e la stessa casella "permessi aperti a tutti (1777)" attiva di default; B) cartella fissa `/data` senza campo; C) solo il campo, senza valore predefinito.
+**Suggerimento**: A.
+**Risposta utente**:
