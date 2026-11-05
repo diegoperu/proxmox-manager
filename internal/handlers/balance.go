@@ -412,7 +412,10 @@ func loadGuestFacts(c balanceAPI, g resGuestB, shared map[string]bool) guestFact
 }
 
 // osdCounts: Ceph OSDs per node (the reserve for them), best effort: known=false when no node answers.
-func osdCounts(c balanceAPI) (map[string]int, bool) {
+func osdCounts(c interface {
+	GetNodes() (json.RawMessage, error)
+	GetCephOSD(node string) (json.RawMessage, error)
+}) (map[string]int, bool) {
 	osds := map[string]int{}
 	cands, err := cephNodeCandidates(c, nil)
 	if err != nil {

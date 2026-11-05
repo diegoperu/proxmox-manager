@@ -565,12 +565,33 @@ func (h *Handler) VMAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 400)
 		return
 	}
+	if action == "start" {
+		data, ref, err := startGuarded(client, clusterIdx(r), node, "qemu", vmid, time.Now(), func() (json.RawMessage, error) {
+			return client.VMAction(node, vmid, action, params)
+		})
+		writeStartResult(w, data, ref, err)
+		return
+	}
 	data, err := client.VMAction(node, vmid, action, params)
 	if err != nil {
 		writeError(w, err, 502)
 		return
 	}
 	writeJSON(w, data)
+}
+
+// writeStartResult answers a guarded start: 409 not_enough_ram with the numbers, or the Proxmox answer.
+func writeStartResult(w http.ResponseWriter, data json.RawMessage, ref *startRefusal, err error) {
+	switch {
+	case ref != nil:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": ref.Message(), "reason": "not_enough_ram", "node": ref.Node, "missing_bytes": ref.MissingBytes()})
+	case err != nil:
+		writeError(w, err, 502)
+	default:
+		writeJSON(w, data)
+	}
 }
 
 func (h *Handler) VMSnapshot(w http.ResponseWriter, r *http.Request) {
@@ -747,6 +768,7 @@ type BatchResult struct {
 	VMID   int             `json:"vmid"`
 	Result json.RawMessage `json:"result,omitempty"`
 	Error  string          `json:"error,omitempty"`
+	Reason string          `json:"reason,omitempty"` // e.g. not_enough_ram
 }
 
 func (h *Handler) BatchAction(w http.ResponseWriter, r *http.Request) {
@@ -768,13 +790,26 @@ func (h *Handler) BatchAction(w http.ResponseWriter, r *http.Request) {
 	for _, vm := range req.VMs {
 		var data json.RawMessage
 		var opErr error
+		var ref *startRefusal
+		kind := "qemu"
 		if vm.Type == "lxc" {
-			data, opErr = client.ContainerAction(vm.Node, vm.VMID, req.Action, params)
+			kind = "lxc"
+		}
+		run := func() (json.RawMessage, error) {
+			if kind == "lxc" {
+				return client.ContainerAction(vm.Node, vm.VMID, req.Action, params)
+			}
+			return client.VMAction(vm.Node, vm.VMID, req.Action, params)
+		}
+		if req.Action == "start" && nodeNamePattern.MatchString(vm.Node) {
+			data, ref, opErr = startGuarded(client, clusterIdx(r), vm.Node, kind, vm.VMID, time.Now(), run)
 		} else {
-			data, opErr = client.VMAction(vm.Node, vm.VMID, req.Action, params)
+			data, opErr = run()
 		}
 		br := BatchResult{Node: vm.Node, VMID: vm.VMID}
-		if opErr != nil {
+		if ref != nil {
+			br.Error, br.Reason = ref.Message(), "not_enough_ram"
+		} else if opErr != nil {
 			br.Error = opErr.Error()
 		} else {
 			br.Result = data
@@ -798,6 +833,13 @@ func (h *Handler) ContainerAction(w http.ResponseWriter, r *http.Request) {
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)
+		return
+	}
+	if action == "start" {
+		data, ref, err := startGuarded(client, clusterIdx(r), node, "lxc", vmid, time.Now(), func() (json.RawMessage, error) {
+			return client.ContainerAction(node, vmid, action, params)
+		})
+		writeStartResult(w, data, ref, err)
 		return
 	}
 	data, err := client.ContainerAction(node, vmid, action, params)

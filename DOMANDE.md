@@ -626,3 +626,13 @@ Verifica del 2026-11-05 dopo l'aggiunta del disco alla creazione VM: la creazion
 **Opzioni**: A) piccola: il server rifiuta uno slot che non esiste nella configurazione della VM (400); il riavvio non parte piu' da solo: il server risponde 409 `restart_needed` e la pagina chiede una conferma di pericolo ("la VM viene spenta e riaccesa") prima di ripetere la richiesta con il permesso; il testo sotto il pulsante dice che "disco scelto" e' quello vuoto trovato nel guest; B) completa: come A, piu' collegamento slot -> dispositivo con la dimensione (nuovo sotto-comando o output di `find-blank` con la dimensione, con helper vecchio che continua a funzionare ripiegando su A) e rifiuto se la dimensione non corrisponde; richiede di aggiornare gli helper nei template; C) lasciare com'e' e togliere solo il punto dalla roadmap.
 **Suggerimento**: A: toglie il riavvio a sorpresa, che e' il vero rischio, senza toccare gli helper nei guest; B solo se capita davvero di avere piu' dischi vuoti insieme.
 **Risposta utente**: 2026-11-05 — A
+
+## ROADMAP 12 — Controllo della RAM prima di avviare una VM (richiesta utente 2026-11-05: "semplice, affrontiamolo")
+
+Assunzioni dichiarate (provvisorie, non bloccanti: l'utente ha chiesto di procedere senza discussione):
+- **Misura:** lo stesso modello del bilanciamento e del consiglio per le VM nuove: RAM assegnata alle VM **accese** del nodo + la RAM della VM da avviare deve stare entro la RAM assegnabile (fisica meno riserva di 8 GB + 4 GB per OSD Ceph). Le VM spente non contano (non occupano RAM).
+- **Cosa succede se non entra:** rifiuto (409 `not_enough_ram`) con i GB mancanti, senza avviare niente e senza possibilita' di forzare dalla pagina; se serve davvero si avvia da Proxmox.
+- **Dove:** avvio singolo di VM e di container e azione `start` del Batch; non nei percorsi che hanno gia' deciso il nodo con lo stesso modello (migrazione a freddo del bilanciamento, creazione guidata) ne' nel riavvio di `setup-disk` (la VM era gia' accesa e la sua RAM e' gia' contata).
+- **Quando non si riesce a leggere il cluster:** si lascia partire l'avvio (decide Proxmox) e si scrive nel log; il controllo e' una protezione, non una condizione per poter avviare.
+- **Avvii ravvicinati:** controllo e avvio sono serializzati per nodo, e una VM avviata da meno di 90 secondi che Proxmox mostra ancora ferma conta come accesa (un Batch di avvii non puo' superare il limite).
+

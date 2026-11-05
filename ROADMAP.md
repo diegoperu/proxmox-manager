@@ -22,6 +22,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 9 | Errore JS aprendo direttamente `#/gpu` (`Gpu.summary`, gia' presente prima del 3b) | console pulita, nessun rischio di pagina vuota | S | — | da fare |
 | 10 | Controllo preventivo alla creazione VM: snippet `cicustom` presente sul nodo di destinazione; spazio anche per il volume clonato (non solo per il disco aggiuntivo) | niente VM lasciate spente a meta' | S | — | da fare |
 | 11 | Colonna "disco" della lista VM: oggi solo `/`, estendibile al disco piu' pieno | stessa informazione del pannello | S | — | da decidere |
+| 12 | Prima di avviare una VM spenta, controllare che il nodo abbia la RAM per avviarla | niente avvii che sovraccaricano il nodo | S | modello di carico del bilanciamento | fatto (2026-11-05): avvio singolo, container e Batch; rifiuto 409 con i GB mancanti |
 
 ## Dettaglio
 
