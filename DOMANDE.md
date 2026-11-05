@@ -655,7 +655,7 @@ Assunzioni dichiarate (provvisorie, non bloccanti):
 **Cosa ho verificato (sola lettura):** questa macchina e' la postazione (`diego-ict`), non un nodo: `rsync_snippets.sh` e `/var/lib/vz/snippets` non si vedono da qui. CALCOLO (11 nodi) **non ha CephFS** (nessun MDS) **ne' storage condiviso per file**: gli unici condivisi sono dischi Ceph e PBS, quindi gli snippet vanno copiati nodo per nodo. Lo storage `local` di CALCOLO ha contenuti `backup,iso,vztmpl`, **senza `snippets`**: l'API non li elenca (e il controllo preventivo del consiglio dei nodi non puo' verificarli). HOSTING (2 nodi) ha invece `local` con `iso,snippets,vztmpl,backup`. Gli snippet sono `vendor-data` di cloud-init: **vengono eseguiti come root in ogni VM nuova**, quindi l'integrita' dei file e' il requisito principale (vedi rischi in `CLAUDE.md`).
 
 ### D69 — Inventario: cosa c'e' davvero sul nodo-1
-**Stato**: APERTA (risposta parziale: nodo-1 letto, restano gli altri file di `/root` e `/root/cloud-images`, vedi D81)
+**Stato**: RISPOSTA (nodo-1 letto, resto in `SUPPORT-FILES/`) (risposta parziale: nodo-1 letto, restano gli altri file di `/root` e `/root/cloud-images`, vedi D81)
 **Bloccante**: si'
 **Domanda**: Posso avere, in sola lettura, `cat` di `rsync_snippets.sh`, `ls -la` della cartella degli snippet e l'elenco (percorsi) degli script di creazione, aggiornamento e supporto che stanno sul nodo-1 (e quali di questi usa il manager)? Senza non so cosa sincronizzare ne' dove stia ogni cosa.
 **Opzioni**: A) li lanci tu e incolli l'output (comandi sotto); B) mi indichi un accesso SSH in sola lettura al nodo-1 (host, utente, chiave) e lo leggo io.
@@ -839,35 +839,61 @@ D) **Uno storage condiviso** (CephFS) montato su tutti i nodi: nessuna copia den
 **Risposta utente**: B
 
 ### D79 — Utente non root sui nodi: chi lo crea la prima volta
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: Le API di Proxmox non creano utenti del sistema operativo (verificato, vedi `CLAUDE.md`): `POST /access/users` crea solo un utente Proxmox (realm `pve`/`pam`), e per `pam` l'utente Linux deve gia' esistere. Come creiamo `pmgr-sync` sui nodi?
 **Perche' conta**: serve root almeno una volta per nodo. Dopo, la sincronizzazione gira senza root.
 **Opzioni**: A) ti preparo uno script idempotente (crea utente `pmgr-sync` senza password, gruppo `pmgr-sync`, cartelle con permessi, riga in `authorized_keys`) e lo lanci tu: a mano, o con Ansible (hai gia' `.ansible` su nodo-1) su tutti i nodi di un cluster; B) mi dai un accesso root temporaneo solo ai 3 nodi di Magi per la prova.
 **Suggerimento**: A, provato prima su Magi (lo lanci tu). Su CALCOLO (10 nodi + nodo-1) e HOSTING lo stesso script, quando la prova e' andata bene.
-**Risposta utente**:
+**Risposta utente**: A
 
 ### D80 — Dove stanno gli script e gli snippet "veri"
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: `/root/cloud-images` e' sotto `/root` (0700): un utente non root non puo' leggerlo. Dove devono stare gli script da sincronizzare?
 **Opzioni**: A) nuova cartella `/var/lib/vz/pmgr-scripts` (gruppo `pmgr-sync`, 2775): i tuoi generatori restano dove sono e scrivono li' (o un tuo passo li copia); B) restare in `/root/cloud-images` e sincronizzare quella cartella solo come root; C) cartella unica `/var/lib/vz/pmgr` con sottocartelle `snippets/` e `scripts/`.
 **Suggerimento**: A: gli snippet restano dove Proxmox li cerca (`/var/lib/vz/snippets`, gruppo `pmgr-sync`), gli script in una cartella accanto, nessun file in `/root` coinvolto.
-**Risposta utente**:
+**Risposta utente**: A
 
 ### D81 — Cosa c'e' in `/root/cloud-images` e negli altri file di supporto
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: Non ti serve darmi un accesso: bastano elenchi di nomi. Sono file con segreti?
 **Perche' conta**: la sincronizzazione ammette solo estensioni scelte (`.sh`, `.yaml`, `.sha256`); i segreti non devono finire su altri nodi ne' nel manifest.
 **Opzioni**: A) incolli l'output di `ls -laR --time-style=long-iso /root/cloud-images | head -150` e di `grep -rIlE 'password|passwd|secret|token|BEGIN [A-Z ]*PRIVATE' /root/cloud-images /root/*.sh 2>/dev/null` (solo i nomi dei file che contengono quelle parole, non il contenuto); B) crei un utente di sola lettura sul nodo-1 (sconsigliato: serve a me solo per leggere nomi).
 **Suggerimento**: A.
-**Risposta utente**:
+**Risposta utente**: ti ho messo una copia della cartella in modo che la puoi esaminare e leggeri gli script per correggerli in /SUPPORT-FILES da aggiungere a git ignore. In questo modo almeno all'inizio abbiamo una copia in root della cartella con gli script funzionanti. Quando avrai analizzato i file ti sarai reso conto che esistono script di aggiornamento delle immagini che creano i templates. Dobbiamo mettere un pulsante che esegua l'aggiornamento da proxmox manager. Da decidere come gestire l'upgrade di un template ora che avró multi copie. Questo lo metterei come task successivo dipendente dalla fine di questo. 
 
 ### D82 — Tra cluster: chi spinge i file
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: Il nodo sorgente raggiunge in rete i nodi degli altri cluster (Magi 10.75.132.201-203, HOSTING 10.75.132.100...)?
 **Opzioni**: A) spinge la sorgente (`rsync` su ssh con la chiave di `pmgr-sync` del nodo sorgente verso `pmgr-sync` delle destinazioni): il manager non vede mai i file; B) il manager fa da ponte (legge dalla sorgente e scrive sulla destinazione): serve solo se la sorgente non raggiunge l'altro cluster, e il manager avrebbe una chiave per ogni destinazione.
 **Suggerimento**: A. Verifica dal nodo-1: `for h in 10.75.132.201 10.75.132.100; do timeout 3 bash -c "echo > /dev/tcp/$h/22" && echo "$h ok" || echo "$h NO"; done`.
+**Risposta utente**: Ho verificato, A. Altra feat da aggiungere in sequenza sulla roadmap: migrazione di una vm su un cluster diverso.
+
+### D83 — Password in chiaro negli script di finalizzazione
+**Stato**: APERTA
+**Bloccante**: si' (prima di sincronizzare `finalize_image.sh`)
+**Domanda**: I sette `finalize_image.sh` (`debian`, `debian_13`, `rocky_8`, `rocky_9`, `ubuntu`, `ubuntu_24.04`, `ubuntu_26.04`) contengono in chiaro la password che `qm set --cipassword` mette nei template (per l'utente `tecnico`). Come la togliamo?
+**Perche' conta**: la sincronizzazione copierebbe la password su tutti i nodi e su altri cluster, e finirebbe in ogni backup e log. Nel repository non c'e' (`SUPPORT-FILES/` e' ignorata), ma e' comparsa nell'output di questa sessione di lavoro durante l'esame dei file.
+**Opzioni**: A) gli script leggono la password da un file `0600` fuori dalla cartella sincronizzata (per esempio `/root/.pmgr-template-secrets`), presente solo sui nodi dove si eseguono gli aggiornamenti; `finalize_image.sh` resta sincronizzabile; B) `finalize_image.sh` esclusi dalla sincronizzazione e lasciati solo sul nodo che aggiorna i template; C) A piu' cambio della password (la nuova non e' mai passata di qui).
+**Suggerimento**: A, e C a tua discrezione (la password attuale e' valida solo per l'utente `tecnico` dei template e le VM nuove la cambiano? da verificare con te).
 **Risposta utente**:
+
+### D84 — Correzioni agli script di aggiornamento (prima di sincronizzarli)
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Posso correggere le copie in `SUPPORT-FILES/` (e poi tu le rimetti sul nodo-1) con queste modifiche? Elenco dopo la lettura:
+1. **Percorsi**: ovunque c'e' `/root/cloud-images` scritto a mano e in `ubuntu_24.04/*.sh` percorsi relativi (`./ubuntu_24.04/...`, funzionano solo lanciandoli da `/root/cloud-images`). Serve una cartella base unica (variabile `PMGR_BASE`, predefinita la cartella dello script) per poterli spostare.
+2. **Template distrutto prima di sapere se l'immagine c'e'**: `update_image.sh` cancella l'immagine e poi scarica con `wget -q` senza controllare l'esito; `create_template.sh` fa `qm destroy 1003` comunque. Se il download fallisce (rete, mirror) il template sparisce e se ne crea uno vuoto. Proposta: `set -euo pipefail`, scarico in un file temporaneo, controllo di dimensione e hash (dove il mirror li pubblica), sostituzione solo a scarico riuscito, `qm destroy` solo dopo.
+3. **VMID, storage, bridge, DNS, dominio di ricerca** scritti a mano (1001-1007, `datacloud-ssd`, `vmbr0`, `10.248.16.30 10.248.26.30`, `inside.dei.polimi.it`): in un file di configurazione per cluster (necessario per Magi e HOSTING, che hanno storage e DNS diversi).
+4. **Password in chiaro**: vedi D83.
+5. **`ubuntu_26.04/finalize_image.sh` usa `vendor_ubuntu_24.04.yaml`** (invece di `vendor_ubuntu_26.04.yaml`, che esiste ed e' identico per ora): probabile copia-incolla; da correggere?
+6. **`update.sh`**: `#/bin/bash` senza `!` (parte comunque con la shell dell'utente, ma non e' un bash garantito).
+7. **Helper dei guest**: le copie in `rocky_8/guestscripts` e `rocky_9/guestscripts` (`adduser.sh`, `disk.sh`) hanno stessa logica ma sono vecchie (accenti e `—` al posto di ASCII): i generatori dovrebbero prenderle dal repository (`internal/handlers/guestscripts/`) come dichiarano gia' nei commenti, cosi' si evita la deriva. `dmesg.sh` e' identico.
+8. **Nessun controllo se un altro aggiornamento e' in corso** (lock) ne' log unico: 3 log in tutto, a mano.
+**Opzioni**: A) tutte e otto; B) solo 1-3 e 5-6 ora, il resto con il pulsante di aggiornamento (task successivo); C) solo quelle che servono alla sincronizzazione (1, 3, 4).
+**Suggerimento**: A, con un solo cambiamento per volta e prova su Magi prima di toccare il nodo-1.
+**Risposta utente**:
+
