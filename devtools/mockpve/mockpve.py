@@ -132,6 +132,7 @@ def resources():
     for n, b in NODES.items():  # storage condiviso (come Ceph) e uno locale, per il consiglio della creazione VM
         if b["status"] == "online":
             res.append(dict(id=f"storage/{n}/ceph-vm", type="storage", node=n, storage="ceph-vm", status="available", shared=1, content="images,rootdir", maxdisk=5000 * GB, disk=int(1000 * GB)))
+            res.append(dict(id=f"storage/{n}/local", type="storage", node=n, storage="local", status="available", shared=0, content="snippets,iso,backup", maxdisk=100 * GB, disk=10 * GB))
             res.append(dict(id=f"storage/{n}/local-lvm", type="storage", node=n, storage="local-lvm", status="available", shared=0, content="images,rootdir", maxdisk=900 * GB, disk=int(900 * GB * b["disk"])))
     return res
 
@@ -259,6 +260,10 @@ def route(path):
             from urllib.parse import unquote
             up = unquote(rest[len("tasks/"):-len("/status")]); MIG_TASKS[up] = MIG_TASKS.get(up, 0) + 1
             return dict(status="running") if MIG_TASKS[up] <= 2 else dict(status="stopped", exitstatus="OK")
+        if rest.startswith("storage/") and rest.endswith("/content"):  # snippet di cloud-init: ci sono sui nodi 1 e 2, non sul 3
+            if node in ("datacloud-node-1", "datacloud-node-2") and rest == "storage/local/content":
+                return [dict(volid="local:snippets/vendor.yaml", content="snippets", format="snippet", size=1200)]
+            return []
         if rest == "qemu": return [x for x in VMS if x["node"] == node and x["type"] == "qemu"]
         if rest == "lxc": return [x for x in VMS if x["node"] == node and x["type"] == "lxc"]
         if rest == "storage":
@@ -281,6 +286,7 @@ def route(path):
                 if v.get("template"):
                     cfg["template"] = 1
                     cfg["virtio0"] = f"ceph-vm:base-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"
+                    cfg["cicustom"] = "vendor=local:snippets/vendor.yaml"  # file che sta sul nodo e il clone non copia
                 if seg[0] == "qemu" and not v.get("template"): cfg["virtio0"] = f"ceph-vm:vm-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"; cfg["virtio1"] = f"ceph-vm:vm-{v['vmid']}-disk-1,size=20G"; cfg["ide2"] = f"ceph-vm:vm-{v['vmid']}-cloudinit,media=cdrom"
                 if v.get("mem_mb"): cfg["memory"] = v["mem_mb"]
                 if v.get("maxcpu"): cfg["cores"] = v["maxcpu"]

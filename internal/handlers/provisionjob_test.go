@@ -35,10 +35,15 @@ type fakeProv struct {
 	failStart       int // the next N start requests fail
 	onClone         func()
 	nextID          int
-	extraStorage    bool     // a non shared "local" storage on n1
-	blank           []string // devices the guest reports as blank (nil = ["vdb"])
-	blankAfterStart []string // what the guest reports once the VM has been started again (nil = unchanged)
-	started         int      // "start" requests seen
+	extraStorage    bool                // a non shared "local" storage on n1
+	noSnippetKind   bool                // a storage "nosnip" on n1 and n2 whose content types do NOT include snippets
+	onlyN1Storage   bool                // a storage "onlyn1" (content snippets) on n1 only
+	localFiles      bool                // a "local" storage on n1 and n2 that lists snippets and ISO (content "snippets,iso")
+	files           map[string][]string // node -> volids present on its storages (snippets, ISO)
+	filesErr        bool                // the storage listing cannot be read
+	blank           []string            // devices the guest reports as blank (nil = ["vdb"])
+	blankAfterStart []string            // what the guest reports once the VM has been started again (nil = unchanged)
+	started         int                 // "start" requests seen
 	setupExit       int
 }
 
@@ -83,6 +88,19 @@ func (f *fakeProv) GetClusterResources(t string) (json.RawMessage, error) {
 			// a small local storage on n2 (5 GB free) and an ISO-only one
 			map[string]interface{}{"type": "storage", "node": "n2", "storage": "fast", "shared": 0, "status": "available", "content": "images", "maxdisk": g(20), "disk": g(15)},
 			map[string]interface{}{"type": "storage", "node": "n1", "storage": "isos", "shared": 1, "status": "available", "content": "iso", "maxdisk": g(100), "disk": g(1)})
+		if f.localFiles {
+			for _, nd := range []string{"n1", "n2"} {
+				list = append(list, map[string]interface{}{"type": "storage", "node": nd, "storage": "local", "shared": 0, "status": "available", "content": "snippets,iso", "maxdisk": g(100), "disk": g(10)})
+			}
+		}
+		if f.noSnippetKind {
+			for _, nd := range []string{"n1", "n2"} {
+				list = append(list, map[string]interface{}{"type": "storage", "node": nd, "storage": "nosnip", "shared": 0, "status": "available", "content": "iso,backup", "maxdisk": g(100), "disk": g(10)})
+			}
+		}
+		if f.onlyN1Storage {
+			list = append(list, map[string]interface{}{"type": "storage", "node": "n1", "storage": "onlyn1", "shared": 0, "status": "available", "content": "snippets", "maxdisk": g(100), "disk": g(10)})
+		}
 		if f.extraStorage {
 			list = append(list, map[string]interface{}{"type": "storage", "node": "n1", "storage": "local", "shared": 0, "status": "available", "content": "images"})
 		}
@@ -288,6 +306,21 @@ func (f *fakeProv) VMAction(node string, id int, action string, p url.Values) (j
 }
 func (f *fakeProv) VMMigrate(node string, id int, target string, online bool) (json.RawMessage, error) {
 	return nil, errors.New("not used")
+}
+func (f *fakeProv) GetStorageContent(node, storage, content string) (json.RawMessage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.filesErr {
+		return nil, errors.New("proxmox 500: storage not available")
+	}
+	list := []map[string]string{}
+	for _, v := range f.files[node] {
+		if strings.HasPrefix(v, storage+":"+content+"/") {
+			list = append(list, map[string]string{"volid": v})
+		}
+	}
+	b, _ := json.Marshal(list)
+	return b, nil
 }
 func (f *fakeProv) WaitForTask(upid json.RawMessage, timeout time.Duration) error { return nil }
 func (f *fakeProv) GetTaskStatus(node, upid string) (json.RawMessage, error) {
@@ -832,13 +865,37 @@ func TestValidateProvIPv4Mapped(t *testing.T) {
 	}
 }
 
-func TestTemplateStorages(t *testing.T) {
-	got := templateStorages(map[string]interface{}{
-		"virtio0": "ceph:base-1-disk-1,size=32G", "efidisk0": "ceph:base-1-disk-0", "ide2": "local:iso/x.iso,media=cdrom",
-		"tpmstate0": "fast:vm-1-tpm", "net0": "virtio=AA,bridge=vmbr0", "scsi1": "none,media=cdrom", "unused0": "other:vm-1-disk-9", "name": "x",
-	})
-	if strings.Join(got, ",") != "ceph,fast,local" {
-		t.Fatalf("%v", got)
+func TestParseTemplateInfo(t *testing.T) {
+	cfg := map[string]interface{}{
+		"virtio0": "ceph:base-1-disk-1,size=32G", "efidisk0": "ceph:base-1-disk-0,size=1M", "ide2": "ceph:vm-1-cloudinit,media=cdrom",
+		"ide0": "local:iso/win.iso,media=cdrom,size=4G", "tpmstate0": "fast:vm-1-tpm,size=4M", "net0": "virtio=AA,bridge=vmbr0",
+		"scsi1": "none,media=cdrom", "unused0": "other:vm-1-disk-9", "name": "x",
+		"cicustom": "vendor=local:snippets/vendor_ubuntu.yaml,user=snip:snippets/u.yaml",
+	}
+	info := parseTemplateInfo(cfg, "virtio0", 50)
+	if strings.Join(info.Storages, ",") != "ceph,fast" || info.MainStorage != "ceph" || info.CurDiskGB != 32 {
+		t.Fatalf("%+v", info)
+	}
+	// the main disk is counted at the requested size (50 GB), the cloud-init drive at 4 MB, ISO and snippets not at all
+	want := int64(50)<<30 + 1<<20 + cloudInitDriveBytes
+	if info.Need["ceph"] != want || info.Need["fast"] != 4<<20 || info.Need["local"] != 0 {
+		t.Fatalf("need %v want ceph=%d", info.Need, want)
+	}
+	files := []string{}
+	for _, f := range info.Files {
+		files = append(files, f.volid())
+	}
+	if strings.Join(files, ",") != "local:iso/win.iso,local:snippets/vendor_ubuntu.yaml,snip:snippets/u.yaml" {
+		t.Fatalf("files %v", files)
+	}
+	// a smaller request than the template does not shrink the need
+	if parseTemplateInfo(cfg, "virtio0", 10).Need["ceph"] != int64(32)<<30+1<<20+cloudInitDriveBytes {
+		t.Fatal("the need shrank below the template's disk")
+	}
+	// hostile config values never make a file reference
+	bad := parseTemplateInfo(map[string]interface{}{"cicustom": "vendor=local:snippets/../../etc/passwd,user=x:snippets/a\nb,evil=local:snippets/x", "ide2": "local:iso/a/b.iso"}, "virtio0", 0)
+	if len(bad.Files) != 0 {
+		t.Fatalf("hostile references accepted: %+v", bad.Files)
 	}
 }
 

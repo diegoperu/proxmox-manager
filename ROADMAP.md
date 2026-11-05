@@ -20,7 +20,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 7 | Rifare la prova del fallback inline su Rocky SELinux | capire se gli helper sono davvero necessari | S | VM di prova | da fare |
 | 8 | `allowed_hosts` (anti DNS rebinding) | sicurezza dietro reverse proxy | S | decisione D14 | in discussione |
 | 9 | Errore JS aprendo direttamente `#/gpu` (`Gpu.summary`, gia' presente prima del 3b) | console pulita, nessun rischio di pagina vuota | S | — | fatto (2026-11-05): non piu' riproducibile; la pagina ora normalizza la risposta (vedi CLAUDE.md) |
-| 10 | Controllo preventivo alla creazione VM: snippet `cicustom` presente sul nodo di destinazione; spazio anche per il volume clonato (non solo per il disco aggiuntivo) | niente VM lasciate spente a meta' | S | — | da fare |
+| 10 | Controllo preventivo alla creazione VM: snippet `cicustom` presente sul nodo di destinazione; spazio anche per il volume clonato (non solo per il disco aggiuntivo) | niente VM lasciate spente a meta' | S | — | fatto (2026-11-05): file del template sul nodo (verificabile solo dove lo storage elenca quel tipo di contenuto) e spazio del clone |
 | 11 | Colonna "disco" della lista VM: oggi solo `/`, estendibile al disco piu' pieno | stessa informazione del pannello | S | — | da decidere |
 | 12 | Prima di avviare una VM spenta, controllare che il nodo abbia la RAM per avviarla | niente avvii che sovraccaricano il nodo | S | modello di carico del bilanciamento | fatto (2026-11-05): avvio singolo, container e Batch; rifiuto 409 con i GB mancanti |
 

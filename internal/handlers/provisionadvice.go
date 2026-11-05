@@ -48,6 +48,9 @@ const (
 	adviceDisk2Unavailable = "disk2_storage_unavailable" // the storage of the extra disk is not available on the node
 	adviceDisk2NoImages    = "disk2_storage_no_images"   // ... or cannot hold VM disks
 	adviceDisk2NoSpace     = "disk2_no_space"            // ... or has less free space than the disk (Missing = bytes)
+	// what the clone needs on the node (ROADMAP 10)
+	adviceFileMissing  = "file_missing"   // a snippet or ISO of the template that is not on the node (Detail = volid)
+	adviceCloneNoSpace = "clone_no_space" // a storage has less free space than the clone writes there (Missing, Detail = storage)
 )
 
 var storageNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
@@ -59,13 +62,17 @@ type adviceQuery struct {
 	Storages     []string // storages of the template's volumes: all must be reachable from the node
 	TemplateNode string
 	Group        string
-	Cluster      int    // cluster index: the creations in flight and the guests started a moment ago are per cluster (not a request parameter)
-	Disk2GB      int    // extra disk size in GB (0 = none)
-	Disk2Storage string // its storage; "" = the first of Storages (the template's)
+	Cluster      int      // cluster index: the creations in flight and the guests started a moment ago are per cluster (not a request parameter)
+	TemplateVMID int      // the server reads the template itself: storages, files and sizes come from its config
+	DiskDevice   string   // main disk of the template (default virtio0)
+	DiskGB       int      // requested total size of the main disk (0 = as the template)
+	Disk2GB      int      // extra disk size in GB (0 = none)
+	Disk2Storage string   // its storage; "" = the storage of the main disk
+	tpl          *tplInfo // already read by the caller (the creation precheck): not read again
 }
 
 func (q adviceQuery) key() string {
-	return fmt.Sprintf("%d|%d|%t|%s|%s|%s", q.MemMB, q.Cores, q.GPU, strings.Join(q.Storages, ","), q.TemplateNode, q.Group) + fmt.Sprintf("|%d|%s", q.Disk2GB, q.Disk2Storage)
+	return fmt.Sprintf("%d|%d|%t|%s|%s|%s", q.MemMB, q.Cores, q.GPU, strings.Join(q.Storages, ","), q.TemplateNode, q.Group) + fmt.Sprintf("|%d|%s|%d|%s|%d", q.Disk2GB, q.Disk2Storage, q.TemplateVMID, q.DiskDevice, q.DiskGB)
 }
 
 func parseAdviceQuery(q func(string) string) (adviceQuery, error) {
@@ -104,6 +111,25 @@ func parseAdviceQuery(q func(string) string) (adviceQuery, error) {
 			return out, errors.New("template_node non valido")
 		}
 		out.TemplateNode = s
+	}
+	if s := q("template_vmid"); s != "" {
+		if !vmidPattern.MatchString(s) {
+			return out, errors.New("template_vmid non valido")
+		}
+		out.TemplateVMID, _ = strconv.Atoi(s)
+	}
+	if s := q("disk_device"); s != "" {
+		if !diskDevPattern.MatchString(s) {
+			return out, errors.New("disk_device non valido")
+		}
+		out.DiskDevice = s
+	}
+	if s := q("disk_gb"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 65536 {
+			return out, errors.New("disk_gb non valido (1 - 65536)")
+		}
+		out.DiskGB = n
 	}
 	if s := q("disk2_gb"); s != "" {
 		n, err := strconv.Atoi(s)
@@ -177,6 +203,7 @@ type adviceStorage struct {
 	Online bool
 	Free   int64 // maxdisk - disk in bytes; -1 = not reported by Proxmox
 	Total  int64
+	Kinds  map[string]bool // content types enabled on the storage ("images", "iso", "snippets"...): only those can be listed
 }
 
 // reserved: node|addr of the cards reserved by creations in progress (they are shown, not selectable).
@@ -232,7 +259,11 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 						free = 0
 					}
 				}
-				storages[sn][node] = adviceStorage{Shared: parseBoolish(r["shared"]), Images: containsStr(strings.Split(content, ","), "images"), Online: status == "available", Free: free, Total: intField(r, "maxdisk")}
+				kinds := map[string]bool{}
+				for _, k := range strings.Split(content, ",") {
+					kinds[strings.TrimSpace(k)] = true
+				}
+				storages[sn][node] = adviceStorage{Shared: parseBoolish(r["shared"]), Images: kinds["images"], Online: status == "available", Free: free, Total: intField(r, "maxdisk"), Kinds: kinds}
 			}
 		case "qemu", "lxc":
 			vmid := int(intField(r, "vmid"))
@@ -275,9 +306,52 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 
 	// reasons known here, per node: storage, and a free card with a mapping when a GPU is wanted
 	extra := map[string][]balance.PlaceReason{}
+	// the template, read by the server: its volumes decide the storages, the files that must be on the node and the
+	// space the clone writes (the page only says which template and which disk size it wants)
+	info := q.tpl
+	if info == nil && q.TemplateVMID > 0 && nodeNamePattern.MatchString(q.TemplateNode) {
+		if raw, err := c.GetVMConfig(q.TemplateNode, q.TemplateVMID); err == nil {
+			var cfg map[string]interface{}
+			if json.Unmarshal(raw, &cfg) == nil && isTemplateRes(map[string]interface{}{"template": cfg["template"], "name": cfg["name"]}) {
+				dev := q.DiskDevice
+				if dev == "" {
+					dev = "virtio0"
+				}
+				x := parseTemplateInfo(cfg, dev, q.DiskGB)
+				info = &x
+			}
+		}
+		if info == nil {
+			meta.Partial = append(meta.Partial, "template")
+		}
+	}
+	if info != nil && len(q.Storages) == 0 {
+		q.Storages = info.Storages
+	}
 	d2Storage := q.Disk2Storage
+	if d2Storage == "" && info != nil {
+		d2Storage = info.MainStorage
+	}
 	if d2Storage == "" && len(q.Storages) > 0 {
 		d2Storage = q.Storages[0]
+	}
+	sharedStorage := map[string]bool{}
+	for sid, per := range storages {
+		for _, st := range per {
+			if st.Shared {
+				sharedStorage[sid] = true
+			}
+		}
+	}
+	// bytes the creation writes on each storage: the clone, and the extra disk (on its own storage)
+	need := map[string]int64{}
+	if info != nil {
+		for sid, b := range info.Need {
+			need[sid] += b
+		}
+		if q.Disk2GB > 0 && d2Storage != "" {
+			need[d2Storage] += int64(q.Disk2GB) * balance.GiB
+		}
 	}
 	for _, n := range nodes {
 		seen := map[string]bool{}
@@ -307,8 +381,60 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceDisk2Unavailable})
 			case !st.Images:
 				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceDisk2NoImages})
-			case st.Free >= 0 && st.Free < need:
+			case info == nil && st.Free >= 0 && st.Free < need:
 				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceDisk2NoSpace, Missing: need - st.Free})
+			}
+		}
+		if info == nil {
+			continue
+		}
+		// space: every storage the creation writes to, on this node (not reported by Proxmox = not checked)
+		sids := make([]string, 0, len(need))
+		for sid := range need {
+			sids = append(sids, sid)
+		}
+		sort.Strings(sids)
+		for _, sid := range sids {
+			st, ok := storages[sid][n.name]
+			if !ok || !st.Online || st.Free < 0 || st.Free >= need[sid] {
+				continue
+			}
+			code := adviceCloneNoSpace
+			if _, cloned := info.Need[sid]; !cloned {
+				code = adviceDisk2NoSpace // only the extra disk goes there
+			}
+			extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: code, Missing: need[sid] - st.Free, Detail: sid})
+		}
+		// files that the clone only references: they must be on this node, unless the storage is shared or the node
+		// is the one of the template (the file is there)
+		if n.name != q.TemplateNode {
+			for _, ref := range info.Files {
+				if sharedStorage[ref.Storage] {
+					continue
+				}
+				st, have := storages[ref.Storage][n.name]
+				if !have || !st.Online {
+					// the storage that holds the file does not exist (or is not active) on this node: the file is not reachable
+					extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceFileMissing, Detail: ref.volid()})
+					continue
+				}
+				if !st.Kinds[ref.Kind] {
+					// Proxmox lists only the content types enabled on a storage: a "local" with iso,backup,vztmpl shows no
+					// snippets even where they exist. Nothing can be said, so nothing is blocked.
+					if !containsStr(meta.Partial, "files_unverified") {
+						meta.Partial = append(meta.Partial, "files_unverified")
+					}
+					continue
+				}
+				present, known := fileOnNode(c, q.Cluster, n.name, ref)
+				switch {
+				case !known:
+					if !containsStr(meta.Partial, "files") {
+						meta.Partial = append(meta.Partial, "files")
+					}
+				case !present:
+					extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceFileMissing, Detail: ref.volid()})
+				}
 			}
 		}
 	}
