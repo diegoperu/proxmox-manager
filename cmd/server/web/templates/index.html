@@ -861,7 +861,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.163.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.165.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -936,7 +936,7 @@ html.spiderman{
     <div class="page" id="page-balance">
       <div class="cond" id="bal-cond" aria-live="polite"></div>
       <div class="toolbar" style="margin-top:18px">
-        <label class="bal-opt"><input type="checkbox" class="chk" id="bal-stopped" checked onchange="Balance.changed()"> Le VM spente contano</label>
+        <label class="bal-opt"><input type="checkbox" class="chk" id="bal-stopped" onchange="Balance.changed()"> Le VM spente contano</label>
         <label class="bal-opt"><input type="checkbox" class="chk" id="bal-cold" onchange="Balance.changed()"> Includi i container (riavvio breve)</label>
         <label class="bal-opt">Simula lo spegnimento di <select class="inp" id="bal-evac" onchange="Balance.changed()"><option value="">nessun nodo</option></select></label>
         <label class="bal-opt">Solo queste VM <input class="inp" type="text" id="bal-only" inputmode="numeric" maxlength="400" placeholder="VMID, es. 174 180" style="width:150px" onchange="Balance.changed()" aria-describedby="bal-only-h"></label>
@@ -3399,10 +3399,16 @@ const Balance={
       <div class="panel"><div class="tw"><table><thead><tr><th>VM</th><th>Nodo</th><th>RAM</th><th>Motivo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
   blocked(d){
-    if(!d.blocked.length)return'';
-    const rows=d.blocked.map(b=>`<tr><td class="tn"><button type="button" class="nm-btn" onclick="VMs.detail(${js(b.node)},${js(b.vmid)},${js(b.kind)})"><span class="nm">${esc(b.name||('VM '+b.vmid))}</span></button> <span class="td">${tbadge(b.kind)} ${esc(b.vmid)}</span></td><td>${esc(b.node)}</td><td>${this.gb(b.mem)} GB</td><td>${b.reasons.map(r=>esc(Object.hasOwn(Balance.BLOCK,r)?Balance.BLOCK[r]:r)).join('; ')}${b.reasons.length===1&&b.reasons[0]==='cpu_host'?' '+Balance.coldBox(b.vmid,b.name||b.vmid,false):''}</td></tr>`).join('');
-    return`<details class="sh-det" style="margin-top:22px"><summary>VM che non si spostano (${d.blocked.length})</summary>
-      <div class="panel" style="margin-top:8px"><div class="tw"><table><thead><tr><th>VM</th><th>Nodo</th><th>RAM</th><th>Perche'</th></tr></thead><tbody>${rows}</tbody></table></div></div></details>`;
+    // le VM spente non contate (impostazione predefinita) non sono "bloccate": non occupano RAM e spostarle non cambia
+    // il carico; una riga le riassume invece di riempire la tabella
+    const notCounted=b=>b.reasons.length===1&&b.reasons[0]==='not_counted';
+    const idle=d.blocked.filter(notCounted).length;
+    const idleNote=idle?`<p class="cnote" style="margin-top:14px">${idle} ${Dashboard.plural(idle,'VM spenta non e\' conteggiata','VM spente non sono conteggiate')}: non occupano RAM, quindi non entrano nel piano (si possono includere con "Le VM spente contano").</p>`:'';
+    const blockedList=d.blocked.filter(b=>!notCounted(b));
+    if(!blockedList.length)return idleNote;
+    const rows=blockedList.map(b=>`<tr><td class="tn"><button type="button" class="nm-btn" onclick="VMs.detail(${js(b.node)},${js(b.vmid)},${js(b.kind)})"><span class="nm">${esc(b.name||('VM '+b.vmid))}</span></button> <span class="td">${tbadge(b.kind)} ${esc(b.vmid)}</span></td><td>${esc(b.node)}</td><td>${this.gb(b.mem)} GB</td><td>${b.reasons.map(r=>esc(Object.hasOwn(Balance.BLOCK,r)?Balance.BLOCK[r]:r)).join('; ')}${b.reasons.length===1&&b.reasons[0]==='cpu_host'?' '+Balance.coldBox(b.vmid,b.name||b.vmid,false):''}</td></tr>`).join('');
+    return`<details class="sh-det" style="margin-top:22px"><summary>VM che non si spostano (${blockedList.length})</summary>
+      <div class="panel" style="margin-top:8px"><div class="tw"><table><thead><tr><th>VM</th><th>Nodo</th><th>RAM</th><th>Perche'</th></tr></thead><tbody>${rows}</tbody></table></div></div></details>${idleNote}`;
   },
   runHTML(){
     const r=Balance.run;

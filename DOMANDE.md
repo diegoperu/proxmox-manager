@@ -636,3 +636,4 @@ Assunzioni dichiarate (provvisorie, non bloccanti: l'utente ha chiesto di proced
 - **Quando non si riesce a leggere il cluster:** si lascia partire l'avvio (decide Proxmox) e si scrive nel log; il controllo e' una protezione, non una condizione per poter avviare.
 - **Avvii ravvicinati:** controllo e avvio sono serializzati per nodo, e una VM avviata da meno di 90 secondi che Proxmox mostra ancora ferma conta come accesa (un Batch di avvii non puo' superare il limite).
 
+**D45 rivista (2026-11-05, richiesta utente):** il predefinito dell'interruttore "Le VM spente contano" passa da **si' a no**: una VM spenta non occupa RAM, e il consiglio per le VM nuove e il controllo prima dell'avvio gia' non le contano. L'interruttore resta nella pagina Bilanciamento per chi vuole prevedere cosa succede se le spente partono.
