@@ -506,6 +506,9 @@ td.spk{width:130px}
 .sh-use{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .sh-use .mb2 .mv{font-size:18px}
 .sh-use .bw{margin-top:6px}
+.sh-disks{margin-top:10px;display:grid;gap:6px}
+.sh-dk{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr) auto;gap:4px 10px;align-items:center;background:var(--bg3);border-radius:10px;padding:8px 12px;font-size:12px}
+.sh-dk .bw{margin:0}.sh-dk .nm3{overflow-wrap:anywhere}.sh-dk .nm3 small{color:var(--text3);display:block;font-size:11px}.sh-dk .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .sh-use .sub{font-size:11px;color:var(--text3);margin-top:4px;overflow-wrap:anywhere}
 .sh-net{font-size:12px;color:var(--text3);margin-top:8px;font-variant-numeric:tabular-nums}
 .sh-sec .dl{margin-top:0}
@@ -858,7 +861,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.152.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.154.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1794,6 +1797,29 @@ function nodeState(o){
 const OS_NAMES={'Red Hat Enterprise Linux':'RHEL','Rocky Linux':'Rocky','AlmaLinux':'AlmaLinux','Debian GNU/Linux':'Debian','CentOS Linux':'CentOS','CentOS Stream':'CentOS Stream','Oracle Linux Server':'Oracle Linux','Fedora Linux':'Fedora'};
 const OSTYPES={l26:'Linux',l24:'Linux 2.4',win11:'Windows 11',win10:'Windows 10',win8:'Windows 8',win7:'Windows 7',wvista:'Windows Vista',wxp:'Windows XP',w2k:'Windows 2000',w2k3:'Windows Server 2003',w2k8:'Windows Server 2008',w2k12:'Windows Server 2012',w2k16:'Windows Server 2016',w2k19:'Windows Server 2019',w2k22:'Windows Server 2022',w2k25:'Windows Server 2025',solaris:'Solaris',other:'Altro',archlinux:'Arch Linux',nixos:'NixOS',opensuse:'openSUSE'};
 function osFromType(t){if(!t)return'';return Object.hasOwn(OSTYPES,t)?OSTYPES[t]:(t.charAt(0).toUpperCase()+t.slice(1));}
+// Filesystem dei dischi FISICAMENTE collegati alla VM, dal guest agent (guest-get-fsinfo). Il guest decide cosa
+// dichiarare, quindi ogni campo e' controllato. Un filesystem conta solo se poggia su un disco della VM (`disk`
+// non vuoto: bus virtio/scsi/sata/ide): restano fuori i montaggi di rete (nfs, cifs, fuse...), i dispositivi
+// virtuali (tmpfs, loop/snap squashfs, overlay), i supporti ottici e la partizione EFI (/boot/efi, vfat).
+// Una sola riga per dispositivo (bind mount e subvolume non si contano due volte).
+const FS_NOT_DISK=/^(nfs\d*|cifs|smb\w*|smbfs|fuse(\..+)?|9p|virtiofs|ceph|glusterfs|afs|sshfs|davfs|tmpfs|devtmpfs|ramfs|overlay|squashfs|iso9660|udf|proc|sysfs|cgroup2?)$/i;
+function physicalDisks(fs){
+  if(!Array.isArray(fs))return[];
+  const byDev=new Map();
+  for(const f of fs){
+    if(!f||typeof f!=='object'||typeof f.mountpoint!=='string'||!f.mountpoint||f.mountpoint.length>200)continue;
+    const type=typeof f.type==='string'?f.type.slice(0,24):'';
+    const total=Number(f['total-bytes']), used=Number(f['used-bytes']);
+    if(!(total>0)||!(used>=0)||FS_NOT_DISK.test(type))continue;
+    if(!Array.isArray(f.disk)||!f.disk.length)continue;
+    if(f.mountpoint==='/boot/efi'&&/^vfat$/i.test(type))continue;
+    const dev=typeof f.name==='string'&&f.name?f.name.slice(0,40):f.mountpoint;
+    const row={mount:f.mountpoint,type,dev,used:Math.min(used,total),total};
+    const prev=byDev.get(dev);
+    if(!prev||row.mount==='/'||(prev.mount!=='/'&&row.mount.length<prev.mount.length))byDev.set(dev,row);
+  }
+  return[...byDev.values()].sort((a,b)=>(a.mount==='/'?-1:b.mount==='/'?1:a.mount.localeCompare(b.mount))).slice(0,12);
+}
 function osLabel(o){
   if(!o||!(o.name||o.pretty_name))return'';
   if(o.id==='mswindows')return String(o.pretty_name||o.name).replace(/^Microsoft\s+/,'');
@@ -4150,6 +4176,11 @@ const VMs=(()=>{
         const lxcDisk=kind==='lxc'&&s.maxdisk>0;
         const dPct=lxcDisk?pct(s.disk,s.maxdisk):(dTot?Math.round(dUsed/dTot*100):null);
         const use=(l,v,sub)=>`<div class="mb2"><div class="ml">${l}</div><div class="mv">${v==null?'—':v+'%'}</div>${v==null?'':'<div class="bw"><div class="bf2 '+(v>85?'crit2':v>65?'warn2':'ok2')+'" style="width:'+v+'%"></div></div>'}<div class="sub">${sub}</div></div>`;
+        // piu' dischi fisici: l'elenco con l'occupazione di ciascuno (la tessera sopra resta quella di "/")
+        const disks=kind==='qemu'?physicalDisks(fsinfo):[];
+        const disksHtml=disks.length>1?`<div class="sh-disks" role="list" aria-label="Occupazione dei dischi della VM">${disks.map(d=>{
+          const pc=Math.round(d.used/d.total*100);
+          return`<div class="sh-dk" role="listitem"><span class="nm3"><b class="tm">${esc(d.mount)}</b><small>${esc(d.type)} · ${esc(d.dev)}</small></span><div class="bw" aria-hidden="true"><div class="bf2 ${pc>85?'crit2':pc>65?'warn2':'ok2'}" style="width:${pc}%"></div></div><span class="num">${fmtB(d.used)} / ${fmtB(d.total)} · <b>${pc}%</b></span></div>`;}).join('')}</div>`:'';
         const ipTxt=v0?.ip||netinfo.primary_ipv4||'';
         const osTxt=osLabel(osinfo)||osFromType(v0?.ostype);
         const resTxt=[s.cpus?esc(s.cpus)+' core':'',s.maxmem?fmtB(s.maxmem)+' RAM':'',s.maxdisk?'disco '+fmtB(s.maxdisk):''].filter(Boolean).join(' · ')||'—';
@@ -4165,6 +4196,7 @@ const VMs=(()=>{
               ${use('RAM',m,s.maxmem?fmtB(s.mem||0)+' / '+fmtB(s.maxmem):'')}
               ${use('Disco /',dPct,lxcDisk?fmtB(s.disk||0)+' / '+fmtB(s.maxdisk):dTot?fmtB(dUsed)+' / '+fmtB(dTot):(kind==='qemu'?'guest agent non disponibile':fmtB(s.maxdisk||0)))}
             </div>
+            ${disksHtml}
             <div class="sh-net">Rete: in ${fmtB(s.netin)}/s · out ${fmtB(s.netout)}/s</div>
           </section>
           <section class="sh-sec" aria-label="Identità">

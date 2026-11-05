@@ -305,7 +305,15 @@ def route(path):
             if seg[2] == "agent" and seg[3] == "get-osinfo":
                 if v["status"] != "running" or v["type"] != "qemu": return None
                 return dict(result=OSES[v["vmid"] % len(OSES)])
-            if seg[2] == "agent": return dict(result=[dict(mountpoint="/", **{"used-bytes": v["disk"], "total-bytes": v["maxdisk"]}, type="ext4", name="vda1")])
+            if seg[2] == "agent":
+                root = dict(mountpoint="/", **{"used-bytes": v["disk"], "total-bytes": v["maxdisk"]}, type="ext4", name="vda1", disk=[{"bus-type": "virtio", "dev": "/dev/vda1"}])
+                if v["vmid"] % 4 != 0: return dict(result=[root])
+                # alcune VM: disco secondario, snap, partizione EFI e un montaggio NFS (da non mostrare)
+                return dict(result=[root,
+                    dict(mountpoint="/boot/efi", **{"used-bytes": 6 * 1024 * 1024, "total-bytes": 100 * 1024 * 1024}, type="vfat", name="vda15", disk=[{"bus-type": "virtio", "dev": "/dev/vda15"}]),
+                    dict(mountpoint="/data", **{"used-bytes": 38 * GB, "total-bytes": 50 * GB}, type="xfs", name="vdb1", disk=[{"bus-type": "virtio", "dev": "/dev/vdb1"}]),
+                    dict(mountpoint="/snap/core/1", **{"used-bytes": 100 * 1024 * 1024, "total-bytes": 100 * 1024 * 1024}, type="squashfs", name="loop0", disk=[]),
+                    dict(mountpoint="/mnt/nas", **{"used-bytes": 900 * GB, "total-bytes": 1000 * GB}, type="nfs4", name="nas:/export", disk=[])])
             if seg[2] == "rrddata":
                 pts = rrd(node, "day")
                 for pt in pts:  # campi per-VM: mem/maxmem (non memused/memtotal)
