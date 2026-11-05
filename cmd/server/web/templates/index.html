@@ -861,7 +861,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.165.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.167.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2803,7 +2803,23 @@ const Gpu={
     const used=d.nodes.flatMap(n=>n.cards.flatMap(c=>c.uses));
     return{cards,free,problems:d.problems.length,direct:used.filter(u=>u.kind==='direct').length,mapped:used.filter(u=>u.kind==='mapping').length};
   },
-  note(d,idx){Gpu.by[idx]=d;Gpu.availBy[idx]=!!(d&&d.nodes.some(n=>n.cards.length));Gpu.syncNav();},
+  // La risposta di /api/gpus e' usata da tutta la pagina con n.cards.length, c.uses.map... : una lista mancante o nulla
+  // (dati parziali, nodo fuori linea, un campo che cambia) non deve far fallire il rendering. Si corregge qui, una volta, sul posto.
+  norm(d){
+    if(!d||typeof d!=='object')return d;
+    if(!Array.isArray(d.nodes))d.nodes=[];
+    d.nodes=d.nodes.filter(n=>n&&typeof n==='object');
+    for(const k of ['problems','mappings','partial'])if(!Array.isArray(d[k]))d[k]=[];
+    for(const n of d.nodes){
+      if(!Array.isArray(n.cards))n.cards=[];
+      if(!Array.isArray(n.groups))n.groups=[];
+      n.cards=n.cards.filter(c=>c&&typeof c==='object');
+      for(const c of n.cards){if(!Array.isArray(c.uses))c.uses=[];if(!Array.isArray(c.mappings))c.mappings=[];}
+      for(const g of n.groups){if(g&&!Array.isArray(g.uses))g.uses=[];}
+    }
+    return d;
+  },
+  note(d,idx){d=Gpu.norm(d);Gpu.by[idx]=d;Gpu.availBy[idx]=!!(d&&d.nodes.some(n=>n.cards.length));Gpu.syncNav();},
   isAvail(){return Gpu.availBy[ClusterMgr.current]===true;},
   syncNav(){const b=document.querySelector('.ni[data-page="gpu"]');if(b)b.hidden=!Gpu.isAvail()&&App.cur!=='gpu';},
   // Per la panoramica e la voce di menu; non genera toast e non blocca niente (la prima lettura costa qualche secondo).
@@ -4629,6 +4645,7 @@ const Provision=(()=>{
       try{r=await api('/provision/advice?'+p,{quiet:true,timeoutMs:60000});}
       catch(e){if(seq!==advSeq)return;adv=null;box.innerHTML=e.status===429?errBox('Un altro calcolo e\' in corso su questo cluster.','Provision.advice()'):errBox(e.message,'Provision.advice()');Provision.summary();return;}
       if(seq!==advSeq)return;
+      r.nodes=Array.isArray(r.nodes)?r.nodes:[]; r.cards=Array.isArray(r.cards)?r.cards:[]; r.storages=r.storages&&typeof r.storages==='object'?r.storages:{};
       adv=r; Provision.paintWhere(); Provision.fillStorages(); Provision.summary();
     },
     // ── disco aggiuntivo ──

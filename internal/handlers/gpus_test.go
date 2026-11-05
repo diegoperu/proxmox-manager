@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -198,5 +199,26 @@ func TestFetchGPUInventoryEndToEnd(t *testing.T) {
 	}
 	if len(inv.Partial) != 1 || inv.Partial[0] != "n2" || len(inv.Nodes) != 2 {
 		t.Fatalf("partial=%v nodes=%d", inv.Partial, len(inv.Nodes))
+	}
+}
+
+// The page iterates every list of the answer (n.cards.length, c.uses.map, ...): none may ever be null, whatever the
+// state of the nodes (offline, no PCI data, no card, a free card with no mapping).
+func TestInventoryJSONNeverHasNullLists(t *testing.T) {
+	inv := BuildGPUInventory([]GPUNodeInput{
+		{Node: "up", Online: true, PCI: testPCI(), VMs: nil},
+		{Node: "down", Online: false, PCI: nil, VMs: nil},              // offline: nothing read
+		{Node: "empty", Online: true, PCI: PCITable{}, VMs: []GPUVM{}}, // online, no cards
+	}, testMaps(), time.Now())
+	for name, v := range map[string]interface{}{"inventory": inv, "with corrections": withGPUModels(inv, nil)} {
+		b, err := json.Marshal(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range []string{"nodes", "cards", "groups", "uses", "mappings", "problems", "partial"} {
+			if strings.Contains(string(b), `"`+k+`":null`) {
+				t.Errorf("%s: %q is null: %s", name, k, b)
+			}
+		}
 	}
 }
