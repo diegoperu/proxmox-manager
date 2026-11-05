@@ -1140,9 +1140,10 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Disk       string `json:"disk"`
-		MountPoint string `json:"mount_point"`
-		StickyBit  *bool  `json:"sticky_bit"`
+		Disk         string `json:"disk"`
+		MountPoint   string `json:"mount_point"`
+		StickyBit    *bool  `json:"sticky_bit"`
+		AllowRestart bool   `json:"allow_restart"` // the user confirmed that the VM may be stopped and started
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, err, 400)
@@ -1155,7 +1156,6 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 	if body.StickyBit != nil {
 		sticky = *body.StickyBit
 	}
-
 	if err := validateDiskSlot(body.Disk); err != nil {
 		writeError(w, err, 400)
 		return
@@ -1164,171 +1164,17 @@ func (h *Handler) SetupVMDisk(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 400)
 		return
 	}
-
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)
 		return
 	}
-
-	statusRaw, err := client.GetVMStatus(node, vmid)
-	if err != nil {
-		writeError(w, err, 502)
+	res, e := runSetupDisk(client, node, vmid, setupDiskReq{Disk: body.Disk, MountPoint: body.MountPoint, Sticky: sticky, AllowRestart: body.AllowRestart})
+	if e != nil {
+		writeSetupDiskErr(w, e)
 		return
 	}
-	var st struct {
-		Status string `json:"status"`
-	}
-	json.Unmarshal(statusRaw, &st)
-	if st.Status != "running" {
-		writeError(w, fmt.Errorf(
-			"la VM deve essere in esecuzione per configurare il disco lato guest",
-		), 400)
-		return
-	}
-
-	var opLog []string
-
-	// Helper etichettato (SELinux enforcing) se presente nel guest, altrimenti script inline.
-	// Il probe si fa una volta per richiesta.
-	useHelper, err := diskTool.probeHelper(client, node, vmid)
-	if err != nil {
-		writeError(w, err, 502)
-		return
-	}
-	log.Printf("setup-disk %s/%d: esecuzione %s", node, vmid, guestMode(useHelper))
-	opLog = append(opLog, "Esecuzione guest: "+guestMode(useHelper))
-
-	disk := func(timeout time.Duration, args ...string) (guestResult, error) {
-		return diskTool.run(client, node, vmid, useHelper, args, timeout)
-	}
-	// findBlank: dischi candidati (vergini, o lasciati a metà da un tentativo precedente).
-	// Un lsblk che fallisce nel guest è un errore (exit 3), non "nessun disco".
-	findBlank := func() ([]string, error) {
-		res, err := disk(30*time.Second, "find-blank")
-		if err != nil {
-			return nil, err
-		}
-		if res.ExitCode != 0 {
-			return nil, fmt.Errorf("ricerca dischi fallita nel guest (exit %d): %s", res.ExitCode, strings.TrimSpace(res.Err))
-		}
-		return strings.Fields(res.Out), nil
-	}
-
-	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
-	candidates, err := findBlank()
-	if err != nil {
-		writeErrorLog(w, fmt.Errorf("guest agent: %w", err), 502, opLog)
-		return
-	}
-
-	if len(candidates) == 0 {
-		opLog = append(opLog, "Nessun disco vuoto trovato — rescan bus...")
-		disk(30*time.Second, "rescan") // best effort: un rescan fallito non è un errore
-		for attempt := 0; attempt < 5 && len(candidates) == 0; attempt++ {
-			time.Sleep(2 * time.Second)
-			candidates, _ = findBlank()
-		}
-	}
-
-	if len(candidates) == 0 {
-		// Fallback: il device non è apparso nemmeno col rescan — forza un ciclo stop+start
-		// reale della VM (nuovo processo QEMU, config riletta da zero). NON basta un
-		// VMAction("reboot") senza attendere il task: senza WaitForTask si crea una race in
-		// cui il polling "guest agent pronto" può avere successo contro la sessione PRE-riavvio
-		// (VM non ancora spenta), portando a un diff/ricerca sullo stato vecchio.
-		opLog = append(opLog, "Disco non rilevato — arresto VM per applicare la configurazione...")
-
-		shutdownUPID, err := client.VMAction(node, vmid, "shutdown", url.Values{"forceStop": {"1"}, "timeout": {"30"}})
-		if err != nil {
-			writeErrorLog(w, fmt.Errorf("arresto VM fallito: %w", err), 502, opLog)
-			return
-		}
-		if err := client.WaitForTask(shutdownUPID, 90*time.Second); err != nil {
-			writeErrorLog(w, fmt.Errorf("arresto VM non completato: %w", err), 502, opLog)
-			return
-		}
-
-		opLog = append(opLog, "VM arrestata, riavvio...")
-		startUPID, err := client.VMAction(node, vmid, "start", url.Values{})
-		if err != nil {
-			writeErrorLog(w, fmt.Errorf("avvio VM fallito: %w", err), 502, opLog)
-			return
-		}
-		if err := client.WaitForTask(startUPID, 60*time.Second); err != nil {
-			writeErrorLog(w, fmt.Errorf("avvio VM non completato: %w", err), 502, opLog)
-			return
-		}
-
-		opLog = append(opLog, "Attesa guest agent pronto (max 2 minuti)...")
-		agentReady := false
-		rebootDeadline := time.Now().Add(120 * time.Second)
-		for time.Now().Before(rebootDeadline) {
-			time.Sleep(5 * time.Second)
-			if _, err := runGuestScript(client, node, vmid, `echo ready`, nil, 15*time.Second); err == nil {
-				agentReady = true
-				break
-			}
-		}
-		if !agentReady {
-			writeErrorLog(w, fmt.Errorf(
-				"la VM non ha completato il riavvio entro 2 minuti — riprova più tardi",
-			), 502, opLog)
-			return
-		}
-		opLog = append(opLog, "Guest agent di nuovo raggiungibile, nuova ricerca disco...")
-
-		candidates, _ = findBlank()
-		if len(candidates) == 0 {
-			writeErrorLog(w, fmt.Errorf(
-				"disco non rilevato nemmeno dopo il riavvio — verifica la configurazione "+
-					"del disco in Proxmox (bus, storage, VMID)",
-			), 502, opLog)
-			return
-		}
-		opLog = append(opLog, fmt.Sprintf("Dischi vuoti trovati dopo riavvio: %s", strings.Join(candidates, ", ")))
-	} else {
-		opLog = append(opLog, fmt.Sprintf("Dischi vuoti trovati: %s", strings.Join(candidates, ", ")))
-	}
-
-	if len(candidates) > 1 {
-		writeErrorLog(w, fmt.Errorf(
-			"trovati %d dischi vuoti candidati (%s) — impossibile determinare automaticamente "+
-				"quale sia quello appena aggiunto; rimuovi/configura gli altri dischi vuoti e riprova",
-			len(candidates), strings.Join(candidates, ", "),
-		), 409, opLog)
-		return
-	}
-	newDevice := candidates[0]
-	opLog = append(opLog, fmt.Sprintf("Disco selezionato: /dev/%s", newDevice))
-
-	// Step 4: partiziona, formatta, monta, fstab, permessi
-	perm := "1777"
-	if !sticky {
-		perm = "0777"
-	}
-	dev := "/dev/" + newDevice
-
-	opLog = append(opLog, fmt.Sprintf("Partizionamento GPT + ext4 su %s...", dev))
-	// 120 s: mkfs.ext4 su un disco grande può superare i 30 s dei comandi brevi.
-	res, err := disk(120*time.Second, "setup", dev, body.MountPoint, perm)
-	if err != nil {
-		writeErrorLog(w, fmt.Errorf("setup disco fallito: %w", err), 502, opLog)
-		return
-	}
-	if res.ExitCode != 0 {
-		writeErrorLog(w, fmt.Errorf("setup disco fallito (exit %d): %s", res.ExitCode, strings.TrimSpace(res.Err)), 502, opLog)
-		return
-	}
-	out := res.Out
-	opLog = append(opLog, "Output: "+strings.TrimSpace(out))
-	opLog = append(opLog, fmt.Sprintf("✓ Disco montato su %s (permessi %s)", body.MountPoint, perm))
-
-	writeJSON(w, map[string]interface{}{
-		"log":         opLog,
-		"device":      dev,
-		"mount_point": body.MountPoint,
-	})
+	writeJSON(w, res)
 }
 
 func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {

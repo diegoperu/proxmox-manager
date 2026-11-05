@@ -21,23 +21,25 @@ import (
 // "ceph" storage, a template 9000 on n1, two NVIDIA cards on n2 (g1 free, g2 used by VM 50 directly).
 // Cluster resources are derived from the VMs, so the RAM check sees what the procedure creates.
 type fakeProv struct {
-	mu           sync.Mutex
-	vms          map[int]*fvm
-	ver          map[int]int
-	writes       []string // "op vmid key=value..." (no secret values: they are recorded as ***)
-	cloudInit    url.Values
-	execs        [][]string
-	agentUp      bool
-	agentFrom    time.Time // agent answers only after this time
-	probes       int
-	userExit     int
-	failClone    bool
-	failStart    int // the next N start requests fail
-	onClone      func()
-	nextID       int
-	extraStorage bool     // a non shared "local" storage on n1
-	blank        []string // devices the guest reports as blank (nil = ["vdb"])
-	setupExit    int
+	mu              sync.Mutex
+	vms             map[int]*fvm
+	ver             map[int]int
+	writes          []string // "op vmid key=value..." (no secret values: they are recorded as ***)
+	cloudInit       url.Values
+	execs           [][]string
+	agentUp         bool
+	agentFrom       time.Time // agent answers only after this time
+	probes          int
+	userExit        int
+	failClone       bool
+	failStart       int // the next N start requests fail
+	onClone         func()
+	nextID          int
+	extraStorage    bool     // a non shared "local" storage on n1
+	blank           []string // devices the guest reports as blank (nil = ["vdb"])
+	blankAfterStart []string // what the guest reports once the VM has been started again (nil = unchanged)
+	started         int      // "start" requests seen
+	setupExit       int
 }
 
 type fvm struct {
@@ -279,6 +281,7 @@ func (f *fakeProv) VMAction(node string, id int, action string, p url.Values) (j
 	}
 	if v := f.vms[id]; v != nil && action == "start" {
 		v.status = "running"
+		f.started++
 	}
 	f.rec(fmt.Sprintf("%s %d", action, id))
 	return upidFor(node, "qm"+action, id), nil
@@ -286,6 +289,7 @@ func (f *fakeProv) VMAction(node string, id int, action string, p url.Values) (j
 func (f *fakeProv) VMMigrate(node string, id int, target string, online bool) (json.RawMessage, error) {
 	return nil, errors.New("not used")
 }
+func (f *fakeProv) WaitForTask(upid json.RawMessage, timeout time.Duration) error { return nil }
 func (f *fakeProv) GetTaskStatus(node, upid string) (json.RawMessage, error) {
 	return json.RawMessage(`{"status":"stopped","exitstatus":"OK"}`), nil
 }
@@ -316,6 +320,9 @@ func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, e
 	switch {
 	case sub == "find-blank":
 		devs := f.blank
+		if f.blankAfterStart != nil && f.started > 0 {
+			devs = f.blankAfterStart
+		}
 		if devs == nil {
 			devs = []string{"vdb"}
 		}

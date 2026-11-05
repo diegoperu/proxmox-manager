@@ -614,3 +614,15 @@ Richiesta: sotto "Utente aggiuntivo" della pagina Nuova VM, una sezione "Disco a
 
 **Interpretazione dichiarata (D66)**: "cambia il default nel crea vm in VirtIO" letto come il campo "Disco device" della pagina Nuova VM (prima `scsi0`); il disco aggiuntivo usa lo stesso bus del disco principale (un disco principale `ide` ripiega su virtio, che ha abbastanza slot).
 **Richiesta in piu' (2026-11-05)**: attesa del guest agent portata a **10 minuti per attesa** (due attese, fino a 20 minuti in tutto): in una creazione reale l'avviso `agent_timeout` e' arrivato pochi secondi prima che il primo avvio (con gli aggiornamenti automatici) finisse e comparisse il login.
+
+## ROADMAP 6 — `setup-disk` (finestra "Aggiungi disco" della pagina VM)
+
+Verifica del 2026-11-05 dopo l'aggiunta del disco alla creazione VM: la creazione usa una funzione propria (`formatAndMountBlank`, mai un riavvio) e non ha cambiato `SetupVMDisk`. Nel pulsante del pannello restano due cose: (1) il disco scelto nel menu e' validato (`validateDiskSlot`) ma **non usato**: il server formatta l'unico disco vuoto che trova (`candidates[0]`); (2) se non ne trova, **spegne e riaccende la VM** (`forceStop`, fino a 2 minuti) senza una conferma esplicita: c'e' solo la riga di avviso sotto il pulsante. Il rischio di perdere dati e' basso (si tocca solo un disco senza partizioni ne' filesystem, e con piu' di un candidato non scrive), ma il riavvio puo' essere inutile (disco gia' configurato) e brusco su una VM di produzione. Il collegamento "slot Proxmox -> dispositivo nel guest" richiede la dimensione del disco: oggi `find-blank` stampa solo i nomi, e cambiarlo vuol dire reinstallare l'helper `disk.sh` nei template.
+
+### D68 — Come sistemare `setup-disk`
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Quanto si vuole correggere?
+**Opzioni**: A) piccola: il server rifiuta uno slot che non esiste nella configurazione della VM (400); il riavvio non parte piu' da solo: il server risponde 409 `restart_needed` e la pagina chiede una conferma di pericolo ("la VM viene spenta e riaccesa") prima di ripetere la richiesta con il permesso; il testo sotto il pulsante dice che "disco scelto" e' quello vuoto trovato nel guest; B) completa: come A, piu' collegamento slot -> dispositivo con la dimensione (nuovo sotto-comando o output di `find-blank` con la dimensione, con helper vecchio che continua a funzionare ripiegando su A) e rifiuto se la dimensione non corrisponde; richiede di aggiornare gli helper nei template; C) lasciare com'e' e togliere solo il punto dalla roadmap.
+**Suggerimento**: A: toglie il riavvio a sorpresa, che e' il vero rischio, senza toccare gli helper nei guest; B solo se capita davvero di avere piu' dischi vuoti insieme.
+**Risposta utente**: 2026-11-05 — A

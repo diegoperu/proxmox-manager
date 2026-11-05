@@ -861,7 +861,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.154.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.158.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1525,7 +1525,7 @@ html.spiderman{
     </div>
   </div>
   <button class="btn bpurp wf mb12" id="disk-setup-btn" onclick="DiskMgr.setupDisk()">Configura disco</button>
-  <div class="hint mb12">Partiziona e formatta il disco scelto (i dati presenti vengono cancellati). Se il disco non viene rilevato, la VM viene spenta e riaccesa: fino a 2 minuti.</div>
+  <div class="hint mb12">Partiziona, formatta e monta l'unico disco vuoto (senza partizioni né filesystem) che il guest trova: il disco scelto sopra deve esistere nella VM, ma quello formattato è scelto nel guest. Se il guest non lo vede, la VM non viene toccata: ti viene chiesto prima se spegnerla e riaccenderla (fino a 2 minuti).</div>
 
   <h2 class="sec">Log</h2>
   <div class="plog" id="disk-log"><span class="td">In attesa...</span></div>
@@ -4380,18 +4380,18 @@ const DiskMgr = {
         `Disco: ${disk}${this.slotCfg?.[disk] ? ' — ' + this.slotCfg[disk] : ''}`,
         `Mount point: ${mount} · Permessi: ${sticky ? '1777 (sticky)' : '0777'}`
       ],
-      consequence: 'Il disco viene partizionato e formattato in ext4: i dati presenti su quel disco vengono cancellati. Se il guest non lo rileva, la VM viene spenta e riaccesa senza ulteriori conferme.',
+      consequence: 'Viene formattato in ext4 l\'unico disco vuoto (senza partizioni né filesystem) che il guest trova; non si tocca un disco con dati. La VM non viene riavviata senza chiedertelo.',
       level: 'danger', typed: String(this.vmid), okLabel: 'Formatta e monta'
-    }, () => this.runSetup(disk, mount, sticky));
+    }, () => this.runSetup(disk, mount, sticky, false));
   },
 
-  async runSetup(disk, mount, sticky) {
+  async runSetup(disk, mount, sticky, allowRestart) {
     this.log(`▶ Configurazione disco ${disk} → ${mount}...`, 'ta');
     this.busy(true);
     try {
       const res = await api(`/nodes/${this.node}/qemu/${this.vmid}/setup-disk`, {
         method: 'POST',
-        body: JSON.stringify({ disk, mount_point: mount, sticky_bit: sticky }),
+        body: JSON.stringify({ disk, mount_point: mount, sticky_bit: sticky, allow_restart: allowRestart }),
         quiet: true
       });
       (res.log || []).forEach(l => this.log(l));
@@ -4399,6 +4399,18 @@ const DiskMgr = {
       toast(`Disco montato su ${res.mount_point}`, 'ok');
     } catch (e) {
       (e.body?.log || []).forEach(l => this.log(l));
+      if (e.body?.reason === 'restart_needed') {
+        // il guest non vede il disco: l'unico rimedio e' spegnere e riaccendere la VM, solo se l'utente lo vuole
+        this.log('⚠ Il disco non e\' stato rilevato nel guest.', 'tr');
+        this.busy(false);
+        askConfirm({
+          title: `Spegnere e riaccendere la VM ${this.vmid}?`,
+          lines: [`Il guest non vede il disco ${disk}: l'unico rimedio e' un riavvio completo della VM.`, `VM: ${this.vmid} · Nodo: ${this.node}`],
+          consequence: 'La VM viene spenta (ordinatamente, poi forzata se serve) e riaccesa: ci vuole fino a 2 minuti e i servizi nel guest si interrompono. Se il disco era gia\' configurato il riavvio e\' inutile: controlla prima nel guest.',
+          level: 'danger', okLabel: 'Spegni e riaccendi'
+        }, () => this.runSetup(disk, mount, sticky, true));
+        return;
+      }
       this.log(`✗ ${e.message}`, 'tr');
       toast(`Configurazione disco non riuscita: ${e.message}`, 'err');
     } finally {

@@ -13,12 +13,15 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 1 | Gruppi dai tag di Proxmox | report corretti (niente "gruppi" finti come `ubuntu`) | M | — | fatto e rilasciato (2026-11-04) |
 | 2 | Convertire le 22 assegnazioni GPU dirette ai mapping | l'app può gestire tutte le GPU | S (lavoro in Proxmox) | — | da fare |
 | 3 | Bilanciamento del cluster (proposte di spostamento VM) | nodi caricati in modo uguale (pareggio) | L | 1 (gruppi) utile, non bloccante | fatto (2026-11-04): algoritmo, pagina Bilanciamento, esecuzione passo-passo a caldo/a freddo (D50-D53), riserva minima per eseguire, filtro "solo queste VM" (D54), vincolo di produttore CPU per `cpu: host` (D55, dopo l'incidente della VM 109), revisione di sicurezza e prove reali (VM 109, 174) |
-| 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | in discussione: D56-D61 (2026-11-04) |
+| 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | fatto e rilasciato (2026-11-05): consiglio del nodo e delle schede, creazione guidata dal server, utente e disco aggiuntivi (D56-D67), nome e memoria delle schede modificabili (D62); da provare a mano l'utente con rete |
 | 4 | Uso reale delle GPU (`nvidia-smi`) | report su GPU assegnate ma inutilizzate | M | helper nei guest | da fare |
 | 5 | Coda richieste dell'intranet per i report | domanda non soddisfatta nei report manageriali | M | accesso/API intranet | da fare |
-| 6 | Correggere `setup-disk` (usa il disco richiesto) | evita formattazioni/riavvii inutili | S | — | da fare |
+| 6 | Correggere `setup-disk` (usa il disco richiesto) | evita formattazioni/riavvii inutili | S | — | fatto (2026-11-05), D68 A: slot controllato, riavvio solo con conferma |
 | 7 | Rifare la prova del fallback inline su Rocky SELinux | capire se gli helper sono davvero necessari | S | VM di prova | da fare |
 | 8 | `allowed_hosts` (anti DNS rebinding) | sicurezza dietro reverse proxy | S | decisione D14 | in discussione |
+| 9 | Errore JS aprendo direttamente `#/gpu` (`Gpu.summary`, gia' presente prima del 3b) | console pulita, nessun rischio di pagina vuota | S | — | da fare |
+| 10 | Controllo preventivo alla creazione VM: snippet `cicustom` presente sul nodo di destinazione; spazio anche per il volume clonato (non solo per il disco aggiuntivo) | niente VM lasciate spente a meta' | S | — | da fare |
+| 11 | Colonna "disco" della lista VM: oggi solo `/`, estendibile al disco piu' pieno | stessa informazione del pannello | S | — | da decidere |
 
 ## Dettaglio
 
