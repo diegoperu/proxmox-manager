@@ -873,16 +873,16 @@ D) **Uno storage condiviso** (CephFS) montato su tutti i nodi: nessuna copia den
 **Risposta utente**: Ho verificato, A. Altra feat da aggiungere in sequenza sulla roadmap: migrazione di una vm su un cluster diverso.
 
 ### D83 — Password in chiaro negli script di finalizzazione
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si' (prima di sincronizzare `finalize_image.sh`)
 **Domanda**: I sette `finalize_image.sh` (`debian`, `debian_13`, `rocky_8`, `rocky_9`, `ubuntu`, `ubuntu_24.04`, `ubuntu_26.04`) contengono in chiaro la password che `qm set --cipassword` mette nei template (per l'utente `tecnico`). Come la togliamo?
 **Perche' conta**: la sincronizzazione copierebbe la password su tutti i nodi e su altri cluster, e finirebbe in ogni backup e log. Nel repository non c'e' (`SUPPORT-FILES/` e' ignorata), ma e' comparsa nell'output di questa sessione di lavoro durante l'esame dei file.
 **Opzioni**: A) gli script leggono la password da un file `0600` fuori dalla cartella sincronizzata (per esempio `/root/.pmgr-template-secrets`), presente solo sui nodi dove si eseguono gli aggiornamenti; `finalize_image.sh` resta sincronizzabile; B) `finalize_image.sh` esclusi dalla sincronizzazione e lasciati solo sul nodo che aggiorna i template; C) A piu' cambio della password (la nuova non e' mai passata di qui).
 **Suggerimento**: A, e C a tua discrezione (la password attuale e' valida solo per l'utente `tecnico` dei template e le VM nuove la cambiano? da verificare con te).
-**Risposta utente**:
+**Risposta utente**: A, mi occuperó di cambiare la password in seguito
 
 ### D84 — Correzioni agli script di aggiornamento (prima di sincronizzarli)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: Posso correggere le copie in `SUPPORT-FILES/` (e poi tu le rimetti sul nodo-1) con queste modifiche? Elenco dopo la lettura:
 1. **Percorsi**: ovunque c'e' `/root/cloud-images` scritto a mano e in `ubuntu_24.04/*.sh` percorsi relativi (`./ubuntu_24.04/...`, funzionano solo lanciandoli da `/root/cloud-images`). Serve una cartella base unica (variabile `PMGR_BASE`, predefinita la cartella dello script) per poterli spostare.
@@ -895,5 +895,17 @@ D) **Uno storage condiviso** (CephFS) montato su tutti i nodi: nessuna copia den
 8. **Nessun controllo se un altro aggiornamento e' in corso** (lock) ne' log unico: 3 log in tutto, a mano.
 **Opzioni**: A) tutte e otto; B) solo 1-3 e 5-6 ora, il resto con il pulsante di aggiornamento (task successivo); C) solo quelle che servono alla sincronizzazione (1, 3, 4).
 **Suggerimento**: A, con un solo cambiamento per volta e prova su Magi prima di toccare il nodo-1.
+**Risposta utente**: A, tutto deve funzionare sul magi prima di qualsiasi cosa. Va gestito anche il fatto che ogni cluster puó avere nomi pool diverse o target dischi diversi. La sincronizzazione multicluster deve gestire in automatico la correzione degli script. Mi serve il tuo script idempotente per crearti l'acesso sul magi (puoi usare i file di supporto come sorgente senza toccare calcolo.). Il template presente sul nodo 1 del magi é cancellabile o rinominabile con un altro ID.
+
+### D85 — Script uguali ovunque, configurazione diversa per cluster
+**Stato**: APERTA
+**Bloccante**: si' (prima di correggere gli script)
+**Domanda**: Hai chiesto che la sincronizzazione tra cluster gestisca "in automatico la correzione degli script" (pool, storage, bridge, DNS, VMID diversi). Come?
+**Perche' conta**: se la sincronizzazione riscrivesse il testo degli script per ogni cluster, i file sulle destinazioni non avrebbero piu' lo stesso hash della sorgente: il manifest (D75 A) non potrebbe piu' dire "uguale", e uno script modificato in automatico e' codice eseguito come root che nessuno ha riletto.
+**Opzioni**:
+A) **Script identici ovunque, tutto cio' che cambia in un file `cluster.conf` locale a ogni cluster** (storage dei template, storage del cloud-init, bridge, DNS, dominio di ricerca, VMID di partenza, nome dell'utente, percorso del file con la password). `cluster.conf` e' **escluso dalla sincronizzazione**. La "correzione automatica" e' la **creazione di `cluster.conf`**: al primo uso su un cluster nuovo il manager legge dalle API storage e rete (per Magi: `dirac-sea` al posto di `datacloud-ssd`), propone i valori, tu li confermi in pagina e li scrive. Se `cluster.conf` manca o e' incompleto gli script si fermano senza toccare niente.
+B) Il manager riscrive gli script per ogni destinazione (sostituzione di nomi): sconsigliato per il motivo sopra.
+C) Come A, ma `cluster.conf` generato solo a mano.
+**Suggerimento**: A. Gli script restano uguali, controllabili con l'hash, e la parte "automatica" si limita a proporre i valori. Chi scrive `cluster.conf` sul nodo lo decidiamo allo step del backend (per ora lo crei tu o lo script di setup dal modello).
 **Risposta utente**:
 
