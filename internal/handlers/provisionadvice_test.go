@@ -259,3 +259,79 @@ func TestParseAdviceQuery(t *testing.T) {
 		}
 	}
 }
+
+func TestAdviceExtraDiskSpaceAndStorages(t *testing.T) {
+	f := newFakeProv()
+	// 'fast' on n2 has 5 GB free: a 10 GB disk misses 5 GB there, and n2 is not eligible; n1 has no 'fast'
+	q := adviceQuery{MemMB: 1024, Cores: 1, Storages: []string{"ceph"}, TemplateNode: "n1", Disk2GB: 10, Disk2Storage: "fast"}
+	r, err := buildAdvice(f, nil, "C", q, nil, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string][]string{}
+	missing := int64(0)
+	for _, n := range r.Nodes {
+		for _, re := range n.Reasons {
+			by[n.Name] = append(by[n.Name], re.Code)
+			if re.Code == adviceDisk2NoSpace {
+				missing = re.Missing
+			}
+		}
+	}
+	if !containsStr(by["n2"], adviceDisk2NoSpace) || missing != 5*(int64(1)<<30) || !containsStr(by["n1"], adviceDisk2Unavailable) || r.Recommended != "" {
+		t.Fatalf("%v missing=%d rec=%q", by, missing, r.Recommended)
+	}
+	// the default storage of the extra disk is the template's: ceph has room everywhere
+	q.Disk2Storage = ""
+	r, _ = buildAdvice(f, nil, "C", q, nil, time.Now())
+	if r.Recommended == "" {
+		t.Fatalf("%+v", r.Nodes)
+	}
+	// the storages offered per node: active and accepting VM disks (not the ISO-only one)
+	ids := func(node string) string {
+		out := []string{}
+		for _, s := range r.Storages[node] {
+			out = append(out, s.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	if ids("n1") != "ceph" || ids("n2") != "ceph,fast" {
+		t.Fatalf("n1=%s n2=%s", ids("n1"), ids("n2"))
+	}
+	for _, s := range r.Storages["n2"] {
+		if s.ID == "fast" && (s.Free != 5*(int64(1)<<30) || s.Total != 20*(int64(1)<<30)) {
+			t.Fatalf("%+v", s)
+		}
+	}
+	// without a disk nothing about disk2 is asked
+	r, _ = buildAdvice(f, nil, "C", adviceQuery{MemMB: 1024, Cores: 1}, nil, time.Now())
+	for _, n := range r.Nodes {
+		for _, re := range n.Reasons {
+			if strings.HasPrefix(re.Code, "disk2") {
+				t.Fatalf("disk2 reason without a disk: %+v", n)
+			}
+		}
+	}
+}
+
+func TestParseAdviceExtraDiskParams(t *testing.T) {
+	good := []string{"memory_mb", "4096", "cores", "4"}
+	q, err := parseAdviceQuery(query(append(good, "disk2_gb", "100", "disk2_storage", "datacloud-ssd")...))
+	if err != nil || q.Disk2GB != 100 || q.Disk2Storage != "datacloud-ssd" {
+		t.Fatalf("%v %+v", err, q)
+	}
+	if a, b := q.key(), (adviceQuery{MemMB: q.MemMB, Cores: q.Cores}).key(); a == b {
+		t.Fatal("the cache key ignores the extra disk")
+	}
+	for name, kv := range map[string][]string{
+		"zero":         append(good, "disk2_gb", "0"),
+		"too big":      append(good, "disk2_gb", "16385"),
+		"text":         append(good, "disk2_gb", "100G"),
+		"bad storage":  append(good, "disk2_storage", "a;b"),
+		"long storage": append(good, "disk2_storage", strings.Repeat("a", 65)),
+	} {
+		if _, err := parseAdviceQuery(query(kv...)); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}

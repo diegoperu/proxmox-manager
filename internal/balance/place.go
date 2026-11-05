@@ -23,9 +23,9 @@ type PlaceRequest struct {
 	Mem    int64    // assigned RAM, bytes (> 0)
 	VCPU   int      // > 0
 	Groups []string // groups of the new VM (soft preference to spread them, D49)
-	// Extra maps a node to the reasons the caller already knows (e.g. "storage_unavailable"): the node is
-	// not eligible, the reasons are copied as they are.
-	Extra map[string][]string
+	// Extra maps a node to the reasons the caller already knows (e.g. "storage_unavailable", or "disk2_no_space"
+	// with the bytes missing): the node is not eligible, the reasons are copied as they are.
+	Extra map[string][]PlaceReason
 }
 
 // PlaceReason is one reason, with the numbers behind it when there are any.
@@ -104,9 +104,7 @@ func Place(nodes []Node, vms []VM, req PlaceRequest, p Params) (PlaceResult, err
 		if n.in.Cores <= 0 || req.VCPU > n.in.Cores {
 			pn.Reasons = append(pn.Reasons, PlaceReason{Code: PlaceVCPUThreads, Need: req.VCPU, Have: n.in.Cores})
 		}
-		for _, code := range req.Extra[name] {
-			pn.Reasons = append(pn.Reasons, PlaceReason{Code: code})
-		}
+		pn.Reasons = append(pn.Reasons, req.Extra[name]...)
 		// the cluster spread and the CPU warnings with the VM on this node (online nodes only are destinations)
 		n.load += req.Mem
 		n.vcpu += req.VCPU
