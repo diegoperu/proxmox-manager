@@ -98,7 +98,7 @@ func (v VM) Key() string { return fmt.Sprintf("%s/%s/%d", v.Node, v.Kind, v.VMID
 type Params struct {
 	HostReserve  int64   // bytes per node for the host (default 8 GiB)
 	PerOSD       int64   // bytes per Ceph OSD (default 4 GiB)
-	CountStopped bool    // D45: stopped VMs count in the load (default true)
+	CountStopped bool    // D45: stopped VMs count in the load (default FALSE since 2026-11-05: a stopped VM uses no RAM)
 	Cold         bool    // D46: migration with shutdown/restart: LXC become movable
 	MaxSteps     int     // D47: balancing steps (evacuation steps are not capped)
 	VCPUPerCore  float64 // CPU warning: vCPU assigned per physical core
@@ -115,7 +115,7 @@ type Params struct {
 
 // DefaultParams are the values approved on 2026-11-03 (D43-D47).
 func DefaultParams() Params {
-	return Params{HostReserve: 8 * GiB, PerOSD: 4 * GiB, CountStopped: true, MaxSteps: 10,
+	return Params{HostReserve: 8 * GiB, PerOSD: 4 * GiB, CountStopped: false, MaxSteps: 10,
 		VCPUPerCore: 4, CPUWarnPct: 80, MinGainPts: 0.1}
 }
 

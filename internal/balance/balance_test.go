@@ -164,12 +164,17 @@ func TestStoppedVMsToggle(t *testing.T) {
 	off := vm("a", 1, 60, 1)
 	off.Running = false
 	vms := []VM{off, vm("b", 2, 20, 1)}
-	// default (D45 C): stopped VMs count, a is at 60%, b at 20%
-	if pl := mustPlan(t, nodes, vms, noReserve()); nodeState(pl, "a").PctBefore != 60 {
+	// the default does NOT count stopped VMs (since 2026-11-05, a stopped VM uses no RAM)
+	if DefaultParams().CountStopped {
+		t.Fatal("the default must not count stopped VMs")
+	}
+	// with the toggle on (D45), stopped VMs count: a is at 60%, b at 20%
+	on := noReserve()
+	on.CountStopped = true
+	if pl := mustPlan(t, nodes, vms, on); nodeState(pl, "a").PctBefore != 60 {
 		t.Fatalf("%#v", pl.Nodes)
 	}
 	p := noReserve()
-	p.CountStopped = false
 	pl := mustPlan(t, nodes, vms, p)
 	// a is at 0%, b at 20%: moving the 20 GB VM would only swap them, and the stopped VM never moves
 	if nodeState(pl, "a").PctBefore != 0 || len(pl.Steps) != 0 {

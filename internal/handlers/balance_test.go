@@ -299,3 +299,18 @@ func manyNodes(n int) string {
 	}
 	return strings.Join(l, ",")
 }
+
+func TestParseBalanceQueryStoppedVMsDefault(t *testing.T) {
+	q, err := parseBalanceQuery(query())
+	if err != nil || q.P.CountStopped {
+		t.Fatalf("default counts stopped VMs: %v %+v", err, q.P)
+	}
+	on, _ := parseBalanceQuery(query("count_stopped", "1"))
+	off, _ := parseBalanceQuery(query("count_stopped", "0"))
+	if !on.P.CountStopped || off.P.CountStopped {
+		t.Fatalf("explicit values ignored: %v %v", on.P.CountStopped, off.P.CountStopped)
+	}
+	if on.key() == off.key() {
+		t.Fatal("the cache key ignores count_stopped")
+	}
+}
