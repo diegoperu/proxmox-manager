@@ -76,7 +76,7 @@ func TestPlaceOfflineThreadsAndExtraReasons(t *testing.T) {
 	off.Online = false
 	small := node("small", 100, 4, 0)
 	nodes := []Node{off, small, node("ok", 100, 32, 0), node("nostorage", 100, 32, 0)}
-	r, err := Place(nodes, nil, PlaceRequest{Mem: GiB, VCPU: 8, Extra: map[string][]string{"nostorage": {"storage_unavailable"}}}, noReserve())
+	r, err := Place(nodes, nil, PlaceRequest{Mem: GiB, VCPU: 8, Extra: map[string][]PlaceReason{"nostorage": {{Code: "storage_unavailable"}, {Code: "disk2_no_space", Missing: 5 * GiB}}}}, noReserve())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestPlaceOfflineThreadsAndExtraReasons(t *testing.T) {
 	if rs := by["small"].Reasons; len(rs) != 1 || rs[0].Code != PlaceVCPUThreads || rs[0].Need != 8 || rs[0].Have != 4 {
 		t.Fatalf("%+v", by["small"])
 	}
-	if rs := by["nostorage"].Reasons; len(rs) != 1 || rs[0].Code != "storage_unavailable" {
+	if rs := by["nostorage"].Reasons; len(rs) != 2 || rs[0].Code != "storage_unavailable" || rs[1].Missing != 5*GiB {
 		t.Fatalf("%+v", by["nostorage"])
 	}
 }

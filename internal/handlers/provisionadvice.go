@@ -44,6 +44,10 @@ const (
 	adviceCardNoMapping      = "no_mapping"          // card: free but no resource mapping points to it
 	adviceCardNodeNotFit     = "node_not_eligible"   // card: its node cannot take the VM (reasons are on the node)
 	adviceCardReserved       = "card_reserved"       // card: free, but reserved by a creation in progress (soft lock)
+	// the extra disk (D64-D67): its own storage, which may differ from the template's
+	adviceDisk2Unavailable = "disk2_storage_unavailable" // the storage of the extra disk is not available on the node
+	adviceDisk2NoImages    = "disk2_storage_no_images"   // ... or cannot hold VM disks
+	adviceDisk2NoSpace     = "disk2_no_space"            // ... or has less free space than the disk (Missing = bytes)
 )
 
 var storageNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
@@ -55,10 +59,12 @@ type adviceQuery struct {
 	Storages     []string // storages of the template's volumes: all must be reachable from the node
 	TemplateNode string
 	Group        string
+	Disk2GB      int    // extra disk size in GB (0 = none)
+	Disk2Storage string // its storage; "" = the first of Storages (the template's)
 }
 
 func (q adviceQuery) key() string {
-	return fmt.Sprintf("%d|%d|%t|%s|%s|%s", q.MemMB, q.Cores, q.GPU, strings.Join(q.Storages, ","), q.TemplateNode, q.Group)
+	return fmt.Sprintf("%d|%d|%t|%s|%s|%s", q.MemMB, q.Cores, q.GPU, strings.Join(q.Storages, ","), q.TemplateNode, q.Group) + fmt.Sprintf("|%d|%s", q.Disk2GB, q.Disk2Storage)
 }
 
 func parseAdviceQuery(q func(string) string) (adviceQuery, error) {
@@ -98,6 +104,19 @@ func parseAdviceQuery(q func(string) string) (adviceQuery, error) {
 		}
 		out.TemplateNode = s
 	}
+	if s := q("disk2_gb"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > 16384 {
+			return out, errors.New("disk2_gb non valido (1 - 16384)")
+		}
+		out.Disk2GB = n
+	}
+	if s := q("disk2_storage"); s != "" {
+		if !storageNamePattern.MatchString(s) {
+			return out, errors.New("disk2_storage non valido")
+		}
+		out.Disk2Storage = s
+	}
 	if s := q("group"); s != "" {
 		if !groupPattern.MatchString(s) {
 			return out, errors.New("group non valido")
@@ -136,16 +155,27 @@ type adviceMeta struct {
 	Partial     []string `json:"partial"`
 }
 
+// adviceStorageOpt is a storage the form may offer for the extra disk on a node.
+type adviceStorageOpt struct {
+	ID     string `json:"id"`
+	Shared bool   `json:"shared"`
+	Free   int64  `json:"free"`  // bytes; -1 = not reported
+	Total  int64  `json:"total"` // bytes
+}
+
 type adviceResult struct {
 	balance.PlaceResult
-	Cards []adviceCard `json:"cards"`
-	Meta  adviceMeta   `json:"meta"`
+	Cards    []adviceCard                  `json:"cards"`
+	Storages map[string][]adviceStorageOpt `json:"storages"` // node -> active storages that accept VM disks
+	Meta     adviceMeta                    `json:"meta"`
 }
 
 type adviceStorage struct {
 	Shared bool
 	Images bool
 	Online bool
+	Free   int64 // maxdisk - disk in bytes; -1 = not reported by Proxmox
+	Total  int64
 }
 
 // reserved: node|addr of the cards reserved by creations in progress (they are shown, not selectable).
@@ -194,7 +224,14 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 				if storages[sn] == nil {
 					storages[sn] = map[string]adviceStorage{}
 				}
-				storages[sn][node] = adviceStorage{Shared: parseBoolish(r["shared"]), Images: containsStr(strings.Split(content, ","), "images"), Online: status == "available"}
+				free := int64(-1)
+				if total := intField(r, "maxdisk"); total > 0 {
+					free = total - intField(r, "disk")
+					if free < 0 {
+						free = 0
+					}
+				}
+				storages[sn][node] = adviceStorage{Shared: parseBoolish(r["shared"]), Images: containsStr(strings.Split(content, ","), "images"), Online: status == "available", Free: free, Total: intField(r, "maxdisk")}
 			}
 		case "qemu", "lxc":
 			vmid := int(intField(r, "vmid"))
@@ -236,7 +273,11 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 	}
 
 	// reasons known here, per node: storage, and a free card with a mapping when a GPU is wanted
-	extra := map[string][]string{}
+	extra := map[string][]balance.PlaceReason{}
+	d2Storage := q.Disk2Storage
+	if d2Storage == "" && len(q.Storages) > 0 {
+		d2Storage = q.Storages[0]
+	}
 	for _, n := range nodes {
 		seen := map[string]bool{}
 		for _, sid := range q.Storages {
@@ -252,7 +293,21 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 			}
 			if code != "" && !seen[code] {
 				seen[code] = true
-				extra[n.name] = append(extra[n.name], code)
+				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: code})
+			}
+		}
+		// the extra disk is a NEW volume: its storage only has to exist and be active on this node (a node local
+		// storage is fine), accept VM disks and have the space; space Proxmox does not report is not checked
+		if q.Disk2GB > 0 && d2Storage != "" {
+			st, ok := storages[d2Storage][n.name]
+			need := int64(q.Disk2GB) * balance.GiB
+			switch {
+			case !ok || !st.Online:
+				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceDisk2Unavailable})
+			case !st.Images:
+				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceDisk2NoImages})
+			case st.Free >= 0 && st.Free < need:
+				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceDisk2NoSpace, Missing: need - st.Free})
 			}
 		}
 	}
@@ -267,7 +322,7 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 		}
 		for _, n := range nodes {
 			if !freeOn[n.name] {
-				extra[n.name] = append(extra[n.name], adviceNoFreeGPU)
+				extra[n.name] = append(extra[n.name], balance.PlaceReason{Code: adviceNoFreeGPU})
 			}
 		}
 		if len(inv.Partial) > 0 {
@@ -282,7 +337,18 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 	if err != nil {
 		return adviceResult{}, err
 	}
-	res := adviceResult{PlaceResult: place, Cards: []adviceCard{}, Meta: meta}
+	opts := map[string][]adviceStorageOpt{}
+	for _, n := range nodes {
+		list := []adviceStorageOpt{}
+		for sid, per := range storages {
+			if st, ok := per[n.name]; ok && st.Online && st.Images {
+				list = append(list, adviceStorageOpt{ID: sid, Shared: st.Shared, Free: st.Free, Total: st.Total})
+			}
+		}
+		sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
+		opts[n.name] = list
+	}
+	res := adviceResult{PlaceResult: place, Cards: []adviceCard{}, Storages: opts, Meta: meta}
 	sort.Strings(res.Meta.Partial)
 	if q.GPU {
 		// a card is usable only if its node can take the VM; the recommended one sits on the best ranked node

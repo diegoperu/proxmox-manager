@@ -35,7 +35,9 @@ type fakeProv struct {
 	failStart    int // the next N start requests fail
 	onClone      func()
 	nextID       int
-	extraStorage bool // a non shared "local" storage on n1
+	extraStorage bool     // a non shared "local" storage on n1
+	blank        []string // devices the guest reports as blank (nil = ["vdb"])
+	setupExit    int
 }
 
 type fvm struct {
@@ -74,8 +76,11 @@ func (f *fakeProv) GetClusterResources(t string) (json.RawMessage, error) {
 		list = append(list,
 			map[string]interface{}{"type": "node", "node": "n1", "status": "online", "maxmem": g(100), "maxcpu": 16},
 			map[string]interface{}{"type": "node", "node": "n2", "status": "online", "maxmem": g(100), "maxcpu": 16},
-			map[string]interface{}{"type": "storage", "node": "n1", "storage": "ceph", "shared": 1, "status": "available", "content": "images"},
-			map[string]interface{}{"type": "storage", "node": "n2", "storage": "ceph", "shared": 1, "status": "available", "content": "images"})
+			map[string]interface{}{"type": "storage", "node": "n1", "storage": "ceph", "shared": 1, "status": "available", "content": "images", "maxdisk": g(1000), "disk": g(100)},
+			map[string]interface{}{"type": "storage", "node": "n2", "storage": "ceph", "shared": 1, "status": "available", "content": "images", "maxdisk": g(1000), "disk": g(100)},
+			// a small local storage on n2 (5 GB free) and an ISO-only one
+			map[string]interface{}{"type": "storage", "node": "n2", "storage": "fast", "shared": 0, "status": "available", "content": "images", "maxdisk": g(20), "disk": g(15)},
+			map[string]interface{}{"type": "storage", "node": "n1", "storage": "isos", "shared": 1, "status": "available", "content": "iso", "maxdisk": g(100), "disk": g(1)})
 		if f.extraStorage {
 			list = append(list, map[string]interface{}{"type": "storage", "node": "n1", "storage": "local", "shared": 0, "status": "available", "content": "images"})
 		}
@@ -301,6 +306,26 @@ func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, e
 	if strings.Contains(strings.Join(args, " "), "[ -x") {
 		return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":"INLINE\n"}`), nil
 	}
+	// the guest scripts: the sub command is what follows "pmgr" (inline) or the helper path
+	sub := ""
+	for i, a := range args {
+		if a == "pmgr" && i+1 < len(args) {
+			sub = strings.Join(args[i+1:], " ")
+		}
+	}
+	switch {
+	case sub == "find-blank":
+		devs := f.blank
+		if devs == nil {
+			devs = []string{"vdb"}
+		}
+		out, _ := json.Marshal(strings.Join(devs, " ") + "\n")
+		return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":` + string(out) + `}`), nil
+	case sub == "rescan":
+		return json.RawMessage(`{"exited":1,"exitcode":0}`), nil
+	case strings.HasPrefix(sub, "setup "):
+		return json.RawMessage(`{"exited":1,"exitcode":` + strconv.Itoa(f.setupExit) + `}`), nil
+	}
 	return json.RawMessage(`{"exited":1,"exitcode":` + strconv.Itoa(f.userExit) + `}`), nil
 }
 
@@ -311,6 +336,10 @@ func provFast(t *testing.T) {
 	coldFast(t)
 	old := provTiming
 	provTiming.Clone, provTiming.Task, provTiming.Agent, provTiming.AgentPoll = time.Second, time.Second, 40*time.Millisecond, 5*time.Millisecond
+	provTiming.DiskScanWait = time.Millisecond
+	oldPoll := guestPollInterval
+	guestPollInterval = 2 * time.Millisecond // each guest command polls for its result
+	t.Cleanup(func() { guestPollInterval = oldPoll })
 	t.Cleanup(func() { provTiming = old })
 	provReserved.Lock()
 	provReserved.m = map[string]string{}
@@ -803,5 +832,224 @@ func TestTemplateStorages(t *testing.T) {
 	})
 	if strings.Join(got, ",") != "ceph,fast,local" {
 		t.Fatalf("%v", got)
+	}
+}
+
+// ── extra disk (D64-D67) ──
+
+func withDisk(r provReq, gb int) provReq {
+	r.ExtraDisk = &provDisk{SizeGB: gb}
+	return r
+}
+
+func TestProvisionExtraDiskAttachedFormattedAndMounted(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	r := withDisk(baseReq(), 100)
+	r.ExtraDisk.MountPoint = "/dati"
+	j, err := startProv(f, 20, "C", mustPlanProv(t, r), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := waitProv(t, j)
+	if v.Result != provOK || len(v.Warnings) != 0 {
+		t.Fatalf("%+v", v)
+	}
+	// attached with the main disk's bus (virtio) in the first free slot, on the template's storage, before the start
+	if got := f.vms[200].cfg["virtio1"]; got != "ceph:100" {
+		t.Fatalf("virtio1 = %q (%v)", got, f.vms[200].cfg)
+	}
+	w := f.log()
+	if strings.Index(w, "config 200 virtio1=ceph:100") < 0 || strings.Index(w, "config 200 virtio1") > strings.Index(w, "start 200") {
+		t.Fatalf("disk not attached before the start:\n%s", w)
+	}
+	// formatted and mounted: the device and the mount point go as ARGUMENTS of the script, 1777 by default
+	var setup []string
+	for _, e := range f.execs {
+		for i, a := range e {
+			if a == "setup" {
+				setup = e[i:]
+			}
+		}
+	}
+	if len(setup) != 4 || setup[1] != "/dev/vdb" || setup[2] != "/dati" || setup[3] != "1777" {
+		t.Fatalf("setup args %q", setup)
+	}
+	steps := ""
+	for _, s := range v.Steps {
+		steps += s.Phase + ","
+	}
+	if !strings.Contains(steps, "disk2,") || !strings.HasSuffix(steps, "agent,mount,") {
+		t.Fatalf("steps %s", steps)
+	}
+}
+
+func TestProvisionExtraDiskFollowsTheMainDiskBusAndDefaults(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.vms[9000].cfg["scsi0"] = f.vms[9000].cfg["virtio0"]
+	delete(f.vms[9000].cfg, "virtio0")
+	r := withDisk(baseReq(), 10)
+	r.DiskDevice = "scsi0"
+	no := false
+	r.ExtraDisk.Sticky = &no
+	p := mustPlanProv(t, r)
+	if p.disk2Bus != "scsi" || p.disk2.MountPoint != "/data" || p.disk2Sticky {
+		t.Fatalf("%+v", p)
+	}
+	j, err := startProv(f, 20, "C", p, noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := waitProv(t, j); v.Result != provOK {
+		t.Fatalf("%+v", v)
+	}
+	if f.vms[200].cfg["scsi1"] != "ceph:10" {
+		t.Fatalf("%v", f.vms[200].cfg)
+	}
+	found := false
+	for _, e := range f.execs {
+		found = found || strings.Join(e, " ") == strings.Join(e, " ") && len(e) > 2 && e[len(e)-1] == "0777"
+	}
+	if !found {
+		t.Fatalf("0777 not passed: %q", f.execs)
+	}
+}
+
+func TestProvisionExtraDiskWithoutStartOnlyAttaches(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	r := withDisk(baseReq(), 10)
+	no := false
+	r.Start = &no
+	j, _ := startProv(f, 20, "C", mustPlanProv(t, r), noOpts, time.Now())
+	v := waitProv(t, j)
+	if v.Result != provWarnings || len(v.Warnings) != 1 || v.Warnings[0] != "mount_skipped" || f.vms[200].cfg["virtio1"] == "" || len(f.execs) != 0 {
+		t.Fatalf("%+v %v %q", v, f.vms[200].cfg, f.execs)
+	}
+}
+
+func TestProvisionExtraDiskMountProblemsAreWarningsAndNeverTouchTheWrongDisk(t *testing.T) {
+	provFast(t)
+	setupRan := func(f *fakeProv) bool {
+		for _, e := range f.execs {
+			for _, a := range e {
+				if a == "setup" {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for name, mod := range map[string]func(*fakeProv){
+		"no blank disk in the guest": func(f *fakeProv) { f.blank = []string{} },
+		"two blank disks":            func(f *fakeProv) { f.blank = []string{"vdb", "vdc"} },
+		"format fails":               func(f *fakeProv) { f.setupExit = 1 },
+	} {
+		f := newFakeProv()
+		mod(f)
+		r := withDisk(baseReq(), 10)
+		r.ExtraUser = &provUser{Username: "mario"}
+		j, _ := startProv(f, 20, "C", mustPlanProv(t, r), noOpts, time.Now())
+		v := waitProv(t, j)
+		// the VM is created and running, the user was created, the failure is a warning
+		if v.Result != provWarnings || len(v.Warnings) != 1 || v.Warnings[0] != "mount_failed" || f.vms[200].status != "running" {
+			t.Errorf("%s: %+v", name, v)
+		}
+		userDone := false
+		for _, s := range v.Steps {
+			userDone = userDone || (s.Phase == provPhUser && s.OK)
+		}
+		if !userDone {
+			t.Errorf("%s: the user was skipped because of the disk", name)
+		}
+		if name != "format fails" && setupRan(f) {
+			t.Errorf("%s: formatted something", name)
+		}
+		for _, a := range f.writes {
+			if strings.HasPrefix(a, "stop") || strings.HasPrefix(a, "shutdown") {
+				t.Errorf("%s: the VM was stopped to make the disk appear: %s", name, a)
+			}
+		}
+	}
+}
+
+func TestProvisionExtraDiskAgentNeverAnswersWarnsOnce(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.agentUp = false
+	j, _ := startProv(f, 20, "C", mustPlanProv(t, withDisk(baseReq(), 10)), noOpts, time.Now())
+	v := waitProv(t, j)
+	if v.Result != provWarnings || len(v.Warnings) != 1 || v.Warnings[0] != "agent_timeout" || f.vms[200].cfg["virtio1"] == "" {
+		t.Fatalf("%+v", v)
+	}
+	if note := v.Steps[len(v.Steps)-1].Note; !strings.Contains(note, "montaggio del disco") || !strings.Contains(note, "20 minuti") {
+		t.Fatalf("note %q", note)
+	}
+}
+
+func TestProvisionExtraDiskStorageAndSpaceRefusals(t *testing.T) {
+	provFast(t)
+	cases := map[string]struct {
+		mut    func(*provReq)
+		reason string
+	}{
+		"not enough space on the chosen storage": {func(r *provReq) { r.ExtraDisk.Storage, r.ExtraDisk.SizeGB = "fast", 10 }, adviceDisk2NoSpace},
+		"storage that does not exist":            {func(r *provReq) { r.ExtraDisk.Storage = "nope" }, adviceDisk2Unavailable},
+		"storage without VM disks":               {func(r *provReq) { r.ExtraDisk.Storage = "isos" }, adviceDisk2Unavailable}, // isos is on n1 only, not on n2
+	}
+	for name, c := range cases {
+		f := newFakeProv()
+		r := withDisk(baseReq(), 10)
+		c.mut(&r)
+		_, err := startProv(f, 21, "C", mustPlanProv(t, r), noOpts, time.Now())
+		var ref *provRefusal
+		if !errors.As(err, &ref) || ref.Reason != "node_not_eligible" || !containsStr(ref.Reasons, c.reason) {
+			t.Errorf("%s: %v %+v", name, err, ref)
+		}
+		if w := f.log(); w != "" {
+			t.Errorf("%s: written:\n%s", name, w)
+		}
+	}
+	// a small local storage is fine for a disk that fits (5 GB free, 4 asked)
+	f := newFakeProv()
+	r := withDisk(baseReq(), 4)
+	r.ExtraDisk.Storage = "fast"
+	j, err := startProv(f, 21, "C", mustPlanProv(t, r), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := waitProv(t, j); v.Result != provOK || f.vms[200].cfg["virtio1"] != "fast:4" {
+		t.Fatalf("%+v %v", v, f.vms[200].cfg)
+	}
+}
+
+func TestValidateProvExtraDisk(t *testing.T) {
+	for name, d := range map[string]*provDisk{
+		"zero":        {SizeGB: 0},
+		"too big":     {SizeGB: 16385},
+		"bad storage": {SizeGB: 5, Storage: "a;b"},
+		"system dir":  {SizeGB: 5, MountPoint: "/etc"},
+		"under var":   {SizeGB: 5, MountPoint: "/var/lib"},
+		"relative":    {SizeGB: 5, MountPoint: "data"},
+		"traversal":   {SizeGB: 5, MountPoint: "/data/../etc"},
+		"shell chars": {SizeGB: 5, MountPoint: "/data;rm"},
+	} {
+		r := baseReq()
+		r.ExtraDisk = d
+		if _, err := validateProvReq(r); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	r := baseReq()
+	r.DiskDevice = "ide0" // an ide main disk: the extra one still gets a bus with slots
+	r.ExtraDisk = &provDisk{SizeGB: 5}
+	if p, err := validateProvReq(r); err != nil || p.disk2Bus != "virtio" {
+		t.Fatalf("%v %+v", err, p)
+	}
+	r = baseReq()
+	r.DiskDevice = ""
+	if p, err := validateProvReq(r); err != nil || p.DiskDevice != "virtio0" {
+		t.Fatalf("default disk device: %v %+v", err, p)
 	}
 }

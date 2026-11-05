@@ -352,9 +352,11 @@ class H(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", "0") or 0)
             cmd = parse_qs(self.rfile.read(min(n, 65536)).decode()).get("command", [])
             pid = 1000 + len(EXEC)
-            if any("-x" in c and "HELPER" in c for c in cmd):
+            if "pmgr" in cmd and cmd[cmd.index("pmgr") + 1:] == ["find-blank"]:  # script del disco: un solo disco vuoto
+                EXEC[pid] = (0, "vdb\n")
+            elif any("-x" in c and "HELPER" in c for c in cmd):
                 EXEC[pid] = (0, "INLINE\n")
-            elif "pmgr" in cmd and len(cmd) >= 6:
+            elif "pmgr" in cmd and len(cmd) >= 6 and cmd[-2].isdigit():  # solo dmesg (righe, livello)
                 a_lines, a_level = int(cmd[-2]), cmd[-1]
                 EXEC[pid] = (0, fake_dmesg(a_lines, a_level))
             else:

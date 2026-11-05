@@ -858,7 +858,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.146.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.147.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1104,7 +1104,7 @@ html.spiderman{
               </div>
               <div class="fr">
                 <label class="fl" for="pv-diskdev">Disco device</label>
-                <input class="inp w" id="pv-diskdev" type="text" value="scsi0">
+                <input class="inp w" id="pv-diskdev" type="text" value="virtio0">
               </div>
             </div>
             <div class="fr" style="margin-top:12px">
@@ -1165,7 +1165,30 @@ html.spiderman{
               <label class="fl" for="pv-xkey">Chiave pubblica SSH <span class="td">(opzionale)</span></label>
               <textarea class="inp w" id="pv-xkey" rows="2" placeholder="ssh-ed25519 AAAA... (vuota = password iniziale)" style="resize:vertical;font-family:monospace;font-size:11px"></textarea>
             </div>
-            <div class="hint" id="pv-xhint">Si crea con il guest agent, come il pulsante "Aggiungi utente" della VM: senza chiave la password iniziale e' <code>p4ssw0rd</code> e scade al primo accesso. Serve che la VM si avvii e l'agent risponda (si attende fino a 10 minuti; se non risponde la VM resta creata e l'utente si aggiunge dal pannello).</div>
+            <div class="hint" id="pv-xhint">Si crea con il guest agent, come il pulsante "Aggiungi utente" della VM: senza chiave la password iniziale e' <code>p4ssw0rd</code> e scade al primo accesso. Serve che la VM si avvii e l'agent risponda (si attende fino a 20 minuti, il primo avvio puo' essere lento; se non risponde la VM resta creata e l'utente si aggiunge dal pannello).</div>
+          </div>
+
+          <h2 class="sec">Disco aggiuntivo <small>opzionale, un secondo disco creato, formattato e montato nella VM</small></h2>
+          <div class="card mb14">
+            <label class="pv-opt" for="pv-d2on"><input type="checkbox" class="chk" id="pv-d2on" onchange="Provision.onDisk2()"> Aggiungi un secondo disco</label>
+            <div id="pv-d2" hidden style="margin-top:12px">
+              <div class="g g2 g8 mb12">
+                <div class="fr">
+                  <label class="fl" for="pv-d2gb">Dimensione (GB)</label>
+                  <input class="inp w" id="pv-d2gb" type="number" min="1" max="16384" step="1" value="50">
+                </div>
+                <div class="fr">
+                  <label class="fl" for="pv-d2st">Storage</label>
+                  <select class="inp w" id="pv-d2st" onchange="Provision.onDisk2()"><option value="">come il disco del template</option></select>
+                </div>
+              </div>
+              <div class="fr mb12">
+                <label class="fl" for="pv-d2mp">Cartella di montaggio</label>
+                <input class="inp w" id="pv-d2mp" type="text" maxlength="64" value="/data" autocomplete="off" spellcheck="false" aria-describedby="pv-d2hint">
+              </div>
+              <label class="pv-opt mb12" for="pv-d2sticky"><input type="checkbox" class="chk" id="pv-d2sticky" checked> Permessi aperti a tutti (1777, con sticky bit)</label>
+              <div class="hint" id="pv-d2hint">Il disco usa lo stesso bus del disco principale. Dopo l'avvio e l'attesa del guest agent viene partizionato (GPT), formattato ext4 e montato in <code>/etc/fstab</code>, come il pulsante "Aggiungi disco" della VM; senza avvio o senza agent resta collegato e vuoto e si formatta dal pannello. Cartelle di sistema (<code>/etc</code>, <code>/var</code>, <code>/home</code>…) non sono ammesse.</div>
+            </div>
           </div>
 
           <h2 class="sec">4. Esegui</h2>
@@ -4359,7 +4382,7 @@ const Provision=(()=>{
   let templates=[], gwManual=false;
   // consiglio del nodo (GET /provision/advice): ultima risposta, scelta dell'utente, sequenza per scartare risposte superate
   let adv=null, advSeq=0, advTimer=null, manualNode='', manualCard='', job=null;
-  const GB=1073741824, LABEL={clone:'Clonazione del template sul nodo scelto',config:'Core e RAM',disk:'Dimensione del disco',cloudinit:'Cloud-init',group:'Gruppo',gpu:'Scheda video',start:'Avvio',agent:'Attesa del guest agent',user:'Utente aggiuntivo'};
+  const GB=1073741824, LABEL={clone:'Clonazione del template sul nodo scelto',config:'Core e RAM',disk:'Dimensione del disco',disk2:'Disco aggiuntivo collegato',mount:'Disco aggiuntivo formattato e montato',cloudinit:'Cloud-init',group:'Gruppo',gpu:'Scheda video',start:'Avvio',agent:'Attesa del guest agent',user:'Utente aggiuntivo'};
   const gbTxt=b=>{const g=b/GB;return g>=10?String(Math.ceil(g)):String(Math.ceil(g*10)/10).replace('.',',');};
   const REASON=r=>{switch(r.code){
     case 'node_offline':return'nodo fuori linea';
@@ -4369,12 +4392,17 @@ const Provision=(()=>{
     case 'storage_not_shared':return'lo storage del template non e\' condiviso: serve il nodo del template';
     case 'storage_no_images':return'lo storage non puo\' contenere dischi di VM';
     case 'no_free_gpu':return'nessuna scheda libera con un mapping';
+    case 'disk2_storage_unavailable':return'lo storage del disco aggiuntivo non e\' disponibile su questo nodo';
+    case 'disk2_storage_no_images':return'lo storage del disco aggiuntivo non accetta dischi di VM';
+    case 'disk2_no_space':return`mancano ${gbTxt(r.missing||0)} GB di spazio per il disco aggiuntivo`;
     default:return String(r.code);}};
   const CARD_REASON={card_busy:'in uso',no_mapping:'nessun mapping: la app assegna solo tramite mapping',card_reserved:'in creazione (prenotata da un\'altra creazione)',node_not_eligible:'il suo nodo non puo\' ricevere la VM'};
   const WARN={cpu_vcpu:'molte vCPU gia\' assegnate (oltre 4 per thread)',cpu_p95:'CPU reale gia\' alta (oltre l\'80%)'};
   const val=id=>document.getElementById(id).value.trim();
   const tplNow=()=>templates[parseInt(document.getElementById('tpl-select').value)];
   // storage di tutti i volumi del template (dischi, EFI, TPM, cloud-init, ISO): come il controllo del server
+  // storage del disco principale del template (default del disco aggiuntivo, D65 A)
+  const tplMainStorage=tpl=>{const d=tpl&&tpl.config&&tpl.config[val('pv-diskdev')||'virtio0'];const i=typeof d==='string'?d.indexOf(':'):-1;return i>0?d.slice(0,i):'';};
   const tplStorages=tpl=>{const out=new Set();if(!tpl||!tpl.config)return[];for(const[k,v]of Object.entries(tpl.config)){if(!/^((virtio|scsi|sata|ide)\d{1,2}|efidisk\d|tpmstate\d)$/.test(k)||typeof v!=='string'||v.startsWith('none'))continue;const i=v.indexOf(':');if(i>0&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v.slice(0,i)))out.add(v.slice(0,i));}return[...out].sort().slice(0,8);};
 
   return{
@@ -4427,7 +4455,7 @@ const Provision=(()=>{
       if(tpl.config){
         try{
           const cfg=tpl.config;
-          const dev=document.getElementById('pv-diskdev').value||'scsi0';
+          const dev=document.getElementById('pv-diskdev').value||'virtio0';
           if(cfg[dev]){
             diskInfo=cfg[dev];
             const m=cfg[dev].match(/size=(\d+)G/);
@@ -4458,14 +4486,14 @@ const Provision=(()=>{
       info.innerHTML=`
         <div><span class="td">Template:</span> <strong>${esc(tpl.name)}</strong> (VMID ${esc(tpl.vmid)})</div>
         <div><span class="td">Nodo:</span> ${esc(tpl.node)}</div>
-        <div><span class="td">Disco (${esc(document.getElementById('pv-diskdev').value||'scsi0')}):</span> ${esc(diskInfo)}</div>`;
+        <div><span class="td">Disco (${esc(document.getElementById('pv-diskdev').value||'virtio0')}):</span> ${esc(diskInfo)}</div>`;
     },
 
     // Se l'utente scrive un gateway proprio, l'auto-calcolo dall'IP non lo sovrascrive più.
     onGw(el){gwManual=el.value.trim()!=='';Provision.summary();},
     bind(){
       const pg=document.getElementById('page-provision');
-      const ADV=new Set(['pv-cpu','pv-ram','tpl-select','pv-diskdev','pv-group','pv-gpu']);
+      const ADV=new Set(['pv-cpu','pv-ram','tpl-select','pv-diskdev','pv-group','pv-gpu','pv-d2gb']);
       const on=e=>{Provision.summary();if(e&&e.target&&ADV.has(e.target.id))Provision.schedule();};
       pg.addEventListener('input',on);
       pg.addEventListener('change',on);
@@ -4485,6 +4513,7 @@ const Provision=(()=>{
       line(`Rete: ${g('pv-ip')||'IP non impostato'}${g('pv-gw')?' via '+g('pv-gw'):''}`);
       if(g('pv-group'))line(`Gruppo: ${g('pv-group')}`);
       if(g('pv-xuser'))line(`Utente aggiuntivo: ${g('pv-xuser')}`);
+      {const d2=Provision.disk2();if(d2)line(`Disco aggiuntivo: ${d2.size_gb} GB su ${d2.storage||'lo storage del template'}, montato in ${d2.mount_point}`);}
       line(document.getElementById('pv-start').checked?'Alla fine la VM viene avviata.':'La VM resta spenta.');
     },
 
@@ -4543,13 +4572,34 @@ const Provision=(()=>{
       const p=new URLSearchParams({memory_mb:String(Math.round(ram*1024)),cores:String(cores),template_node:tpl.node});
       const st=tplStorages(tpl); if(st.length)p.set('storage',st.join(','));
       if(document.getElementById('pv-gpu').checked)p.set('gpu','1');
+      const d2=Provision.disk2(); if(d2){p.set('disk2_gb',String(d2.size_gb));const st2=d2.storage||tplMainStorage(tpl);if(st2)p.set('disk2_storage',st2);}
       const gp=Groups.parse(val('pv-group')); if(gp.ok&&gp.groups.length===1)p.set('group',gp.groups[0]);
       box.innerHTML='<span class="td">Calcolo del nodo consigliato…</span>';
       let r;
       try{r=await api('/provision/advice?'+p,{quiet:true,timeoutMs:60000});}
       catch(e){if(seq!==advSeq)return;adv=null;box.innerHTML=e.status===429?errBox('Un altro calcolo e\' in corso su questo cluster.','Provision.advice()'):errBox(e.message,'Provision.advice()');Provision.summary();return;}
       if(seq!==advSeq)return;
-      adv=r; Provision.paintWhere(); Provision.summary();
+      adv=r; Provision.paintWhere(); Provision.fillStorages(); Provision.summary();
+    },
+    // ── disco aggiuntivo ──
+    // null se la sezione e' spenta o i valori non sono validi; il server ripete ogni controllo
+    disk2(){
+      if(!document.getElementById('pv-d2on').checked)return null;
+      const gb=parseInt(val('pv-d2gb'),10);
+      if(!Number.isInteger(gb)||gb<1||gb>16384)return null;
+      return{size_gb:gb,storage:val('pv-d2st'),mount_point:val('pv-d2mp')||'/data',sticky_bit:document.getElementById('pv-d2sticky').checked};
+    },
+    onDisk2(){document.getElementById('pv-d2').hidden=!document.getElementById('pv-d2on').checked;Provision.schedule();Provision.summary();},
+    // gli storage del nodo scelto che accettano dischi di VM, con lo spazio libero
+    fillStorages(){
+      const sel=document.getElementById('pv-d2st'); if(!sel)return;
+      const cur=sel.value, node=Provision.target(), list=(adv&&adv.storages&&adv.storages[node])||[];
+      sel.replaceChildren(new Option('come il disco del template',''));
+      for(const st of list){
+        const free=st.free>=0?` · liberi ${gbTxt(st.free)} GB`:'';
+        sel.append(new Option(`${st.id}${st.shared?' (condiviso)':''}${free}`,st.id));
+      }
+      sel.value=[...sel.options].some(o=>o.value===cur)?cur:'';
     },
     paintWhere(){
       const box=document.getElementById('pv-where'), gpu=document.getElementById('pv-gpu').checked, cur=Provision.target(), card=Provision.card();
@@ -4579,8 +4629,8 @@ const Provision=(()=>{
       if((adv.meta.partial||[]).length)html+=`<p class="cnote" style="margin-top:8px">Dati non letti del tutto: ${esc(adv.meta.partial.join(', '))}. Il server ricontrolla tutto prima di creare.</p>`;
       box.innerHTML=html;
     },
-    pickNode(n){manualNode=n;Provision.paintWhere();Provision.summary();},
-    pickCard(k){manualCard=k;Provision.paintWhere();Provision.summary();},
+    pickNode(n){manualNode=n;Provision.paintWhere();Provision.fillStorages();Provision.summary();},
+    pickCard(k){manualCard=k;Provision.paintWhere();Provision.fillStorages();Provision.summary();},
 
     // ── creazione: il server guida la procedura, qui si legge solo lo stato ──
     _grpOk:false,
@@ -4608,7 +4658,7 @@ const Provision=(()=>{
         template_node: tpl.node, template_vmid: tpl.vmid, target_node: node,
         new_vmid: parseInt(val('pv-vmid'))||0, name: vmName,
         cores: parseInt(val('pv-cpu'))||2, memory: Math.round((parseFloat(val('pv-ram'))||4)*1024),
-        disk_gb: parseInt(val('pv-disk'))||0, disk_device: val('pv-diskdev')||'scsi0',
+        disk_gb: parseInt(val('pv-disk'))||0, disk_device: val('pv-diskdev')||'virtio0',
         ip: val('pv-ip'), gateway: val('pv-ip')?val('pv-gw'):'', dns: val('pv-dns'),
         ciuser: val('pv-user'), cipassword: document.getElementById('pv-pass').value, ssh_keys: document.getElementById('pv-ssh').value,
         group: grp, group_new: grpNew,
@@ -4616,6 +4666,11 @@ const Provision=(()=>{
         start: document.getElementById('pv-start').checked,
       };
       if(xuser)payload.extra_user={username:xuser,ssh_key:document.getElementById('pv-xkey').value.trim()};
+      if(document.getElementById('pv-d2on').checked){
+        const d2=Provision.disk2();
+        if(!d2){toast('Disco aggiuntivo: la dimensione deve essere un numero tra 1 e 16384 GB','err');document.getElementById('pv-d2gb').focus();return;}
+        payload.extra_disk=d2;
+      }
       const doCreate=async()=>{
         const btn=document.getElementById('pv-btn'), log=document.getElementById('pv-log');
         btn.disabled=true; btn.textContent='Creazione in corso...'; log.replaceChildren();
@@ -4651,7 +4706,7 @@ const Provision=(()=>{
       const nodes=[line(`VM ${v.vmid} · ${v.name} · ${v.node}`)];
       for(const s of v.steps)nodes.push(line(`${s.ok?'✓':'⚠'} ${LABEL[s.phase]||s.phase}${s.note?' — '+s.note:''}`,s.ok?'ok':'wn'));
       if(v.phase!=='done'){nodes.push(line(`▶ ${LABEL[v.phase]||v.phase}…`));log.replaceChildren(...nodes);setTimeout(Provision.pollJob,2000);return;}
-      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto: l\'utente aggiuntivo si aggiunge dal pannello della VM (Aggiungi utente).',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.'};
+      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto in 20 minuti: utente e montaggio del disco si fanno dal pannello della VM (Aggiungi utente, Aggiungi disco).',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.',mount_failed:'Il disco aggiuntivo e\' collegato ma non formattato o montato: completalo dal pannello della VM (Aggiungi disco).',mount_skipped:'Il disco aggiuntivo e\' collegato ma vuoto, perche\' la VM non e\' stata avviata: si formatta dal pannello della VM.'};
       for(const w of v.warnings)nodes.push(line('⚠ '+(Object.hasOwn(WTXT,w)?WTXT[w]:w),'wn'));
       if(v.result==='failed'){
         nodes.push(line(`✗ La creazione si e' fermata alla fase "${LABEL[v.failed_phase]||v.failed_phase}".`,'er'));

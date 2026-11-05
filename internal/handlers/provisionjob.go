@@ -48,14 +48,18 @@ var provTiming = struct {
 	Task      time.Duration // other tasks (start)
 	Agent     time.Duration // one wait for the guest agent (D61: two of them)
 	AgentPoll time.Duration
-	Keep      time.Duration // a finished procedure stays readable this long
-}{15 * time.Minute, 5 * time.Minute, 5 * time.Minute, 10 * time.Second, time.Hour}
+	// DiskScanWait: pause between two searches for the new disk in the guest
+	DiskScanWait time.Duration
+	Keep         time.Duration // a finished procedure stays readable this long
+}{15 * time.Minute, 5 * time.Minute, 10 * time.Minute, 10 * time.Second, 2 * time.Second, time.Hour}
 
 // phases and results (codes: the page writes the sentences)
 const (
 	provPhClone     = "clone"
 	provPhConfig    = "config"
 	provPhDisk      = "disk"
+	provPhDisk2     = "disk2" // the extra disk is attached to the VM
+	provPhMount     = "mount" // ... and formatted and mounted in the guest
 	provPhCloudInit = "cloudinit"
 	provPhGroup     = "group"
 	provPhGPU       = "gpu"
@@ -101,19 +105,33 @@ type provReq struct {
 	GPUMapping   string    `json:"gpu_mapping"` // "" = no GPU
 	Start        *bool     `json:"start"`       // default true (decision 2026-11-03)
 	ExtraUser    *provUser `json:"extra_user"`
+	ExtraDisk    *provDisk `json:"extra_disk"`
+}
+
+// provDisk is the extra disk (D64 B, D65 A, D66 A, D67 A): a new volume of SizeGB on Storage (default: the
+// template's storage), attached with the bus of the main disk, then formatted and mounted on MountPoint.
+type provDisk struct {
+	SizeGB     int    `json:"size_gb"`
+	Storage    string `json:"storage"`
+	MountPoint string `json:"mount_point"` // default /data
+	Sticky     *bool  `json:"sticky_bit"`  // default true: permissions 1777
 }
 
 // provPlan is the validated request, ready to be executed.
 type provPlan struct {
 	provReq
-	start    bool
-	groups   []string
-	ipcfg    string // ipconfig0 value or ""
-	dns      string
-	sshKeys  string // normalised, one per line
-	extraKey string
-	storage  string // storage of the template's disk
-	curDisk  int    // GB of the template's disk
+	start       bool
+	groups      []string
+	ipcfg       string // ipconfig0 value or ""
+	dns         string
+	sshKeys     string // normalised, one per line
+	extraKey    string
+	disk2       *provDisk // validated copy, defaults filled
+	disk2Sticky bool
+	disk2Store  string // resolved storage of the extra disk
+	disk2Bus    string // bus of the main disk (virtio, scsi, sata)
+	storage     string // storage of the template's disk
+	curDisk     int    // GB of the template's disk
 }
 
 func validateProvReq(r provReq) (provPlan, error) {
@@ -141,7 +159,7 @@ func validateProvReq(r provReq) (provPlan, error) {
 		return bad("disco (GB)")
 	}
 	if p.DiskDevice == "" {
-		p.DiskDevice = "scsi0"
+		p.DiskDevice = "virtio0"
 	}
 	if !diskDevPattern.MatchString(p.DiskDevice) {
 		return bad("dispositivo del disco")
@@ -218,6 +236,27 @@ func validateProvReq(r provReq) (provPlan, error) {
 	}
 	if r.GPUMapping != "" && !mappingPat.MatchString(r.GPUMapping) {
 		return bad("mapping della GPU")
+	}
+	if r.ExtraDisk != nil {
+		d := *r.ExtraDisk
+		if d.SizeGB < 1 || d.SizeGB > 16384 {
+			return bad("dimensione del disco aggiuntivo (1 - 16384 GB)")
+		}
+		if d.Storage != "" && !storageNamePattern.MatchString(d.Storage) {
+			return bad("storage del disco aggiuntivo")
+		}
+		if d.MountPoint == "" {
+			d.MountPoint = "/data"
+		}
+		if err := validateMountPoint(d.MountPoint); err != nil {
+			return provPlan{}, err
+		}
+		p.disk2, p.disk2Sticky, p.disk2Store = &d, d.Sticky == nil || *d.Sticky, d.Storage
+		bus := strings.TrimRight(p.DiskDevice, "0123456789")
+		if _, ok := diskSlotLimits[bus]; !ok {
+			bus = "virtio" // an ide main disk: the extra disk still gets a bus with enough slots
+		}
+		p.disk2Bus = bus
 	}
 	if r.ExtraUser != nil {
 		if !validUsername.MatchString(r.ExtraUser.Username) {
@@ -528,7 +567,13 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 		}
 		inv = &fresh
 	}
+	if p.disk2 != nil && p.disk2Store == "" {
+		p.disk2Store = p.storage // D65 A: by default the template's storage
+	}
 	q := adviceQuery{MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storages: storages, TemplateNode: p.TemplateNode}
+	if p.disk2 != nil {
+		q.Disk2GB, q.Disk2Storage = p.disk2.SizeGB, p.disk2Store
+	}
 	if len(p.groups) > 0 {
 		q.Group = p.groups[0]
 	}
@@ -708,6 +753,32 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		j.step(provPhDisk, true, "")
 	}
 
+	// 3b. extra disk: a new volume attached with the main disk's bus, first free slot
+	if p.disk2 != nil {
+		j.enter(provPhDisk2)
+		raw, err := c.GetVMConfig(node, vmid)
+		var cfg map[string]interface{}
+		if err != nil || json.Unmarshal(raw, &cfg) != nil {
+			j.fail(provPhDisk2, coldMsg("configurazione della VM non leggibile"))
+			return
+		}
+		slot, err := nextDiskSlot(cfg, p.disk2Bus)
+		if err != nil {
+			j.fail(provPhDisk2, coldMsg(err.Error()))
+			return
+		}
+		// the digest makes Proxmox refuse if anyone changed the VM since we read it
+		params := url.Values{slot: {fmt.Sprintf("%s:%d", p.disk2Store, p.disk2.SizeGB)}}
+		if d, _ := cfg["digest"].(string); d != "" {
+			params.Set("digest", d)
+		}
+		if _, err := c.VMSetConfig(node, vmid, params); err != nil {
+			j.fail(provPhDisk2, err)
+			return
+		}
+		j.step(provPhDisk2, true, fmt.Sprintf("%s = %s:%d GB", slot, p.disk2Store, p.disk2.SizeGB))
+	}
+
 	// 4. cloud-init (values validated; the password and the keys are never logged)
 	ci := url.Values{}
 	if p.ipcfg != "" {
@@ -769,6 +840,9 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		j.card = ""
 	}
 	if !p.start {
+		if p.disk2 != nil { // formatting needs the guest: the disk stays attached and empty
+			j.warn("mount_skipped", provPhMount, coldMsg("la VM non e' stata avviata: il disco e' collegato ma non formattato"))
+		}
 		j.finish()
 		return
 	}
@@ -780,12 +854,14 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		return
 	}
 	j.step(provPhStart, true, "")
-	if p.ExtraUser == nil {
+	mountWanted := p.disk2 != nil
+	if p.ExtraUser == nil && !mountWanted {
 		j.finish()
 		return
 	}
 
-	// 8. guest agent: up to 5 minutes, then a second wait of 5 minutes (D61 C)
+	// 8. guest agent: up to 10 minutes, then a second wait of 10 minutes (D61 C; the first boot of a template
+	// that updates itself can take longer than 5 minutes before the agent answers)
 	j.enter(provPhAgent)
 	useHelper, ready := false, false
 	for attempt := 0; attempt < 2 && !ready; attempt++ {
@@ -799,24 +875,49 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		}
 	}
 	if !ready {
-		j.warn("agent_timeout", provPhAgent, coldMsg("il guest agent non ha risposto in 10 minuti: l'utente aggiuntivo si aggiunge dal pannello della VM"))
+		what := "i passi dentro la VM"
+		switch {
+		case p.ExtraUser != nil && mountWanted:
+			what = "l'utente aggiuntivo e il montaggio del disco"
+		case p.ExtraUser != nil:
+			what = "l'utente aggiuntivo"
+		case mountWanted:
+			what = "il montaggio del disco"
+		}
+		j.warn("agent_timeout", provPhAgent, coldMsg("il guest agent non ha risposto in 20 minuti: "+what+" si fanno dal pannello della VM"))
 		j.finish()
 		return
 	}
 	j.step(provPhAgent, true, "")
 
 	// 9. additional user: same script and rules as the "Aggiungi utente" button
-	j.enter(provPhUser)
-	res, err := addUserTool.run(c, node, vmid, useHelper, []string{p.ExtraUser.Username, p.extraKey}, 30*time.Second)
-	switch {
-	case err != nil:
-		j.warn("user_failed", provPhUser, agentError(err))
-	case res.ExitCode == 3:
-		j.warn("user_exists", provPhUser, coldMsg("l'utente esiste gia' nella VM: nessuna modifica"))
-	case res.ExitCode != 0:
-		j.warn("user_failed", provPhUser, coldMsg(fmt.Sprintf("lo script e' uscito con codice %d", res.ExitCode)))
-	default:
-		j.step(provPhUser, true, p.ExtraUser.Username)
+	if p.ExtraUser != nil {
+		j.enter(provPhUser)
+		res, err := addUserTool.run(c, node, vmid, useHelper, []string{p.ExtraUser.Username, p.extraKey}, 30*time.Second)
+		switch {
+		case err != nil:
+			j.warn("user_failed", provPhUser, agentError(err))
+		case res.ExitCode == 3:
+			j.warn("user_exists", provPhUser, coldMsg("l'utente esiste gia' nella VM: nessuna modifica"))
+		case res.ExitCode != 0:
+			j.warn("user_failed", provPhUser, coldMsg(fmt.Sprintf("lo script e' uscito con codice %d", res.ExitCode)))
+		default:
+			j.step(provPhUser, true, p.ExtraUser.Username)
+		}
+	}
+
+	// 10. extra disk: format and mount (D64 B). Independent of the user: one failing does not skip the other.
+	if mountWanted {
+		j.enter(provPhMount)
+		if err := formatAndMountBlank(c, node, vmid, p.disk2.MountPoint, p.disk2Sticky); err != nil {
+			var ours coldMsg // our own explanation (no disk, several disks...) is shown as it is
+			if !errors.As(err, &ours) {
+				err = agentError(err)
+			}
+			j.warn("mount_failed", provPhMount, err)
+		} else {
+			j.step(provPhMount, true, p.disk2.MountPoint)
+		}
 	}
 	j.finish()
 }
