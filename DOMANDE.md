@@ -909,3 +909,58 @@ C) Come A, ma `cluster.conf` generato solo a mano.
 **Suggerimento**: A. Gli script restano uguali, controllabili con l'hash, e la parte "automatica" si limita a proporre i valori. Chi scrive `cluster.conf` sul nodo lo decidiamo allo step del backend (per ora lo crei tu o lo script di setup dal modello).
 **Risposta utente**: Approvo la tua proposta (A).
 
+## ROADMAP 13 — Profilo "hosting" e SSH (richiesta utente 2026-11-05)
+
+Richiesta: (1) le Rocky del cluster di calcolo devono avere l'accesso SSH abilitato; (2) quando si fa il Sync verso un altro cluster si deve poter specificare se e' di hosting: se si', SSH con password disattivato e accesso con chiave imposto; (3) a ogni riavvio della VM l'accesso a sola chiave deve essere rimesso, perche' modifiche degli utenti non abbassino la sicurezza.
+
+### D86 — Rocky del cluster di calcolo: SSH con password
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: "Abilita l'accesso con SSH" per le Rocky significa SSH con password, come gia' fanno Ubuntu e Debian?
+**Perche' conta**: gli snippet Rocky non avevano nessuna impostazione SSH (Ubuntu/Debian impostano `PasswordAuthentication yes` e `PermitRootLogin no`).
+**Opzioni**: A) si', password come Ubuntu/Debian; B) altro.
+**Suggerimento**: A.
+**Risposta utente**: A. Implementato come file `/etc/ssh/sshd_config.d/00-pmgr-ssh.conf` (`PasswordAuthentication yes`, `PermitRootLogin no`); su Rocky 8 lo snippet aggiunge anche la riga `Include` in testa a `sshd_config`, che li' manca.
+
+### D87 — Dove si specifica che un cluster di destinazione e' di hosting
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Per destinazione e ricordato, oppure a ogni sync?
+**Opzioni**: A) casella "hosting" sul cluster di destinazione, ricordata (configurazione del sync e pagina del manager); B) interruttore a ogni sync.
+**Suggerimento**: A: meno rischio di dimenticarla e mandare snippet con password SSH su un cluster di hosting.
+**Risposta utente**: A. La parte di rendering e' fatta (`pmgr-os.sh --render DIR --profile hosting`, e `PROFILE=hosting` in `cluster.conf` per i template generati nel cluster); la casella nel sync e nella pagina arriva con `pmgr-snippets-sync` (vedi D90).
+
+### D88 — Quando si rimette l'SSH a sola chiave
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Solo al riavvio, oppure anche con un controllo periodico?
+**Opzioni**: A) solo al riavvio; B) riavvio + controllo ogni 15 minuti.
+**Suggerimento**: A (come richiesto).
+**Risposta utente**: B: riavvio **e** ogni 15 minuti. Implementato con `pmgr-ssh-enforce` (servizio `Before=ssh.service` + timer).
+
+### D89 — Password dell'utente del template nell'hosting
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Nel template di hosting resta la password per l'accesso da console, con il solo SSH a password disattivato?
+**Opzioni**: A) si', resta; B) nessuna password.
+**Suggerimento**: A.
+**Risposta utente**: A. `finalize` non cambia: `cipassword` resta.
+
+### D90 — Come il sync consegna le varianti di hosting
+**Stato**: APERTA
+**Bloccante**: no (serve quando si scrive `pmgr-snippets-sync`)
+**Domanda**: Le destinazioni di hosting devono ricevere snippet diversi dagli standard, con gli **stessi nomi di file** (i template li referenziano per nome). Come?
+**Perche' conta**: il manifest con gli hash (D75 A) deve restare valido per ogni destinazione.
+**Opzioni**: A) la sorgente genera **due alberi** (standard e hosting) con `pmgr-os.sh --render` e un manifest per profilo; il sync spinge a ogni destinazione l'albero del suo profilo; B) l'hosting genera i propri snippet localmente (`PROFILE=hosting` in `cluster.conf`) e il sync non li tocca; C) il sync trasforma il testo al volo (sconsigliato: gli hash non tornerebbero).
+**Suggerimento**: A: una sola sorgente di verita', nessuna riscrittura al volo, il profilo e' una proprieta' della destinazione.
+**Risposta utente**:
+
+### D91 — VM di hosting gia' esistenti
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Le VM del cluster HOSTING (28) create con i vecchi snippet hanno SSH con password. Vuoi uno script di rollout, come per fail2ban, che installi `pmgr-ssh-enforce` anche su quelle?
+**Perche' conta**: la regola vale solo per le VM nuove, finche' non si aggiornano quelle esistenti. Attenzione: chi oggi entra con la password viene escluso; servono le chiavi prima.
+**Opzioni**: A) si', con `--check` e una VM di prova; B) no, solo VM nuove.
+**Suggerimento**: A, dopo avere verificato che ogni VM abbia almeno una chiave in `authorized_keys`.
+**Risposta utente**:
+
