@@ -345,6 +345,45 @@ func reservedCards(cluster int) map[string]bool {
 	return out
 }
 
+// ── creations in flight: RAM promised to a node by a VM that is cloned but not started yet ──
+
+type pendingVM struct {
+	Cluster int
+	Node    string
+	VMID    int
+	Mem     int64
+	VCPU    int
+}
+
+var provPending = struct {
+	sync.Mutex
+	m map[string]pendingVM // job id -> promise
+}{m: map[string]pendingVM{}}
+
+func addPending(job string, p pendingVM) {
+	provPending.Lock()
+	defer provPending.Unlock()
+	provPending.m[job] = p
+}
+
+func releasePending(job string) {
+	provPending.Lock()
+	defer provPending.Unlock()
+	delete(provPending.m, job)
+}
+
+func pendingCreations(cluster int) []pendingVM {
+	provPending.Lock()
+	defer provPending.Unlock()
+	out := []pendingVM{}
+	for _, p := range provPending.m {
+		if p.Cluster == cluster {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // provCreate serialises "check -> clone -> RAM set" per cluster, so two creations cannot both pass the RAM check
 // for the same node (the second one sees the first VM with its final RAM).
 var provCreate sync.Map // cluster -> *sync.Mutex
@@ -570,7 +609,7 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 	if p.disk2 != nil && p.disk2Store == "" {
 		p.disk2Store = p.storage // D65 A: by default the template's storage
 	}
-	q := adviceQuery{MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storages: storages, TemplateNode: p.TemplateNode}
+	q := adviceQuery{Cluster: cluster, MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storages: storages, TemplateNode: p.TemplateNode}
 	if p.disk2 != nil {
 		q.Disk2GB, q.Disk2Storage = p.disk2.SizeGB, p.disk2Store
 	}
@@ -696,6 +735,7 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 			j.fail(j.view().Phase, coldMsg("errore interno"))
 		}
 		unlock()
+		releasePending(j.ID) // on every exit: a started VM is counted from its running state, a failed one uses no RAM
 		if j.card != "" {
 			releaseCard(j.card, j.ID)
 		}
@@ -854,6 +894,9 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		return
 	}
 	j.step(provPhStart, true, "")
+	// from here the VM counts as running (even if Proxmox still shows it stopped for a moment); the promise ends
+	markStarted(j.Cluster, node, "qemu", vmid, time.Now())
+	releasePending(j.ID)
 	mountWanted := p.disk2 != nil
 	if p.ExtraUser == nil && !mountWanted {
 		j.finish()
@@ -1005,6 +1048,8 @@ func startProv(c provAPI, idx int, label string, plan provPlan, optionsFor func(
 		return nil, err
 	}
 	j.vmid, j.node, j.name = plan.NewVMID, plan.TargetNode, plan.Name
+	// promise the RAM of the new VM to its node from now on, still inside the locked check -> clone section
+	addPending(j.ID, pendingVM{Cluster: idx, Node: plan.TargetNode, VMID: plan.NewVMID, Mem: int64(plan.Memory) << 20, VCPU: plan.Cores})
 	if card != "" {
 		if !reserveCard(card, j.ID) {
 			j.fail(provPhClone, coldMsg("la scheda e' stata appena prenotata da un'altra creazione"))

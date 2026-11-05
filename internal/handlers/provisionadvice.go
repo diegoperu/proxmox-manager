@@ -59,6 +59,7 @@ type adviceQuery struct {
 	Storages     []string // storages of the template's volumes: all must be reachable from the node
 	TemplateNode string
 	Group        string
+	Cluster      int    // cluster index: the creations in flight and the guests started a moment ago are per cluster (not a request parameter)
 	Disk2GB      int    // extra disk size in GB (0 = none)
 	Disk2Storage string // its storage; "" = the first of Storages (the template's)
 }
@@ -241,7 +242,7 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 			name, _ := r["name"].(string)
 			ts, _ := r["tags"].(string)
 			vms = append(vms, balance.VM{Node: node, Kind: typ, VMID: vmid, Name: clampText(name, 64), Mem: intField(r, "maxmem"),
-				VCPU: int(intField(r, "maxcpu")), Running: status == "running", Groups: resolver.resolve(name, ts).Groups, CPUCores: -1})
+				VCPU: int(intField(r, "maxcpu")), Running: guestUsesRAM(q.Cluster, node, typ, vmid, status, now), Groups: resolver.resolve(name, ts).Groups, CPUCores: -1})
 		}
 	}
 	if len(nodes) == 0 {
@@ -333,7 +334,28 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 	if q.Group != "" {
 		groups = []string{q.Group}
 	}
-	place, err := balance.Place(in, vms, balance.PlaceRequest{Mem: q.MemMB << 20, VCPU: q.Cores, Groups: groups, Extra: extra}, balance.DefaultParams())
+	// creations in progress: their VM is cloned and stays stopped for minutes before it starts, but its RAM is
+	// already promised to the node (otherwise two creations in a row would both see room)
+	known := map[string]bool{}
+	for _, n := range nodes {
+		known[n.name] = true
+	}
+	running := map[int]bool{}
+	for _, v := range vms {
+		if v.Running {
+			running[v.VMID] = true
+		}
+	}
+	for _, pv := range pendingCreations(q.Cluster) {
+		if known[pv.Node] && !running[pv.VMID] {
+			vms = append(vms, balance.VM{Node: pv.Node, Kind: "qemu", VMID: pv.VMID, Mem: pv.Mem, VCPU: pv.VCPU, Running: true, CPUCores: -1})
+		}
+	}
+	// a new VM is placed on the RAM that guests use now: stopped ones do not count (they may never start, and the
+	// start of one of them is checked on its own, see startcheck.go)
+	params := balance.DefaultParams()
+	params.CountStopped = false
+	place, err := balance.Place(in, vms, balance.PlaceRequest{Mem: q.MemMB << 20, VCPU: q.Cores, Groups: groups, Extra: extra}, params)
 	if err != nil {
 		return adviceResult{}, err
 	}
@@ -453,6 +475,7 @@ func (h *Handler) GetProvisionAdvice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer g.Unlock()
+	q.Cluster = idx
 	v, err := cephCached("advice|"+strconv.Itoa(idx)+"|"+q.key()+"|"+reservedKey(idx)+"|"+gpuModelsKey(), adviceCacheTTL, func() (interface{}, error) {
 		var inv *GPUInventory
 		if q.GPU {

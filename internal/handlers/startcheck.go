@@ -107,6 +107,12 @@ func startLock(cluster int, node string) *sync.Mutex {
 	return &startLocks[h%uint32(len(startLocks))]
 }
 
+// guestUsesRAM: a guest uses RAM when it is running, or when we started it a moment ago and Proxmox still shows it stopped.
+// Stopped guests use none (neither the start check nor the advice for a new VM count them).
+func guestUsesRAM(cluster int, node, kind string, vmid int, status string, now time.Time) bool {
+	return status == "running" || recentlyStarted(cluster, node, kind, vmid, now)
+}
+
 // checkStartRAM returns nil when the guest may start (or when there is nothing to check), else the refusal.
 func checkStartRAM(c startCheckAPI, cluster int, node, kind string, vmid int, now time.Time) *startRefusal {
 	raw, err := c.GetClusterResources("")
@@ -160,7 +166,7 @@ func checkStartRAM(c startCheckAPI, cluster int, node, kind string, vmid int, no
 			continue
 		}
 		status, _ := r["status"].(string)
-		if status != "running" && !recentlyStarted(cluster, n, typ, id, now) {
+		if !guestUsesRAM(cluster, n, typ, id, status, now) {
 			continue
 		}
 		vms = append(vms, balance.VM{Node: n, Kind: typ, VMID: id, Mem: intField(r, "maxmem"), VCPU: int(intField(r, "maxcpu")), Running: true, CPUCores: -1})

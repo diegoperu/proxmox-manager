@@ -335,3 +335,119 @@ func TestParseAdviceExtraDiskParams(t *testing.T) {
 		}
 	}
 }
+
+// ── a new VM is placed on the RAM that guests use now: stopped ones do not count ──
+
+func pending(t *testing.T) {
+	t.Helper()
+	provPending.Lock()
+	provPending.m = map[string]pendingVM{}
+	provPending.Unlock()
+	startedRecently.Lock()
+	startedRecently.m = map[string]time.Time{}
+	startedRecently.Unlock()
+}
+
+func adviceFor(t *testing.T, f *fakeProv, memGB int, now time.Time) adviceResult {
+	t.Helper()
+	r, err := buildAdvice(f, nil, "C", adviceQuery{Cluster: 41, MemMB: int64(memGB) * 1024, Cores: 2}, nil, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func nodeEligible(r adviceResult, name string) (bool, float64) {
+	for _, n := range r.Nodes {
+		if n.Name == name {
+			return n.Eligible, n.PctBefore
+		}
+	}
+	return false, -1
+}
+
+func TestAdviceIgnoresStoppedVMs(t *testing.T) {
+	pending(t)
+	f := newFakeProv()
+	// n2: 92 GB assignable, VM 50 (20 GB) running. A stopped 200 GB VM must not take room: a 60 GB VM fits.
+	stoppedVM(f, 70, "n2", 200)
+	stoppedVM(f, 71, "n2", 40)
+	r := adviceFor(t, f, 60, time.Now())
+	ok, before := nodeEligible(r, "n2")
+	if !ok {
+		t.Fatalf("stopped VMs taken into account: %+v", r.Nodes)
+	}
+	// 20 GB of 92 assignable = 21.74 %: the stopped guests are not in the load
+	if before != 21.74 {
+		t.Fatalf("load before = %v, want 21.74", before)
+	}
+	// and a running one does count: 20 + 60 + 40 (running) > 92
+	f.vms[71].status = "running"
+	if ok, _ := nodeEligible(adviceFor(t, f, 60, time.Now()), "n2"); ok {
+		t.Fatal("a running VM is not counted")
+	}
+}
+
+func TestAdviceCountsCreationsInFlightAndGuestsStartedAMomentAgo(t *testing.T) {
+	pending(t)
+	f := newFakeProv()
+	// a VM being created on n2 (70 GB, cloned but not started): 20 + 70 + 40 > 92 -> n2 is full for a 40 GB VM
+	addPending("job-1", pendingVM{Cluster: 41, Node: "n2", VMID: 300, Mem: 70 << 30, VCPU: 4})
+	if ok, _ := nodeEligible(adviceFor(t, f, 40, time.Now()), "n2"); ok {
+		t.Fatal("a creation in flight is not counted")
+	}
+	// another cluster's creation does not count here
+	if ok, _ := nodeEligible(func() adviceResult {
+		r, _ := buildAdvice(f, nil, "C", adviceQuery{Cluster: 42, MemMB: 40 * 1024, Cores: 2}, nil, time.Now())
+		return r
+	}(), "n2"); !ok {
+		t.Fatal("a creation of another cluster counted")
+	}
+	releasePending("job-1")
+	if ok, _ := nodeEligible(adviceFor(t, f, 40, time.Now()), "n2"); !ok {
+		t.Fatal("the promise was not released")
+	}
+	// a guest started a moment ago that Proxmox still shows stopped counts; after the TTL it does not
+	stoppedVM(f, 70, "n2", 70)
+	now := time.Now()
+	markStarted(41, "n2", "qemu", 70, now)
+	if ok, _ := nodeEligible(adviceFor(t, f, 40, now.Add(5*time.Second)), "n2"); ok {
+		t.Fatal("a guest started a moment ago is not counted")
+	}
+	if ok, _ := nodeEligible(adviceFor(t, f, 40, now.Add(startReserveTTL+time.Second)), "n2"); !ok {
+		t.Fatal("the reservation did not expire")
+	}
+	// a creation whose VM is already running is counted once, not twice
+	f.vms[70].status = "running"
+	addPending("job-2", pendingVM{Cluster: 41, Node: "n2", VMID: 70, Mem: 70 << 30, VCPU: 2})
+	if ok, _ := nodeEligible(adviceFor(t, f, 2, time.Now()), "n2"); !ok {
+		t.Fatal("a running VM with a promise still pending was counted twice")
+	}
+	releasePending("job-2")
+}
+
+func TestProvisionPromisesRAMUntilTheVMStartsAndKeepsNoneAfterAFailure(t *testing.T) {
+	provFast(t)
+	pending(t)
+	// the job ends well: the promise is gone, the VM counts as running
+	f := newFakeProv()
+	j, err := startProv(f, 41, "C", mustPlanProv(t, baseReq()), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(pendingCreations(41)); got != 1 {
+		t.Fatalf("no promise right after the start of the creation: %d", got)
+	}
+	waitProv(t, j)
+	if got := len(pendingCreations(41)); got != 0 {
+		t.Fatalf("promise left after the job: %d", got)
+	}
+	// a failed clone leaves no promise
+	f = newFakeProv()
+	f.failClone = true
+	j, _ = startProv(f, 41, "C", mustPlanProv(t, baseReq()), noOpts, time.Now())
+	waitProv(t, j)
+	if got := len(pendingCreations(41)); got != 0 {
+		t.Fatalf("promise left after a failed clone: %d", got)
+	}
+}
