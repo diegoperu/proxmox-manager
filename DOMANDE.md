@@ -947,20 +947,31 @@ Richiesta: (1) le Rocky del cluster di calcolo devono avere l'accesso SSH abilit
 **Risposta utente**: A. `finalize` non cambia: `cipassword` resta.
 
 ### D90 — Come il sync consegna le varianti di hosting
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (serve quando si scrive `pmgr-snippets-sync`)
 **Domanda**: Le destinazioni di hosting devono ricevere snippet diversi dagli standard, con gli **stessi nomi di file** (i template li referenziano per nome). Come?
 **Perche' conta**: il manifest con gli hash (D75 A) deve restare valido per ogni destinazione.
 **Opzioni**: A) la sorgente genera **due alberi** (standard e hosting) con `pmgr-os.sh --render` e un manifest per profilo; il sync spinge a ogni destinazione l'albero del suo profilo; B) l'hosting genera i propri snippet localmente (`PROFILE=hosting` in `cluster.conf`) e il sync non li tocca; C) il sync trasforma il testo al volo (sconsigliato: gli hash non tornerebbero).
 **Suggerimento**: A: una sola sorgente di verita', nessuna riscrittura al volo, il profilo e' una proprieta' della destinazione.
-**Risposta utente**:
+**Risposta utente**: Si (A): due alberi generati dalla sorgente con `pmgr-os.sh --render` (standard e hosting), un manifest per profilo, ogni destinazione riceve quello del suo profilo. Il rendering e' fatto; la consegna con la casella 'hosting' per destinazione arriva con `pmgr-snippets-sync`.
 
 ### D91 — VM di hosting gia' esistenti
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: Le VM del cluster HOSTING (28) create con i vecchi snippet hanno SSH con password. Vuoi uno script di rollout, come per fail2ban, che installi `pmgr-ssh-enforce` anche su quelle?
 **Perche' conta**: la regola vale solo per le VM nuove, finche' non si aggiornano quelle esistenti. Attenzione: chi oggi entra con la password viene escluso; servono le chiavi prima.
 **Opzioni**: A) si', con `--check` e una VM di prova; B) no, solo VM nuove.
 **Suggerimento**: A, dopo avere verificato che ogni VM abbia almeno una chiave in `authorized_keys`.
-**Risposta utente**:
+**Risposta utente**: Si (A): script di rollout con `--check` e una VM di prova, e con il controllo che ci sia almeno una chiave in `authorized_keys` prima di disattivare la password. Fatto: `pmgr-vm-rollout.sh --module ssh-hosting` (modulo `ssh-hosting` di `pmgr-vm-apply.sh`).
+
+## ROADMAP 13 — Aggiornamenti di sicurezza automatici (richiesta utente 2026-11-05)
+
+Richiesta: verificare che gli snippet abilitino correttamente gli aggiornamenti automatici **di sicurezza**: controllo e installazione **due volte al giorno**, **nessun riavvio automatico**, **avviso a ogni login** (console e SSH) quando serve un riavvio; **tutti i cluster** (standard e hosting).
+
+### D92 — Esito della verifica e correzioni
+**Stato**: RISPOSTA (nessuna scelta richiesta all'utente: sono correzioni di difetti)
+**Bloccante**: no
+**Cosa c'era**: Debian non installava nessun pacchetto per gli aggiornamenti automatici; Ubuntu aveva un cron di mezzanotte lanciato come utente `tecnico` (non root: non poteva installare) mentre i timer di apt controllano due volte al giorno ma **installano una volta sola** (06:00, con ritardo casuale fino a un'ora) e gli intervalli "1 giorno" saltano comunque il secondo giro; Rocky abilitava `dnf-automatic.timer` ma la configurazione di serie e' `apply_updates = no` (**scarica soltanto, non installa mai**) e `upgrade_type = default` (tutti gli aggiornamenti, non solo la sicurezza); nessuna delle tre mostrava un avviso di riavvio al login (Ubuntu solo se c'e' `update-notifier-common`, Debian e Rocky mai).
+**Cosa e' stato fatto** (tutti i cluster e i profili): `unattended-upgrades` anche su Debian; origini **solo di sicurezza** (Debian: `-security` e `Debian-Security`; Ubuntu: `-security`, ESM apps e infra), `Automatic-Reboot "false"`, `APT::Periodic::* "always"` e `Enable "1"`; timer di apt con i due orari al giorno (liste 04:30 e 16:30, installazione 06:00 e 18:00, ritardo casuale 20-30 min); Rocky: `upgrade_type = security`, `apply_updates = yes`, `reboot = never` (dove l'opzione esiste), timer di `dnf-automatic` alle 06:00 e 18:00, `dnf-utils`; il vecchio cron tolto; `pmgr-reboot-check` (kernel installato piu' nuovo di quello in uso, `reboot-required`, `needs-restarting`, flag in `/run`) e `/etc/profile.d/pmgr-reboot-required.sh` che a ogni login interattivo (console e SSH) stampa l'avviso in italiano e in inglese e **non** sporca l'output di script e comandi via SSH.
+**Risposta utente**: (presa d'atto)
 
