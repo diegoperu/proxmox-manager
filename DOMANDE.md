@@ -647,3 +647,94 @@ Assunzioni dichiarate (provvisorie, non bloccanti):
 - **Effetto collaterale voluto:** un template con una ISO su `local` (come il Windows 130) risulta ora "file mancante" sui nodi che non l'hanno, invece del generico "storage non condiviso".
 
 **Correzione emersa dalla prova sul cluster vero (2026-11-05):** lo storage `local` ha come contenuti `vztmpl,backup,iso`, **senza `snippets`**, e Proxmox elenca solo i tipi di contenuto abilitati: per questo l'elenco degli snippet e' vuoto anche sul `node-1`, dove il file c'e'. Quindi un file e' **verificabile solo se lo storage ha abilitato quel tipo di contenuto**; altrimenti il controllo non e' possibile, non si blocca niente e la risposta lo dice (`files_unverified`, nella pagina: "gli snippet o le ISO del template non si possono verificare... abilitando il tipo di contenuto in Proxmox il controllo diventa possibile"). Se lo storage del file non esiste (o non e' attivo) sul nodo, il file e' irraggiungibile (`file_missing`). Le ISO invece si verificano (il `local` ha `iso`): il template Windows 130 ha le sue due ISO solo su `node-11`, quindi li' e' idoneo e altrove no. Per abilitare il controllo degli snippet basterebbe aggiungere `snippets` ai contenuti di `local` in Proxmox (Datacenter > Storage): lo decide l'utente, l'app non tocca la configurazione degli storage.
+
+## ROADMAP 13 — Sincronizzazione di script e snippet (richiesta utente 2026-11-05)
+
+**Obiettivo (dall'utente):** il `node-1` di CALCOLO contiene gli script aggiornati (creazione, aggiornamento e supporto) e gli snippet di cloud-init usati anche dal manager, e **non ha copie**. Serve poterli copiare su un altro nodo dello stesso cluster o di un altro cluster; `rsync_snippets.sh` oggi sincronizza solo verso i nodi diversi dal nodo 1 e va reso generico (sorgente spostabile); la copia deve avere una **sezione propria nella parte amministrativa del manager**, che puo' anche gestire il sync.
+
+**Cosa ho verificato (sola lettura):** questa macchina e' la postazione (`diego-ict`), non un nodo: `rsync_snippets.sh` e `/var/lib/vz/snippets` non si vedono da qui. CALCOLO (11 nodi) **non ha CephFS** (nessun MDS) **ne' storage condiviso per file**: gli unici condivisi sono dischi Ceph e PBS, quindi gli snippet vanno copiati nodo per nodo. Lo storage `local` di CALCOLO ha contenuti `backup,iso,vztmpl`, **senza `snippets`**: l'API non li elenca (e il controllo preventivo del consiglio dei nodi non puo' verificarli). HOSTING (2 nodi) ha invece `local` con `iso,snippets,vztmpl,backup`. Gli snippet sono `vendor-data` di cloud-init: **vengono eseguiti come root in ogni VM nuova**, quindi l'integrita' dei file e' il requisito principale (vedi rischi in `CLAUDE.md`).
+
+### D69 — Inventario: cosa c'e' davvero sul nodo-1
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Posso avere, in sola lettura, `cat` di `rsync_snippets.sh`, `ls -la` della cartella degli snippet e l'elenco (percorsi) degli script di creazione, aggiornamento e supporto che stanno sul nodo-1 (e quali di questi usa il manager)? Senza non so cosa sincronizzare ne' dove stia ogni cosa.
+**Opzioni**: A) li lanci tu e incolli l'output (comandi sotto); B) mi indichi un accesso SSH in sola lettura al nodo-1 (host, utente, chiave) e lo leggo io.
+**Suggerimento**: A: nessun accesso nuovo per me. Comandi, da lanciare sul nodo-1: `cat <percorso>/rsync_snippets.sh` (e dove sta: `find / -xdev -name 'rsync_snippets*' 2>/dev/null`), `ls -la --time-style=long-iso /var/lib/vz/snippets`, `ls -la ~ /root /usr/local/bin /usr/local/sbin 2>/dev/null | head -80`, `crontab -l; systemctl list-timers | grep -i snip`.
+**Risposta utente**:
+
+### D70 — Architettura
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Chi copia i file?
+**Perche' conta**: i file diventano codice eseguito come root in ogni VM nuova. Il manager non ha login: se accettasse contenuti dal browser, chiunque raggiunga la pagina potrebbe infilare codice nelle VM future.
+**Opzioni**:
+A) **Script generico + pagina di sola lettura.** Il nuovo `pmgr-snippets-sync` gira sul nodo sorgente (a mano o a timer); la pagina mostra solo lo stato (uguale / diverso / mancante / in piu' per nodo e file) e non copia niente. Rischio minimo, ma la copia resta un passo manuale fuori dall'app.
+B) **Script generico + il manager lo lancia (consigliata).** Come A, ma la pagina ha i pulsanti "Controlla" e "Sincronizza", eseguiti dal manager via SSH verso il nodo sorgente con una chiave ristretta a **un solo comando** (`command="..."` in `authorized_keys`: il manager non ha una shell, puo' solo chiedere `status`, `diff` o `run`). I contenuti arrivano **solo dalla sorgente**: dal browser non entra nessun file.
+C) **Il manager copia tramite le API di Proxmox** (upload nello storage). Nessuna chiave SSH, ma non e' certo che Proxmox accetti l'upload di snippet, non c'e' modo di leggere i file dalla sorgente tramite API, e servirebbe `snippets` abilitato ovunque: da provare prima, non lo userei come base.
+D) **Uno storage condiviso** (CephFS) montato su tutti i nodi: nessuna copia dentro CALCOLO. Non c'e' CephFS e crearlo (MDS, pool) e' un lavoro grosso; non risolve comunque il passaggio verso un altro cluster.
+**Suggerimento**: B. A e' il ripiego se non vuoi dare al manager una chiave SSH.
+**Risposta utente**:
+
+### D71 — Fonte di verita' e "spostare il nodo sorgente"
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Il nodo sorgente e' sempre un nodo con i file "veri" (oggi il nodo-1), oppure i file vivono in un archivio a parte?
+**Opzioni**: A) la sorgente e' un nodo configurato (`source`): per cambiarla si installa lo script sul nuovo nodo, si sincronizza, si verifica e si cambia una riga di configurazione (nel manager, con la procedura guidata "Sposta sorgente"); B) un archivio versionato (git privato **fuori da questo repository**, che non deve mai contenere gli script) da cui si distribuisce a tutti i nodi, nodo-1 compreso; C) come A ma con una copia "di riserva" sempre tenuta aggiornata su un secondo nodo.
+**Suggerimento**: A con C: e' quello che hai chiesto e toglie subito il punto debole (nodo-1 unica copia). B e' piu' robusto ma cambia il tuo modo di lavorare.
+**Risposta utente**:
+
+### D72 — Destinazioni
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Verso quali nodi si copia?
+**Opzioni**: A) una **lista esplicita** nel file di configurazione (nodi di CALCOLO, di HOSTING o altri cluster, ognuno con host e cartella), controllata dal manager per nome; B) tutti i nodi del cluster in automatico (da `/etc/pve/.members`) piu' la lista per gli altri cluster; C) a gruppi (per esempio "tutti CALCOLO", "tutti HOSTING").
+**Suggerimento**: A con la comodita' di B per il cluster della sorgente.
+**Risposta utente**:
+
+### D73 — File spariti dalla sorgente
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Se un file non c'e' piu' sulla sorgente, si cancella dalle destinazioni?
+**Opzioni**: A) mai in automatico: la pagina li mostra come "in piu'" e si cancellano solo uno per uno con conferma di pericolo; B) si cancellano con la sincronizzazione (come `rsync --delete`).
+**Suggerimento**: A: un errore sulla sorgente non deve cancellare le copie, che sono proprio la protezione.
+**Risposta utente**:
+
+### D74 — Cosa si sincronizza
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Gli snippet e gli script di supporto stanno nella stessa cartella?
+**Opzioni**: A) due cartelle con elenchi di nomi ammessi: `snippets` (file `.yaml`, nella cartella degli snippet) e `scripts` (script di creazione, aggiornamento, supporto, es. `/var/lib/vz/pmgr-scripts`); B) una cartella sola; C) una lista di percorsi scelta da te nel file di configurazione.
+**Suggerimento**: dipende dall'inventario (D69); di base A con una lista di estensioni ammesse (`.yaml`, `.sh`, `.sha256`) e nessun altro file.
+**Risposta utente**:
+
+### D75 — Verifica dell'integrita'
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Come si sa che la copia e' identica alla sorgente?
+**Opzioni**: A) un file `MANIFEST.sha256` generato sulla sorgente (hash di ogni file) e verificato su ogni destinazione dopo la copia e a ogni controllo; la pagina mostra uguale/diverso/mancante/in piu' per file; B) solo dimensione e data (quello che elenca Proxmox), senza hash; C) A piu' firma del manifest con una chiave tua (protegge anche da una sorgente manomessa).
+**Suggerimento**: A. C solo se vuoi proteggerti da chi riesce a scrivere sul nodo-1.
+**Risposta utente**:
+
+### D76 — Quando si sincronizza
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Solo a mano o anche in automatico?
+**Opzioni**: A) solo a mano dalla pagina (con anteprima delle differenze e conferma); B) a timer sul nodo sorgente; C) a mano, piu' un avviso nella panoramica quando le copie sono diverse dalla sorgente da piu' di N giorni.
+**Suggerimento**: C: niente copie automatiche di codice eseguito come root, ma nessuna differenza che passa inosservata.
+**Risposta utente**:
+
+### D77 — Accesso SSH del manager (solo se D70 = B)
+**Stato**: APERTA
+**Bloccante**: si' (per B)
+**Domanda**: Con quale utente e quale chiave il manager parla col nodo sorgente?
+**Opzioni**: A) una chiave dedicata, usata solo dal manager, in `authorized_keys` del nodo sorgente con `command=` (un solo script che accetta `status|diff|run`), `no-pty,no-port-forwarding,no-agent-forwarding`, ristretta all'indirizzo della postazione; lo script (installato da te, root) fa le copie verso le destinazioni con la chiave del nodo sorgente verso gli altri nodi; B) la tua chiave attuale (no: da non usare, ha una shell completa).
+**Suggerimento**: A. La preparazione (creare la chiave, aggiungere la riga) e' un passo tuo, ti preparo i comandi.
+**Risposta utente**:
+
+### D78 — Copia di sicurezza subito
+**Stato**: APERTA
+**Bloccante**: no (ma consigliata prima di tutto)
+**Domanda**: Facciamo subito una copia manuale, prima di sviluppare niente?
+**Opzioni**: A) si': copia a mano del contenuto degli snippet e degli script su un secondo nodo (e uno di HOSTING), anche solo con `rsync -a` o `tar`, cosi' il rischio "unica copia" sparisce oggi; B) si aspetta lo strumento.
+**Suggerimento**: A, adesso: l'app non c'entra, e' un comando tuo di un minuto una volta che sai la cartella.
+**Risposta utente**:
