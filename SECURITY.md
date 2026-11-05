@@ -172,3 +172,6 @@ A live migration of a QEMU VM with `cpu: host` (or `max`, `custom-*`) from an AM
 
 `POST /nodes/{n}/qemu/{id}/setup-disk` formats the single blank disk found in the guest. The slot sent by the page is checked against the VM configuration (it must exist and not be a CD-ROM); several blank disks mean no write. A forced stop + start of the VM, which used to happen on its own when the disk did not show up, now needs `allow_restart` in the request: without it the server answers 409 `restart_needed` before touching the VM and the page asks the user in a separate danger confirmation.
 
+### Start check (RAM)
+
+Starting a stopped VM or container (single action, container action, Batch `start`) first checks, under a per-node lock, that the RAM of the running guests of the node plus the guest's own fits the assignable RAM; otherwise 409 `not_enough_ram` and nothing is started. The check reads cluster resources only and uses no request text in the answer except Proxmox names clamped to 64 characters. It fails open (the start goes on, logged) when the cluster cannot be read: it is a safeguard against overbooking, not an access control.
