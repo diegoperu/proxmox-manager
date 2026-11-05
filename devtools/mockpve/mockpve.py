@@ -16,6 +16,8 @@ NODES = {
     "datacloud-node-4": dict(maxmem=256 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
 }
 # processori diversi come nel cluster reale: le VM con cpu=host si spostano a caldo solo tra node-1 e node-3
+# flag CPU (accorciati): una VM con cpu=host va a caldo solo verso un nodo che li ha tutti
+CPU_FLAGS = {"AMD EPYC 7313": "fpu sse2 avx2 svm vaes pku", "Intel Xeon E5-2640 v4": "fpu sse2 avx2 vmx"}
 CPU_MODELS = {"datacloud-node-1": "AMD EPYC 7313", "datacloud-node-2": "Intel Xeon E5-2640 v4", "datacloud-node-3": "AMD EPYC 7313"}
 OSES = [
     {"id": "ubuntu", "name": "Ubuntu", "pretty-name": "Ubuntu 24.04.1 LTS", "version": "24.04.1 LTS (Noble Numbat)", "version-id": "24.04", "kernel-release": "6.8.0-45-generic", "machine": "x86_64"},
@@ -247,7 +249,7 @@ def route(path):
         if rest == "status":
             return dict(cpu=b["cpu"], memory=dict(used=int(b["maxmem"] * b["mem"]), total=b["maxmem"]), uptime=86400 * 12,
                         loadavg=["1.2", "1.1", "0.9"], pveversion="pve-manager/8.2.4", kversion="Linux 6.8.8-2-pve",
-                        cpuinfo=dict(cpus=b["cores"], model=CPU_MODELS.get(node, "AMD EPYC 7313")))
+                        cpuinfo=dict(cpus=b["cores"], model=CPU_MODELS.get(node, "AMD EPYC 7313"), flags=CPU_FLAGS.get(CPU_MODELS.get(node, "AMD EPYC 7313"), "")))
         if rest == "hardware/pci":
             return [dict(id="0000:01:00.0", **{"class": "0x030000"}, vendor="0x10de", iommugroup=12, vendor_name="NVIDIA Corporation", device_name="GA102 [GeForce RTX 3090]"),
                     dict(id="0000:01:00.1", **{"class": "0x040300"}, vendor_name="NVIDIA Corporation", device_name="GA102 High Definition Audio"),

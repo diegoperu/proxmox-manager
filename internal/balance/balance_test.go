@@ -3,6 +3,7 @@ package balance
 import (
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -355,7 +356,7 @@ func TestInvariantsRandomClusters(t *testing.T) {
 			n := node(string(rune('a'+i)), int64(64+r.Intn(2000)), 8+r.Intn(250), r.Intn(5))
 			n.Online = r.Intn(12) > 0
 			n.CPUP95 = float64(r.Intn(100))
-			n.CPUVendor = []string{"", "amd", "intel"}[r.Intn(3)]
+			n.CPUFlags = []map[string]bool{nil, flagSet("a b"), flagSet("a b c"), flagSet("a d"), flagSet("a b c d")}[r.Intn(5)]
 			nodes = append(nodes, n)
 		}
 		var vms []VM
@@ -419,9 +420,20 @@ func checkInvariants(t *testing.T, round int, nodes []Node, vms []VM, p Params, 
 		assign[n.Name], load[n.Name] = n.Assignable, n.LoadBefore
 		total += n.LoadBefore
 	}
-	model := map[string]string{}
+	nflags := map[string]map[string]bool{}
 	for _, n := range nodes {
-		model[n.Name] = n.CPUVendor
+		nflags[n.Name] = n.CPUFlags
+	}
+	superset := func(src, dst map[string]bool) bool {
+		if len(src) == 0 || len(dst) == 0 {
+			return false
+		}
+		for f := range src {
+			if !dst[f] {
+				return false
+			}
+		}
+		return true
 	}
 	byKey := map[string]VM{}
 	for _, v := range vms {
@@ -446,8 +458,8 @@ func checkInvariants(t *testing.T, round int, nodes []Node, vms []VM, p Params, 
 			t.Fatalf("round %d: %d vCPU sent to %s with %d threads %#v", round, v.VCPU, s.To, threads[s.To], s)
 		}
 		live := v.Kind == "qemu" && v.Running && !coldSet[v.VMID]
-		if live && v.HostCPU && (model[s.From] == "" || model[s.From] != model[s.To]) {
-			t.Fatalf("round %d: live move of a host-CPU VM across CPU vendors %#v", round, s)
+		if live && v.HostCPU && !superset(nflags[s.From], nflags[s.To]) {
+			t.Fatalf("round %d: live move of a host-CPU VM to a CPU without all the source flags %#v", round, s)
 		}
 		if s.Cold != (v.Kind == "qemu" && v.Running && coldSet[v.VMID]) {
 			t.Fatalf("round %d: wrong cold flag %#v", round, s)
@@ -491,52 +503,53 @@ func checkInvariants(t *testing.T, round int, nodes []Node, vms []VM, p Params, 
 	}
 }
 
-func TestHostCPULiveOnlyToTheSameVendor(t *testing.T) {
-	amd, intel, intel2 := node("amd", 1000, 64, 0), node("intel", 1000, 64, 0), node("intel2", 1000, 64, 0)
-	amd.CPUVendor, intel.CPUVendor, intel2.CPUVendor = "amd", "intel", "intel" // intel2: another Intel model
-	host := vm("amd", 1, 300, 4)
-	host.HostCPU = true
-	host2 := vm("amd", 5, 300, 4)
-	host2.HostCPU = true
-	// only the AMD node has the VMs' CPU: live is impossible, both blocked with cpu_host
-	pl := mustPlan(t, []Node{amd, intel}, []VM{host, host2}, noReserve())
+func flagSet(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, f := range strings.Fields(s) {
+		out[f] = true
+	}
+	return out
+}
+
+func TestHostCPULiveOnlyToACPUWithAllTheFlags(t *testing.T) {
+	// the real case: an EPYC 7713 (Zen 3) has flags an EPYC 7302 (Zen 2) lacks; the reverse is fine
+	zen3, zen2, zen3b := node("zen3", 1000, 64, 0), node("zen2", 1000, 64, 0), node("zen3b", 1000, 64, 0)
+	zen3.CPUFlags, zen2.CPUFlags, zen3b.CPUFlags = flagSet("svm avx2 vaes pku"), flagSet("svm avx2"), flagSet("svm avx2 vaes pku")
+	host, host2 := vm("zen3", 1, 300, 4), vm("zen3", 5, 300, 4)
+	host.HostCPU, host2.HostCPU = true, true
+	// only an older CPU elsewhere: blocked live
+	pl := mustPlan(t, []Node{zen3, zen2}, []VM{host, host2}, noReserve())
 	if len(pl.Steps) != 0 || len(pl.Blocked) != 2 || pl.Blocked[0].Reasons[0] != BlockCPUHost {
 		t.Fatalf("steps %#v blocked %#v", pl.Steps, pl.Blocked)
 	}
-	// VM 1 chosen cold: it may go to the Intel node, the step says cold; VM 5 stays blocked
+	// chosen cold: allowed, no CPU check
 	p := noReserve()
 	p.ColdVMs = []int{1}
-	pl = mustPlan(t, []Node{amd, intel}, []VM{host, host2}, p)
-	if len(pl.Steps) != 1 || pl.Steps[0].VMID != 1 || !pl.Steps[0].Cold || pl.Steps[0].SameVendor || pl.Steps[0].To != "intel" {
+	pl = mustPlan(t, []Node{zen3, zen2}, []VM{host, host2}, p)
+	if len(pl.Steps) != 1 || pl.Steps[0].VMID != 1 || !pl.Steps[0].Cold || pl.Steps[0].CPUChecked {
 		t.Fatalf("cold %#v", pl.Steps)
 	}
-	// Intel host VM: live only to the other Intel of the same model, flagged same_cpu
-	ih, ih2 := vm("intel", 2, 300, 4), vm("intel", 6, 300, 4)
-	ih.HostCPU, ih2.HostCPU = true, true
-	pl = mustPlan(t, []Node{amd, intel, intel2}, []VM{ih, ih2}, noReserve())
-	if len(pl.Steps) != 1 || pl.Steps[0].To != "intel2" || !pl.Steps[0].SameVendor || pl.Steps[0].Cold {
-		t.Fatalf("same model %#v", pl.Steps)
+	// a node with the same flags: live, checked
+	pl = mustPlan(t, []Node{zen3, zen2, zen3b}, []VM{host, host2}, noReserve())
+	if len(pl.Steps) != 1 || pl.Steps[0].To != "zen3b" || !pl.Steps[0].CPUChecked {
+		t.Fatalf("same flags %#v", pl.Steps)
 	}
-	// a generic CPU type moves freely; an unknown model is never a live destination for a host VM
-	gen, gen2 := vm("amd", 3, 300, 4), vm("amd", 7, 300, 4)
-	unk := node("unknown", 1000, 64, 0)
-	pl = mustPlan(t, []Node{amd, unk}, []VM{gen, gen2}, noReserve())
-	if len(pl.Steps) != 1 {
+	// from the older CPU to the newer one: live is fine
+	old1, old2 := vm("zen2", 7, 300, 4), vm("zen2", 8, 300, 4)
+	old1.HostCPU, old2.HostCPU = true, true
+	pl = mustPlan(t, []Node{zen3, zen2}, []VM{old1, old2}, noReserve())
+	if len(pl.Steps) != 1 || pl.Steps[0].To != "zen3" || !pl.Steps[0].CPUChecked {
+		t.Fatalf("older to newer %#v", pl.Steps)
+	}
+	// unknown flags never match; a generic CPU type moves freely
+	unk := node("unk", 1000, 64, 0)
+	pl = mustPlan(t, []Node{zen3, unk}, []VM{host, host2}, noReserve())
+	if len(pl.Steps) != 0 {
+		t.Fatalf("unknown flags matched: %#v", pl.Steps)
+	}
+	pl = mustPlan(t, []Node{zen3, zen2}, []VM{vm("zen3", 3, 300, 4), vm("zen3", 4, 300, 4)}, noReserve())
+	if len(pl.Steps) != 1 || pl.Steps[0].CPUChecked {
 		t.Fatalf("generic %#v", pl.Steps)
-	}
-	amdU := amd
-	amdU.CPUVendor = ""
-	unk2 := node("unknown2", 1000, 64, 0)
-	pl = mustPlan(t, []Node{amdU, unk2}, []VM{host, host2}, noReserve())
-	if len(pl.Steps) != 0 || pl.Blocked[0].Reasons[0] != BlockCPUHost {
-		t.Fatalf("unknown models must not match: %#v", pl.Steps)
-	}
-	// a stopped host-CPU VM is not live: free
-	off, off2 := host, host2
-	off.Running, off2.Running = false, false
-	pl = mustPlan(t, []Node{amd, intel}, []VM{off, off2}, noReserve())
-	if len(pl.Steps) != 1 || pl.Steps[0].Cold {
-		t.Fatalf("stopped %#v", pl.Steps)
 	}
 }
 

@@ -68,8 +68,10 @@ type Node struct {
 	CPUP95   float64 // real CPU use p95 over 4 weeks, percent 0-100; < 0 = unknown
 	// Reserve, if >= 0, replaces the automatic reserve (host + per OSD) for this node.
 	Reserve int64
-	// CPUVendor "amd" | "intel" from cpuinfo.model; "" = unknown: never a live destination for a host-CPU VM
-	CPUVendor string
+	// CPUFlags: the CPU feature flags of the node (cpuinfo.flags). A VM with the host CPU type resumes after a live
+	// migration only on a node that has ALL the flags of the source (D63 B, checked on 2026-11-05 on every pair
+	// of CPU models of the cluster). Empty = unknown: never a live destination for a host-CPU VM.
+	CPUFlags map[string]bool
 }
 
 // VM is one guest (QEMU or LXC). Blockers are filled by the caller from the config and from Proxmox's
@@ -178,7 +180,7 @@ type Step struct {
 	Mem        int64    `json:"mem"`
 	Running    bool     `json:"running"`
 	Cold       bool     `json:"cold"`        // running QEMU VM moved with shutdown, migrate, start (chosen by the user)
-	SameVendor bool     `json:"same_vendor"` // live move of a host-CPU VM: the destination has the same CPU vendor
+	CPUChecked bool     `json:"cpu_checked"` // live move of a host-CPU VM: the destination has every CPU flag of the source
 	Why        string   `json:"why"`         // evacuate | over_limit | balance
 	Warnings   []string `json:"warnings"`    // CPU warnings of the destination after this step (new or already there)
 	// spread of the online nodes (std dev of the %, points) after this step
@@ -245,8 +247,9 @@ type vmRT struct {
 	pinned  bool // outside the Only filter
 }
 
-// needsSameCPU: a live migration of a host-CPU QEMU VM (D55: same vendor, decided 2026-11-04 after a working
-// Intel -> Intel live migration between different models; AMD <-> Intel kills the VM at resume).
+// needsSameCPU: a live migration of a host-CPU QEMU VM. History: D55 same model, then same vendor (2026-11-04),
+// then D63 B (2026-11-05): the destination must have every CPU flag of the source, because two live migrations
+// from an EPYC 7713 to an EPYC 7302 (same vendor, older generation) died at resume.
 func (v *vmRT) needsSameCPU() bool {
 	return v.in.Kind == "qemu" && v.in.Running && !v.cold && v.in.HostCPU
 }
@@ -384,7 +387,7 @@ func (st *state) blockersOf(r *vmRT, nd *nodeRT) []string {
 	return out
 }
 
-// sameCPUExists: another destination node with the same (known) CPU vendor that Proxmox allows.
+// sameCPUExists: another destination node whose CPU flags include the source's, that Proxmox allows.
 func (st *state) sameCPUExists(r *vmRT, from *nodeRT) bool {
 	for _, name := range st.names {
 		n := st.nodes[name]
@@ -416,7 +419,18 @@ func (st *state) enoughThreadsExists(r *vmRT, from *nodeRT) bool {
 	return false
 }
 
-func sameCPU(a, b *nodeRT) bool { return a.in.CPUVendor != "" && a.in.CPUVendor == b.in.CPUVendor }
+// sameCPU: b can run what a's CPU offers to a host-CPU guest (b's flags include all of a's; unknown = no).
+func sameCPU(a, b *nodeRT) bool {
+	if len(a.in.CPUFlags) == 0 || len(b.in.CPUFlags) == 0 {
+		return false
+	}
+	for f := range a.in.CPUFlags {
+		if !b.in.CPUFlags[f] {
+			return false
+		}
+	}
+	return true
+}
 
 // dest reports whether a node can receive VMs at all.
 func (st *state) dest(n *nodeRT) bool { return n.in.Online && !n.evac }
@@ -628,7 +642,7 @@ func (st *state) record(plan *Plan, m move, why string) {
 	m.v.moved = true
 	plan.Steps = append(plan.Steps, Step{N: len(plan.Steps) + 1, Key: m.v.in.Key(), Kind: m.v.in.Kind, VMID: m.v.in.VMID,
 		Name: m.v.in.Name, From: from, To: m.to.in.Name, Mem: m.v.in.Mem, Running: m.v.in.Running, Why: why,
-		Cold: m.v.cold, SameVendor: m.v.needsSameCPU(),
+		Cold: m.v.cold, CPUChecked: m.v.needsSameCPU(),
 		Warnings: m.warns, SpreadAfter: round2(st.spread())})
 }
 
