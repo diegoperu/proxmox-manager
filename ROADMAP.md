@@ -16,7 +16,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 3b | Nodo consigliato alla creazione VM + GPU assegnata nel deploy | VM create nel posto giusto, GPU subito pronta | M-L | 3 (modello di carico e vincoli), pagina GPU | fatto e rilasciato (2026-11-05): consiglio del nodo e delle schede, creazione guidata dal server, utente e disco aggiuntivi (D56-D67), nome e memoria delle schede modificabili (D62); da provare a mano l'utente con rete |
 | 4 | Uso reale delle GPU (`nvidia-smi`) | report su GPU assegnate ma inutilizzate | M | helper nei guest | da fare |
 | 5 | Coda richieste dell'intranet per i report | domanda non soddisfatta nei report manageriali | M | accesso/API intranet | da fare |
-| 6 | Correggere `setup-disk` (usa il disco richiesto) | evita formattazioni/riavvii inutili | S | — | da fare |
+| 6 | Correggere `setup-disk` (usa il disco richiesto) | evita formattazioni/riavvii inutili | S | — | in discussione: D68 (verificato il 2026-11-05: ancora aperto, la creazione VM ha il suo percorso senza riavvii) |
 | 7 | Rifare la prova del fallback inline su Rocky SELinux | capire se gli helper sono davvero necessari | S | VM di prova | da fare |
 | 8 | `allowed_hosts` (anti DNS rebinding) | sicurezza dietro reverse proxy | S | decisione D14 | in discussione |
 | 9 | Errore JS aprendo direttamente `#/gpu` (`Gpu.summary`, gia' presente prima del 3b) | console pulita, nessun rischio di pagina vuota | S | — | da fare |
