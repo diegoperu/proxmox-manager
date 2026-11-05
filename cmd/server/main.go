@@ -118,7 +118,6 @@ func main() {
 		// Provisioning
 		r.Get("/templates", h.GetTemplates)
 		r.Get("/nextid", h.GetNextVMID)
-		r.Post("/provision", h.ProvisionVM)
 		r.Get("/groups", h.GetGroups)
 		r.Put("/nodes/{node}/{kind}/{vmid}/groups", h.SetGroups)
 
@@ -131,6 +130,10 @@ func main() {
 		r.Get("/ceph/summary", h.GetCephSummary())
 		r.Get("/gpus", h.GetGPUs())
 		r.Get("/reports/{model}", h.GetReport)
+		r.Get("/provision/advice", h.GetProvisionAdvice)
+		r.Put("/gpu-models", h.PutGPUModel)
+		r.Post("/provision/job", h.PostProvisionJob)
+		r.Get("/provision/job", h.GetProvisionJob)
 		r.Get("/balance", h.GetBalance)
 		r.Post("/balance/step", h.PostBalanceStep)
 		r.Get("/balance/task", h.GetBalanceTask)

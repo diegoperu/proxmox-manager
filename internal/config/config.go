@@ -2,9 +2,13 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
+	"strings"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 )
 
 type ClusterConfig struct {
@@ -25,7 +29,23 @@ type Config struct {
 	ListenAddr   string          `json:"listen_addr"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
 	AllowedHosts []string `json:"allowed_hosts"`
+	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
+	// model string Proxmox reports. Valid for every cluster; the built-in table is the default.
+	GPUModels map[string]GPUModel `json:"gpu_models,omitempty"`
 }
+
+// GPUModel is one correction: an empty Name keeps the model's own name, MemoryGB 0 keeps the default size.
+type GPUModel struct {
+	Name     string `json:"name"`
+	MemoryGB int    `json:"memory_gb"`
+}
+
+const (
+	gpuModelKeyMax  = 160
+	gpuModelNameMax = 64
+	gpuModelMaxGB   = 512
+	gpuModelsMax    = 128
+)
 
 var (
 	current Config
@@ -46,7 +66,7 @@ func ValidTheme(t string) bool { return t == "" || themes[t] }
 // ValidDensity reports whether d is "" or a known density.
 func ValidDensity(d string) bool { return d == "" || densities[d] }
 
-const cfgPath = "config.json"
+var cfgPath = "config.json" // a variable only so that tests can point it to a temporary directory
 
 func Load() error {
 	mu.Lock()
@@ -117,6 +137,7 @@ func Get() Config {
 	c := current
 	c.Clusters = make([]ClusterConfig, len(current.Clusters))
 	copy(c.Clusters, current.Clusters)
+	c.GPUModels = copyGPUModels(current.GPUModels)
 	return c
 }
 
@@ -170,4 +191,79 @@ func AllowedHosts() []string {
 	mu.RLock()
 	defer mu.RUnlock()
 	return append([]string(nil), current.AllowedHosts...)
+}
+
+func copyGPUModels(m map[string]GPUModel) map[string]GPUModel {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]GPUModel, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// GPUModels returns a copy of the card model corrections.
+func GPUModels() map[string]GPUModel {
+	mu.RLock()
+	defer mu.RUnlock()
+	return copyGPUModels(current.GPUModels)
+}
+
+func printableText(s string, max int) bool {
+	if !utf8.ValidString(s) || len(s) > max*4 || utf8.RuneCountInString(s) > max {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPrint(r) || unicode.Is(unicode.Bidi_Control, r) {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidGPUModel checks one correction: the model key as Proxmox writes it, the shown name and the size.
+func ValidGPUModel(key string, m GPUModel) error {
+	switch {
+	case key == "" || !printableText(key, gpuModelKeyMax):
+		return errors.New("modello non valido")
+	case !printableText(m.Name, gpuModelNameMax):
+		return errors.New("nome non valido (testo semplice, massimo 64 caratteri)")
+	case m.MemoryGB < 0 || m.MemoryGB > gpuModelMaxGB:
+		return errors.New("memoria non valida (0 = predefinita, massimo 512 GB)")
+	}
+	return nil
+}
+
+// SetGPUModel stores a correction and saves; an empty name with memory 0 removes it. The file is rewritten
+// whole, so on a write error the in-memory value goes back to what it was.
+func SetGPUModel(key string, m GPUModel) error {
+	m.Name = strings.TrimSpace(m.Name)
+	if err := ValidGPUModel(key, m); err != nil {
+		return err
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	prev, had := current.GPUModels[key]
+	if m.Name == "" && m.MemoryGB == 0 {
+		delete(current.GPUModels, key)
+	} else {
+		if _, exists := current.GPUModels[key]; !exists && len(current.GPUModels) >= gpuModelsMax {
+			return errors.New("troppe correzioni salvate")
+		}
+		if current.GPUModels == nil {
+			current.GPUModels = map[string]GPUModel{}
+		}
+		current.GPUModels[key] = m
+	}
+	if err := save(); err != nil {
+		if had {
+			current.GPUModels[key] = prev
+		} else {
+			delete(current.GPUModels, key)
+		}
+		return err
+	}
+	return nil
 }

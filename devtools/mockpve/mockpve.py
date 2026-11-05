@@ -127,8 +127,12 @@ def resources():
     for v in VMS:
         r = {k: v[k] for k in ("type", "node", "vmid", "name", "status", "maxmem", "mem", "cpu", "maxdisk", "disk", "template", "tags")}
         r["id"] = f"{v['type']}/{v['vmid']}"
-        r["maxcpu"] = 2
+        r["maxcpu"] = v.get("maxcpu", 2)
         res.append(r)
+    for n, b in NODES.items():  # storage condiviso (come Ceph) e uno locale, per il consiglio della creazione VM
+        if b["status"] == "online":
+            res.append(dict(id=f"storage/{n}/ceph-vm", type="storage", node=n, storage="ceph-vm", status="available", shared=1, content="images,rootdir", maxdisk=5000 * GB, disk=int(1000 * GB)))
+            res.append(dict(id=f"storage/{n}/local-lvm", type="storage", node=n, storage="local-lvm", status="available", shared=0, content="images,rootdir", maxdisk=900 * GB, disk=int(900 * GB * b["disk"])))
     return res
 
 
@@ -229,7 +233,7 @@ def route(path):
     if p.startswith("/cluster/ceph/"): return ceph_route(p[len("/cluster/ceph/"):])
     if p == "/cluster/mapping/pci": return [dict(id="gpu-a100", map=[f"node={n},path=0000:02:00,id=10de:20f1" for n in NODES]), dict(id="gpu-3090", map=["node=datacloud-node-1,path=0000:01:00"])]
     if p == "/cluster/tasks": return tasks()
-    if p == "/cluster/nextid": return "214"
+    if p == "/cluster/nextid": return str(max(v["vmid"] for v in VMS) + 1)
     if p == "/cluster/ha/resources": return []
     if p == "/nodes":
         return [dict(node=n, status=b["status"], maxmem=b["maxmem"], mem=int(b["maxmem"] * b["mem"]), cpu=b["cpu"],
@@ -274,7 +278,11 @@ def route(path):
                 val = f"ip={v['ip']}/24,gw=10.75.4.254" if v["ip"] else ""
                 cfg = {"name": v["name"], "cores": 2, "memory": v["maxmem"] // (1024 * 1024)}
                 if v.get("tags"): cfg["tags"] = v["tags"]
-                if v.get("template"): cfg["template"] = 1
+                if v.get("template"):
+                    cfg["template"] = 1
+                    cfg["virtio0"] = f"ceph-vm:base-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"
+                if v.get("mem_mb"): cfg["memory"] = v["mem_mb"]
+                if v.get("maxcpu"): cfg["cores"] = v["maxcpu"]
                 if val: cfg[key] = val
                 if seg[0] == "qemu" and v["vmid"] % 3 == 0: cfg["serial0"] = "socket"  # alcune VM con console seriale
                 if seg[0] == "qemu" and v["vmid"] % 2 == 0: cfg["cpu"] = "host"  # meta' delle VM con la CPU del nodo
@@ -362,7 +370,7 @@ class H(BaseHTTPRequestHandler):
         if self.command == "PUT" and len(parts) == 5 and parts[0] == "nodes" and parts[2] in ("qemu", "lxc") and parts[4] == "config" and parts[3].isdigit():
             vmid = int(parts[3]); cur = route("/" + "/".join(parts))
             if cur is None: return self.send_error(404)
-            if form.get("digest", [""])[0] != cur["digest"]:
+            if form.get("digest", [cur["digest"]])[0] != cur["digest"]:  # come Proxmox: il digest e' facoltativo, se c'e' deve coincidere
                 return self._json({"data": None, "message": "detected modified configuration - file changed by other user? Try again"}, 500)
             ed = CFG_EDITS.setdefault(vmid, {})
             vm = next(x for x in VMS if x["vmid"] == vmid)
@@ -373,6 +381,8 @@ class H(BaseHTTPRequestHandler):
                         if d == "tags": vm["tags"] = ""
                         else: ed[d] = None
                 elif k == "tags": vm["tags"] = val[0]
+                elif k == "memory" and val[0].isdigit(): vm["maxmem"] = int(val[0]) * 1024 * 1024; vm["mem_mb"] = int(val[0])
+                elif k == "cores" and val[0].isdigit(): vm["maxcpu"] = int(val[0])
                 else: ed[k] = val[0]
             return self._json({"data": None}, 200)
         # spegnimento/accensione: POST /nodes/{n}/qemu/{id}/status/{shutdown|stop|start}
@@ -386,6 +396,19 @@ class H(BaseHTTPRequestHandler):
             up = "UPID:%s:0000ABCD:00123456:65F0A1B2:qm%s:%d:root@pam!mock:" % (parts[1], parts[5], vmid)
             MIG_TASKS[up] = 2  # gia' "finito" alla prossima lettura
             return self._json({"data": up}, 200)
+        # clone: POST /nodes/{n}/qemu/{id}/clone newid,name,target (crea la VM solo in memoria, sul nodo "target")
+        if self.command == "POST" and len(parts) == 5 and parts[0] == "nodes" and parts[2] == "qemu" and parts[4] == "clone" and parts[3].isdigit():
+            src = next((x for x in VMS if x["vmid"] == int(parts[3])), None)
+            newid = form.get("newid", [""])[0]; tgt = form.get("target", [parts[1]])[0]
+            if src is None or not newid.isdigit() or any(x["vmid"] == int(newid) for x in VMS) or tgt not in NODES or NODES[tgt]["status"] != "online":
+                return self._json({"data": None, "message": "clone refused"}, 500)
+            VMS.append(dict(src, vmid=int(newid), name=form.get("name", ["clone"])[0], node=tgt, status="stopped", mem=0, cpu=0, template=0, tags="", ip=""))
+            up = "UPID:%s:0000ABCD:00123456:65F0A1B2:qmclone:%s:root@pam!mock:" % (parts[1], parts[3])
+            MIG_TASKS.pop(up, None)
+            return self._json({"data": up}, 200)
+        # resize disco: PUT /nodes/{n}/qemu/{id}/resize (solo conferma)
+        if self.command == "PUT" and len(parts) == 5 and parts[0] == "nodes" and parts[2] == "qemu" and parts[4] == "resize" and parts[3].isdigit():
+            return self._json({"data": None}, 200)
         # migrazione: POST /nodes/{n}/{qemu|lxc}/{id}/migrate target=<nodo> (sposta la VM solo in memoria)
         if self.command == "POST" and len(parts) == 5 and parts[0] == "nodes" and parts[2] in ("qemu", "lxc") and parts[4] == "migrate" and parts[3].isdigit():
             vm = next((x for x in VMS if x["vmid"] == int(parts[3])), None)

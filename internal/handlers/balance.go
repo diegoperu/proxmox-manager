@@ -411,6 +411,45 @@ func loadGuestFacts(c balanceAPI, g resGuestB, shared map[string]bool) guestFact
 	return f
 }
 
+// osdCounts: Ceph OSDs per node (the reserve for them), best effort: known=false when no node answers.
+func osdCounts(c balanceAPI) (map[string]int, bool) {
+	osds := map[string]int{}
+	cands, err := cephNodeCandidates(c, nil)
+	if err != nil {
+		return osds, false
+	}
+	for i, n := range cands {
+		if i >= cephNodeAttempts {
+			break
+		}
+		if oraw, err := c.GetCephOSD(n); err == nil {
+			for _, o := range normalizeCephOSDs(oraw) {
+				osds[o.Host]++
+			}
+			return osds, true
+		}
+	}
+	return osds, false
+}
+
+// nodeCPUP95: real CPU use of a node over 4 weeks (RRD "month", 30 min resolution: a true percentile), percent;
+// -1 when it cannot be read.
+func nodeCPUP95(c balanceAPI, node string) float64 {
+	raw, err := c.GetNodeRRDcf(node, "month", "AVERAGE")
+	if err != nil {
+		return -1
+	}
+	s, err := parseRRD(raw, "cpu")
+	if err != nil {
+		return -1
+	}
+	cpu := scaleNaN(orNaN(s.Cols["cpu"], len(s.T)), 100)
+	if st := statOf(cpu, nil, medianStep(s.T), 1e18); st.P95 != nil {
+		return *st.P95
+	}
+	return -1
+}
+
 func dedupSorted(in []string) []string {
 	set := map[string]bool{}
 	for _, s := range in {
@@ -545,21 +584,8 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 	}
 
 	// Ceph OSDs per node (reserve), best effort
-	osds := map[string]int{}
-	if cands, err := cephNodeCandidates(c, nil); err == nil {
-		for i, n := range cands {
-			if i >= cephNodeAttempts {
-				break
-			}
-			if oraw, err := c.GetCephOSD(n); err == nil {
-				meta.CephKnown = true
-				for _, o := range normalizeCephOSDs(oraw) {
-					osds[o.Host]++
-				}
-				break
-			}
-		}
-	}
+	osds, cephKnown := osdCounts(c)
+	meta.CephKnown = cephKnown
 	if !meta.CephKnown {
 		meta.Partial = append(meta.Partial, "ceph")
 	}
@@ -611,16 +637,7 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 		i := i
 		nodeCPU[i] = -1
 		jobs = append(jobs, func() {
-			raw, err := c.GetNodeRRDcf(nodes[i].name, "month", "AVERAGE")
-			if err != nil {
-				return
-			}
-			if s, err := parseRRD(raw, "cpu"); err == nil {
-				cpu := scaleNaN(orNaN(s.Cols["cpu"], len(s.T)), 100)
-				if st := statOf(cpu, nil, medianStep(s.T), 1e18); st.P95 != nil {
-					nodeCPU[i] = *st.P95
-				}
-			}
+			nodeCPU[i] = nodeCPUP95(c, nodes[i].name)
 		})
 	}
 	runLimited(jobs)

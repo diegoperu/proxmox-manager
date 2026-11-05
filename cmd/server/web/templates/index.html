@@ -440,6 +440,15 @@ td.spk{width:130px}
 .bal-run.ask{border-color:var(--warn);flex-wrap:wrap}.bal-run.ask .bal-act{display:flex;gap:8px;margin-left:auto}
 .bal-run.bad{border-color:var(--red)}
 .bal-mode{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+.pv-opt{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+.pv-where{margin-top:10px}.pv-where fieldset{border:0;margin:0;padding:0;min-width:0}.pv-where legend{font-size:12px;color:var(--text3);margin-bottom:6px;padding:0}
+.pv-n,.pv-c{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);margin-bottom:6px;font-size:13px}
+.pv-n.sel,.pv-c.sel{border-color:var(--accent)}.pv-n.off,.pv-c.off{opacity:.62;background:var(--bg3)}
+.pv-n .nm2,.pv-c .nm2{display:flex;gap:6px 10px;flex-wrap:wrap;align-items:baseline}.pv-n small,.pv-c small{color:var(--text3);font-size:12px}
+.pv-n .tags,.pv-c .tags{display:flex;gap:4px 6px;flex-wrap:wrap;margin-top:4px}
+.pv-gh{font-size:12px;color:var(--text3);margin:10px 0 4px}
+.pv-star{font-size:11px;border:1px solid var(--accent);border-radius:6px;padding:1px 6px;color:var(--accent)}
+.pv-job{font-size:13px;line-height:1.9}.pv-job .ok{color:var(--green)}.pv-job .wn{color:var(--warn)}.pv-job .er{color:var(--red)}
 @media(max-width:850px){.bal-n{grid-template-columns:1fr}}
 .olegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--text3);margin:0 0 8px}
 .olegend span{display:inline-flex;gap:6px;align-items:center}
@@ -849,7 +858,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.134.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.142.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1066,7 +1075,7 @@ html.spiderman{
           </div>
 
           <h2 class="sec">2. Configurazione VM</h2>
-          <div class="card">
+          <div class="card mb14">
             <div class="g g2 g8 mb12">
               <div class="fr">
                 <label class="fl" for="pv-name">Nome VM</label>
@@ -1098,15 +1107,17 @@ html.spiderman{
                 <input class="inp w" id="pv-diskdev" type="text" value="scsi0">
               </div>
             </div>
-            <div class="fr">
-              <label class="fl" for="pv-node">Nodo target</label>
-              <select class="inp w" id="pv-node"><option value="">— stesso del template —</option></select>
-            </div>
             <div class="fr" style="margin-top:12px">
               <label class="fl" for="pv-group">Gruppo <span class="td">(opzionale)</span></label>
               <input class="inp w" id="pv-group" type="text" list="grp-dl" maxlength="32" autocomplete="off" spellcheck="false" placeholder="es. rossi" oninput="Provision.summary()">
               <div class="hint" id="pv-group-hint">Scrive il tag gruppo-nome sulla VM: i report la contano in quel gruppo.</div>
             </div>
+          </div>
+
+          <h2 class="sec">Dove <small>nodo consigliato in base al carico di RAM; si puo' cambiare tra i nodi idonei</small></h2>
+          <div class="card">
+            <label class="pv-opt" for="pv-gpu"><input type="checkbox" class="chk" id="pv-gpu" onchange="Provision.onGpu()"> La VM avra' una scheda video (GPU)</label>
+            <div class="pv-where" id="pv-where" aria-live="polite"><span class="td">Scegli un template e indica core e RAM.</span></div>
           </div>
         </div>
 
@@ -1144,14 +1155,28 @@ html.spiderman{
             </div>
           </div>
 
+          <h2 class="sec">Utente aggiuntivo <small>opzionale, creato nella VM al primo avvio</small></h2>
+          <div class="card mb14">
+            <div class="fr">
+              <label class="fl" for="pv-xuser">Nome utente</label>
+              <input class="inp w" id="pv-xuser" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="es. mario" aria-describedby="pv-xhint">
+            </div>
+            <div class="fr">
+              <label class="fl" for="pv-xkey">Chiave pubblica SSH <span class="td">(opzionale)</span></label>
+              <textarea class="inp w" id="pv-xkey" rows="2" placeholder="ssh-ed25519 AAAA... (vuota = password iniziale)" style="resize:vertical;font-family:monospace;font-size:11px"></textarea>
+            </div>
+            <div class="hint" id="pv-xhint">Si crea con il guest agent, come il pulsante "Aggiungi utente" della VM: senza chiave la password iniziale e' <code>p4ssw0rd</code> e scade al primo accesso. Serve che la VM si avvii e l'agent risponda (si attende fino a 10 minuti; se non risponde la VM resta creata e l'utente si aggiunge dal pannello).</div>
+          </div>
+
           <h2 class="sec">4. Esegui</h2>
           <div class="card">
             <div id="pv-summary" style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.9">
               <span class="td">Configura i parametri e clicca Provisiona.</span>
             </div>
+            <label class="pv-opt mb12" for="pv-start"><input type="checkbox" class="chk" id="pv-start" checked> Avvia la VM al termine</label>
             <button class="btn ba wf mb12" onclick="Provision.run()" id="pv-btn">Provisiona VM</button>
-            <h2 class="sec">Log provisioning</h2>
-            <div class="plog" id="pv-log"><span class="td">In attesa...</span></div>
+            <h2 class="sec">Avanzamento</h2>
+            <div class="plog pv-job" id="pv-log" aria-live="polite"><span class="td">In attesa...</span></div>
           </div>
         </div>
       </div>
@@ -1392,6 +1417,21 @@ html.spiderman{
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('mgpu')">Annulla</button>
     <button class="btn ba" onclick="Gpu.next()">Continua</button>
+  </div>
+</div></div>
+
+<!-- MODAL: NOME E MEMORIA DI UN MODELLO DI SCHEDA (D62) -->
+<div class="ov" id="mgm"><div class="modal" style="min-width:min(500px,calc(100vw - 24px))">
+  <div class="mt">Nome e memoria del modello</div>
+  <div class="td" id="mgm-model" style="margin-bottom:12px;word-break:break-word"></div>
+  <div class="fr mb12"><label class="fl" for="mgm-name">Nome mostrato <span class="td">(vuoto = quello di Proxmox)</span></label><input class="inp w" id="mgm-name" type="text" maxlength="64" autocomplete="off"></div>
+  <div class="fr mb12"><label class="fl" for="mgm-gb">Memoria (GB) <span class="td">(0 = <span id="mgm-def"></span>)</span></label><input class="inp w" id="mgm-gb" type="number" min="0" max="512" step="1" value="0"></div>
+  <p class="cnote" id="mgm-note"></p>
+  <div id="mgm-msg" role="status" style="margin-top:10px"></div>
+  <div class="mf">
+    <button class="btn bg2" onclick="closeModal('mgm')">Annulla</button>
+    <button class="btn bg2" id="mgm-reset" onclick="Gpu.modelSave(true)">Ripristina</button>
+    <button class="btn ba" id="mgm-ok" onclick="Gpu.modelSave(false)">Salva</button>
   </div>
 </div></div>
 
@@ -2780,11 +2820,42 @@ const Gpu={
       const uses=c.uses.map(u=>`<div>${Gpu.vmBtn(n.node,u)} ${Gpu.useBadge(u)}${u.status==='running'?' <span class="td">· accesa</span>':''}</div>`).join('')||'<span class="td">—</span>';
       const acts=c.uses.filter(u=>u.editable).map(u=>`<button type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(n.node)},${js(u.vmid)},${js(u.slot)})">Togli</button>`).join(' ')
         ||(c.status==='free'?(c.mappings.length?`<button type="button" class="btn ba sm" onclick="Gpu.assign(${js(n.node)},${js(c.addr)})">Assegna…</button>`:'<span class="td" title="In Proxmox: Datacenter › Resource Mappings › PCI">serve un mapping</span>'):'');
-      return`<tr><td><b>${esc(Gpu.short(c.name))}</b></td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td><td>${acts}</td></tr>`;
+      const mem=c.memory_gb?`${c.memory_gb} GB${c.memory_custom?' (corretta)':''}`:'memoria non nota';
+      const model=`<b>${esc(c.display_name||Gpu.short(c.name))}</b><div class="td">${esc(mem)} <button type="button" class="btn bg2 sm" style="margin-left:4px" aria-label="${esc('Modifica nome e memoria del modello '+(c.display_name||Gpu.short(c.name)))}" onclick="Gpu.modelEdit(${js(n.node)},${js(c.addr)})">Modifica</button></div>`;
+      return`<tr><td>${model}</td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td><td>${acts}</td></tr>`;
     }).join('');
     const groups=n.groups.length?`<p class="cnote" style="padding:0 var(--card-pad) 12px">Mapping a gruppo (sola lettura): ${n.groups.map(g=>esc(`${g.id} · ${g.cards} schede · ${new Set(g.uses.map(u=>u.vmid)).size} VM`)).join(' · ')}</p>`:'';
     return`<div class="panel"><div class="panel-h"><h2>${esc(n.node)}</h2><small>${n.cards.length} ${Dashboard.plural(n.cards.length,'scheda','schede')} · ${free} ${Dashboard.plural(free,'libera','libere')}</small></div>
       <div class="tw"><table><thead><tr><th>Scheda</th><th>Indirizzo</th><th>Stato</th><th>VM</th><th>Mapping</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${groups}</div>`;
+  },
+
+  // ── nome e memoria di un modello (D62): vale per tutte le schede di quel modello e per tutti i cluster ──
+  modelCtx:null,
+  modelEdit(node,addr){
+    const d=Gpu.by[ClusterMgr.current], n=d&&d.nodes.find(x=>x.node===node), c=n&&n.cards.find(x=>x.addr===addr);
+    if(!c)return;
+    const same=d.nodes.reduce((a,x)=>a+x.cards.filter(y=>y.model===c.model).length,0);
+    Gpu.modelCtx={model:c.model,custom:!!(c.display_name||c.memory_custom)};
+    document.getElementById('mgm-model').textContent=c.model;
+    document.getElementById('mgm-name').value=c.display_name||'';
+    document.getElementById('mgm-gb').value=c.memory_custom?c.memory_gb:0;
+    document.getElementById('mgm-def').textContent=c.default_memory_gb?`predefinita: ${c.default_memory_gb} GB`:'memoria non nota';
+    document.getElementById('mgm-note').textContent=`Vale per le ${same} ${Dashboard.plural(same,'scheda','schede')} di questo modello in questo cluster e per ogni cluster che ne ha. Serve a leggere meglio l'elenco e a raggruppare le schede per memoria nella creazione di una VM.`;
+    document.getElementById('mgm-msg').replaceChildren();
+    document.getElementById('mgm-reset').hidden=!Gpu.modelCtx.custom;
+    openModal('mgm');
+  },
+  async modelSave(reset){
+    const ctx=Gpu.modelCtx, msg=document.getElementById('mgm-msg'); if(!ctx||Gpu.busy)return;
+    const name=reset?'':document.getElementById('mgm-name').value.trim(), gb=reset?0:parseInt(document.getElementById('mgm-gb').value||'0',10);
+    if(!Number.isInteger(gb)||gb<0||gb>512){msg.textContent='La memoria deve essere un numero tra 0 e 512.';return;}
+    if(name.length>64){msg.textContent='Il nome puo\' avere al massimo 64 caratteri.';return;}
+    Gpu.busy=true; msg.textContent='Salvataggio…';
+    try{
+      await api('/gpu-models',{method:'PUT',body:JSON.stringify({model:ctx.model,name,memory_gb:gb}),quiet:true});
+      Gpu.busy=false; closeModal('mgm'); toast(reset?'Valori predefiniti ripristinati':'Modello aggiornato','ok'); _tc.clear();
+      Gpu.load(true);
+    }catch(e){Gpu.busy=false;msg.textContent=e.message;}
   },
 
   // ── assegna ──
@@ -4285,18 +4356,30 @@ const DiskMgr = {
 // PROVISION
 // ════════════════════════════════════════════════════════════════════════════
 const Provision=(()=>{
-  let templates=[], nodes=[], gwManual=false;
+  let templates=[], gwManual=false;
+  // consiglio del nodo (GET /provision/advice): ultima risposta, scelta dell'utente, sequenza per scartare risposte superate
+  let adv=null, advSeq=0, advTimer=null, manualNode='', manualCard='', job=null;
+  const GB=1073741824, LABEL={clone:'Clonazione del template sul nodo scelto',config:'Core e RAM',disk:'Dimensione del disco',cloudinit:'Cloud-init',group:'Gruppo',gpu:'Scheda video',start:'Avvio',agent:'Attesa del guest agent',user:'Utente aggiuntivo'};
+  const gbTxt=b=>{const g=b/GB;return g>=10?String(Math.ceil(g)):String(Math.ceil(g*10)/10).replace('.',',');};
+  const REASON=r=>{switch(r.code){
+    case 'node_offline':return'nodo fuori linea';
+    case 'ram':return`mancano ${gbTxt(r.missing||0)} GB di RAM`;
+    case 'vcpu_over_threads':return r.have?`servono ${r.need} thread, il nodo ne ha ${r.have}`:'thread del nodo non noti';
+    case 'storage_unavailable':return'lo storage del template non e\' disponibile su questo nodo';
+    case 'storage_not_shared':return'lo storage del template non e\' condiviso: serve il nodo del template';
+    case 'storage_no_images':return'lo storage non puo\' contenere dischi di VM';
+    case 'no_free_gpu':return'nessuna scheda libera con un mapping';
+    default:return String(r.code);}};
+  const CARD_REASON={card_busy:'in uso',no_mapping:'nessun mapping: la app assegna solo tramite mapping',card_reserved:'in creazione (prenotata da un\'altra creazione)',node_not_eligible:'il suo nodo non puo\' ricevere la VM'};
+  const WARN={cpu_vcpu:'molte vCPU gia\' assegnate (oltre 4 per thread)',cpu_p95:'CPU reale gia\' alta (oltre l\'80%)'};
+  const val=id=>document.getElementById(id).value.trim();
+  const tplNow=()=>templates[parseInt(document.getElementById('tpl-select').value)];
+  // storage di tutti i volumi del template (dischi, EFI, TPM, cloud-init, ISO): come il controllo del server
+  const tplStorages=tpl=>{const out=new Set();if(!tpl||!tpl.config)return[];for(const[k,v]of Object.entries(tpl.config)){if(!/^((virtio|scsi|sata|ide)\d{1,2}|efidisk\d|tpmstate\d)$/.test(k)||typeof v!=='string'||v.startsWith('none'))continue;const i=v.indexOf(':');if(i>0&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v.slice(0,i)))out.add(v.slice(0,i));}return[...out].sort().slice(0,8);};
 
   return{
     async load(){
       Groups.fetch().catch(()=>{}); // riempie l'elenco dei gruppi esistenti (suggerimenti del campo Gruppo)
-      // Load nodes for target selector
-      if(!nodes.length){
-        const ns=await api('/nodes',{quiet:true}).catch(()=>[]);
-        nodes=Array.isArray(ns)?ns:[];
-        const sel=document.getElementById('pv-node');
-        nodes.forEach(n=>{if(![...sel.options].find(o=>o.value===n.node))sel.add(new Option(n.node,n.node));});
-      }
       // Load templates
       const tl=document.getElementById('tpl-loading');
       tl.innerHTML='<div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Ricerca template...'; tl.style.display='flex';
@@ -4382,8 +4465,10 @@ const Provision=(()=>{
     onGw(el){gwManual=el.value.trim()!=='';Provision.summary();},
     bind(){
       const pg=document.getElementById('page-provision');
-      pg.addEventListener('input',()=>Provision.summary());
-      pg.addEventListener('change',()=>Provision.summary());
+      const ADV=new Set(['pv-cpu','pv-ram','tpl-select','pv-diskdev','pv-group','pv-gpu']);
+      const on=e=>{Provision.summary();if(e&&e.target&&ADV.has(e.target.id))Provision.schedule();};
+      pg.addEventListener('input',on);
+      pg.addEventListener('change',on);
       Provision.summary();
     },
     // Riepilogo di ciò che verrà creato: la clonazione può durare minuti, meglio vederlo prima. Solo testo.
@@ -4394,15 +4479,18 @@ const Provision=(()=>{
       el.replaceChildren();
       const line=(t,cls)=>{const d=document.createElement('div');if(cls)d.className=cls;d.textContent=t;el.append(d);};
       if(!tpl){line('Seleziona un template, compila i parametri e clicca Provisiona.','td');return;}
-      line(`Clona ${tpl.name} (${tpl.vmid}, ${tpl.node}) in ${g('pv-name')||'— nome mancante —'} sul nodo ${g('pv-node')||tpl.node}`);
+      line(`Clona ${tpl.name} (${tpl.vmid}, ${tpl.node}) in ${g('pv-name')||'— nome mancante —'} sul nodo ${Provision.target()||'— da scegliere —'}`);
+      if(document.getElementById('pv-gpu').checked){const c=Provision.card();line(c?`Scheda video: ${c.name} (${c.addr}, mapping ${c.mappings[0]})`:'Scheda video: — da scegliere —');}
       line(`VMID ${g('pv-vmid')&&g('pv-vmid')!=='0'?g('pv-vmid'):'automatico'} · ${g('pv-cpu')||'?'} CPU · ${g('pv-ram')||'?'} GB RAM · disco ${g('pv-disk')?g('pv-disk')+' GB':'come il template'}`);
       line(`Rete: ${g('pv-ip')||'IP non impostato'}${g('pv-gw')?' via '+g('pv-gw'):''}`);
       if(g('pv-group'))line(`Gruppo: ${g('pv-group')}`);
+      if(g('pv-xuser'))line(`Utente aggiuntivo: ${g('pv-xuser')}`);
+      line(document.getElementById('pv-start').checked?'Alla fine la VM viene avviata.':'La VM resta spenta.');
     },
 
     // Avanzamento: un passo e' completo quando i suoi campi obbligatori sono validi (stessa validazione del nome di run()).
     steps(tpl,g){
-      const nameOk=/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(g('pv-name'))&&g('pv-name').length<=253;
+      const nameOk=/^[A-Za-z0-9]([A-Za-z0-9.-]{0,61}[A-Za-z0-9])?$/.test(g('pv-name'));
       const d1=!!tpl, d2=d1&&nameOk&&!!g('pv-cpu')&&!!g('pv-ram'), d3=d2&&/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(g('pv-ip'));
       const done=[d1,d2,d3,false], cur=done.findIndex(x=>!x);
       document.querySelectorAll('#pv-steps .pv-step').forEach((b,i)=>{
@@ -4435,66 +4523,148 @@ const Provision=(()=>{
       document.getElementById('pv-gw').value=[(gw>>>24)&255,(gw>>>16)&255,(gw>>>8)&255,gw&255].join('.');
     },
 
+    // ── consiglio del nodo e scelta della scheda ──
+    onGpu(){manualCard='';Provision.schedule();Provision.summary();},
+    schedule(){clearTimeout(advTimer);advTimer=setTimeout(Provision.advice,400);},
+    target(){
+      if(document.getElementById('pv-gpu').checked){const c=Provision.card();return c?c.node:'';}
+      if(!adv)return'';
+      const el=adv.nodes.find(n=>n.name===manualNode&&n.eligible);
+      return el?el.name:(adv.recommended||'');
+    },
+    card(){
+      if(!adv||!adv.cards)return null;
+      return adv.cards.find(c=>c.addr+'@'+c.node===manualCard&&c.selectable)||adv.cards.find(c=>c.recommended)||null;
+    },
+    async advice(){
+      const seq=++advSeq, box=document.getElementById('pv-where'), tpl=tplNow();
+      const ram=parseFloat(val('pv-ram')), cores=parseInt(val('pv-cpu'));
+      if(!tpl||!(ram>0)||!(cores>0)){adv=null;box.innerHTML='<span class="td">Scegli un template e indica core e RAM.</span>';Provision.summary();return;}
+      const p=new URLSearchParams({memory_mb:String(Math.round(ram*1024)),cores:String(cores),template_node:tpl.node});
+      const st=tplStorages(tpl); if(st.length)p.set('storage',st.join(','));
+      if(document.getElementById('pv-gpu').checked)p.set('gpu','1');
+      const gp=Groups.parse(val('pv-group')); if(gp.ok&&gp.groups.length===1)p.set('group',gp.groups[0]);
+      box.innerHTML='<span class="td">Calcolo del nodo consigliato…</span>';
+      let r;
+      try{r=await api('/provision/advice?'+p,{quiet:true,timeoutMs:60000});}
+      catch(e){if(seq!==advSeq)return;adv=null;box.innerHTML=e.status===429?errBox('Un altro calcolo e\' in corso su questo cluster.','Provision.advice()'):errBox(e.message,'Provision.advice()');Provision.summary();return;}
+      if(seq!==advSeq)return;
+      adv=r; Provision.paintWhere(); Provision.summary();
+    },
+    paintWhere(){
+      const box=document.getElementById('pv-where'), gpu=document.getElementById('pv-gpu').checked, cur=Provision.target(), card=Provision.card();
+      const pct=n=>`${n.pct_before}% → <b>${n.pct_after}%</b> della RAM assegnabile`;
+      const nodeRow=n=>{
+        const sel=n.name===cur, off=!n.eligible, ro=gpu||off;
+        const tags=[n.recommended?'<span class="pv-star">consigliato</span>':'',
+          ...n.reasons.map(r=>`<span class="bal-flag r">${esc(REASON(r))}</span>`),
+          ...(n.warnings||[]).map(w=>`<span class="bal-flag w">${esc(Object.hasOwn(WARN,w)?WARN[w]:w)}</span>`)].join('');
+        return`<label class="pv-n${sel?' sel':''}${off?' off':''}"><input type="radio" name="pv-node" value="${esc(n.name)}" ${sel?'checked':''} ${ro?'disabled':''} onchange="Provision.pickNode(${js(n.name)})"><span><span class="nm2"><b>${esc(n.name)}</b><small>${pct(n)}</small></span><span class="tags">${tags}</span></span></label>`;
+      };
+      let html=`<fieldset><legend>${gpu?'Nodi (con una scheda il nodo e\' quello della scheda scelta)':'Nodo di destinazione'}</legend>${adv.nodes.map(nodeRow).join('')}</fieldset>`;
+      if(!adv.recommended)html+='<p class="cnote" style="margin-top:8px">Nessun nodo puo\' ricevere questa VM con i valori indicati: riduci RAM o core'+(gpu?', o scegli un\'altra scheda':'')+'.</p>';
+      if(gpu){
+        const groups=new Map();
+        for(const c of adv.cards){const k=c.memory_gb||0;if(!groups.has(k))groups.set(k,[]);groups.get(k).push(c);}
+        const cardRow=c=>{
+          const key=c.addr+'@'+c.node, sel=card&&card.addr===c.addr&&card.node===c.node, off=!c.selectable;
+          const why=c.reasons.map(x=>{let t=Object.hasOwn(CARD_REASON,x)?CARD_REASON[x]:x;if(x==='card_busy'&&c.uses.length)t='in uso da '+c.uses.map(u=>u.name||('VM '+u.vmid)).join(', ');return`<span class="bal-flag r">${esc(t)}</span>`;}).join('');
+          return`<label class="pv-c${sel?' sel':''}${off?' off':''}"><input type="radio" name="pv-card" value="${esc(key)}" ${sel?'checked':''} ${off?'disabled':''} onchange="Provision.pickCard(${js(key)})"><span><span class="nm2"><b>${esc(c.name)}</b><small>${esc(c.node)} · ${esc(c.addr)}${c.mappings.length?' · mapping '+esc(c.mappings.join(', ')):''}</small>${c.recommended?'<span class="pv-star">consigliata</span>':''}</span><span class="tags">${c.selectable?'<span class="bal-flag">libera</span>':why}</span></span></label>`;
+        };
+        html+=`<fieldset style="margin-top:14px"><legend>Scheda video</legend>`;
+        if(!adv.cards.length)html+='<p class="cnote">Nessuna scheda Nvidia trovata nel cluster.</p>';
+        for(const [gb,list] of [...groups.entries()].sort((a,b)=>(b[0]||-1)-(a[0]||-1)))html+=`<div class="pv-gh">${gb?gb+' GB di memoria':'Memoria non nota'}</div>${list.map(cardRow).join('')}`;
+        html+='</fieldset>';
+      }
+      if((adv.meta.partial||[]).length)html+=`<p class="cnote" style="margin-top:8px">Dati non letti del tutto: ${esc(adv.meta.partial.join(', '))}. Il server ricontrolla tutto prima di creare.</p>`;
+      box.innerHTML=html;
+    },
+    pickNode(n){manualNode=n;Provision.paintWhere();Provision.summary();},
+    pickCard(k){manualCard=k;Provision.paintWhere();Provision.summary();},
+
+    // ── creazione: il server guida la procedura, qui si legge solo lo stato ──
     _grpOk:false,
     async run(){
+      if(job){toast('C\'e\' gia\' una creazione in corso','err');return;}
       const grpConfirmed=Provision._grpOk; Provision._grpOk=false;
-      const idx=parseInt(document.getElementById('tpl-select').value);
-      const tpl=templates[idx];
+      const tpl=tplNow();
       if(!tpl){toast('Seleziona un template','err');return;}
-      const vmName=document.getElementById('pv-name').value.trim();
-      if(!vmName||vmName.length>253||!/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(vmName)){
-        toast('Nome VM non valido: usa lettere, numeri, punti e trattini (non può iniziare con un simbolo)','err');
+      const vmName=val('pv-name');
+      if(!/^[A-Za-z0-9]([A-Za-z0-9.-]{0,61}[A-Za-z0-9])?$/.test(vmName)){
+        toast('Nome VM non valido: lettere, numeri, punti e trattini (non puo\' iniziare o finire con un simbolo, massimo 63 caratteri)','err');
         document.getElementById('pv-name').focus(); return;
       }
-
-      const gp=Groups.parse(document.getElementById('pv-group').value);
+      const node=Provision.target(), gpuOn=document.getElementById('pv-gpu').checked, card=gpuOn?Provision.card():null;
+      if(!node){toast(gpuOn?'Scegli una scheda video disponibile':'Nessun nodo idoneo: controlla RAM e core','err');return;}
+      const gp=Groups.parse(val('pv-group'));
       if(!gp.ok||gp.groups.length>1){toast(gp.ok?'In creazione si sceglie un solo gruppo':'Gruppo non valido: '+gp.err,'err');document.getElementById('pv-group').focus();return;}
       const grp=gp.groups[0]||'', grpNew=!!grp&&!Groups.existing().has(grp);
       if(grpNew&&!grpConfirmed){
         askConfirm({title:`Nuovo gruppo: ${grp}`,lines:[`Il gruppo "${grp}" non esiste ancora su nessuna VM.`],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\': controlla il nome prima di continuare.',level:'warn',okLabel:'Crea il gruppo e provisiona'},()=>{Provision._grpOk=true;Provision.run();});
         return;
       }
+      const xuser=val('pv-xuser');
       const payload={
-        template_node: tpl.node,
-        template_vmid: tpl.vmid,
-        target_node:   document.getElementById('pv-node').value||tpl.node,
-        new_vmid:      parseInt(document.getElementById('pv-vmid').value)||0,
-        name:          vmName,
-        cpu:           parseInt(document.getElementById('pv-cpu').value)||2,
-        memory:        Math.round((parseFloat(document.getElementById('pv-ram').value)||4)*1024),
-        disk:          document.getElementById('pv-disk').value?document.getElementById('pv-disk').value+'G':'',
-        disk_device:   document.getElementById('pv-diskdev').value||'scsi0',
-        ip:            document.getElementById('pv-ip').value,
-        gateway:       document.getElementById('pv-gw').value,
-        dns:           document.getElementById('pv-dns').value,
-        ciuser:        document.getElementById('pv-user').value,
-        cipassword:    document.getElementById('pv-pass').value,
-        ssh_keys:      document.getElementById('pv-ssh').value,
-        group:         grp,
-        group_new:     grpNew,
+        template_node: tpl.node, template_vmid: tpl.vmid, target_node: node,
+        new_vmid: parseInt(val('pv-vmid'))||0, name: vmName,
+        cores: parseInt(val('pv-cpu'))||2, memory: Math.round((parseFloat(val('pv-ram'))||4)*1024),
+        disk_gb: parseInt(val('pv-disk'))||0, disk_device: val('pv-diskdev')||'scsi0',
+        ip: val('pv-ip'), gateway: val('pv-ip')?val('pv-gw'):'', dns: val('pv-dns'),
+        ciuser: val('pv-user'), cipassword: document.getElementById('pv-pass').value, ssh_keys: document.getElementById('pv-ssh').value,
+        group: grp, group_new: grpNew,
+        gpu_mapping: card?card.mappings[0]:'',
+        start: document.getElementById('pv-start').checked,
       };
-
-      const btn=document.getElementById('pv-btn');
-      btn.disabled=true; btn.textContent='Provisioning in corso...';
-      const log=document.getElementById('pv-log');
-      log.replaceChildren();
-      logLine(log,`▶ Avvio provisioning "${payload.name||'vm'}"...`,'ta');
-
-      try{
-        const res=await api('/provision',{method:'POST',body:JSON.stringify(payload),quiet:true});
-        for(const line of (res.log||[])){
-          const c=line.startsWith('⚠')?'tr':line.startsWith('✓')?'tg':'ta';
-          logLine(log,line,c);
+      if(xuser)payload.extra_user={username:xuser,ssh_key:document.getElementById('pv-xkey').value.trim()};
+      const doCreate=async()=>{
+        const btn=document.getElementById('pv-btn'), log=document.getElementById('pv-log');
+        btn.disabled=true; btn.textContent='Creazione in corso...'; log.replaceChildren();
+        const line=(t,c)=>{const d=document.createElement('div');if(c)d.className=c;d.textContent=t;log.append(d);};
+        line(`▶ Controllo e avvio della creazione di "${payload.name}" su ${node}…`);
+        try{
+          const r=await api('/provision/job',{method:'POST',body:JSON.stringify(payload),quiet:true,timeoutMs:120000});
+          job={id:r.job,vmid:r.vmid,node,name:payload.name,errs:0,cluster:ClusterMgr.current??0};
+          Provision.pollJob();
+        }catch(e){
+          btn.disabled=false; btn.textContent='Provisiona VM';
+          const b=e.body||{}, why=b.reason;
+          const detail=(b.reasons||[]).map(x=>Object.hasOwn(CARD_REASON,x)?CARD_REASON[x]:REASON({code:x})).join('; ');
+          const T={node_not_eligible:'Il nodo scelto non puo\' ricevere la VM',card_unavailable:'La scheda scelta non e\' piu\' disponibile',card_reserved:'La scheda e\' stata appena prenotata da un\'altra creazione',
+            vmid_taken:'Il VMID e\' gia\' in uso',template_disk:'Il template non ha quel disco: controlla il campo "Disco device"',disk_smaller:b.error,template:'Template non leggibile',new_group:'Il gruppo e\' nuovo e va confermato'};
+          const msg=Object.hasOwn(T,why||'')?T[why]+(detail?` (${detail})`:''):e.message;
+          line('✗ '+msg,'er'); toast('Creazione non avviata: '+msg,'err');
+          Provision.advice(); // la situazione e' cambiata: nuovo consiglio
         }
-        logLine(log,`✓ VM ${res.vmid} creata su ${res.node}`,'tg');
-        toast(`VM ${res.name||res.vmid} creata`,'ok');
-      }catch(e){
-        (e.body?.log||[]).forEach(l=>logLine(log,l,l.startsWith('⚠')?'tr':'ta'));
-        logLine(log,`✗ Errore: ${e.message}`,'tr');
-        toast(`Provisioning non riuscito: ${e.message}`,'err');
-      }finally{
-        btn.disabled=false; btn.textContent='Provisiona VM';
+      };
+      doCreate();
+    },
+    async pollJob(){
+      const j=job; if(!j)return;
+      const log=document.getElementById('pv-log'), btn=document.getElementById('pv-btn');
+      const line=(t,c)=>{const d=document.createElement('div');if(c)d.className=c;d.textContent=t;return d;};
+      let v;
+      try{v=await api('/provision/job?id='+encodeURIComponent(j.id),{quiet:true});j.errs=0;}
+      catch(e){
+        if(e.status===404||++j.errs>=60){job=null;btn.disabled=false;btn.textContent='Provisiona VM';log.append(line(`✗ Stato della creazione non leggibile: controlla la VM ${j.vmid} in Proxmox`,'er'));return;}
+        setTimeout(Provision.pollJob,2000);return;
       }
+      const nodes=[line(`VM ${v.vmid} · ${v.name} · ${v.node}`)];
+      for(const s of v.steps)nodes.push(line(`${s.ok?'✓':'⚠'} ${LABEL[s.phase]||s.phase}${s.note?' — '+s.note:''}`,s.ok?'ok':'wn'));
+      if(v.phase!=='done'){nodes.push(line(`▶ ${LABEL[v.phase]||v.phase}…`));log.replaceChildren(...nodes);setTimeout(Provision.pollJob,2000);return;}
+      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto: l\'utente aggiuntivo si aggiunge dal pannello della VM (Aggiungi utente).',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.'};
+      for(const w of v.warnings)nodes.push(line('⚠ '+(Object.hasOwn(WTXT,w)?WTXT[w]:w),'wn'));
+      if(v.result==='failed'){
+        nodes.push(line(`✗ La creazione si e' fermata alla fase "${LABEL[v.failed_phase]||v.failed_phase}".`,'er'));
+        nodes.push(line(v.vm_created?`La VM ${v.vmid} esiste ed e' SPENTA: non e' stata cancellata, controllala in Proxmox.`:'Nessuna VM e\' stata creata.','er'));
+        toast('Creazione non riuscita','err');
+      }else{
+        nodes.push(line(v.result==='ok'?`✓ VM ${v.vmid} pronta su ${v.node}`:`✓ VM ${v.vmid} creata su ${v.node}, con avvisi`,'ok'));
+        toast(`VM ${v.name} creata`,'ok');
+      }
+      log.replaceChildren(...nodes);
+      if(v.vm_created){const b=document.createElement('button');b.type='button';b.className='btn bg2 sm';b.textContent='Apri la VM';b.onclick=()=>VMs.detail(v.node,v.vmid,'qemu');const d=document.createElement('div');d.append(b);log.append(d);}
+      job=null; btn.disabled=false; btn.textContent='Provisiona VM'; _tc.clear();
+      Provision.advice(); // schede e RAM sono cambiate
     }
   };
 })();

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"proxmox-manager/internal/config"
+
 	"proxmox-manager/internal/api"
 )
 
@@ -106,7 +108,13 @@ type GPUCard struct {
 	Group    int      `json:"iommu_group"`
 	Status   string   `json:"status"` // free | assigned | conflict
 	Uses     []GPUUse `json:"uses"`
-	Mappings []string `json:"mappings"` // mapping ids that point to this card on this node
+	Mappings []string `json:"mappings"`  // mapping ids that point to this card on this node
+	MemoryGB int      `json:"memory_gb"` // effective video memory: the user's correction, else the name/table value; 0 = unknown
+	// Model is the name exactly as Proxmox reports it: the key of the corrections (D62) and what options are matched on.
+	Model         string `json:"model"`
+	DisplayName   string `json:"display_name,omitempty"` // the user's name for the model, if any
+	DefaultMemory int    `json:"default_memory_gb"`      // what the name/table say, to show next to a correction
+	MemoryCustom  bool   `json:"memory_custom"`
 }
 
 type GPUGroupMapping struct {
@@ -171,7 +179,7 @@ func BuildGPUInventory(nodes []GPUNodeInput, maps MappingSet, now time.Time) GPU
 		for addr, info := range n.PCI {
 			if info.IsNvidiaDisplay() {
 				name := strings.TrimSpace(strings.TrimSpace(info.Vendor) + " " + strings.TrimSpace(info.Device))
-				cards[addr] = &GPUCard{Addr: fullAddr(addr), Name: name, Group: info.Group, Status: "free", Uses: []GPUUse{}, Mappings: []string{}}
+				cards[addr] = &GPUCard{Addr: fullAddr(addr), Name: name, Group: info.Group, Status: "free", Uses: []GPUUse{}, Mappings: []string{}, MemoryGB: gpuMemoryGB(name), DefaultMemory: gpuMemoryGB(name), Model: name}
 			}
 		}
 		// mappings pointing to this node's cards; group mappings (several cards on this node) are tracked apart
@@ -459,6 +467,9 @@ func (h *Handler) GetGPUs() http.HandlerFunc {
 			log.Printf("gpus (cluster %d): %v", idx, err)
 			writeError(w, errors.New("dati GPU non disponibili"), http.StatusBadGateway)
 			return
+		}
+		if inv, ok := v.(GPUInventory); ok {
+			v = withGPUModels(inv, config.GPUModels()) // a copy: the cached inventory stays as Proxmox gave it
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, v)
