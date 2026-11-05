@@ -898,7 +898,7 @@ D) **Uno storage condiviso** (CephFS) montato su tutti i nodi: nessuna copia den
 **Risposta utente**: A, tutto deve funzionare sul magi prima di qualsiasi cosa. Va gestito anche il fatto che ogni cluster puó avere nomi pool diverse o target dischi diversi. La sincronizzazione multicluster deve gestire in automatico la correzione degli script. Mi serve il tuo script idempotente per crearti l'acesso sul magi (puoi usare i file di supporto come sorgente senza toccare calcolo.). Il template presente sul nodo 1 del magi é cancellabile o rinominabile con un altro ID.
 
 ### D85 — Script uguali ovunque, configurazione diversa per cluster
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si' (prima di correggere gli script)
 **Domanda**: Hai chiesto che la sincronizzazione tra cluster gestisca "in automatico la correzione degli script" (pool, storage, bridge, DNS, VMID diversi). Come?
 **Perche' conta**: se la sincronizzazione riscrivesse il testo degli script per ogni cluster, i file sulle destinazioni non avrebbero piu' lo stesso hash della sorgente: il manifest (D75 A) non potrebbe piu' dire "uguale", e uno script modificato in automatico e' codice eseguito come root che nessuno ha riletto.
@@ -907,5 +907,5 @@ A) **Script identici ovunque, tutto cio' che cambia in un file `cluster.conf` lo
 B) Il manager riscrive gli script per ogni destinazione (sostituzione di nomi): sconsigliato per il motivo sopra.
 C) Come A, ma `cluster.conf` generato solo a mano.
 **Suggerimento**: A. Gli script restano uguali, controllabili con l'hash, e la parte "automatica" si limita a proporre i valori. Chi scrive `cluster.conf` sul nodo lo decidiamo allo step del backend (per ora lo crei tu o lo script di setup dal modello).
-**Risposta utente**:
+**Risposta utente**: Approvo la tua proposta (A).
 
