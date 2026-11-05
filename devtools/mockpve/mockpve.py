@@ -281,6 +281,7 @@ def route(path):
                 if v.get("template"):
                     cfg["template"] = 1
                     cfg["virtio0"] = f"ceph-vm:base-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"
+                if seg[0] == "qemu" and not v.get("template"): cfg["virtio0"] = f"ceph-vm:vm-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"; cfg["virtio1"] = f"ceph-vm:vm-{v['vmid']}-disk-1,size=20G"; cfg["ide2"] = f"ceph-vm:vm-{v['vmid']}-cloudinit,media=cdrom"
                 if v.get("mem_mb"): cfg["memory"] = v["mem_mb"]
                 if v.get("maxcpu"): cfg["cores"] = v["maxcpu"]
                 if val: cfg[key] = val
@@ -325,6 +326,8 @@ def route(path):
 
 
 MIG_TASKS = {}
+RESTARTED = set()  # VM riaccese: il disco "invisibile" compare solo dopo
+NOBLANK = set(x for x in os.environ.get("NOBLANK_VMIDS", "").split(",") if x.strip().isdigit())  # il guest non vede il disco nuovo finche' la VM non viene riavviata
 NOSHUTDOWN = set(x for x in os.environ.get("NOSHUTDOWN_VMIDS", "").split(",") if x.strip().isdigit())
 
 
@@ -361,7 +364,8 @@ class H(BaseHTTPRequestHandler):
             cmd = parse_qs(self.rfile.read(min(n, 65536)).decode()).get("command", [])
             pid = 1000 + len(EXEC)
             if "pmgr" in cmd and cmd[cmd.index("pmgr") + 1:] == ["find-blank"]:  # script del disco: un solo disco vuoto
-                EXEC[pid] = (0, "vdb\n")
+                vm_id = path.split("/")[-3] if path.count("/") >= 3 else ""
+                EXEC[pid] = (0, "" if (vm_id in NOBLANK and vm_id not in RESTARTED) else "vdb\n")
             elif any("-x" in c and "HELPER" in c for c in cmd):
                 EXEC[pid] = (0, "INLINE\n")
             elif "pmgr" in cmd and len(cmd) >= 6 and cmd[-2].isdigit():  # solo dmesg (righe, livello)
@@ -401,7 +405,7 @@ class H(BaseHTTPRequestHandler):
             vmid = int(parts[3])
             for v in VMS:
                 if v["vmid"] != vmid: continue
-                if parts[5] == "start": v["status"] = "running"
+                if parts[5] == "start": v["status"] = "running"; RESTARTED.add(str(vmid))
                 elif parts[5] == "stop" or str(vmid) not in NOSHUTDOWN: v["status"] = "stopped"
             up = "UPID:%s:0000ABCD:00123456:65F0A1B2:qm%s:%d:root@pam!mock:" % (parts[1], parts[5], vmid)
             MIG_TASKS[up] = 2  # gia' "finito" alla prossima lettura
