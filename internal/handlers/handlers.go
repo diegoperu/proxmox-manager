@@ -1081,7 +1081,7 @@ func (h *Handler) AddVMDisk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Bus == "" {
-		body.Bus = "scsi"
+		body.Bus = "virtio" // same default as the page (and as the new-VM page)
 	}
 	if !storagePattern.MatchString(body.Storage) {
 		writeError(w, fmt.Errorf("nome storage non valido"), 400)
