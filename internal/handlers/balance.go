@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,7 +42,7 @@ type balanceAPI interface {
 	GetHAResources() (json.RawMessage, error)
 	GetNodes() (json.RawMessage, error)
 	GetCephOSD(node string) (json.RawMessage, error)
-	GetNodeStatus(node string) (json.RawMessage, error) // cpuinfo.model -> vendor: live migration of host-CPU VMs (D55)
+	GetNodeStatus(node string) (json.RawMessage, error) // cpuinfo.flags: live migration of host-CPU VMs (D63)
 }
 
 var _ balanceAPI = (*api.Client)(nil)
@@ -216,22 +217,42 @@ func vmidList(s string) ([]int, error) {
 	return out, nil
 }
 
-// cpuVendor: "amd" or "intel" from Proxmox's cpuinfo.model ("AMD EPYC 7713 64-Core Processor",
-// "Intel(R) Xeon(R) CPU E5-2640 v4 @ 2.40GHz"); anything else is unknown (never matched).
-func cpuVendor(model string) string {
-	m := strings.ToLower(model)
-	isAMD, isIntel := strings.Contains(m, "amd"), strings.Contains(m, "intel")
-	switch {
-	case isAMD && !isIntel:
-		return "amd"
-	case isIntel && !isAMD:
-		return "intel"
+var cpuFlagPattern = regexp.MustCompile(`^[a-z0-9_.]{1,40}$`)
+
+// hostOnlyCPUFlags describe the host itself (virtualization extensions, SEV, the host's APIC mode, the inventory
+// number), not instructions a guest runs: they are left out of the live-migration comparison. Chosen on the
+// matrix of 2026-11-05 (VM 108 "moving-test", the 56 ordered pairs of the 8 CPU models of CALCOLO): with them
+// left out, the rule "the destination has every flag of the source" never allows a pair that failed (task error
+// or a guest that hung after a "successful" task) and allows every same-generation and older->newer pair that worked.
+var hostOnlyCPUFlags = map[string]bool{
+	"vmx": true, "svm": true, "svm_lock": true, "ept": true, "ept_ad": true, "vpid": true, "flexpriority": true,
+	"tpr_shadow": true, "vnmi": true, "npt": true, "lbrv": true, "nrip_save": true, "tsc_scale": true,
+	"vmcb_clean": true, "flushbyasid": true, "decodeassists": true, "pausefilter": true, "pfthreshold": true,
+	"vgif": true, "v_vmsave_vmload": true, "v_spec_ctrl": true, "avic": true, "x2avic": true,
+	"sev": true, "sev_es": true, "sev_snp": true, "sme": true, "x2apic": true, "intel_ppin": true, "amd_ppin": true,
+}
+
+// cpuFlags parses cpuinfo.flags ("fpu vme de pse ..."), without the host-only ones; invalid or oversized lists
+// give nil (= unknown).
+func cpuFlags(s string) map[string]bool {
+	fields := strings.Fields(s)
+	if len(fields) == 0 || len(fields) > 1000 {
+		return nil
 	}
-	return ""
+	out := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		if !cpuFlagPattern.MatchString(f) {
+			return nil
+		}
+		if !hostOnlyCPUFlags[f] {
+			out[f] = true
+		}
+	}
+	return out
 }
 
 // hostCPUType: the CPU type of a QEMU config passes the physical CPU to the guest (host, max) or may be derived
-// from it (custom-*): a live migration then needs the same CPU vendor (D55). No "cpu" key = Proxmox's generic default.
+// from it (custom-*): a live migration then needs a destination with every CPU flag of the source (D63). No "cpu" key = Proxmox's generic default.
 func hostCPUType(cfg map[string]interface{}) bool {
 	s, ok := cfg["cpu"].(string)
 	if !ok || s == "" {
@@ -564,7 +585,7 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 			facts[i] = f
 		})
 	}
-	nodeModel := make([]string, len(nodes))
+	nodeFlags := make([]map[string]bool, len(nodes))
 	for i := range nodes {
 		i := i
 		if !nodes[i].online {
@@ -577,11 +598,11 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 			}
 			var st struct {
 				CPUInfo struct {
-					Model string `json:"model"`
+					Flags string `json:"flags"`
 				} `json:"cpuinfo"`
 			}
 			if json.Unmarshal(raw, &st) == nil {
-				nodeModel[i] = clampText(strings.TrimSpace(st.CPUInfo.Model), 128)
+				nodeFlags[i] = cpuFlags(st.CPUInfo.Flags)
 			}
 		})
 	}
@@ -613,11 +634,10 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 		if nodeCPU[i] >= 0 {
 			meta.CPUKnown = true
 		}
-		vendor := cpuVendor(nodeModel[i])
-		if n.online && vendor == "" && !containsStr(meta.Partial, "cpu_vendor") {
-			meta.Partial = append(meta.Partial, "cpu_vendor") // unknown vendor: no live destination for host-CPU VMs there
+		if n.online && len(nodeFlags[i]) == 0 && !containsStr(meta.Partial, "cpu_flags") {
+			meta.Partial = append(meta.Partial, "cpu_flags") // unknown flags: no live destination for host-CPU VMs there
 		}
-		in = append(in, balance.Node{Name: n.name, Online: n.online, MemTotal: n.mem, Cores: int(n.cores), OSDs: osds[n.name], CPUP95: nodeCPU[i], Reserve: res, CPUVendor: vendor})
+		in = append(in, balance.Node{Name: n.name, Online: n.online, MemTotal: n.mem, Cores: int(n.cores), OSDs: osds[n.name], CPUP95: nodeCPU[i], Reserve: res, CPUFlags: nodeFlags[i]})
 	}
 	vms := make([]balance.VM, 0, len(guests))
 	for i, g := range guests {

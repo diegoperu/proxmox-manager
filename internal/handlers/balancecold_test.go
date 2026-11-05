@@ -280,10 +280,11 @@ func TestStepModeMustMatchThePlan(t *testing.T) {
 	}
 }
 
-func TestHostCPUVMsAndNodeModels(t *testing.T) {
+func TestHostCPUVMsAndNodeFlags(t *testing.T) {
 	f, _ := stepFixture()
 	f.hostCPU = map[int]bool{1: true}
-	f.models = map[string]string{"n1": "AMD EPYC 7713 64-Core Processor", "n2": "Intel(R) Xeon(R) CPU E5-2640 v4 @ 2.40GHz"}
+	// n1 newer than n2: n2 lacks "vaes"
+	f.models = map[string]string{"n1": "fpu svm avx2 vaes", "n2": "fpu svm avx2"}
 	q, _ := parseBalanceQuery(query("cold", "1"))
 	res, err := buildBalance(f, "C", 7, q, time.Now())
 	if err != nil {
@@ -291,7 +292,7 @@ func TestHostCPUVMsAndNodeModels(t *testing.T) {
 	}
 	for _, s := range res.Steps {
 		if s.VMID == 1 {
-			t.Fatalf("host-CPU VM moved live across CPU vendors: %+v", s)
+			t.Fatalf("host-CPU VM moved live to a CPU without all the flags: %+v", s)
 		}
 	}
 	found := false
@@ -307,16 +308,16 @@ func TestHostCPUVMsAndNodeModels(t *testing.T) {
 	if err != nil || len(res.Steps) == 0 || res.Steps[0].VMID != 1 || !res.Steps[0].Cold {
 		t.Fatalf("cold: %v %+v", err, res.Steps)
 	}
-	// two Intel models: the live move is allowed (vendor, not model)
-	f.models["n1"] = "Intel(R) Xeon(R) Silver 4114 CPU @ 2.20GHz"
+	// destination with every flag (and more): live allowed and marked checked
+	f.models["n2"] = "fpu svm avx2 vaes avx512f"
 	res, _ = buildBalance(f, "C", 7, q, time.Now())
-	if len(res.Steps) == 0 || res.Steps[0].VMID != 1 || res.Steps[0].Cold || !res.Steps[0].SameVendor {
-		t.Fatalf("Intel -> Intel live: %+v", res.Steps)
+	if len(res.Steps) == 0 || res.Steps[0].VMID != 1 || res.Steps[0].Cold || !res.Steps[0].CPUChecked {
+		t.Fatalf("superset live: %+v", res.Steps)
 	}
-	// a node whose model cannot be read is reported
+	// flags that cannot be read are reported
 	f.models["n2"] = ""
 	res, _ = buildBalance(f, "C", 7, q, time.Now())
-	if !containsStr(res.Meta.Partial, "cpu_vendor") {
+	if !containsStr(res.Meta.Partial, "cpu_flags") {
 		t.Fatalf("partial %v", res.Meta.Partial)
 	}
 }
@@ -360,13 +361,22 @@ func TestHostCPUType(t *testing.T) {
 	}
 }
 
-func TestCPUVendor(t *testing.T) {
-	for m, want := range map[string]string{
-		"AMD EPYC 7713 64-Core Processor": "amd", "Intel(R) Xeon(R) CPU E5-2640 v4 @ 2.40GHz": "intel", "Intel Xeon Test": "intel",
-		"": "", "Common KVM processor": "", "AMD Intel mix": "",
-	} {
-		if got := cpuVendor(m); got != want {
-			t.Errorf("%q: %q", m, got)
+func TestCPUFlags(t *testing.T) {
+	if f := cpuFlags("fpu vme  sse4_2 avx512f x86-64"); f != nil {
+		t.Fatalf("a dash is not a flag character, the list must be refused: %v", f)
+	}
+	f := cpuFlags("fpu vme sse4_2 avx512f 3dnowprefetch")
+	if len(f) != 5 || !f["sse4_2"] || !f["3dnowprefetch"] {
+		t.Fatalf("%v", f)
+	}
+	// host-only flags do not count: two hosts that differ only there are equivalent for a guest
+	a, b := cpuFlags("fpu avx2 svm avic sev sev_es x2apic amd_ppin"), cpuFlags("fpu avx2 svm")
+	if len(a) != 2 || len(b) != 2 || !a["avx2"] || a["avic"] || a["svm"] {
+		t.Fatalf("host-only flags kept: %v %v", a, b)
+	}
+	for _, bad := range []string{"", "   ", "fpu <script>", "fpu " + strings.Repeat("a", 41), strings.Repeat("f ", 1001)} {
+		if cpuFlags(bad) != nil {
+			t.Errorf("%q accepted", bad)
 		}
 	}
 }
