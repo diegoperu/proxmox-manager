@@ -861,7 +861,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.167.0 · 2026-11-05</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.169.0 · 2026-11-05</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -4460,16 +4460,16 @@ const Provision=(()=>{
     case 'no_free_gpu':return'nessuna scheda libera con un mapping';
     case 'disk2_storage_unavailable':return'lo storage del disco aggiuntivo non e\' disponibile su questo nodo';
     case 'disk2_storage_no_images':return'lo storage del disco aggiuntivo non accetta dischi di VM';
-    case 'disk2_no_space':return`mancano ${gbTxt(r.missing||0)} GB di spazio per il disco aggiuntivo`;
+    case 'disk2_no_space':return`mancano ${gbTxt(r.missing||0)} GB di spazio per il disco aggiuntivo${r.detail?' sullo storage '+r.detail:''}`;
+    case 'clone_no_space':return`mancano ${gbTxt(r.missing||0)} GB sullo storage ${r.detail||'del template'} per copiare il template`;
+    case 'file_missing':return`il file ${r.detail||'del template'} non c\'e\' su questo nodo (il clone non lo copia)`;
     default:return String(r.code);}};
   const CARD_REASON={card_busy:'in uso',no_mapping:'nessun mapping: la app assegna solo tramite mapping',card_reserved:'in creazione (prenotata da un\'altra creazione)',node_not_eligible:'il suo nodo non puo\' ricevere la VM'};
   const WARN={cpu_vcpu:'molte vCPU gia\' assegnate (oltre 4 per thread)',cpu_p95:'CPU reale gia\' alta (oltre l\'80%)'};
   const val=id=>document.getElementById(id).value.trim();
   const tplNow=()=>templates[parseInt(document.getElementById('tpl-select').value)];
-  // storage di tutti i volumi del template (dischi, EFI, TPM, cloud-init, ISO): come il controllo del server
   // storage del disco principale del template (default del disco aggiuntivo, D65 A)
   const tplMainStorage=tpl=>{const d=tpl&&tpl.config&&tpl.config[val('pv-diskdev')||'virtio0'];const i=typeof d==='string'?d.indexOf(':'):-1;return i>0?d.slice(0,i):'';};
-  const tplStorages=tpl=>{const out=new Set();if(!tpl||!tpl.config)return[];for(const[k,v]of Object.entries(tpl.config)){if(!/^((virtio|scsi|sata|ide)\d{1,2}|efidisk\d|tpmstate\d)$/.test(k)||typeof v!=='string'||v.startsWith('none'))continue;const i=v.indexOf(':');if(i>0&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(v.slice(0,i)))out.add(v.slice(0,i));}return[...out].sort().slice(0,8);};
 
   return{
     async load(){
@@ -4559,7 +4559,7 @@ const Provision=(()=>{
     onGw(el){gwManual=el.value.trim()!=='';Provision.summary();},
     bind(){
       const pg=document.getElementById('page-provision');
-      const ADV=new Set(['pv-cpu','pv-ram','tpl-select','pv-diskdev','pv-group','pv-gpu','pv-d2gb']);
+      const ADV=new Set(['pv-cpu','pv-ram','tpl-select','pv-diskdev','pv-disk','pv-group','pv-gpu','pv-d2gb']);
       const on=e=>{Provision.summary();if(e&&e.target&&ADV.has(e.target.id))Provision.schedule();};
       pg.addEventListener('input',on);
       pg.addEventListener('change',on);
@@ -4636,7 +4636,9 @@ const Provision=(()=>{
       const ram=parseFloat(val('pv-ram')), cores=parseInt(val('pv-cpu'));
       if(!tpl||!(ram>0)||!(cores>0)){adv=null;box.innerHTML='<span class="td">Scegli un template e indica core e RAM.</span>';Provision.summary();return;}
       const p=new URLSearchParams({memory_mb:String(Math.round(ram*1024)),cores:String(cores),template_node:tpl.node});
-      const st=tplStorages(tpl); if(st.length)p.set('storage',st.join(','));
+      // il server legge il template e ne ricava storage, file da trovare sul nodo e spazio del clone
+      p.set('template_vmid',String(tpl.vmid)); p.set('disk_device',val('pv-diskdev')||'virtio0');
+      const dgb=parseInt(val('pv-disk'),10); if(Number.isInteger(dgb)&&dgb>=1&&dgb<=65536)p.set('disk_gb',String(dgb));
       if(document.getElementById('pv-gpu').checked)p.set('gpu','1');
       const d2=Provision.disk2(); if(d2){p.set('disk2_gb',String(d2.size_gb));const st2=d2.storage||tplMainStorage(tpl);if(st2)p.set('disk2_storage',st2);}
       const gp=Groups.parse(val('pv-group')); if(gp.ok&&gp.groups.length===1)p.set('group',gp.groups[0]);
@@ -4693,7 +4695,10 @@ const Provision=(()=>{
         for(const [gb,list] of [...groups.entries()].sort((a,b)=>(b[0]||-1)-(a[0]||-1)))html+=`<div class="pv-gh">${gb?gb+' GB di memoria':'Memoria non nota'}</div>${list.map(cardRow).join('')}`;
         html+='</fieldset>';
       }
-      if((adv.meta.partial||[]).length)html+=`<p class="cnote" style="margin-top:8px">Dati non letti del tutto: ${esc(adv.meta.partial.join(', '))}. Il server ricontrolla tutto prima di creare.</p>`;
+      if((adv.meta.partial||[]).length){
+        const PW={files_unverified:'gli snippet o le ISO del template non si possono verificare sui nodi: lo storage che li contiene non ha abilitato quel tipo di contenuto in Proxmox (abilitandolo il controllo diventa possibile)',files:'l\'elenco dei file di uno storage non e\' leggibile',template:'il template non e\' leggibile',ceph:'i dischi Ceph non sono letti',cpu_flags:'le istruzioni CPU di un nodo',gpu:'l\'inventario delle schede e\' incompleto'};
+        html+=`<p class="cnote" style="margin-top:8px">Non verificato: ${adv.meta.partial.map(x=>esc(Object.hasOwn(PW,x)?PW[x]:x)).join('; ')}. Il server ricontrolla quello che puo' prima di creare.</p>`;
+      }
       box.innerHTML=html;
     },
     pickNode(n){manualNode=n;Provision.paintWhere();Provision.fillStorages();Provision.summary();},
@@ -4750,7 +4755,7 @@ const Provision=(()=>{
         }catch(e){
           btn.disabled=false; btn.textContent='Provisiona VM';
           const b=e.body||{}, why=b.reason;
-          const detail=(b.reasons||[]).map(x=>Object.hasOwn(CARD_REASON,x)?CARD_REASON[x]:REASON({code:x})).join('; ');
+          const detail=(b.items&&b.items.length?b.items.map(REASON):(b.reasons||[]).map(x=>Object.hasOwn(CARD_REASON,x)?CARD_REASON[x]:REASON({code:x}))).join('; ');
           const T={node_not_eligible:'Il nodo scelto non puo\' ricevere la VM',card_unavailable:'La scheda scelta non e\' piu\' disponibile',card_reserved:'La scheda e\' stata appena prenotata da un\'altra creazione',
             vmid_taken:'Il VMID e\' gia\' in uso',template_disk:'Il template non ha quel disco: controlla il campo "Disco device"',disk_smaller:b.error,template:'Template non leggibile',new_group:'Il gruppo e\' nuovo e va confermato'};
           const msg=Object.hasOwn(T,why||'')?T[why]+(detail?` (${detail})`:''):e.message;

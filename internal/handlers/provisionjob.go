@@ -11,13 +11,13 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"proxmox-manager/internal/api"
+	"proxmox-manager/internal/balance"
 	"proxmox-manager/internal/config"
 )
 
@@ -550,7 +550,8 @@ var _ provAPI = (*api.Client)(nil)
 type provRefusal struct {
 	Reason  string
 	Msg     string
-	Reasons []string // node reasons, when the node is not eligible
+	Reasons []string              // node reasons, when the node is not eligible
+	Items   []balance.PlaceReason // the same with their numbers and details (file name, storage, GB missing)
 }
 
 func (e *provRefusal) Error() string { return e.Msg }
@@ -577,9 +578,10 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 		return "", &provRefusal{Reason: "template_disk", Msg: "il template non ha il disco " + p.DiskDevice}
 	}
 	p.storage = disk[:i]
-	// every volume of the template (disks, EFI, TPM, cloud-init drive, ISO) must be reachable from the target:
-	// a full clone with "target" copies all of them
-	storages := templateStorages(tcfg)
+	// every disk volume of the template (disks, EFI, TPM, cloud-init drive) must be reachable from the target, with the
+	// space for the copy; the snippets and ISO images it only references must exist on the target node (ROADMAP 10)
+	info := parseTemplateInfo(tcfg, p.DiskDevice, p.DiskGB)
+	storages := info.Storages
 	if len(storages) > 8 {
 		return "", &provRefusal{Reason: "template_disk", Msg: "il template usa troppi storage diversi"}
 	}
@@ -609,7 +611,7 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 	if p.disk2 != nil && p.disk2Store == "" {
 		p.disk2Store = p.storage // D65 A: by default the template's storage
 	}
-	q := adviceQuery{Cluster: cluster, MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storages: storages, TemplateNode: p.TemplateNode}
+	q := adviceQuery{Cluster: cluster, MemMB: int64(p.Memory), Cores: p.Cores, GPU: p.GPUMapping != "", Storages: storages, TemplateNode: p.TemplateNode, tpl: &info}
 	if p.disk2 != nil {
 		q.Disk2GB, q.Disk2Storage = p.disk2.SizeGB, p.disk2Store
 	}
@@ -629,7 +631,7 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 			for _, r := range n.Reasons {
 				codes = append(codes, r.Code)
 			}
-			return "", &provRefusal{Reason: "node_not_eligible", Msg: "il nodo scelto non puo' ricevere la VM", Reasons: codes}
+			return "", &provRefusal{Reason: "node_not_eligible", Msg: "il nodo scelto non puo' ricevere la VM", Reasons: codes, Items: n.Reasons}
 		}
 		if p.GPUMapping == "" {
 			return "", nil
@@ -645,28 +647,6 @@ func provPrecheck(c provAPI, cluster int, label string, p *provPlan, now time.Ti
 		return "", &provRefusal{Reason: "card_unavailable", Msg: "il mapping non punta a una scheda di questo nodo"}
 	}
 	return "", &provRefusal{Reason: "node_not_eligible", Msg: "nodo sconosciuto"}
-}
-
-var templateVolumeKey = regexp.MustCompile(`^((virtio|scsi|sata|ide)[0-9]{1,2}|efidisk[0-9]|tpmstate[0-9])$`)
-
-// templateStorages lists the storages of every volume of a template config ("storage:volume,..."), sorted.
-func templateStorages(cfg map[string]interface{}) []string {
-	set := map[string]bool{}
-	for k, v := range cfg {
-		s, _ := v.(string)
-		if !templateVolumeKey.MatchString(k) || s == "" || strings.HasPrefix(s, "none") {
-			continue
-		}
-		if i := strings.IndexByte(s, ':'); i > 0 && storageNamePattern.MatchString(s[:i]) {
-			set[s[:i]] = true
-		}
-	}
-	out := make([]string, 0, len(set))
-	for k := range set {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
 
 func nextVMID(c provAPI) (int, error) {
@@ -1003,7 +983,11 @@ func (h *Handler) PostProvisionJob(w http.ResponseWriter, r *http.Request) {
 			if reasons == nil {
 				reasons = []string{}
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": ref.Msg, "reason": ref.Reason, "reasons": reasons})
+			items := ref.Items
+			if items == nil {
+				items = []balance.PlaceReason{}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": ref.Msg, "reason": ref.Reason, "reasons": reasons, "items": items})
 			return
 		}
 		log.Printf("provision (cluster %d): %v", idx, err)

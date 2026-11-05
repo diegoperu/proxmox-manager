@@ -237,6 +237,12 @@ func (c *Client) LXCMigrate(node string, vmid int, target string, restart bool) 
 }
 
 // GetTaskStatus reads a task (read only): status running|stopped and exitstatus when stopped.
+// GetStorageContent lists the volumes of a storage on a node for one content type ("snippets", "iso", "images"...).
+// The caller validates node, storage and content before calling.
+func (c *Client) GetStorageContent(node, storage, content string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/storage/" + storage + "/content?content=" + url.QueryEscape(content))
+}
+
 func (c *Client) GetTaskStatus(node, upid string) (json.RawMessage, error) {
 	return c.Get("/nodes/" + node + "/tasks/" + url.PathEscape(upid) + "/status")
 }

@@ -31,9 +31,10 @@ type PlaceRequest struct {
 // PlaceReason is one reason, with the numbers behind it when there are any.
 type PlaceReason struct {
 	Code    string `json:"code"`
-	Missing int64  `json:"missing,omitempty"` // ram: bytes missing
+	Missing int64  `json:"missing,omitempty"` // ram, space: bytes missing
 	Need    int    `json:"need,omitempty"`    // vcpu_over_threads
 	Have    int    `json:"have,omitempty"`
+	Detail  string `json:"detail,omitempty"` // which file or storage the reason is about (file_missing, clone_no_space)
 }
 
 // PlaceNode is the answer for one node.
