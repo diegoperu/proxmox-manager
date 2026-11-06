@@ -30,7 +30,28 @@ if id "$U" >/dev/null 2>&1; then
     exit 3
 fi
 
+# Senza sudo (e senza visudo per validare) l'utente nascerebbe senza poter diventare amministratore
+# e lo script direbbe OK: si rifiuta PRIMA di creare qualsiasi cosa (exit 4).
+if ! command -v sudo >/dev/null 2>&1 || ! command -v visudo >/dev/null 2>&1; then
+    echo "sudo non e' installato nella VM: utente $U non creato" >&2
+    exit 4
+fi
+
+# Da qui in poi un errore non deve lasciare un utente a meta' (senza sudo e non piu' riparabile
+# dal manager, che rifiuta gli utenti esistenti): si annulla la creazione.
+created=0
+rollback() {
+    rc=$?
+    if [ "$created" = 1 ] && [ "$rc" != 0 ]; then
+        rm -f "/etc/sudoers.d/$U"
+        userdel -r "$U" >/dev/null 2>&1 || usermod -L "$U" >/dev/null 2>&1 || true
+        echo "creazione dell'utente $U annullata (errore, codice $rc)" >&2
+    fi
+}
+trap rollback EXIT
+
 useradd -m -s /bin/bash "$U"
+created=1
 
 # Gruppo amministrativo: wheel su RHEL/Rocky, sudo su Debian/Ubuntu. Si aggiunge quello
 # che esiste davvero, senza ingoiare l'errore di un gruppo assente.
@@ -42,7 +63,22 @@ done
 
 HOME_DIR=$(getent passwd "$U" | cut -d: -f6)
 
+# Sudo indipendente dalle regole di gruppo di /etc/sudoers (potrebbero essere state tolte):
+# file dedicato, validato con visudo prima di metterlo al suo posto.
+write_sudoers() {
+    tmp=$(mktemp "/etc/sudoers.d/.pmgr.XXXXXX")
+    printf '%s\n' "$1" > "$tmp"
+    chmod 440 "$tmp"
+    if ! visudo -cf "$tmp" >/dev/null 2>&1; then
+        rm -f "$tmp"
+        echo "regola sudoers non valida per $U" >&2
+        exit 5
+    fi
+    mv -f "$tmp" "/etc/sudoers.d/$U"
+}
+
 if [ -z "$KEY" ]; then
+    write_sudoers "$U ALL=(ALL) ALL"
     # Password fissa iniziale, da cambiare al primo accesso (decisione di progetto).
     printf '%s:%s\n' "$U" "p4ssw0rd" | chpasswd
     if ! chage -d 0 "$U"; then
@@ -53,6 +89,7 @@ if [ -z "$KEY" ]; then
         else
             echo "ATTENZIONE: impossibile forzare il cambio password e impossibile bloccare l'account $U" >&2
         fi
+        created=0
         exit 1
     fi
 else
@@ -65,8 +102,13 @@ else
     # senza ssh_home_t sshd rifiuta la chiave. restorecon la corregge; assente il comando
     # (guest senza SELinux) non e' un errore.
     command -v restorecon >/dev/null 2>&1 && restorecon -R "$HOME_DIR/.ssh" || true
-    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$U" > "/etc/sudoers.d/$U"
-    chmod 440 "/etc/sudoers.d/$U"
+    write_sudoers "$U ALL=(ALL) NOPASSWD:ALL"
+fi
+
+# Verifica finale: l'utente deve davvero poter usare sudo. Altrimenti si annulla (trap).
+if ! sudo -l -U "$U" >/dev/null 2>&1; then
+    echo "verifica sudo fallita per $U" >&2
+    exit 6
 fi
 
 echo "OK"

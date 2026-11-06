@@ -1275,6 +1275,12 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Senza sudo nella VM l'utente non verrebbe creato (exit 4): nessuna modifica, spiegato in parole.
+	if res.ExitCode == 4 {
+		writeError(w, errors.New("sudo non e' installato nella VM: l'utente non e' stato creato"), 409)
+		return
+	}
+
 	output := res.Out
 	if res.Err != "" {
 		output += res.Err
