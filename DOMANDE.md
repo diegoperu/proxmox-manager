@@ -975,3 +975,26 @@ Richiesta: verificare che gli snippet abilitino correttamente gli aggiornamenti 
 **Cosa e' stato fatto** (tutti i cluster e i profili): `unattended-upgrades` anche su Debian; origini **solo di sicurezza** (Debian: `-security` e `Debian-Security`; Ubuntu: `-security`, ESM apps e infra), `Automatic-Reboot "false"`, `APT::Periodic::* "always"` e `Enable "1"`; timer di apt con i due orari al giorno (liste 04:30 e 16:30, installazione 06:00 e 18:00, ritardo casuale 20-30 min); Rocky: `upgrade_type = security`, `apply_updates = yes`, `reboot = never` (dove l'opzione esiste), timer di `dnf-automatic` alle 06:00 e 18:00, `dnf-utils`; il vecchio cron tolto; `pmgr-reboot-check` (kernel installato piu' nuovo di quello in uso, `reboot-required`, `needs-restarting`, flag in `/run`) e `/etc/profile.d/pmgr-reboot-required.sh` che a ogni login interattivo (console e SSH) stampa l'avviso in italiano e in inglese e **non** sporca l'output di script e comandi via SSH.
 **Risposta utente**: (presa d'atto)
 
+## ROADMAP 13 — Hardening dei sistemi di hosting (richiesta utente 2026-11-06)
+
+Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`): firewall con 22/80/443 aperte e il resto chiuso, SSH solo con chiave, fail2ban, aggiornamenti di sicurezza. Regola dell'utente: **nei nuovi deploy sempre l'ultima LTS**, ogni tanto LTS precedenti; la matrice dei test comprende quindi Ubuntu 26.04/24.04/22.04, Debian 13/12, Rocky 10/9/8.
+
+### D93 — Altre misure di hardening per l'hosting (proposte, nessuna applicata)
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Quali di queste vuoi aggiungere al profilo hosting? Per ciascuna: rischio e mio suggerimento.
+**Perche' conta**: sono VM esposte a Internet con clienti dentro; ogni misura riduce la superficie ma puo' dare fastidio a chi ci lavora.
+**Opzioni** (scegli quali, anche piu' di una):
+1. **sysctl di rete e kernel** (syncookies, niente redirect ICMP e source routing, risposte ICMP false ignorate, `kptr_restrict=2`, `dmesg_restrict=1`, `unprivileged_bpf_disabled=1`). Rischio basso; il "Log del kernel" del manager gira come root e non cambia. **Suggerisco si'.**
+2. **Blocco della porta 25 in uscita** (la VM non puo' mandare posta direttamente: protegge la reputazione dei tuoi indirizzi dallo spam; i clienti usano un relay). Dipende dalla tua politica. **Suggerisco si'.**
+3. **443/udp** aperta (HTTP/3, QUIC). **Suggerisco no**, se non serve a nessuno.
+4. **Elenco di pacchetti ridotto** sull'hosting: togliere `tcpdump`, `iptraf`, `nethogs`, `iftop`, `arpwatch`, `nfs-common`, `cifs-utils`, `acct`, `nmon` (i clienti li installano se servono). Meno codice su una macchina esposta. **Suggerisco si'.**
+5. **Password di console**: oggi e' la stessa su tutte le VM dei template (D83: la cambi tu) e non vale via SSH. Opzioni: lasciarla (a rischio di console accessibile), una diversa per VM, oppure account senza password di console. **Suggerisco di lasciare come e' fino al cambio, poi valutare.**
+6. **fail2ban**: jail `recidive` (una settimana di ban a chi viene bannato piu' volte) e jail web (nginx/apache) quando il server web e' installato. **Suggerisco `recidive` si', jail web a richiesta.**
+7. **SSH**: `ClientAliveInterval 300` + `ClientAliveCountMax 2` (chiude le sessioni morte; **suggerisco si'**); `AllowGroups` per limitare chi puo' entrare (**suggerisco no** per ora: serve decidere il gruppo e la gestione dei clienti).
+8. **Limite alle nuove connessioni SSH nel firewall** (`ufw limit 22/tcp`): complementa fail2ban ma puo' bloccare automazioni in parallelo. **Suggerisco no.**
+9. **Registri verso un server remoto / auditd**: politica da definire. **Suggerisco di rinviare.**
+10. **Docker sui sistemi dei clienti**: le porte pubblicate da Docker aggirano `ufw`. Non si risolve con uno snippet; **suggerisco di documentarlo ai clienti** (e, se serve, regole in `DOCKER-USER`).
+**Suggerimento**: 1, 2, 4, 6 (`recidive`) e 7 (`ClientAlive`).
+**Risposta utente**:
+
