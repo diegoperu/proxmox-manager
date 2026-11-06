@@ -922,8 +922,10 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 			j.warn("user_failed", provPhUser, agentError(err))
 		case res.ExitCode == 3:
 			j.warn("user_exists", provPhUser, coldMsg("l'utente esiste gia' nella VM: nessuna modifica"))
+		case res.ExitCode == 4:
+			j.warn("user_failed", provPhUser, coldMsg("sudo non e' installato nella VM: l'utente non e' stato creato"))
 		case res.ExitCode != 0:
-			j.warn("user_failed", provPhUser, coldMsg(fmt.Sprintf("lo script e' uscito con codice %d", res.ExitCode)))
+			j.warn("user_failed", provPhUser, coldMsg(fmt.Sprintf("lo script e' uscito con codice %d (l'utente non e' stato lasciato a meta')", res.ExitCode)))
 		default:
 			j.step(provPhUser, true, p.ExtraUser.Username)
 		}

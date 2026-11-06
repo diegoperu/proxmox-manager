@@ -301,7 +301,7 @@ func TestEmbeddedGuestScripts(t *testing.T) {
 		}
 	}
 	// adduser.sh: nessuna interpolazione di dati nel testo, solo parametri posizionali
-	for _, must := range []string{`U="${1:?`, `KEY="${2:-}"`, "exit 3", "usermod -L"} {
+	for _, must := range []string{`U="${1:?`, `KEY="${2:-}"`, "exit 3", "exit 4", "usermod -L", "visudo -cf", "sudo -l -U"} {
 		if !strings.Contains(addUserScriptSrc, must) {
 			t.Errorf("adduser.sh: manca %q", must)
 		}
