@@ -786,3 +786,41 @@ Domande D64-D67 in `DOMANDE.md` (fino a dove arriva il disco: collegato o anche 
 - 2026-11-06 — diagnosi dell'accesso a Magi (output dei log dato dall'utente, nodo 1): l'utente `pmgr-sync` esiste ma **non c'e' `authorized_keys`** (lo setup con `--role source` senza `--dev-pubkey` non la crea), quindi il rifiuto della chiave di sviluppo era atteso; **Magi vede la postazione come 10.75.132.254** (router tra le due reti), non come 10.75.131.252: `--dev-from` va impostato a 10.75.132.254, ricordando che `from=` limita quindi alla rete dietro il router e non alla sola postazione (accettato per il cluster di prova; la chiave privata resta sulla postazione, shell senza root ne' sudo). Da rilanciare lo setup con `--dev-pubkey` e `--dev-from 10.75.132.254` sui tre nodi — `CLAUDE.md`
 - 2026-11-06 — Magi, setup eseguito dall'utente sui 3 nodi (nodo 1 sorgente, nodi 2-3 destinazioni, con `--dev-pubkey`/`--dev-from 10.75.132.254`). Prova (assistente, chiave `pmgr_sync_magi_dev`, solo lettura): accesso come `pmgr-sync` (uid 999, senza sudo) OK sui tre nodi; cartelle `root:pmgr-sync 2775` OK; `rsync`/`rrsync` presenti. Catena nodo 1 -> nodi 2 e 3: `pmgr-list` OK, shell arbitraria rifiutata dal gate ("comando non consentito"), `rsync -n` su `snippets/` e `pmgr-scripts/` OK (uscita 0), percorso `/etc/` rifiutato (uscita 12). Nessuna scrittura reale. Nodo 1: nessun gate installato (ruolo source, atteso). Stato: Magi pronto per la sincronizzazione; ancora da fare lato utente: `Snippets` nei contenuti di `local`, `/etc/pmgr/cluster.conf` e password template, sistemare template 1000 — `CLAUDE.md`
 
+## PUNTO DI RIPARTENZA — ROADMAP 13 (salvato 2026-11-06)
+
+Branch `feat/snippet-sync` (locale, **non pushato**, nessuna PR). Ultimo commit docs: `3e36c6f`. Working tree pulito. Leggere questa sezione per prima.
+
+### Dove siamo (fatto e verificato)
+1. **`tools/pmgr-sync/`** (nel repo, committato): `pmgr-sync-setup.sh` + test (51 senza root, 48 in container). **Eseguito dall'utente su Magi**: nodo 1 `magi-node-1` 10.75.132.201 = sorgente; nodi 2-3 (.202, .203) = destinazioni; tutti con `--dev-pubkey` e `--dev-from 10.75.132.254`.
+2. **Accesso Magi verificato (2026-11-06, solo lettura):** chiave `~/.ssh/pmgr_sync_magi_dev` entra come `pmgr-sync` (uid 999, senza sudo) sui 3 nodi; catena nodo 1 -> nodi 2/3 OK: `pmgr-list`, shell rifiutata dal gate, `rsync -n` su `snippets/` e `pmgr-scripts/` OK, `/etc/` rifiutato. **Nessuna scrittura reale fatta.** Magi vede la postazione come 10.75.132.254 (router): `from=` limita alla rete, non a una macchina.
+3. **Strumenti locali** in `SUPPORT-FILES/pmgr-scripts/` (git-ignored, 0700, MAI nel repo): `pmgr-os.sh` (template guidati da dati, 8 release: Debian 12/13, Ubuntu 22.04/24.04/26.04, Rocky 8/9/10), `pmgr-add-release.sh`, snippet con fail2ban (ban 1 h/5 tentativi/15 min, progressivo), aggiornamenti di sicurezza 2x/giorno senza riavvio automatico + avviso al login, SSH (calcolo: password; hosting: solo chiave, rimessa a ogni avvio e ogni 15 min), profilo hosting con firewall (22/80/443, resto chiuso), `pmgr-vm-apply.sh`/`pmgr-vm-rollout.sh` per VM esistenti (moduli fail2ban, updates, ssh-standard, ssh-hosting, firewall-hosting, baseline, `--verify`), `MAGI-TEST-PLAN.md`.
+4. **Test tutti verdi** (container podman, 8 distro): template 179, profilo hosting 16, firewall con traffico vero 110, modulo firewall 42, vm_apply 58/distro, ssh_enforce 27-29/distro, riavvio systemd 17. Nulla provato su VM vera.
+5. **Decisioni prese:** D69-D92 (vedi `DOMANDE.md`), **D93 approvata** (sysctl, SMTP 25 in uscita, pacchetti ridotti hosting, jail `recidive`, `ClientAliveInterval 300`/`CountMax 2`; NO a 443/udp, AllowGroups, limite connessioni SSH, log remoti).
+
+### Cosa MANCA (in ordine)
+**Lato utente (bloccano la prova su Magi):**
+- A. Aggiungere contenuto `Snippets` allo storage `local` di Magi (Proxmox).
+- B. Creare `/etc/pmgr/cluster.conf` sul nodo 1 (`STORAGE=dirac-sea`, bridge, DNS, VMID_BASE, utente, percorso file password; esempio in `SUPPORT-FILES/pmgr-scripts/cluster.conf.example`) e il file della password dei template (`0600`, fuori dalla cartella sincronizzata).
+- C. Sistemare il template 1000 (Debian 13) di Magi: cancellare o rinumerare.
+- D. Darmi IP liberi e DNS per le VM di prova (su CALCOLO il DNS e' 10.248.26.30; i DNS pubblici sono filtrati).
+- E. Dare modo di copiare gli script sul nodo 1: o li copia lui, o accesso root (oggi ho solo `pmgr-sync` senza sudo).
+- F. Dire quando vuole pushare/aprire PR del branch (tools/pmgr-sync + docs).
+
+**Lato mio (dopo il via dell'utente, mai prima):**
+1. Prova su Magi con `MAGI-TEST-PLAN.md`: ultime LTS per prime (Ubuntu 26.04, Debian 13, Rocky 10); `pmgr-os.sh --dry-run`, poi creazione template; baseline VM "vecchia" e "nuova" con `--verify`; **misurare cosa fa il riavvio alle VM vecchie** (ipotesi: cloud-init NON riesegue i nuovi snippet se l'instance-id non cambia); rollout con `pmgr-vm-rollout.sh`; hosting con prova firewall dall'esterno e ban reale. Controllare sulle immagini cloud vere: `guest-exec` su Rocky 10, SELinux, `curl-minimal` su Rocky 9. [Modello: Sonnet, ragionamento alto]
+2. **Implementare D93** negli snippet/profilo hosting + test + moduli per VM esistenti. [Modello: Sonnet alto; poi revisione Opus medio — STOP al cambio modello]
+3. **`pmgr-snippets-sync`**: confronto, copia, verifica con `MANIFEST.sha256`; due alberi (standard/hosting, D90 A); casella "hosting" per destinazione ricordata (D87); mai `--delete`; rsync con `-rltO --no-owner --no-group --chmod=F644,D775`. [Sonnet alto]
+4. **Accesso del manager** al nodo sorgente: chiave dedicata con `command=` (solo `status|diff|run`), config `snippet_sync` in `config.json`, endpoint, una operazione alla volta. [Opus medio]
+5. **Pagina "Script e snippet"** (menu Configurazione): stato per nodo/file, anteprima, conferma, "Sposta sorgente", avviso in panoramica (D76 C). [Sonnet alto]
+6. Revisione di sicurezza + prova reale (nodo 1 -> altri nodi e -> altro cluster). [Opus medio]
+7. Poi ROADMAP 14 (aggiornamento template dal manager) e 15 (migrazione VM tra cluster).
+8. Limiti noti da sistemare: `rsync_snippets.sh` originale del nodo 1 di CALCOLO resta com'e' (unica copia, D78 B: nessuna copia di sicurezza manuale); `do_verify` ora controlla firewall anche senza sshd (fatto).
+
+### Regole da non dimenticare
+- **Promemoria APERTO** (memoria `pending-vm-rollouts`): rollout su VM esistenti (baseline ovunque; ssh-standard calcolo; ssh-hosting + firewall-hosting hosting, dopo controllo chiavi). Ricordarlo a OGNI sessione finche' l'utente non dice "fatto".
+- Nulla e' stato eseguito su CALCOLO ne' HOSTING; su Magi solo letture + `rsync -n`. Niente scritture su cluster senza via esplicito.
+- Nei nuovi deploy sempre l'ultima LTS.
+- Nei comandi: mai `pkill -f`, mai `ls` (alias eza si blocca), niente apostrofi dentro `${var:+...}` tra virgolette doppie.
+- Mai scrivere la `cipassword` dei template da nessuna parte; `SUPPORT-FILES/` mai committata.
+- Modello suggerito per riprendere: **Sonnet, ragionamento alto** (prova su Magi); STOP e `/model` Opus per accesso del manager e revisioni.
+
