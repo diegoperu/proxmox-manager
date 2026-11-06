@@ -40,7 +40,9 @@ e **solo su Magi**, vincolata all'indirizzo della postazione. Non va usata su CA
 cd ~/ai-workspace/proxmox-manager/tools/pmgr-sync
 DEV=~/.ssh/pmgr_sync_magi_dev.pub
 
-# 0. indirizzo con cui la postazione si presenta a Magi (usalo in --dev-from al posto di MIOIP)
+# 0. indirizzo con cui la postazione si presenta a Magi (usalo in --dev-from al posto di MIOIP).
+#    Verificato il 2026-11-06: tra le due reti c'e' un router e Magi vede 10.75.132.254 (non l'indirizzo locale della postazione):
+#    from= limita quindi alla rete dietro il router, non a una sola macchina
 ssh root@10.75.132.201 'echo ${SSH_CLIENT%% *}'
 
 # 1. nodo sorgente di prova: utente, cartelle, chiave ssh
