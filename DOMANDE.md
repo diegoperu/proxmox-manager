@@ -980,7 +980,7 @@ Richiesta: verificare che gli snippet abilitino correttamente gli aggiornamenti 
 Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`): firewall con 22/80/443 aperte e il resto chiuso, SSH solo con chiave, fail2ban, aggiornamenti di sicurezza. Regola dell'utente: **nei nuovi deploy sempre l'ultima LTS**, ogni tanto LTS precedenti; la matrice dei test comprende quindi Ubuntu 26.04/24.04/22.04, Debian 13/12, Rocky 10/9/8.
 
 ### D93 — Altre misure di hardening per l'hosting (proposte, nessuna applicata)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: Quali di queste vuoi aggiungere al profilo hosting? Per ciascuna: rischio e mio suggerimento.
 **Perche' conta**: sono VM esposte a Internet con clienti dentro; ogni misura riduce la superficie ma puo' dare fastidio a chi ci lavora.
@@ -996,5 +996,5 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 9. **Registri verso un server remoto / auditd**: politica da definire. **Suggerisco di rinviare.**
 10. **Docker sui sistemi dei clienti**: le porte pubblicate da Docker aggirano `ufw`. Non si risolve con uno snippet; **suggerisco di documentarlo ai clienti** (e, se serve, regole in `DOCKER-USER`).
 **Suggerimento**: 1, 2, 4, 6 (`recidive`) e 7 (`ClientAlive`).
-**Risposta utente**:
+**Risposta utente**: Approvo le proposte (2026-11-06): quelle suggerite, cioe' 1 sysctl di rete e kernel, 2 blocco della porta 25 in uscita, 4 elenco di pacchetti ridotto sull'hosting, 6 jail `recidive` di fail2ban, 7 `ClientAliveInterval 300` e `ClientAliveCountMax 2`. Restano fuori: 3 (443/udp), 5 (password di console: la cambia l'utente), 7 `AllowGroups`, 8 (limite connessioni SSH), 9 (log remoti), 10 (Docker: da documentare ai clienti). **Da implementare** (non ancora fatto).
 
