@@ -861,7 +861,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.189.0 · 2026-11-06</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.190.0 · 2026-11-06</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -4778,7 +4778,7 @@ const Provision=(()=>{
       const nodes=[line(`VM ${v.vmid} · ${v.name} · ${v.node}`)];
       for(const s of v.steps)nodes.push(line(`${s.ok?'✓':'⚠'} ${LABEL[s.phase]||s.phase}${s.note?' — '+s.note:''}`,s.ok?'ok':'wn'));
       if(v.phase!=='done'){nodes.push(line(`▶ ${LABEL[v.phase]||v.phase}…`));log.replaceChildren(...nodes);setTimeout(Provision.pollJob,2000);return;}
-      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto in 20 minuti: utente e montaggio del disco si fanno dal pannello della VM (Aggiungi utente, Aggiungi disco).',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.',mount_failed:'Il disco aggiuntivo e\' collegato ma non formattato o montato: completalo dal pannello della VM (Aggiungi disco).',mount_skipped:'Il disco aggiuntivo e\' collegato ma vuoto, perche\' la VM non e\' stata avviata: si formatta dal pannello della VM.'};
+      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto in 20 minuti: utente e montaggio del disco si fanno dal pannello della VM (Aggiungi utente, Aggiungi disco).',cloud_init_timeout:'La VM non ha finito la prima configurazione (cloud-init) nel tempo previsto: non ho toccato niente dentro la VM, utente e disco si aggiungono dal pannello della VM quando e\' pronta.',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.',mount_failed:'Il disco aggiuntivo e\' collegato ma non formattato o montato: completalo dal pannello della VM (Aggiungi disco).',mount_skipped:'Il disco aggiuntivo e\' collegato ma vuoto, perche\' la VM non e\' stata avviata: si formatta dal pannello della VM.'};
       for(const w of v.warnings)nodes.push(line('⚠ '+(Object.hasOwn(WTXT,w)?WTXT[w]:w),'wn'));
       if(v.result==='failed'){
         nodes.push(line(`✗ La creazione si e' fermata alla fase "${LABEL[v.failed_phase]||v.failed_phase}".`,'er'));

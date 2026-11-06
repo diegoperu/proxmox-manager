@@ -22,6 +22,11 @@ for img in "${IMAGES[@]}"; do
     sh /a.sh pw2 "" >/dev/null 2>&1; echo "pw2-senza-regola-gruppo rc=$? sudo=$(can pw2 && echo si || echo no)"
     # 3. utente gia esistente: nessuna modifica (rc 3)
     sh /a.sh pw2 "" >/dev/null 2>&1; echo "esistente rc=$?"
+    # 3b. script ucciso (TERM) dopo useradd, come fa il riavvio di qemu-guest-agent: utente annullato
+    cp /a.sh /slow.sh; sed -i "s|^HOME_DIR=|sleep 30; HOME_DIR=|" /slow.sh
+    sh /slow.sh killed "" >/dev/null 2>&1 & sp=$!
+    for i in 1 2 3 4 5 6 7 8 9 10; do id killed >/dev/null 2>&1 && break; sleep 0.5; done
+    kill -TERM $sp; wait $sp 2>/dev/null; echo "ucciso rc=$? esiste=$(id killed >/dev/null 2>&1 && echo si || echo no) sudoers=$([ -e /etc/sudoers.d/killed ] && echo si || echo no)"
     # 4. sudo assente: rc 4 e utente NON creato
     # (togliere il pacchetto dentro un container fallisce: si cancellano i programmi, stesso effetto per lo script)
     rm -f /usr/bin/sudo /usr/sbin/visudo /bin/sudo /sbin/visudo
@@ -32,6 +37,7 @@ for img in "${IMAGES[@]}"; do
   grep -q 'key1 rc=0 sudo=si' <<<"$out" && ok || ko "$img: ramo chiave senza sudo"
   grep -q 'pw2-senza-regola-gruppo rc=0 sudo=si' <<<"$out" && ok || ko "$img: senza la regola di gruppo l'utente non ha sudo"
   grep -q 'esistente rc=3' <<<"$out" && ok || ko "$img: utente esistente non rifiutato"
+  grep -q 'ucciso rc=143 esiste=no sudoers=no' <<<"$out" && ok || ko "$img: script ucciso dopo useradd: utente rimasto a meta'"
   grep -q 'senza-sudo rc=4 esiste=no' <<<"$out" && ok || ko "$img: senza sudo l'utente e' stato creato o l'uscita non e' 4"
 done
 printf 'Test adduser sudo: %d riusciti, %d falliti\n' "$PASS" "$FAIL"

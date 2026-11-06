@@ -49,6 +49,9 @@ rollback() {
     fi
 }
 trap rollback EXIT
+# Se l'agent viene fermato o riavviato mentre lo script gira (systemd manda TERM al gruppo),
+# `exit` fa scattare comunque il rollback qui sopra: niente utente a meta' senza sudo.
+trap 'exit 143' TERM HUP INT
 
 useradd -m -s /bin/bash "$U"
 created=1

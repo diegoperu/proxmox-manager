@@ -44,14 +44,16 @@ const (
 )
 
 var provTiming = struct {
-	Clone     time.Duration // clone task
-	Task      time.Duration // other tasks (start)
-	Agent     time.Duration // one wait for the guest agent (D61: two of them)
-	AgentPoll time.Duration
+	Clone      time.Duration // clone task
+	Task       time.Duration // other tasks (start)
+	Agent      time.Duration // one wait for the guest agent (D61: two of them)
+	AgentPoll  time.Duration
+	Settle     time.Duration // wait for cloud-init to finish (and the final reboot) before touching the guest
+	SettlePoll time.Duration
 	// DiskScanWait: pause between two searches for the new disk in the guest
 	DiskScanWait time.Duration
 	Keep         time.Duration // a finished procedure stays readable this long
-}{15 * time.Minute, 5 * time.Minute, 10 * time.Minute, 10 * time.Second, 2 * time.Second, time.Hour}
+}{15 * time.Minute, 5 * time.Minute, 10 * time.Minute, 10 * time.Second, 15 * time.Minute, 5 * time.Second, 2 * time.Second, time.Hour}
 
 // phases and results (codes: the page writes the sentences)
 const (
@@ -912,6 +914,15 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		return
 	}
 	j.step(provPhAgent, true, "")
+
+	// 8b. the agent answers while cloud-init is still installing packages, restarts the agent and
+	// reboots: whatever runs in the guest in that window can be killed half way (user created
+	// without sudo). Wait until cloud-init has finished in the current boot.
+	if !waitGuestSettled(c, node, vmid, provTiming.Settle, provTiming.SettlePoll) {
+		j.warn("cloud_init_timeout", provPhAgent, coldMsg("cloud-init non e' terminato in tempo: nella VM non ho toccato niente, utente e disco si fanno dal pannello della VM"))
+		j.finish()
+		return
+	}
 
 	// 9. additional user: same script and rules as the "Aggiungi utente" button
 	if p.ExtraUser != nil {
