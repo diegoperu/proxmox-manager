@@ -1,4 +1,4 @@
-# DOMANDE — branch `experiment/ui-redesign`
+exct# DOMANDE — branch `experiment/ui-redesign`
 
 Domande a cui rispondere prima di scrivere codice per il redesign grafico/UX.
 
@@ -998,3 +998,50 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Suggerimento**: 1, 2, 4, 6 (`recidive`) e 7 (`ClientAlive`).
 **Risposta utente**: Approvo le proposte (2026-11-06): quelle suggerite, cioe' 1 sysctl di rete e kernel, 2 blocco della porta 25 in uscita, 4 elenco di pacchetti ridotto sull'hosting, 6 jail `recidive` di fail2ban, 7 `ClientAliveInterval 300` e `ClientAliveCountMax 2`. Restano fuori: 3 (443/udp), 5 (password di console: la cambia l'utente), 7 `AllowGroups`, 8 (limite connessioni SSH), 9 (log remoti), 10 (Docker: da documentare ai clienti). **Da implementare** (non ancora fatto).
 
+
+## ROADMAP 13 — Accesso del manager al nodo sorgente (2026-11-09)
+
+### D94 — Come il manager esegue ssh
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Il manager parla col nodo sorgente con il client `ssh` di sistema o con una libreria Go?
+**Perche' conta**: una dipendenza nuova va approvata; il client di sistema deve esistere dove gira il manager.
+**Opzioni**: A) `os/exec` di `/usr/bin/ssh` con lista di argomenti fissa, senza shell, `-F /dev/null`, `BatchMode`, `IdentitiesOnly`, `StrictHostKeyChecking=yes` con `known_hosts` dedicato; B) `golang.org/x/crypto/ssh`, nessun binario esterno ma una dipendenza nuova e la verifica della chiave host da scrivere.
+**Suggerimento**: A: nessuna dipendenza, nessun input della richiesta negli argomenti.
+**Risposta utente**:
+
+### D95 — Chi puo' premere "Sincronizza"
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Il manager non ha login: basta la protezione delle altre azioni per una copia che finisce in codice eseguito come root nelle VM future?
+**Perche' conta**: chi raggiunge la pagina non puo' inserire contenuti, ma puo' propagare a tutti i nodi una sorgente modificata a meta'.
+**Opzioni**: A) guardia `/api` + anteprima obbligatoria + conferma di pericolo + `--expect <digest>`: la copia parte solo se la sorgente e' ancora identica a quella vista nell'anteprima, altrimenti 409; B) come A piu' un codice segreto da digitare (in `config.json`, hash lento); C) solo stato, copia a mano sul nodo (torna a D70 A).
+**Suggerimento**: A, coerente con le altre azioni distruttive del manager; B se la VPN e' condivisa con persone che non devono poter sincronizzare.
+**Risposta utente**:
+
+### D96 — Limite di indirizzo della chiave del manager
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: `from=` nella chiave del manager: quale indirizzo?
+**Perche' conta**: su Magi la postazione arriva come 10.75.132.254 (router), quindi `from=` limita alla rete dietro il router e non a una macchina. La chiave resta comunque ristretta a `status|diff|run`.
+**Opzioni**: A) accettare il router, sapendo che il limite vero e' la chiave (0600 sulla postazione); B) far girare il manager su una macchina della rete dei nodi, con `from=` esatto.
+**Suggerimento**: A per Magi; per CALCOLO decidere prima della messa in produzione.
+**Risposta utente**:
+
+### D97 — Dove sta `pmgr-snippets-sync.sh`
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Lo strumento resta solo in `SUPPORT-FILES/` (fuori da git) o va in `tools/pmgr-sync/`?
+**Perche' conta**: il manager dipende dalla sua uscita JSON: se non e' versionato, codice e contratto possono divergere senza traccia. Non contiene segreti; la regola "mai nel repo" riguarda i generatori degli snippet.
+**Opzioni**: A) sorgente in `tools/pmgr-sync/` con i suoi test; il comando forzato (root) esegue una copia installata in `/usr/local/libexec/pmgr/`, non scrivibile da `pmgr-sync`; B) resta locale, consegnato nella cartella sincronizzata.
+**Suggerimento**: A: la chiave del manager esegue solo un file di root, non uno modificabile dall'utente della sincronizzazione.
+**Risposta utente**:
+
+### D98 — Una sorgente sola nella configurazione
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: In questo passo il manager conosce una sola sorgente?
+**Perche' conta**: D71 chiede una sorgente spostabile, anche su piu' nodi; la procedura "Sposta sorgente" tocca chiavi su tutte le destinazioni.
+**Opzioni**: A) una sorgente attiva in `snippet_sync` (host, porta, percorsi di chiave e known_hosts); spostarla si progetta con la pagina; B) elenco di sorgenti da subito.
+**Suggerimento**: A: meno superficie ora, e il formato si puo' estendere.
+**Risposta utente**:

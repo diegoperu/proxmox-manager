@@ -100,6 +100,9 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 
 ## Idee non ancora discusse (da valutare)
 
+- **Manager multiutente con livelli diversi** (richiesta utente 2026-11-09): login e ruoli al posto della VPN come unico controllo; riprendere il punto unico di autorizzazione previsto da D95.
+- **Manager su macchina dedicata con IP proprio** (richiesta utente 2026-11-09): sblocca D96 (`from=` esatto sulla chiave del manager).
+
 - **Valori di rete per cluster** (2026-11-09): gateway, prefisso IP, DNS e dominio di ricerca come impostazioni di ogni cluster, chiesti quando lo si aggiunge; oggi la pagina Nuova VM usa le costanti di CALCOLO (gateway 10.75.4.254). Vedi `CLAUDE.md`, Lavori da fare.
 - Esportare il report manageriale anche come pagina HTML autonoma.
 - Report programmati (oggi esclusi: si generano a richiesta).
