@@ -99,6 +99,8 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Stato:** "per ora no, dobbiamo valutare" (2026-11-02). Da riprendere se l'app viene esposta dietro reverse proxy.
 
 ## Idee non ancora discusse (da valutare)
+
+- **Valori di rete per cluster** (2026-11-09): gateway, prefisso IP, DNS e dominio di ricerca come impostazioni di ogni cluster, chiesti quando lo si aggiunge; oggi la pagina Nuova VM usa le costanti di CALCOLO (gateway 10.75.4.254). Vedi `CLAUDE.md`, Lavori da fare.
 - Esportare il report manageriale anche come pagina HTML autonoma.
 - Report programmati (oggi esclusi: si generano a richiesta).
 - Confronto tra due periodi nello stesso report.
