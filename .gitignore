@@ -21,3 +21,6 @@ test-reports/
 
 # Script locale per installare l'helper dmesg nelle VM (stampa gli IP delle VM)
 /install-dmesg-helper.sh
+
+# copia degli script del nodo-1 (puo' contenere segreti): mai nel repository
+/SUPPORT-FILES/

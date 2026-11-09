@@ -1,4 +1,4 @@
-# DOMANDE — branch `experiment/ui-redesign`
+exct# DOMANDE — branch `experiment/ui-redesign`
 
 Domande a cui rispondere prima di scrivere codice per il redesign grafico/UX.
 
@@ -647,3 +647,401 @@ Assunzioni dichiarate (provvisorie, non bloccanti):
 - **Effetto collaterale voluto:** un template con una ISO su `local` (come il Windows 130) risulta ora "file mancante" sui nodi che non l'hanno, invece del generico "storage non condiviso".
 
 **Correzione emersa dalla prova sul cluster vero (2026-11-05):** lo storage `local` ha come contenuti `vztmpl,backup,iso`, **senza `snippets`**, e Proxmox elenca solo i tipi di contenuto abilitati: per questo l'elenco degli snippet e' vuoto anche sul `node-1`, dove il file c'e'. Quindi un file e' **verificabile solo se lo storage ha abilitato quel tipo di contenuto**; altrimenti il controllo non e' possibile, non si blocca niente e la risposta lo dice (`files_unverified`, nella pagina: "gli snippet o le ISO del template non si possono verificare... abilitando il tipo di contenuto in Proxmox il controllo diventa possibile"). Se lo storage del file non esiste (o non e' attivo) sul nodo, il file e' irraggiungibile (`file_missing`). Le ISO invece si verificano (il `local` ha `iso`): il template Windows 130 ha le sue due ISO solo su `node-11`, quindi li' e' idoneo e altrove no. Per abilitare il controllo degli snippet basterebbe aggiungere `snippets` ai contenuti di `local` in Proxmox (Datacenter > Storage): lo decide l'utente, l'app non tocca la configurazione degli storage.
+
+## ROADMAP 13 — Sincronizzazione di script e snippet (richiesta utente 2026-11-05)
+
+**Obiettivo (dall'utente):** il `node-1` di CALCOLO contiene gli script aggiornati (creazione, aggiornamento e supporto) e gli snippet di cloud-init usati anche dal manager, e **non ha copie**. Serve poterli copiare su un altro nodo dello stesso cluster o di un altro cluster; `rsync_snippets.sh` oggi sincronizza solo verso i nodi diversi dal nodo 1 e va reso generico (sorgente spostabile); la copia deve avere una **sezione propria nella parte amministrativa del manager**, che puo' anche gestire il sync.
+
+**Cosa ho verificato (sola lettura):** questa macchina e' la postazione (`diego-ict`), non un nodo: `rsync_snippets.sh` e `/var/lib/vz/snippets` non si vedono da qui. CALCOLO (11 nodi) **non ha CephFS** (nessun MDS) **ne' storage condiviso per file**: gli unici condivisi sono dischi Ceph e PBS, quindi gli snippet vanno copiati nodo per nodo. Lo storage `local` di CALCOLO ha contenuti `backup,iso,vztmpl`, **senza `snippets`**: l'API non li elenca (e il controllo preventivo del consiglio dei nodi non puo' verificarli). HOSTING (2 nodi) ha invece `local` con `iso,snippets,vztmpl,backup`. Gli snippet sono `vendor-data` di cloud-init: **vengono eseguiti come root in ogni VM nuova**, quindi l'integrita' dei file e' il requisito principale (vedi rischi in `CLAUDE.md`).
+
+### D69 — Inventario: cosa c'e' davvero sul nodo-1
+**Stato**: RISPOSTA (nodo-1 letto, resto in `SUPPORT-FILES/`) (risposta parziale: nodo-1 letto, restano gli altri file di `/root` e `/root/cloud-images`, vedi D81)
+**Bloccante**: si'
+**Domanda**: Posso avere, in sola lettura, `cat` di `rsync_snippets.sh`, `ls -la` della cartella degli snippet e l'elenco (percorsi) degli script di creazione, aggiornamento e supporto che stanno sul nodo-1 (e quali di questi usa il manager)? Senza non so cosa sincronizzare ne' dove stia ogni cosa.
+**Opzioni**: A) li lanci tu e incolli l'output (comandi sotto); B) mi indichi un accesso SSH in sola lettura al nodo-1 (host, utente, chiave) e lo leggo io.
+**Suggerimento**: A: nessun accesso nuovo per me. Comandi, da lanciare sul nodo-1: `cat <percorso>/rsync_snippets.sh` (e dove sta: `find / -xdev -name 'rsync_snippets*' 2>/dev/null`), `ls -la --time-style=long-iso /var/lib/vz/snippets`, `ls -la ~ /root /usr/local/bin /usr/local/sbin 2>/dev/null | head -80`, `crontab -l; systemctl list-timers | grep -i snip`.
+**Risposta utente**: 
+root@datacloud-node-1:~# cat /root/cloud-images/rsync_snippets.sh
+#!/bin/bash
+#script per sincronizzare gli snippet
+echo "[$(date -Iseconds)] Start snippets synching..."
+logger -t UPDATE-CLOUD-INIT-DATACLOUD 'Inizio rsync degli snippet'
+rsync -auv /var/lib/vz/snippets root@10.75.132.2:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.3:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.4:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.5:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.6:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.7:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.8:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.9:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.10:/var/lib/vz/
+rsync -auv /var/lib/vz/snippets root@10.75.132.11:/var/lib/vz/
+
+echo "[$(date -Iseconds)] Snippets synched."
+logger -t UPDATE-CLOUD-INIT-DATACLOUD 'Fine rsync degli snippet'
+
+
+root@datacloud-node-1:~# find / -xdev -name 'rsync_snippets*' 2>/dev/null
+/root/cloud-images/rsync_snippets.sh
+root@datacloud-node-1:~# ls -la --time-style=long-iso /var/lib/vz/snippets
+total 65
+drwxr-xr-x 2 root root     9 2026-11-02 14:40 .
+drwxr-xr-x 6 root root     6 2023-12-20 12:27 ..
+-rw-r--r-- 1 root root   971 2026-04-28 09:29 vendor_debian_13.yaml
+-rw-r--r-- 1 root root   971 2026-04-28 09:27 vendor_debian.yaml
+-rw-r--r-- 1 root root 12359 2026-11-02 14:40 vendor_rocky_8.yaml
+-rw-r--r-- 1 root root 12892 2026-11-02 14:40 vendor_rocky_9.yaml
+-rw-r--r-- 1 root root  1738 2026-09-14 09:46 vendor_ubuntu_24.04.yaml
+-rw-r--r-- 1 root root  1738 2026-09-14 09:47 vendor_ubuntu_26.04.yaml
+-rw-r--r-- 1 root root  1520 2026-09-14 09:45 vendor_ubuntu.yaml
+
+root@datacloud-node-1:~# ls -la ~ /root /usr/local/bin /usr/local/sbin 2>/dev/null | head -80
+/root:
+total 104
+drwx------  9 root root    23 Nov  4 13:29 .
+drwxr-xr-x 18 root root    22 Feb 12  2024 ..
+drwx------  3 root root     3 Dec 20  2023 .ansible
+-rw-------  1 root root 13243 Nov  4 13:29 .bash_history
+-rw-r--r--  1 root root   571 Apr 10  2021 .bashrc
+drwx------  4 root root     4 Apr 19  2024 .cache
+drwxr-xr-x 10 root root    19 Oct 14 11:15 cloud-images
+-rw-r--r--  1 root root 50378 Dec 16  2024 cluster_state.json
+drwx------  4 root root     4 Dec 22  2023 .config
+-r--r--r--  1 root root  8390 Nov  2 14:37 .fishsrv.pl
+-rw-r--r--  1 root root    35 Aug  5 11:03 .forward
+-rw-------  1 root root    33 Aug  5 08:49 .lesshst
+drwx------  2 root root     5 Sep 13  2024 .links2
+drwxr-xr-x  3 root root     3 Sep 20  2023 .local
+-rw-r--r--  1 root root   132 Jul  4 11:05 .profile
+-rw-r--r--  1 root root  1507 Aug 12 10:24 proxmox_shutdown.log
+-rw-------  1 root root  1024 Sep  5  2025 .rnd
+-rw-r--r--  1 root root    66 May  2  2024 .selected_editor
+-rwxr-xr-x  1 root root  1387 Aug  7 13:41 set-vm-startup-order.sh
+drwx------  2 root root     8 Jun 29 13:41 .ssh
+-rwx------  1 root root  2298 Aug  5 09:58 stop_all_vm_lxcs.sh
+-rw-------  1 root root 12467 May 13  2024 .viminfo
+-rw-r--r--  1 root root   261 Apr  4  2025 .wget-hsts
+
+/root:
+total 104
+drwx------  9 root root    23 Nov  4 13:29 .
+drwxr-xr-x 18 root root    22 Feb 12  2024 ..
+drwx------  3 root root     3 Dec 20  2023 .ansible
+-rw-------  1 root root 13243 Nov  4 13:29 .bash_history
+-rw-r--r--  1 root root   571 Apr 10  2021 .bashrc
+drwx------  4 root root     4 Apr 19  2024 .cache
+drwxr-xr-x 10 root root    19 Oct 14 11:15 cloud-images
+-rw-r--r--  1 root root 50378 Dec 16  2024 cluster_state.json
+drwx------  4 root root     4 Dec 22  2023 .config
+-r--r--r--  1 root root  8390 Nov  2 14:37 .fishsrv.pl
+-rw-r--r--  1 root root    35 Aug  5 11:03 .forward
+-rw-------  1 root root    33 Aug  5 08:49 .lesshst
+drwx------  2 root root     5 Sep 13  2024 .links2
+drwxr-xr-x  3 root root     3 Sep 20  2023 .local
+-rw-r--r--  1 root root   132 Jul  4 11:05 .profile
+-rw-r--r--  1 root root  1507 Aug 12 10:24 proxmox_shutdown.log
+-rw-------  1 root root  1024 Sep  5  2025 .rnd
+-rw-r--r--  1 root root    66 May  2  2024 .selected_editor
+-rwxr-xr-x  1 root root  1387 Aug  7 13:41 set-vm-startup-order.sh
+drwx------  2 root root     8 Jun 29 13:41 .ssh
+-rwx------  1 root root  2298 Aug  5 09:58 stop_all_vm_lxcs.sh
+-rw-------  1 root root 12467 May 13  2024 .viminfo
+-rw-r--r--  1 root root   261 Apr  4  2025 .wget-hsts
+
+/usr/local/bin:
+total 14
+drwxr-xr-x  2 root root   3 Aug  5 08:34 .
+drwxr-xr-x 10 root root  11 Nov 23  2023 ..
+-rwxr-xr-x  1 root root 232 Aug  5 08:34 pve-startall-guarded.sh
+
+/usr/local/sbin:
+total 9
+drwxr-xr-x  2 root root  2 Nov 23  2023 .
+drwxr-xr-x 10 root root 11 Nov 23  2023 ..
+
+Ci sono anche altri file di supporto in /root e in /root/cloud-image. Forse conviene che creo un'accesso per farti leggere la cartella.
+
+### D70 — Architettura
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Chi copia i file?
+**Perche' conta**: i file diventano codice eseguito come root in ogni VM nuova. Il manager non ha login: se accettasse contenuti dal browser, chiunque raggiunga la pagina potrebbe infilare codice nelle VM future.
+**Opzioni**:
+A) **Script generico + pagina di sola lettura.** Il nuovo `pmgr-snippets-sync` gira sul nodo sorgente (a mano o a timer); la pagina mostra solo lo stato (uguale / diverso / mancante / in piu' per nodo e file) e non copia niente. Rischio minimo, ma la copia resta un passo manuale fuori dall'app.
+B) **Script generico + il manager lo lancia (consigliata).** Come A, ma la pagina ha i pulsanti "Controlla" e "Sincronizza", eseguiti dal manager via SSH verso il nodo sorgente con una chiave ristretta a **un solo comando** (`command="..."` in `authorized_keys`: il manager non ha una shell, puo' solo chiedere `status`, `diff` o `run`). I contenuti arrivano **solo dalla sorgente**: dal browser non entra nessun file.
+C) **Il manager copia tramite le API di Proxmox** (upload nello storage). Nessuna chiave SSH, ma non e' certo che Proxmox accetti l'upload di snippet, non c'e' modo di leggere i file dalla sorgente tramite API, e servirebbe `snippets` abilitato ovunque: da provare prima, non lo userei come base.
+D) **Uno storage condiviso** (CephFS) montato su tutti i nodi: nessuna copia dentro CALCOLO. Non c'e' CephFS e crearlo (MDS, pool) e' un lavoro grosso; non risolve comunque il passaggio verso un altro cluster.
+**Suggerimento**: B. A e' il ripiego se non vuoi dare al manager una chiave SSH.
+**Risposta utente**: B, da capire come gestire lo spostamento tra cluster diversi. Come nota al momento il mio utente ha questi permessi associati al suo token (Datastore.Allocate Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit Group.Allocate Mapping.Audit Mapping.Modify Mapping.Use Permissions.Modify Pool.Allocate Pool.Audit Realm.Allocate Realm.AllocateUser SDN.Allocate SDN.Audit SDN.Use Sys.AccessNetwork Sys.Audit Sys.Console Sys.Incoming Sys.Modify Sys.PowerMgmt Sys.Syslog User.Modify VM.Allocate VM.Audit VM.Backup VM.Clone VM.Config.CDROM VM.Config.CPU VM.Config.Cloudinit VM.Config.Disk VM.Config.HWType VM.Config.Memory VM.Config.Network VM.Config.Options VM.Console VM.GuestAgent.Audit VM.GuestAgent.FileRead VM.GuestAgent.FileSystemMgmt VM.GuestAgent.FileWrite VM.GuestAgent.Unrestricted VM.Migrate VM.PowerMgmt VM.Replicate VM.Snapshot VM.Snapshot.Rollback) su tutti i cluster. Sarebbe ideale creare un utente non root sui vari nodi di ogni cluster, mettere li gli script di generazione degli snippet in modo da non usare root per lo spostamento tra i cluster. Verifica se i permessi permettono di creare utenti. Ho aggiunto un cluster "Magi Neo Tokyo 3" che é il nostro cluster di test creato appositamente per testare queste estensioni pericolose. Non ha tutti gli script del cluster di calcolo, il piú aggiornato, quindi puó essere un ottimo candidato target per il test di creazione utente tramite API, copia etc...
+
+### D71 — Fonte di verita' e "spostare il nodo sorgente"
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Il nodo sorgente e' sempre un nodo con i file "veri" (oggi il nodo-1), oppure i file vivono in un archivio a parte?
+**Opzioni**: A) la sorgente e' un nodo configurato (`source`): per cambiarla si installa lo script sul nuovo nodo, si sincronizza, si verifica e si cambia una riga di configurazione (nel manager, con la procedura guidata "Sposta sorgente"); B) un archivio versionato (git privato **fuori da questo repository**, che non deve mai contenere gli script) da cui si distribuisce a tutti i nodi, nodo-1 compreso; C) come A ma con una copia "di riserva" sempre tenuta aggiornata su un secondo nodo.
+**Suggerimento**: A con C: e' quello che hai chiesto e toglie subito il punto debole (nodo-1 unica copia). B e' piu' robusto ma cambia il tuo modo di lavorare.
+**Risposta utente**: A con C, anche su piú nodi
+
+### D72 — Destinazioni
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Verso quali nodi si copia?
+**Opzioni**: A) una **lista esplicita** nel file di configurazione (nodi di CALCOLO, di HOSTING o altri cluster, ognuno con host e cartella), controllata dal manager per nome; B) tutti i nodi del cluster in automatico (da `/etc/pve/.members`) piu' la lista per gli altri cluster; C) a gruppi (per esempio "tutti CALCOLO", "tutti HOSTING").
+**Suggerimento**: A con la comodita' di B per il cluster della sorgente.
+**Risposta utente**: A con la comodita' di B per il cluster della sorgente.
+
+### D73 — File spariti dalla sorgente
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Se un file non c'e' piu' sulla sorgente, si cancella dalle destinazioni?
+**Opzioni**: A) mai in automatico: la pagina li mostra come "in piu'" e si cancellano solo uno per uno con conferma di pericolo; B) si cancellano con la sincronizzazione (come `rsync --delete`).
+**Suggerimento**: A: un errore sulla sorgente non deve cancellare le copie, che sono proprio la protezione.
+**Risposta utente**: A: un errore sulla sorgente non deve cancellare le copie, che sono proprio la protezione.
+
+### D74 — Cosa si sincronizza
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Gli snippet e gli script di supporto stanno nella stessa cartella?
+**Opzioni**: A) due cartelle con elenchi di nomi ammessi: `snippets` (file `.yaml`, nella cartella degli snippet) e `scripts` (script di creazione, aggiornamento, supporto, es. `/var/lib/vz/pmgr-scripts`); B) una cartella sola; C) una lista di percorsi scelta da te nel file di configurazione.
+**Suggerimento**: dipende dall'inventario (D69); di base A con una lista di estensioni ammesse (`.yaml`, `.sh`, `.sha256`) e nessun altro file.
+**Risposta utente**: A, escludere img, iso etc...
+
+### D75 — Verifica dell'integrita'
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Come si sa che la copia e' identica alla sorgente?
+**Opzioni**: A) un file `MANIFEST.sha256` generato sulla sorgente (hash di ogni file) e verificato su ogni destinazione dopo la copia e a ogni controllo; la pagina mostra uguale/diverso/mancante/in piu' per file; B) solo dimensione e data (quello che elenca Proxmox), senza hash; C) A piu' firma del manifest con una chiave tua (protegge anche da una sorgente manomessa).
+**Suggerimento**: A. C solo se vuoi proteggerti da chi riesce a scrivere sul nodo-1.
+**Risposta utente**: A
+
+### D76 — Quando si sincronizza
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Solo a mano o anche in automatico?
+**Opzioni**: A) solo a mano dalla pagina (con anteprima delle differenze e conferma); B) a timer sul nodo sorgente; C) a mano, piu' un avviso nella panoramica quando le copie sono diverse dalla sorgente da piu' di N giorni.
+**Suggerimento**: C: niente copie automatiche di codice eseguito come root, ma nessuna differenza che passa inosservata.
+**Risposta utente**: C
+
+### D77 — Accesso SSH del manager (solo se D70 = B)
+**Stato**: RISPOSTA
+**Bloccante**: si' (per B)
+**Domanda**: Con quale utente e quale chiave il manager parla col nodo sorgente?
+**Opzioni**: A) una chiave dedicata, usata solo dal manager, in `authorized_keys` del nodo sorgente con `command=` (un solo script che accetta `status|diff|run`), `no-pty,no-port-forwarding,no-agent-forwarding`, ristretta all'indirizzo della postazione; lo script (installato da te, root) fa le copie verso le destinazioni con la chiave del nodo sorgente verso gli altri nodi; B) la tua chiave attuale (no: da non usare, ha una shell completa).
+**Suggerimento**: A. La preparazione (creare la chiave, aggiungere la riga) e' un passo tuo, ti preparo i comandi.
+**Risposta utente**: A, ma leggi la risposta a D70 per valutare un automatismo non root grazie alle API.
+
+### D78 — Copia di sicurezza subito
+**Stato**: RISPOSTA
+**Bloccante**: no (ma consigliata prima di tutto)
+**Domanda**: Facciamo subito una copia manuale, prima di sviluppare niente?
+**Opzioni**: A) si': copia a mano del contenuto degli snippet e degli script su un secondo nodo (e uno di HOSTING), anche solo con `rsync -a` o `tar`, cosi' il rischio "unica copia" sparisce oggi; B) si aspetta lo strumento.
+**Suggerimento**: A, adesso: l'app non c'entra, e' un comando tuo di un minuto una volta che sai la cartella.
+**Risposta utente**: B
+
+### D79 — Utente non root sui nodi: chi lo crea la prima volta
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Le API di Proxmox non creano utenti del sistema operativo (verificato, vedi `CLAUDE.md`): `POST /access/users` crea solo un utente Proxmox (realm `pve`/`pam`), e per `pam` l'utente Linux deve gia' esistere. Come creiamo `pmgr-sync` sui nodi?
+**Perche' conta**: serve root almeno una volta per nodo. Dopo, la sincronizzazione gira senza root.
+**Opzioni**: A) ti preparo uno script idempotente (crea utente `pmgr-sync` senza password, gruppo `pmgr-sync`, cartelle con permessi, riga in `authorized_keys`) e lo lanci tu: a mano, o con Ansible (hai gia' `.ansible` su nodo-1) su tutti i nodi di un cluster; B) mi dai un accesso root temporaneo solo ai 3 nodi di Magi per la prova.
+**Suggerimento**: A, provato prima su Magi (lo lanci tu). Su CALCOLO (10 nodi + nodo-1) e HOSTING lo stesso script, quando la prova e' andata bene.
+**Risposta utente**: A
+
+### D80 — Dove stanno gli script e gli snippet "veri"
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: `/root/cloud-images` e' sotto `/root` (0700): un utente non root non puo' leggerlo. Dove devono stare gli script da sincronizzare?
+**Opzioni**: A) nuova cartella `/var/lib/vz/pmgr-scripts` (gruppo `pmgr-sync`, 2775): i tuoi generatori restano dove sono e scrivono li' (o un tuo passo li copia); B) restare in `/root/cloud-images` e sincronizzare quella cartella solo come root; C) cartella unica `/var/lib/vz/pmgr` con sottocartelle `snippets/` e `scripts/`.
+**Suggerimento**: A: gli snippet restano dove Proxmox li cerca (`/var/lib/vz/snippets`, gruppo `pmgr-sync`), gli script in una cartella accanto, nessun file in `/root` coinvolto.
+**Risposta utente**: A
+
+### D81 — Cosa c'e' in `/root/cloud-images` e negli altri file di supporto
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Non ti serve darmi un accesso: bastano elenchi di nomi. Sono file con segreti?
+**Perche' conta**: la sincronizzazione ammette solo estensioni scelte (`.sh`, `.yaml`, `.sha256`); i segreti non devono finire su altri nodi ne' nel manifest.
+**Opzioni**: A) incolli l'output di `ls -laR --time-style=long-iso /root/cloud-images | head -150` e di `grep -rIlE 'password|passwd|secret|token|BEGIN [A-Z ]*PRIVATE' /root/cloud-images /root/*.sh 2>/dev/null` (solo i nomi dei file che contengono quelle parole, non il contenuto); B) crei un utente di sola lettura sul nodo-1 (sconsigliato: serve a me solo per leggere nomi).
+**Suggerimento**: A.
+**Risposta utente**: ti ho messo una copia della cartella in modo che la puoi esaminare e leggeri gli script per correggerli in /SUPPORT-FILES da aggiungere a git ignore. In questo modo almeno all'inizio abbiamo una copia in root della cartella con gli script funzionanti. Quando avrai analizzato i file ti sarai reso conto che esistono script di aggiornamento delle immagini che creano i templates. Dobbiamo mettere un pulsante che esegua l'aggiornamento da proxmox manager. Da decidere come gestire l'upgrade di un template ora che avró multi copie. Questo lo metterei come task successivo dipendente dalla fine di questo. 
+
+### D82 — Tra cluster: chi spinge i file
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Il nodo sorgente raggiunge in rete i nodi degli altri cluster (Magi 10.75.132.201-203, HOSTING 10.75.132.100...)?
+**Opzioni**: A) spinge la sorgente (`rsync` su ssh con la chiave di `pmgr-sync` del nodo sorgente verso `pmgr-sync` delle destinazioni): il manager non vede mai i file; B) il manager fa da ponte (legge dalla sorgente e scrive sulla destinazione): serve solo se la sorgente non raggiunge l'altro cluster, e il manager avrebbe una chiave per ogni destinazione.
+**Suggerimento**: A. Verifica dal nodo-1: `for h in 10.75.132.201 10.75.132.100; do timeout 3 bash -c "echo > /dev/tcp/$h/22" && echo "$h ok" || echo "$h NO"; done`.
+**Risposta utente**: Ho verificato, A. Altra feat da aggiungere in sequenza sulla roadmap: migrazione di una vm su un cluster diverso.
+
+### D83 — Password in chiaro negli script di finalizzazione
+**Stato**: RISPOSTA
+**Bloccante**: si' (prima di sincronizzare `finalize_image.sh`)
+**Domanda**: I sette `finalize_image.sh` (`debian`, `debian_13`, `rocky_8`, `rocky_9`, `ubuntu`, `ubuntu_24.04`, `ubuntu_26.04`) contengono in chiaro la password che `qm set --cipassword` mette nei template (per l'utente `tecnico`). Come la togliamo?
+**Perche' conta**: la sincronizzazione copierebbe la password su tutti i nodi e su altri cluster, e finirebbe in ogni backup e log. Nel repository non c'e' (`SUPPORT-FILES/` e' ignorata), ma e' comparsa nell'output di questa sessione di lavoro durante l'esame dei file.
+**Opzioni**: A) gli script leggono la password da un file `0600` fuori dalla cartella sincronizzata (per esempio `/root/.pmgr-template-secrets`), presente solo sui nodi dove si eseguono gli aggiornamenti; `finalize_image.sh` resta sincronizzabile; B) `finalize_image.sh` esclusi dalla sincronizzazione e lasciati solo sul nodo che aggiorna i template; C) A piu' cambio della password (la nuova non e' mai passata di qui).
+**Suggerimento**: A, e C a tua discrezione (la password attuale e' valida solo per l'utente `tecnico` dei template e le VM nuove la cambiano? da verificare con te).
+**Risposta utente**: A, mi occuperó di cambiare la password in seguito
+
+### D84 — Correzioni agli script di aggiornamento (prima di sincronizzarli)
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: Posso correggere le copie in `SUPPORT-FILES/` (e poi tu le rimetti sul nodo-1) con queste modifiche? Elenco dopo la lettura:
+1. **Percorsi**: ovunque c'e' `/root/cloud-images` scritto a mano e in `ubuntu_24.04/*.sh` percorsi relativi (`./ubuntu_24.04/...`, funzionano solo lanciandoli da `/root/cloud-images`). Serve una cartella base unica (variabile `PMGR_BASE`, predefinita la cartella dello script) per poterli spostare.
+2. **Template distrutto prima di sapere se l'immagine c'e'**: `update_image.sh` cancella l'immagine e poi scarica con `wget -q` senza controllare l'esito; `create_template.sh` fa `qm destroy 1003` comunque. Se il download fallisce (rete, mirror) il template sparisce e se ne crea uno vuoto. Proposta: `set -euo pipefail`, scarico in un file temporaneo, controllo di dimensione e hash (dove il mirror li pubblica), sostituzione solo a scarico riuscito, `qm destroy` solo dopo.
+3. **VMID, storage, bridge, DNS, dominio di ricerca** scritti a mano (1001-1007, `datacloud-ssd`, `vmbr0`, `10.248.16.30 10.248.26.30`, `inside.dei.polimi.it`): in un file di configurazione per cluster (necessario per Magi e HOSTING, che hanno storage e DNS diversi).
+4. **Password in chiaro**: vedi D83.
+5. **`ubuntu_26.04/finalize_image.sh` usa `vendor_ubuntu_24.04.yaml`** (invece di `vendor_ubuntu_26.04.yaml`, che esiste ed e' identico per ora): probabile copia-incolla; da correggere?
+6. **`update.sh`**: `#/bin/bash` senza `!` (parte comunque con la shell dell'utente, ma non e' un bash garantito).
+7. **Helper dei guest**: le copie in `rocky_8/guestscripts` e `rocky_9/guestscripts` (`adduser.sh`, `disk.sh`) hanno stessa logica ma sono vecchie (accenti e `—` al posto di ASCII): i generatori dovrebbero prenderle dal repository (`internal/handlers/guestscripts/`) come dichiarano gia' nei commenti, cosi' si evita la deriva. `dmesg.sh` e' identico.
+8. **Nessun controllo se un altro aggiornamento e' in corso** (lock) ne' log unico: 3 log in tutto, a mano.
+**Opzioni**: A) tutte e otto; B) solo 1-3 e 5-6 ora, il resto con il pulsante di aggiornamento (task successivo); C) solo quelle che servono alla sincronizzazione (1, 3, 4).
+**Suggerimento**: A, con un solo cambiamento per volta e prova su Magi prima di toccare il nodo-1.
+**Risposta utente**: A, tutto deve funzionare sul magi prima di qualsiasi cosa. Va gestito anche il fatto che ogni cluster puó avere nomi pool diverse o target dischi diversi. La sincronizzazione multicluster deve gestire in automatico la correzione degli script. Mi serve il tuo script idempotente per crearti l'acesso sul magi (puoi usare i file di supporto come sorgente senza toccare calcolo.). Il template presente sul nodo 1 del magi é cancellabile o rinominabile con un altro ID.
+
+### D85 — Script uguali ovunque, configurazione diversa per cluster
+**Stato**: RISPOSTA
+**Bloccante**: si' (prima di correggere gli script)
+**Domanda**: Hai chiesto che la sincronizzazione tra cluster gestisca "in automatico la correzione degli script" (pool, storage, bridge, DNS, VMID diversi). Come?
+**Perche' conta**: se la sincronizzazione riscrivesse il testo degli script per ogni cluster, i file sulle destinazioni non avrebbero piu' lo stesso hash della sorgente: il manifest (D75 A) non potrebbe piu' dire "uguale", e uno script modificato in automatico e' codice eseguito come root che nessuno ha riletto.
+**Opzioni**:
+A) **Script identici ovunque, tutto cio' che cambia in un file `cluster.conf` locale a ogni cluster** (storage dei template, storage del cloud-init, bridge, DNS, dominio di ricerca, VMID di partenza, nome dell'utente, percorso del file con la password). `cluster.conf` e' **escluso dalla sincronizzazione**. La "correzione automatica" e' la **creazione di `cluster.conf`**: al primo uso su un cluster nuovo il manager legge dalle API storage e rete (per Magi: `dirac-sea` al posto di `datacloud-ssd`), propone i valori, tu li confermi in pagina e li scrive. Se `cluster.conf` manca o e' incompleto gli script si fermano senza toccare niente.
+B) Il manager riscrive gli script per ogni destinazione (sostituzione di nomi): sconsigliato per il motivo sopra.
+C) Come A, ma `cluster.conf` generato solo a mano.
+**Suggerimento**: A. Gli script restano uguali, controllabili con l'hash, e la parte "automatica" si limita a proporre i valori. Chi scrive `cluster.conf` sul nodo lo decidiamo allo step del backend (per ora lo crei tu o lo script di setup dal modello).
+**Risposta utente**: Approvo la tua proposta (A).
+
+## ROADMAP 13 — Profilo "hosting" e SSH (richiesta utente 2026-11-05)
+
+Richiesta: (1) le Rocky del cluster di calcolo devono avere l'accesso SSH abilitato; (2) quando si fa il Sync verso un altro cluster si deve poter specificare se e' di hosting: se si', SSH con password disattivato e accesso con chiave imposto; (3) a ogni riavvio della VM l'accesso a sola chiave deve essere rimesso, perche' modifiche degli utenti non abbassino la sicurezza.
+
+### D86 — Rocky del cluster di calcolo: SSH con password
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: "Abilita l'accesso con SSH" per le Rocky significa SSH con password, come gia' fanno Ubuntu e Debian?
+**Perche' conta**: gli snippet Rocky non avevano nessuna impostazione SSH (Ubuntu/Debian impostano `PasswordAuthentication yes` e `PermitRootLogin no`).
+**Opzioni**: A) si', password come Ubuntu/Debian; B) altro.
+**Suggerimento**: A.
+**Risposta utente**: A. Implementato come file `/etc/ssh/sshd_config.d/00-pmgr-ssh.conf` (`PasswordAuthentication yes`, `PermitRootLogin no`); su Rocky 8 lo snippet aggiunge anche la riga `Include` in testa a `sshd_config`, che li' manca.
+
+### D87 — Dove si specifica che un cluster di destinazione e' di hosting
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Per destinazione e ricordato, oppure a ogni sync?
+**Opzioni**: A) casella "hosting" sul cluster di destinazione, ricordata (configurazione del sync e pagina del manager); B) interruttore a ogni sync.
+**Suggerimento**: A: meno rischio di dimenticarla e mandare snippet con password SSH su un cluster di hosting.
+**Risposta utente**: A. La parte di rendering e' fatta (`pmgr-os.sh --render DIR --profile hosting`, e `PROFILE=hosting` in `cluster.conf` per i template generati nel cluster); la casella nel sync e nella pagina arriva con `pmgr-snippets-sync` (vedi D90).
+
+### D88 — Quando si rimette l'SSH a sola chiave
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Solo al riavvio, oppure anche con un controllo periodico?
+**Opzioni**: A) solo al riavvio; B) riavvio + controllo ogni 15 minuti.
+**Suggerimento**: A (come richiesto).
+**Risposta utente**: B: riavvio **e** ogni 15 minuti. Implementato con `pmgr-ssh-enforce` (servizio `Before=ssh.service` + timer).
+
+### D89 — Password dell'utente del template nell'hosting
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Nel template di hosting resta la password per l'accesso da console, con il solo SSH a password disattivato?
+**Opzioni**: A) si', resta; B) nessuna password.
+**Suggerimento**: A.
+**Risposta utente**: A. `finalize` non cambia: `cipassword` resta.
+
+### D90 — Come il sync consegna le varianti di hosting
+**Stato**: RISPOSTA
+**Bloccante**: no (serve quando si scrive `pmgr-snippets-sync`)
+**Domanda**: Le destinazioni di hosting devono ricevere snippet diversi dagli standard, con gli **stessi nomi di file** (i template li referenziano per nome). Come?
+**Perche' conta**: il manifest con gli hash (D75 A) deve restare valido per ogni destinazione.
+**Opzioni**: A) la sorgente genera **due alberi** (standard e hosting) con `pmgr-os.sh --render` e un manifest per profilo; il sync spinge a ogni destinazione l'albero del suo profilo; B) l'hosting genera i propri snippet localmente (`PROFILE=hosting` in `cluster.conf`) e il sync non li tocca; C) il sync trasforma il testo al volo (sconsigliato: gli hash non tornerebbero).
+**Suggerimento**: A: una sola sorgente di verita', nessuna riscrittura al volo, il profilo e' una proprieta' della destinazione.
+**Risposta utente**: Si (A): due alberi generati dalla sorgente con `pmgr-os.sh --render` (standard e hosting), un manifest per profilo, ogni destinazione riceve quello del suo profilo. Il rendering e' fatto; la consegna con la casella 'hosting' per destinazione arriva con `pmgr-snippets-sync`.
+
+### D91 — VM di hosting gia' esistenti
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Le VM del cluster HOSTING (28) create con i vecchi snippet hanno SSH con password. Vuoi uno script di rollout, come per fail2ban, che installi `pmgr-ssh-enforce` anche su quelle?
+**Perche' conta**: la regola vale solo per le VM nuove, finche' non si aggiornano quelle esistenti. Attenzione: chi oggi entra con la password viene escluso; servono le chiavi prima.
+**Opzioni**: A) si', con `--check` e una VM di prova; B) no, solo VM nuove.
+**Suggerimento**: A, dopo avere verificato che ogni VM abbia almeno una chiave in `authorized_keys`.
+**Risposta utente**: Si (A): script di rollout con `--check` e una VM di prova, e con il controllo che ci sia almeno una chiave in `authorized_keys` prima di disattivare la password. Fatto: `pmgr-vm-rollout.sh --module ssh-hosting` (modulo `ssh-hosting` di `pmgr-vm-apply.sh`).
+
+## ROADMAP 13 — Aggiornamenti di sicurezza automatici (richiesta utente 2026-11-05)
+
+Richiesta: verificare che gli snippet abilitino correttamente gli aggiornamenti automatici **di sicurezza**: controllo e installazione **due volte al giorno**, **nessun riavvio automatico**, **avviso a ogni login** (console e SSH) quando serve un riavvio; **tutti i cluster** (standard e hosting).
+
+### D92 — Esito della verifica e correzioni
+**Stato**: RISPOSTA (nessuna scelta richiesta all'utente: sono correzioni di difetti)
+**Bloccante**: no
+**Cosa c'era**: Debian non installava nessun pacchetto per gli aggiornamenti automatici; Ubuntu aveva un cron di mezzanotte lanciato come utente `tecnico` (non root: non poteva installare) mentre i timer di apt controllano due volte al giorno ma **installano una volta sola** (06:00, con ritardo casuale fino a un'ora) e gli intervalli "1 giorno" saltano comunque il secondo giro; Rocky abilitava `dnf-automatic.timer` ma la configurazione di serie e' `apply_updates = no` (**scarica soltanto, non installa mai**) e `upgrade_type = default` (tutti gli aggiornamenti, non solo la sicurezza); nessuna delle tre mostrava un avviso di riavvio al login (Ubuntu solo se c'e' `update-notifier-common`, Debian e Rocky mai).
+**Cosa e' stato fatto** (tutti i cluster e i profili): `unattended-upgrades` anche su Debian; origini **solo di sicurezza** (Debian: `-security` e `Debian-Security`; Ubuntu: `-security`, ESM apps e infra), `Automatic-Reboot "false"`, `APT::Periodic::* "always"` e `Enable "1"`; timer di apt con i due orari al giorno (liste 04:30 e 16:30, installazione 06:00 e 18:00, ritardo casuale 20-30 min); Rocky: `upgrade_type = security`, `apply_updates = yes`, `reboot = never` (dove l'opzione esiste), timer di `dnf-automatic` alle 06:00 e 18:00, `dnf-utils`; il vecchio cron tolto; `pmgr-reboot-check` (kernel installato piu' nuovo di quello in uso, `reboot-required`, `needs-restarting`, flag in `/run`) e `/etc/profile.d/pmgr-reboot-required.sh` che a ogni login interattivo (console e SSH) stampa l'avviso in italiano e in inglese e **non** sporca l'output di script e comandi via SSH.
+**Risposta utente**: (presa d'atto)
+
+## ROADMAP 13 — Hardening dei sistemi di hosting (richiesta utente 2026-11-06)
+
+Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`): firewall con 22/80/443 aperte e il resto chiuso, SSH solo con chiave, fail2ban, aggiornamenti di sicurezza. Regola dell'utente: **nei nuovi deploy sempre l'ultima LTS**, ogni tanto LTS precedenti; la matrice dei test comprende quindi Ubuntu 26.04/24.04/22.04, Debian 13/12, Rocky 10/9/8.
+
+### D93 — Altre misure di hardening per l'hosting (proposte, nessuna applicata)
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Quali di queste vuoi aggiungere al profilo hosting? Per ciascuna: rischio e mio suggerimento.
+**Perche' conta**: sono VM esposte a Internet con clienti dentro; ogni misura riduce la superficie ma puo' dare fastidio a chi ci lavora.
+**Opzioni** (scegli quali, anche piu' di una):
+1. **sysctl di rete e kernel** (syncookies, niente redirect ICMP e source routing, risposte ICMP false ignorate, `kptr_restrict=2`, `dmesg_restrict=1`, `unprivileged_bpf_disabled=1`). Rischio basso; il "Log del kernel" del manager gira come root e non cambia. **Suggerisco si'.**
+2. **Blocco della porta 25 in uscita** (la VM non puo' mandare posta direttamente: protegge la reputazione dei tuoi indirizzi dallo spam; i clienti usano un relay). Dipende dalla tua politica. **Suggerisco si'.**
+3. **443/udp** aperta (HTTP/3, QUIC). **Suggerisco no**, se non serve a nessuno.
+4. **Elenco di pacchetti ridotto** sull'hosting: togliere `tcpdump`, `iptraf`, `nethogs`, `iftop`, `arpwatch`, `nfs-common`, `cifs-utils`, `acct`, `nmon` (i clienti li installano se servono). Meno codice su una macchina esposta. **Suggerisco si'.**
+5. **Password di console**: oggi e' la stessa su tutte le VM dei template (D83: la cambi tu) e non vale via SSH. Opzioni: lasciarla (a rischio di console accessibile), una diversa per VM, oppure account senza password di console. **Suggerisco di lasciare come e' fino al cambio, poi valutare.**
+6. **fail2ban**: jail `recidive` (una settimana di ban a chi viene bannato piu' volte) e jail web (nginx/apache) quando il server web e' installato. **Suggerisco `recidive` si', jail web a richiesta.**
+7. **SSH**: `ClientAliveInterval 300` + `ClientAliveCountMax 2` (chiude le sessioni morte; **suggerisco si'**); `AllowGroups` per limitare chi puo' entrare (**suggerisco no** per ora: serve decidere il gruppo e la gestione dei clienti).
+8. **Limite alle nuove connessioni SSH nel firewall** (`ufw limit 22/tcp`): complementa fail2ban ma puo' bloccare automazioni in parallelo. **Suggerisco no.**
+9. **Registri verso un server remoto / auditd**: politica da definire. **Suggerisco di rinviare.**
+10. **Docker sui sistemi dei clienti**: le porte pubblicate da Docker aggirano `ufw`. Non si risolve con uno snippet; **suggerisco di documentarlo ai clienti** (e, se serve, regole in `DOCKER-USER`).
+**Suggerimento**: 1, 2, 4, 6 (`recidive`) e 7 (`ClientAlive`).
+**Risposta utente**: Approvo le proposte (2026-11-06): quelle suggerite, cioe' 1 sysctl di rete e kernel, 2 blocco della porta 25 in uscita, 4 elenco di pacchetti ridotto sull'hosting, 6 jail `recidive` di fail2ban, 7 `ClientAliveInterval 300` e `ClientAliveCountMax 2`. Restano fuori: 3 (443/udp), 5 (password di console: la cambia l'utente), 7 `AllowGroups`, 8 (limite connessioni SSH), 9 (log remoti), 10 (Docker: da documentare ai clienti). **Da implementare** (non ancora fatto).
+
+
+## ROADMAP 13 — Accesso del manager al nodo sorgente (2026-11-09)
+
+### D94 — Come il manager esegue ssh
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Il manager parla col nodo sorgente con il client `ssh` di sistema o con una libreria Go?
+**Perche' conta**: una dipendenza nuova va approvata; il client di sistema deve esistere dove gira il manager.
+**Opzioni**: A) `os/exec` di `/usr/bin/ssh` con lista di argomenti fissa, senza shell, `-F /dev/null`, `BatchMode`, `IdentitiesOnly`, `StrictHostKeyChecking=yes` con `known_hosts` dedicato; B) `golang.org/x/crypto/ssh`, nessun binario esterno ma una dipendenza nuova e la verifica della chiave host da scrivere.
+**Suggerimento**: A: nessuna dipendenza, nessun input della richiesta negli argomenti.
+**Risposta utente**:
+
+### D95 — Chi puo' premere "Sincronizza"
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Il manager non ha login: basta la protezione delle altre azioni per una copia che finisce in codice eseguito come root nelle VM future?
+**Perche' conta**: chi raggiunge la pagina non puo' inserire contenuti, ma puo' propagare a tutti i nodi una sorgente modificata a meta'.
+**Opzioni**: A) guardia `/api` + anteprima obbligatoria + conferma di pericolo + `--expect <digest>`: la copia parte solo se la sorgente e' ancora identica a quella vista nell'anteprima, altrimenti 409; B) come A piu' un codice segreto da digitare (in `config.json`, hash lento); C) solo stato, copia a mano sul nodo (torna a D70 A).
+**Suggerimento**: A, coerente con le altre azioni distruttive del manager; B se la VPN e' condivisa con persone che non devono poter sincronizzare.
+**Risposta utente**:
+
+### D96 — Limite di indirizzo della chiave del manager
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: `from=` nella chiave del manager: quale indirizzo?
+**Perche' conta**: su Magi la postazione arriva come 10.75.132.254 (router), quindi `from=` limita alla rete dietro il router e non a una macchina. La chiave resta comunque ristretta a `status|diff|run`.
+**Opzioni**: A) accettare il router, sapendo che il limite vero e' la chiave (0600 sulla postazione); B) far girare il manager su una macchina della rete dei nodi, con `from=` esatto.
+**Suggerimento**: A per Magi; per CALCOLO decidere prima della messa in produzione.
+**Risposta utente**:
+
+### D97 — Dove sta `pmgr-snippets-sync.sh`
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: Lo strumento resta solo in `SUPPORT-FILES/` (fuori da git) o va in `tools/pmgr-sync/`?
+**Perche' conta**: il manager dipende dalla sua uscita JSON: se non e' versionato, codice e contratto possono divergere senza traccia. Non contiene segreti; la regola "mai nel repo" riguarda i generatori degli snippet.
+**Opzioni**: A) sorgente in `tools/pmgr-sync/` con i suoi test; il comando forzato (root) esegue una copia installata in `/usr/local/libexec/pmgr/`, non scrivibile da `pmgr-sync`; B) resta locale, consegnato nella cartella sincronizzata.
+**Suggerimento**: A: la chiave del manager esegue solo un file di root, non uno modificabile dall'utente della sincronizzazione.
+**Risposta utente**:
+
+### D98 — Una sorgente sola nella configurazione
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: In questo passo il manager conosce una sola sorgente?
+**Perche' conta**: D71 chiede una sorgente spostabile, anche su piu' nodi; la procedura "Sposta sorgente" tocca chiavi su tutte le destinazioni.
+**Opzioni**: A) una sorgente attiva in `snippet_sync` (host, porta, percorsi di chiave e known_hosts); spostarla si progetta con la pagina; B) elenco di sorgenti da subito.
+**Suggerimento**: A: meno superficie ora, e il formato si puo' estendere.
+**Risposta utente**:

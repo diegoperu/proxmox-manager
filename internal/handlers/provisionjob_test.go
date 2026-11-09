@@ -31,6 +31,9 @@ type fakeProv struct {
 	agentFrom       time.Time // agent answers only after this time
 	probes          int
 	userExit        int
+	settlePending   int // number of settle probes that still answer "pending" (cloud-init running)
+	settleProbes    int
+	settleAt        []int // exec count when a settle probe ran (to check order against the user step)
 	failClone       bool
 	failStart       int // the next N start requests fail
 	onClone         func()
@@ -343,6 +346,14 @@ func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, e
 	if strings.Contains(strings.Join(args, " "), "[ -x") {
 		return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":"INLINE\n"}`), nil
 	}
+	if strings.Contains(strings.Join(args, " "), "boot-finished") {
+		f.settleProbes++
+		if f.settlePending > 0 {
+			f.settlePending--
+			return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":"boot-A pending\n"}`), nil
+		}
+		return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":"boot-B finished\n"}`), nil
+	}
 	// the guest scripts: the sub command is what follows "pmgr" (inline) or the helper path
 	sub := ""
 	for i, a := range args {
@@ -377,6 +388,7 @@ func provFast(t *testing.T) {
 	old := provTiming
 	provTiming.Clone, provTiming.Task, provTiming.Agent, provTiming.AgentPoll = time.Second, time.Second, 40*time.Millisecond, 5*time.Millisecond
 	provTiming.DiskScanWait = time.Millisecond
+	provTiming.Settle, provTiming.SettlePoll = 400*time.Millisecond, 3*time.Millisecond
 	oldPoll := guestPollInterval
 	guestPollInterval = 2 * time.Millisecond // each guest command polls for its result
 	t.Cleanup(func() { guestPollInterval = oldPoll })
@@ -1116,4 +1128,125 @@ func TestValidateProvExtraDisk(t *testing.T) {
 	if p, err := validateProvReq(r); err != nil || p.DiskDevice != "virtio0" {
 		t.Fatalf("default disk device: %v %+v", err, p)
 	}
+}
+
+// The user step must not start while cloud-init is still running (the agent is restarted and the
+// guest reboots in that window: a command started there is killed half way).
+func TestProvisionWaitsForCloudInit(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.settlePending = 6
+	r := baseReq()
+	r.ExtraUser = &provUser{Username: "mario"}
+	j, _ := startProv(f, 7, "C", mustPlanProv(t, r), noOpts, time.Now())
+	if v := waitProv(t, j); v.Result != provOK {
+		t.Fatalf("%+v", v)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.settleProbes < 6+settleStable {
+		t.Fatalf("settle probes = %d, want at least %d", f.settleProbes, 6+settleStable)
+	}
+	// the adduser exec (the last one) comes after every settle probe
+	lastProbe, userExec := -1, -1
+	for i, a := range f.execs {
+		joined := strings.Join(a, " ")
+		if strings.Contains(joined, "boot-finished") {
+			lastProbe = i
+		}
+		if strings.Contains(joined, "mario") {
+			userExec = i
+		}
+	}
+	if userExec < 0 || lastProbe < 0 || userExec < lastProbe {
+		t.Fatalf("user step ran before cloud-init finished (probe %d, user %d)", lastProbe, userExec)
+	}
+}
+
+// cloud-init that never finishes: nothing is run in the guest and the reason is a warning.
+func TestProvisionCloudInitTimeoutTouchesNothing(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.settlePending = 1 << 30
+	r := baseReq()
+	r.ExtraUser = &provUser{Username: "mario"}
+	j, _ := startProv(f, 7, "C", mustPlanProv(t, r), noOpts, time.Now())
+	v := waitProv(t, j)
+	if v.Result != provWarnings || len(v.Warnings) != 1 || v.Warnings[0] != "cloud_init_timeout" {
+		t.Fatalf("%+v", v)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, a := range f.execs {
+		if strings.Contains(strings.Join(a, " "), "mario") {
+			t.Fatalf("a command with the user ran in the guest: %v", a)
+		}
+	}
+	if f.vms[200].status != "running" {
+		t.Fatal("the VM must stay as it is")
+	}
+}
+
+func TestParseSettle(t *testing.T) {
+	for out, want := range map[string]struct {
+		boot string
+		ok   bool
+	}{
+		"abc-123 finished\n":                  {"abc-123", true},
+		"abc-123 pending\n":                   {"abc-123", false},
+		"noboot finished\n":                   {"noboot", true},
+		"":                                    {"", false},
+		"a b c":                               {"", false},
+		"x finished\nextra line":              {"", false},
+		strings.Repeat("a", 65) + " finished": {"", false},
+	} {
+		boot, ok := parseSettle(out)
+		if boot != want.boot || ok != want.ok {
+			t.Errorf("%q -> (%q,%v), want (%q,%v)", out, boot, ok, want.boot, want.ok)
+		}
+	}
+}
+
+// A reboot between two probes (different boot id) restarts the count: "finished" must be seen
+// twice on the same boot.
+func TestSettleNeedsSameBootTwice(t *testing.T) {
+	old := guestPollInterval
+	guestPollInterval = time.Millisecond
+	defer func() { guestPollInterval = old }()
+	seq := []string{"A finished\n", "B finished\n", "B finished\n"}
+	c := &seqExec{outs: seq}
+	if !waitGuestSettled(c, "n", 1, time.Second, time.Millisecond) {
+		t.Fatal("must settle")
+	}
+	if c.n != 3 {
+		t.Fatalf("polls = %d, want 3 (boot changed after the first)", c.n)
+	}
+	// agent errors while the guest reboots only mean "not yet"
+	c = &seqExec{outs: []string{"!", "!", "A finished\n", "A finished\n"}}
+	if !waitGuestSettled(c, "n", 1, time.Second, time.Millisecond) {
+		t.Fatal("must settle after agent errors")
+	}
+}
+
+type seqExec struct {
+	outs []string
+	n    int
+}
+
+func (s *seqExec) AgentExec(node string, id int, args []string) (json.RawMessage, error) {
+	if s.n < len(s.outs) && s.outs[s.n] == "!" {
+		s.n++
+		return nil, errors.New("proxmox 500: QEMU guest agent is not running")
+	}
+	return json.RawMessage(`{"pid":1}`), nil
+}
+
+func (s *seqExec) AgentExecStatus(node string, id, pid int) (json.RawMessage, error) {
+	out := "A finished\n"
+	if s.n < len(s.outs) {
+		out = s.outs[s.n]
+	}
+	s.n++
+	b, _ := json.Marshal(out)
+	return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":` + string(b) + `}`), nil
 }

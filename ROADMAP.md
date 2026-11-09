@@ -21,7 +21,10 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 8 | `allowed_hosts` (anti DNS rebinding) | sicurezza dietro reverse proxy | S | decisione D14 | in discussione |
 | 9 | Errore JS aprendo direttamente `#/gpu` (`Gpu.summary`, gia' presente prima del 3b) | console pulita, nessun rischio di pagina vuota | S | — | fatto (2026-11-05): non piu' riproducibile; la pagina ora normalizza la risposta (vedi CLAUDE.md) |
 | 10 | Controllo preventivo alla creazione VM: snippet `cicustom` presente sul nodo di destinazione; spazio anche per il volume clonato (non solo per il disco aggiuntivo) | niente VM lasciate spente a meta' | S | — | fatto (2026-11-05): file del template sul nodo (verificabile solo dove lo storage elenca quel tipo di contenuto) e spazio del clone |
-| 11 | Colonna "disco" della lista VM: oggi solo `/`, estendibile al disco piu' pieno | stessa informazione del pannello | S | — | da decidere |
+| 11 | Colonna "disco" della lista VM: oggi solo `/`, estendibile al disco piu' pieno | stessa informazione del pannello | S | — | chiuso (2026-11-05): resta solo `/`, decisione utente |
+| 13 | **Sincronizzazione di script e snippet dal nodo-1** (rsync generico + sezione di amministrazione) | il nodo-1 non e' piu' l'unica copia degli script usati dalle VM nuove e dal manager | L | decisioni D69-D78 | in discussione (2026-11-05), **copia di sicurezza manuale da fare subito** |
+| 14 | **Aggiornamento dei template dal manager** (pulsante che lancia la procedura di `update_*_template.sh`: scarica l'immagine, ricrea il template, rigenera lo snippet, sincronizza) | oggi si lancia a mano sul nodo-1 (~40 min, 3 esecuzioni registrate); con piu' copie degli script va deciso chi aggiorna cosa | L | roadmap 13 chiusa; decisioni su template per cluster (VMID e storage diversi), un solo aggiornamento alla volta, protezione contro la distruzione del template se il download fallisce (D84.2) | da progettare dopo la 13 |
+| 15 | **Migrazione di una VM su un altro cluster** | richiesta utente 2026-11-05; Proxmox ha una migrazione remota (`remote_migrate`, token del cluster di destinazione) | L | roadmap 13 (cluster di prova Magi) | da progettare dopo la 13 |
 | 12 | Prima di avviare una VM spenta, controllare che il nodo abbia la RAM per avviarla | niente avvii che sovraccaricano il nodo | S | modello di carico del bilanciamento | fatto (2026-11-05): avvio singolo, container e Batch; rifiuto 409 con i GB mancanti |
 
 ## Dettaglio
@@ -96,6 +99,11 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Stato:** "per ora no, dobbiamo valutare" (2026-11-02). Da riprendere se l'app viene esposta dietro reverse proxy.
 
 ## Idee non ancora discusse (da valutare)
+
+- **Manager multiutente con livelli diversi** (richiesta utente 2026-11-09): login e ruoli al posto della VPN come unico controllo; riprendere il punto unico di autorizzazione previsto da D95.
+- **Manager su macchina dedicata con IP proprio** (richiesta utente 2026-11-09): sblocca D96 (`from=` esatto sulla chiave del manager).
+
+- **Valori di rete per cluster** (2026-11-09): gateway, prefisso IP, DNS e dominio di ricerca come impostazioni di ogni cluster, chiesti quando lo si aggiunge; oggi la pagina Nuova VM usa le costanti di CALCOLO (gateway 10.75.4.254). Vedi `CLAUDE.md`, Lavori da fare.
 - Esportare il report manageriale anche come pagina HTML autonoma.
 - Report programmati (oggi esclusi: si generano a richiesta).
 - Confronto tra due periodi nello stesso report.
