@@ -410,6 +410,10 @@ td.spk{width:130px}
 .osd.og3{border-radius:2px;border-top-width:4px}
 .osd.og4{border-radius:15px 15px 3px 3px}
 .osd.dim{opacity:.22}
+.gchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.gchip{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:3px 11px;color:var(--text);font:inherit;font-size:12px;cursor:pointer}
+.gchip:hover{border-color:var(--border2)}
+.gchip[aria-pressed=true]{border-color:var(--accent);background:var(--accent-dim);color:var(--accent);font-weight:600}
 .ogrps{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .ogrp{display:flex;align-items:center;gap:10px;text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font:inherit;font-size:12px;cursor:pointer;min-width:0}
 .ogrp:hover{border-color:var(--border2)}
@@ -861,7 +865,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.172.0 · 2026-11-11</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.173.0 · 2026-11-11</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1111,9 +1115,10 @@ html.spiderman{
               </div>
             </div>
             <div class="fr" style="margin-top:12px">
-              <label class="fl" for="pv-group">Gruppo <span class="td">(opzionale)</span></label>
-              <input class="inp w" id="pv-group" type="text" list="grp-dl" maxlength="32" autocomplete="off" spellcheck="false" placeholder="es. rossi" oninput="Provision.summary()">
-              <div class="hint" id="pv-group-hint">Scrive il tag gruppo-nome sulla VM: i report la contano in quel gruppo.</div>
+              <label class="fl" for="pv-group">Gruppo <span class="td">(opzionale, uno solo)</span></label>
+              <div class="gchips" id="pv-group-chips" role="group" aria-label="Gruppi esistenti"></div>
+              <input class="inp w" id="pv-group" type="text" list="grp-dl" maxlength="32" autocomplete="off" spellcheck="false" placeholder="oppure scrivi un gruppo nuovo, es. rossi" oninput="Groups.syncChips();Provision.summary()">
+              <div class="hint" id="pv-group-hint">Scegli un gruppo esistente (clic di nuovo per toglierlo) o scrivine uno nuovo. Scrive il tag gruppo-nome sulla VM: i report la contano in quel gruppo.</div>
             </div>
           </div>
 
@@ -3047,6 +3052,27 @@ const Groups={
   fill(){
     const dl=document.getElementById('grp-dl'); if(!dl)return; dl.replaceChildren();
     for(const g of (Groups.d&&Groups.d.groups)||[]){const o=document.createElement('option');o.value=g.name;dl.append(o);}
+    Groups.chips();
+  },
+  // Nuova VM: un clic su un gruppo esistente lo sceglie (di nuovo = toglie); il campo sotto resta per i gruppi nuovi
+  chips(){
+    const box=document.getElementById('pv-group-chips'); if(!box)return; box.replaceChildren();
+    const names=((Groups.d&&Groups.d.groups)||[]).map(g=>g.name).sort((a,b)=>a.localeCompare(b));
+    box.hidden=names.length===0;
+    for(const n of names){
+      const b=document.createElement('button'); b.type='button'; b.className='gchip'; b.textContent=n; b.dataset.g=n;
+      b.addEventListener('click',()=>{
+        const inp=document.getElementById('pv-group'); inp.value=inp.value.trim().toLowerCase()===n?'':n;
+        Groups.syncChips(); inp.dispatchEvent(new Event('input',{bubbles:true}));
+      });
+      box.append(b);
+    }
+    Groups.syncChips();
+  },
+  syncChips(){
+    const box=document.getElementById('pv-group-chips'), inp=document.getElementById('pv-group'); if(!box||!inp)return;
+    const cur=inp.value.trim().toLowerCase();
+    for(const b of box.children)b.setAttribute('aria-pressed',String(b.dataset.g===cur));
   },
   // lettura per pannello VM e Nuova VM (cache breve; dopo una scrittura _tc.clear())
   async fetch(){const d=await apiCached('/groups',15000);Groups.d=d;Groups.fill();return d;},
