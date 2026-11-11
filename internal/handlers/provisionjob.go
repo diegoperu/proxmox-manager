@@ -768,9 +768,18 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		if p.curDisk > 0 {
 			size = "+" + strconv.Itoa(p.DiskGB-p.curDisk) + "G"
 		}
-		if _, err := c.VMResizeDisk(node, vmid, p.DiskDevice, size); err != nil {
+		rraw, err := c.VMResizeDisk(node, vmid, p.DiskDevice, size)
+		if err != nil {
 			j.fail(provPhDisk, err)
 			return
+		}
+		// Proxmox 9 answers with a task and rewrites the config when it ends: reading the config (and its digest)
+		// before that makes the next write fail with "checksum mismatch". Older answers are null = already done.
+		if _, _, perr := parseUPID(rraw); perr == nil {
+			if err := waitTask(c, rraw, provTiming.Clone); err != nil {
+				j.fail(provPhDisk, err)
+				return
+			}
 		}
 		j.step(provPhDisk, true, "")
 	}

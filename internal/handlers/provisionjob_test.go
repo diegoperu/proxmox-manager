@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,8 @@ import (
 // Cluster resources are derived from the VMs, so the RAM check sees what the procedure creates.
 type fakeProv struct {
 	mu              sync.Mutex
+	resizeAsync     bool         // Proxmox 9: resize answers with a task that rewrites the config when it ends
+	resizePending   map[int]bool // resize task not yet finished
 	vms             map[int]*fvm
 	ver             map[int]int
 	writes          []string // "op vmid key=value..." (no secret values: they are recorded as ***)
@@ -187,6 +190,10 @@ func (f *fakeProv) GetVMConfig(node string, id int) (json.RawMessage, error) {
 		return nil, err
 	}
 	b, _ := json.Marshal(c)
+	if f.resizePending[id] { // the unfinished resize task ends right after this read: the digest we hand out goes stale
+		delete(f.resizePending, id)
+		f.ver[id]++
+	}
 	return b, nil
 }
 func (f *fakeProv) GetGuestConfig(node, kind string, id int) (json.RawMessage, error) {
@@ -280,6 +287,13 @@ func (f *fakeProv) VMResizeDisk(node string, id int, disk, size string) (json.Ra
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.rec(fmt.Sprintf("resize %d %s %s", id, disk, size))
+	if f.resizeAsync {
+		if f.resizePending == nil {
+			f.resizePending = map[int]bool{}
+		}
+		f.resizePending[id] = true
+		return upidFor(node, "resize", id), nil
+	}
 	return json.RawMessage(`null`), nil
 }
 func (f *fakeProv) VMSetCloudInit(node string, id int, p url.Values) (json.RawMessage, error) {
@@ -327,6 +341,15 @@ func (f *fakeProv) GetStorageContent(node, storage, content string) (json.RawMes
 }
 func (f *fakeProv) WaitForTask(upid json.RawMessage, timeout time.Duration) error { return nil }
 func (f *fakeProv) GetTaskStatus(node, upid string) (json.RawMessage, error) {
+	if m := regexp.MustCompile(`:resize:(\d+):`).FindStringSubmatch(upid); m != nil {
+		id, _ := strconv.Atoi(m[1])
+		f.mu.Lock()
+		if f.resizePending[id] {
+			delete(f.resizePending, id)
+			f.ver[id]++ // the task rewrote the config
+		}
+		f.mu.Unlock()
+	}
 	return json.RawMessage(`{"status":"stopped","exitstatus":"OK"}`), nil
 }
 func (f *fakeProv) AgentExec(node string, id int, args []string) (json.RawMessage, error) {
@@ -1249,4 +1272,22 @@ func (s *seqExec) AgentExecStatus(node string, id, pid int) (json.RawMessage, er
 	s.n++
 	b, _ := json.Marshal(out)
 	return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":` + string(b) + `}`), nil
+}
+
+func TestProvisionWaitsForTheResizeTaskBeforeTheExtraDisk(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.resizeAsync = true
+	r := withDisk(baseReq(), 100)
+	j, err := startProv(f, 20, "C", mustPlanProv(t, r), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := waitProv(t, j)
+	if v.Result != provOK || len(v.Warnings) != 0 {
+		t.Fatalf("a resize that ends after the config read must not break the extra disk: %+v", v)
+	}
+	if got := f.vms[200].cfg["virtio1"]; got != "ceph:100" {
+		t.Fatalf("virtio1 = %q", got)
+	}
 }
