@@ -996,19 +996,20 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 9. **Registri verso un server remoto / auditd**: politica da definire. **Suggerisco di rinviare.**
 10. **Docker sui sistemi dei clienti**: le porte pubblicate da Docker aggirano `ufw`. Non si risolve con uno snippet; **suggerisco di documentarlo ai clienti** (e, se serve, regole in `DOCKER-USER`).
 **Suggerimento**: 1, 2, 4, 6 (`recidive`) e 7 (`ClientAlive`).
-**Risposta utente**: Approvo le proposte (2026-11-06): quelle suggerite, cioe' 1 sysctl di rete e kernel, 2 blocco della porta 25 in uscita, 4 elenco di pacchetti ridotto sull'hosting, 6 jail `recidive` di fail2ban, 7 `ClientAliveInterval 300` e `ClientAliveCountMax 2`. Restano fuori: 3 (443/udp), 5 (password di console: la cambia l'utente), 7 `AllowGroups`, 8 (limite connessioni SSH), 9 (log remoti), 10 (Docker: da documentare ai clienti). **Da implementare** (non ancora fatto).
+**Risposta utente**: Approvo le proposte (2026-11-06): quelle suggerite, cioe' 1 sysctl di rete e kernel, 2 blocco della porta 25 in uscita, 4 elenco di pacchetti ridotto sull'hosting, 6 jail `recidive` di fail2ban, 7 `ClientAliveInterval 300` e `ClientAliveCountMax 2`. Restano fuori: 3 (443/udp), 5 (password di console: la cambia l'utente), 7 `AllowGroups`, 8 (limite connessioni SSH), 9 (log remoti), 10 (Docker: da documentare ai clienti).
+**Esito (2026-11-09)**: implementati 1, 4, 6, 7 nel profilo hosting e nel modulo `hardening-hosting` per le VM esistenti (jail `recidive` solo SSH, scelta dell'utente: opzione A). **2 (porta 25 in uscita): NON applicata**, l'utente ha deciso di lasciarla aperta; resta APERTA come domanda. Applicato su tutte le VM HOSTING con chiavi il 2026-11-12.
 
 
 ## ROADMAP 13 — Accesso del manager al nodo sorgente (2026-11-09)
 
 ### D94 — Come il manager esegue ssh
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: Il manager parla col nodo sorgente con il client `ssh` di sistema o con una libreria Go?
 **Perche' conta**: una dipendenza nuova va approvata; il client di sistema deve esistere dove gira il manager.
 **Opzioni**: A) `os/exec` di `/usr/bin/ssh` con lista di argomenti fissa, senza shell, `-F /dev/null`, `BatchMode`, `IdentitiesOnly`, `StrictHostKeyChecking=yes` con `known_hosts` dedicato; B) `golang.org/x/crypto/ssh`, nessun binario esterno ma una dipendenza nuova e la verifica della chiave host da scrivere.
 **Suggerimento**: A: nessuna dipendenza, nessun input della richiesta negli argomenti.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-09). Da realizzare con l'integrazione del manager (non ancora scritta).
 
 ### D95 — Chi puo' premere "Sincronizza"
 **Stato**: APERTA
@@ -1017,7 +1018,7 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Perche' conta**: chi raggiunge la pagina non puo' inserire contenuti, ma puo' propagare a tutti i nodi una sorgente modificata a meta'.
 **Opzioni**: A) guardia `/api` + anteprima obbligatoria + conferma di pericolo + `--expect <digest>`: la copia parte solo se la sorgente e' ancora identica a quella vista nell'anteprima, altrimenti 409; B) come A piu' un codice segreto da digitare (in `config.json`, hash lento); C) solo stato, copia a mano sul nodo (torna a D70 A).
 **Suggerimento**: A, coerente con le altre azioni distruttive del manager; B se la VPN e' condivisa con persone che non devono poter sincronizzare.
-**Risposta utente**:
+**Risposta utente**: (2026-11-09) in attesa: proposta A oggi + un punto unico di autorizzazione per il futuro manager multiutente con livelli (vedi ROADMAP).
 
 ### D96 — Limite di indirizzo della chiave del manager
 **Stato**: APERTA
@@ -1026,32 +1027,65 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Perche' conta**: su Magi la postazione arriva come 10.75.132.254 (router), quindi `from=` limita alla rete dietro il router e non a una macchina. La chiave resta comunque ristretta a `status|diff|run`.
 **Opzioni**: A) accettare il router, sapendo che il limite vero e' la chiave (0600 sulla postazione); B) far girare il manager su una macchina della rete dei nodi, con `from=` esatto.
 **Suggerimento**: A per Magi; per CALCOLO decidere prima della messa in produzione.
-**Risposta utente**:
+**Risposta utente**: (2026-11-09) in pausa fino al manager multiutente e alla macchina dedicata (ROADMAP, idee).
 
 ### D97 — Dove sta `pmgr-snippets-sync.sh`
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: Lo strumento resta solo in `SUPPORT-FILES/` (fuori da git) o va in `tools/pmgr-sync/`?
 **Perche' conta**: il manager dipende dalla sua uscita JSON: se non e' versionato, codice e contratto possono divergere senza traccia. Non contiene segreti; la regola "mai nel repo" riguarda i generatori degli snippet.
 **Opzioni**: A) sorgente in `tools/pmgr-sync/` con i suoi test; il comando forzato (root) esegue una copia installata in `/usr/local/libexec/pmgr/`, non scrivibile da `pmgr-sync`; B) resta locale, consegnato nella cartella sincronizzata.
 **Suggerimento**: A: la chiave del manager esegue solo un file di root, non uno modificabile dall'utente della sincronizzazione.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-09). Oggi lo strumento e' ancora in `SUPPORT-FILES/pmgr-scripts/bin/` (locale): da portare in `tools/pmgr-sync/` con l'integrazione del manager.
 
 ### D98 — Una sorgente sola nella configurazione
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: In questo passo il manager conosce una sola sorgente?
 **Perche' conta**: D71 chiede una sorgente spostabile, anche su piu' nodi; la procedura "Sposta sorgente" tocca chiavi su tutte le destinazioni.
 **Opzioni**: A) una sorgente attiva in `snippet_sync` (host, porta, percorsi di chiave e known_hosts); spostarla si progetta con la pagina; B) elenco di sorgenti da subito.
 **Suggerimento**: A: meno superficie ora, e il formato si puo' estendere.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-09).
 
 ### D99 — Aggiornamenti automatici sulle VM con GPU (rollout su CALCOLO)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: Alle 21 VM con scheda GPU del calcolo si applicano anche gli aggiornamenti di sicurezza automatici?
 **Perche' conta**: includono i kernel nuovi; con i driver NVIDIA il modulo del driver si ricostruisce solo se il pacchetto lo prevede (DKMS) e serve comunque un riavvio. Un kernel aggiornato senza driver puo' lasciare la VM senza GPU al prossimo riavvio.
 **Opzioni**: A) solo `fail2ban` e `ssh-standard` (nessun aggiornamento automatico sulle GPU), decidere poi caso per caso; B) tutto come le altre (`baseline ssh-standard`); C) tutto ma escludendo i pacchetti `nvidia*`/`linux-image*` dagli aggiornamenti automatici sulle GPU.
 **Suggerimento**: A per partire, poi C dopo aver visto come sono installati i driver su alcune VM.
-**Risposta utente**:
+**Risposta utente**: piano differenziato approvato (2026-11-10), variante di C: modulo `updates` GPU-aware (scheda NVIDIA rilevata dal bus PCI: aggiornamenti di sicurezza attivi ma esclusi kernel, stack NVIDIA/CUDA, docker/containerd, slurm; avviso al login). Applicato a 13 VM GPU; 8 VM con job sulla GPU saltate per scelta dell'utente. Rollout CALCOLO chiuso il 2026-11-12.
+
+## ROADMAP 13 — Rollout sul cluster HOSTING (2026-11-12)
+
+### D100 — Come mettere in sicurezza le VM HOSTING esistenti
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Come si procede sul cluster HOSTING (20 VM accese raggiunte, una in rete privata esclusa)?
+**Risposta utente**: (2026-11-12) 1) firewall: riattivarlo dove spento, lasciando aperte le porte dei servizi in ascolto (quelle "da segnalare" restano aperte; chiuse cockpit 9090, PCP, rpcbind 111, libvirt); 2) le VM con utenti a sola password restano cosi', con fail2ban attivo; le VM con chiavi procedono con l'hardening SSH (sola chiave, root no); 3) aggiornamenti automatici si'; 4) le aperture Docker non si toccano per ora; 5) riavvii autorizzati; 6) report dettagliato per i proprietari.
+**Esito**: fatto il 2026-11-12 (vedi `CLAUDE.md`, registro). Report: `~/rollout-hosting/REPORT-INTERVENTI-HOSTING.md` (fuori repository).
+
+### D101 — Kernel negli aggiornamenti automatici dell'hosting
+**Stato**: RISPOSTA (assunzione provvisoria dichiarata)
+**Bloccante**: no
+**Domanda**: Il kernel si esclude dagli aggiornamenti automatici anche sull'hosting?
+**Decisione**: no sulle VM senza GPU: il kernel si installa da solo e vale al riavvio, il login avvisa che serve riavviare; l'esclusione resta solo sulle VM con GPU (driver NVIDIA legato al kernel). Prima era stato descritto il contrario: corretto e dichiarato all'utente il 2026-11-12, che ha proseguito con il piano.
+
+### D102 — Aggiornamenti automatici sulle VM con Docker
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Decisione** (2026-11-12, proposta approvata): su Debian/Ubuntu con Docker `docker*`, `containerd*` e `runc` non si aggiornano da soli (l'aggiornamento riavvia i contenitori); il resto della sicurezza si aggiorna. Su Rocky solo un avviso (nessuna esclusione per dnf-automatic).
+
+### D103 — Porte pubblicate da Docker che aggirano ufw
+**Stato**: APERTA (rinviata)
+**Bloccante**: no
+**Domanda**: Le porte pubblicate da Docker (116: 5000 e 9091; 103: 5800 VNC) si chiudono con una regola nella catena `DOCKER-USER`?
+**Perche' conta**: sono raggiungibili da fuori nonostante ufw; chiuderle puo' rompere un servizio.
+**Risposta utente**: (2026-11-12) "non toccare le aperture Docker, per ora".
+
+### D104 — VM 108 (web3dns)
+**Stato**: APERTA (in pausa)
+**Bloccante**: no
+**Domanda**: Si completano SSH a sola chiave, aggiornamenti automatici e riavvio sulla 108? Prima va chiarito come si autenticano i tunnel di `ollama-tunnel` (porte 18000/18001, utente senza chiavi).
+**Risposta utente**: (2026-11-12) "non toccarla per ora": fatti solo firewall e fail2ban.
 

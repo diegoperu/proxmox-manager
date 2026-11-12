@@ -22,10 +22,15 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 9 | Errore JS aprendo direttamente `#/gpu` (`Gpu.summary`, gia' presente prima del 3b) | console pulita, nessun rischio di pagina vuota | S | — | fatto (2026-11-05): non piu' riproducibile; la pagina ora normalizza la risposta (vedi CLAUDE.md) |
 | 10 | Controllo preventivo alla creazione VM: snippet `cicustom` presente sul nodo di destinazione; spazio anche per il volume clonato (non solo per il disco aggiuntivo) | niente VM lasciate spente a meta' | S | — | fatto (2026-11-05): file del template sul nodo (verificabile solo dove lo storage elenca quel tipo di contenuto) e spazio del clone |
 | 11 | Colonna "disco" della lista VM: oggi solo `/`, estendibile al disco piu' pieno | stessa informazione del pannello | S | — | chiuso (2026-11-05): resta solo `/`, decisione utente |
-| 13 | **Sincronizzazione di script e snippet dal nodo-1** (rsync generico + sezione di amministrazione) | il nodo-1 non e' piu' l'unica copia degli script usati dalle VM nuove e dal manager | L | decisioni D69-D78 | in discussione (2026-11-05), **copia di sicurezza manuale da fare subito** |
+| 13 | **Sincronizzazione di script e snippet dal nodo-1** (rsync generico + sezione di amministrazione) | il nodo-1 non e' piu' l'unica copia degli script usati dalle VM nuove e dal manager | L | decisioni D69-D99 | **in corso**: fatti `tools/pmgr-sync/` (accesso non root e comando forzato), nuovo tooling dei template e `pmgr-snippets-sync.sh` (locali, provati su Magi e installati su CALCOLO); **manca l'integrazione del manager** (D94 A, D97 A, D98 A: comando forzato `status\|diff\|run`, `snippet_sync` in `config.json`, endpoint, pagina "Script e snippet"; D95 aperta) |
 | 14 | **Aggiornamento dei template dal manager** (pulsante che lancia la procedura di `update_*_template.sh`: scarica l'immagine, ricrea il template, rigenera lo snippet, sincronizza) | oggi si lancia a mano sul nodo-1 (~40 min, 3 esecuzioni registrate); con piu' copie degli script va deciso chi aggiorna cosa | L | roadmap 13 chiusa; decisioni su template per cluster (VMID e storage diversi), un solo aggiornamento alla volta, protezione contro la distruzione del template se il download fallisce (D84.2) | da progettare dopo la 13 |
 | 15 | **Migrazione di una VM su un altro cluster** | richiesta utente 2026-11-05; Proxmox ha una migrazione remota (`remote_migrate`, token del cluster di destinazione) | L | roadmap 13 (cluster di prova Magi) | da progettare dopo la 13 |
 | 12 | Prima di avviare una VM spenta, controllare che il nodo abbia la RAM per avviarla | niente avvii che sovraccaricano il nodo | S | modello di carico del bilanciamento | fatto (2026-11-05): avvio singolo, container e Batch; rifiuto 409 con i GB mancanti |
+| 16 | **Rollout degli script sulle VM esistenti: CALCOLO** (fail2ban, aggiornamenti di sicurezza, SSH, agent-exec, GPU-aware) | VM allineate agli snippet nuovi | L | strumenti locali (`pmgr-vm-rollout.sh`, `pmgr-rollout-run.sh`) | **fatto e chiuso** (2026-11-10/12, "calcolo e' a posto"); 8 VM GPU con job saltate per scelta |
+| 17 | **Rollout sulle VM esistenti: HOSTING** (firewall, fail2ban, hardening SSH, aggiornamenti, riavvii) | VM esposte a Internet messe in sicurezza | L | stessi strumenti, profilo hosting | **fatto in gran parte** (2026-11-12); restano 108 (in pausa), VM con sola password, porte pubblicate da Docker (D103), Ubuntu 20.04; report per i proprietari generato. Vedi il dettaglio sotto |
+| 18 | Installare il nuovo tooling dei template sul cluster HOSTING (oggi i vecchi script in `/root/cloud-images`) e ricreare i template | le VM nuove di HOSTING nascono gia' conformi (firewall 22/80/443, SSH a sola chiave, hardening) | M | `pmgr-calcolo-install.sh` (profilo hosting con `PROFILE=hosting`), password dei template | da fare |
+| 19 | `disk.sh`: controllare i comandi necessari e dire quale manca (oggi `parted` assente = exit 127) e aggiornare gli helper dei template Rocky | "Aggiungi disco" robusto sulle VM Debian esistenti (senza `parted`) | S | helper nei template | da fare |
+| 20 | **Manager multiutente con livelli** e **macchina dedicata con IP proprio** | login e ruoli al posto della VPN come unico controllo; sblocca D95/D96 | L | decisione sull'architettura | da discutere (idee) |
 
 ## Dettaglio
 
@@ -35,6 +40,11 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Attenzione:** le fotografie già accumulate restano con il gruppo da nome (dichiararlo).
 - **Prima del codice:** domande D35-D41 in `DOMANDE.md` (formato tag, VM senza tag, doppi tag, elenco gruppi, etichettatura delle esistenti, cambio dal pannello, storico). Da leggere in sola lettura: `user-tag-access`/`registered-tags` del datacenter.
 - **Modelli:** progetto breve Opus medio, implementazione Sonnet alto.
+
+### 13/16/17. Script e snippet, rollout sulle VM esistenti (stato al 2026-11-12)
+- **Strumenti** (in `SUPPORT-FILES/pmgr-scripts/`, **fuori da git**; solo `tools/pmgr-sync/` e' nel repo): `pmgr-os.sh` (template guidati da dati, 8 release), snippet con fail2ban/aggiornamenti/SSH/firewall per profilo standard e hosting, `pmgr-vm-apply.sh` + `pmgr-vm-rollout.sh` (moduli `fail2ban`, `updates` GPU-aware e con esclusione Docker, `ssh-standard`, `ssh-hosting`, `firewall-hosting`, `hardening-hosting`, `agent-exec`, `baseline`, `--verify`), `pmgr-rollout-run.sh` (ondate con ripresa), `pmgr-snippets-sync.sh`, `pmgr-calcolo-install.sh`, `pmgr-push-key-guest.sh`. Test in container su 8 distribuzioni.
+- **CALCOLO**: chiuso. **Magi**: cluster di prova allineato. **HOSTING**: fatto il 2026-11-12 (firewall su 104, 105, 108, 118; fail2ban su 20 VM; hardening SSH + sysctl + recidive su 13; aggiornamenti automatici su 19; riavvii su 10). Report per i proprietari: `~/rollout-hosting/REPORT-INTERVENTI-HOSTING.md` (fuori repo).
+- **Resta**: 108 (D104), VM con sola password (102, 103, 112, 114, 117, 118: completare se i proprietari aggiungono una chiave), porte pubblicate da Docker (D103), Ubuntu 20.04 (117, 118), porta 25 in uscita (D93.2, aperta), integrazione del manager (voce 13), tooling sul cluster HOSTING (voce 18), snapshot `pre-*` da cancellare. Il promemoria resta aperto per HOSTING.
 
 ### 2. Convertire le assegnazioni GPU dirette ai mapping
 - **Perché:** le 22 assegnazioni dirette sono mostrate ma non modificabili dall'app (D25).
@@ -103,6 +113,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 - **Manager multiutente con livelli diversi** (richiesta utente 2026-11-09): login e ruoli al posto della VPN come unico controllo; riprendere il punto unico di autorizzazione previsto da D95.
 - **Manager su macchina dedicata con IP proprio** (richiesta utente 2026-11-09): sblocca D96 (`from=` esatto sulla chiave del manager).
 
+- **Docker e firewall**: regole `DOCKER-USER` per le porte pubblicate (D103); documentare ai clienti che Docker aggira ufw.
 - **Valori di rete per cluster** (2026-11-09): gateway, prefisso IP, DNS e dominio di ricerca come impostazioni di ogni cluster, chiesti quando lo si aggiunge; oggi la pagina Nuova VM usa le costanti di CALCOLO (gateway 10.75.4.254). Vedi `CLAUDE.md`, Lavori da fare.
 - Esportare il report manageriale anche come pagina HTML autonoma.
 - Report programmati (oggi esclusi: si generano a richiesta).

@@ -31,8 +31,12 @@ ProxmoxManager is a self-hosted web interface for managing one or more Proxmox V
 - 🖥 **Dashboard** — a one-sentence cluster condition, KPIs with history, per-node 24h min–max bars (Proxmox RRD), recent activity, and the Top 10 VMs/containers by work done in the last 6/12/24 hours
 - 🗂 **VM & LXC management** — start, stop, reboot, shutdown, suspend, resume, reset, snapshot, migrate, delete
 - ⚡ **Batch operations** — multi-node VM/container selector, 7 actions, real-time log output
-- 🚀 **VM provisioning** — clone CloudInit templates, resize disk, configure IP/gateway/DNS/SSH keys via cloud-init
-- 📊 **Reports** — per-VM CPU/RAM/network history with one-click Excel export (.xlsx)
+- 🚀 **Guided VM creation** — the server runs the whole job: recommends the node (RAM never overbooked, CPU only as a warning) and explains why a node is not eligible, clones a CloudInit template straight onto the chosen node, resizes the disk (waiting for the Proxmox task), optionally assigns a GPU, adds an extra disk (formatted and mounted in the guest) and a second user (sudo guaranteed, applied once cloud-init has finished), and picks the group with one click or a new name
+- 🏷 **Groups from Proxmox tags** — `gruppo-<name>` tags, bulk labelling page with a proposal from the VM name, per-VM change, group in reports
+- 🎮 **GPU page** — inventory of NVIDIA cards per node, assign/remove through PCI resource mappings, conflicts and problems, card model names and memory you can correct
+- ⚖ **Cluster balance** — a plan of migrations that evens out assigned RAM (live or cold), "what if I switch off node X", one step at a time with recalculation; CPU compatibility rules for live migration
+- 🗄 **Ceph page** — read-only "weather station" (capacity, I/O, recovery, OSDs per pool, health checks translated)
+- 📊 **Reports** — managerial (bilingual IT+EN, A4 portrait or landscape, printed to PDF) and technical reports (nodes, VMs, GPU, storage, reliability) from Proxmox RRD plus a daily inventory snapshot; CSV and Excel export
 - 🌐 **Multi-cluster** — manage multiple independent Proxmox clusters from a single interface, switch with a dropdown
 - 👤 **Add VM users** — create OS users inside running VMs via QEMU Guest Agent, with optional SSH public key and sudoers setup
 - 🖥 **Serial console** — xterm.js terminal for VMs with `serial0` configured via termproxy WebSocket bridge (requires dedicated credentials — see [Security — Console credentials](#security--console-credentials))
