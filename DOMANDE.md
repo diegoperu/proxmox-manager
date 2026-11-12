@@ -1045,3 +1045,13 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Opzioni**: A) una sorgente attiva in `snippet_sync` (host, porta, percorsi di chiave e known_hosts); spostarla si progetta con la pagina; B) elenco di sorgenti da subito.
 **Suggerimento**: A: meno superficie ora, e il formato si puo' estendere.
 **Risposta utente**:
+
+### D99 — Aggiornamenti automatici sulle VM con GPU (rollout su CALCOLO)
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Alle 21 VM con scheda GPU del calcolo si applicano anche gli aggiornamenti di sicurezza automatici?
+**Perche' conta**: includono i kernel nuovi; con i driver NVIDIA il modulo del driver si ricostruisce solo se il pacchetto lo prevede (DKMS) e serve comunque un riavvio. Un kernel aggiornato senza driver puo' lasciare la VM senza GPU al prossimo riavvio.
+**Opzioni**: A) solo `fail2ban` e `ssh-standard` (nessun aggiornamento automatico sulle GPU), decidere poi caso per caso; B) tutto come le altre (`baseline ssh-standard`); C) tutto ma escludendo i pacchetti `nvidia*`/`linux-image*` dagli aggiornamenti automatici sulle GPU.
+**Suggerimento**: A per partire, poi C dopo aver visto come sono installati i driver su alcune VM.
+**Risposta utente**:
+
