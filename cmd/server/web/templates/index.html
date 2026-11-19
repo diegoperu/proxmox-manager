@@ -878,7 +878,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.181.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.182.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -5381,6 +5381,8 @@ const RPT_TXT={
 };
 function rptMonths(days){return Math.max(1,Math.round(days/30));}
 // Excel/CSV: una cella testuale che inizia con = + - @ (o tab/CR) verrebbe letta come formula: si antepone un apice.
+// Data "AAAA-MM-GG" in parole (es. "4 novembre 2026"). Globale: le note dei report la usano anche fuori dal documento manageriale.
+function rptDate(s,loc){const x=new Date(String(s)+'T12:00:00');return isNaN(x)?'—':x.toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'});}
 function rptSafeCell(v){
   if(typeof v!=='string')return v;
   return /^[=+\-@\t\r]/.test(v)?"'"+v:v;
@@ -5521,7 +5523,7 @@ const Reports={
 
   // ── tecnici ──
   kpi(label,val,sub,cls){return`<div class="kcell"><div class="kl">${esc(label)}</div><div class="kv ${cls||''}">${val}</div><div class="ks">${sub||''}</div></div>`;},
-  notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n==='group_rule_changed'?`Dal ${d.inventory&&d.inventory.group_rule_change?dateFmt(d.inventory.group_rule_change):'—'} i gruppi sono presi dai tag di Proxmox; prima dal nome della VM: il confronto tra gruppi a cavallo di quella data non e' esatto.`:n)).join('<br>')}</p>`:'';},
+  notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n==='group_rule_changed'?`Dal ${d.inventory&&d.inventory.group_rule_change?rptDate(d.inventory.group_rule_change,'it-IT'):'—'} i gruppi sono presi dai tag di Proxmox; prima dal nome della VM: il confronto tra gruppi a cavallo di quella data non e' esatto.`:n)).join('<br>')}</p>`:'';},
   cols(usage=false){
     const n=(v,d)=>Reports.fmtNum(v,d), p=v=>Reports.pct(v), mb=v=>v==null?'—':rptBytes(v);
     if(usage)return[
@@ -5662,7 +5664,7 @@ const Reports={
   },
   docHTML(L,d,eff){
     const T=RPT_TXT[L], loc=T.loc, N=(v,dec)=>Reports.fmtNum(v,dec,loc), B=v=>rptBytes(v,loc), k=d.kpi, inv=d.inventory;
-    const dateFmt=s=>{const x=new Date(s+'T12:00:00');return x.toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'});};
+    const dateFmt=s=>rptDate(s,loc);
     const per={from:dateFmt(d.meta.from),to:dateFmt(d.meta.to)};
     const foot=(n)=>`<footer><span>${esc(RPT_ID.name)} · ${esc(T.title)} · ${esc(per.from)} – ${esc(per.to)}</span><span>${n}</span></footer>`;
     const reasons=d.condition.reasons.map(r=>(T.reason[r.code]||(()=>r.code))(r.code==='availability'||r.code==='task_failures'?N(r.value,1):r.value));
