@@ -101,6 +101,15 @@ The only hardware write the app performs. `GET /api/gpus` and `GET .../gpu/plan`
 - Residual risks, accepted: someone assigning the same card to another VM from the Proxmox UI between our check and our write (only the target VM's digest is checked; the next inventory shows the conflict); a VM started (by a person or HA) in the same instant (the change then waits for the next start). The app has no login: anyone who reaches it can do this, as for the other VM actions; the `/api` guard blocks other web pages.
 - Each change is logged (node, VMID, slot, mapping, card address); no secrets.
 
+## GPU usage monitoring (nvidia-smi in the guests)
+
+When `gpu_usage` is true in `config.json` (off by default), the server runs `guestscripts/gpuuse.sh` every 5 minutes in each running QEMU VM that has a GPU, through the guest agent (labelled helper if present, inline otherwise). The script takes no arguments, only reads (`nvidia-smi --query-gpu=...`, never `-pm`, `-r` or anything that changes the card), is ASCII only and stops `nvidia-smi` after 15 s. No process names are read.
+
+- **Hostile output:** the VM owner controls what `nvidia-smi` prints. The parser keeps at most 8 KB and 8 lines, needs 7 fields, accepts only numbers within ranges and a PCI bus id pattern, cleans the name to 64 printable ASCII characters and drops anything else (counted, logged as a number). A guest can only falsify its own figures; they feed reports, never an automatic action.
+- **Availability:** 4 guests at a time per cluster, 25 s per guest, one of our commands per VM at a time (lock shared with the dmesg reader), the helper probe cached 1 hour, a VM that fails 3 times in a row is left alone for 1 hour, a cycle still running makes the next one a no-op, a panic ends only that cycle. HTTP requests never run anything in a guest: `GET /api/gpu-usage` and the pages read memory only.
+- **Stored data:** table `gpu_use_day`, one row per cluster, day and VMID with daily aggregates (samples, utilization, memory, minutes at work, temperature, power); no names, no processes, no IP; rows validated before writing, parameterised SQL, kept 396 days. The manager report only receives per-group aggregates through a type that cannot carry names, VMIDs or nodes.
+- **Measured on CALCOLO (2026-11-19, VM 202 A100 and VM 170 L4):** `nvidia-smi` query 30-55 ms with persistence mode off; an LLM generation ran at 74.8 tokens/s without reads and 74.7 with a read every second (300 times the collector's rate); during a guest reboot the VM went no_data, then paused, and was read again after it came back.
+
 ## Ceph status (read only)
 
 `GET /api/ceph` and `GET /api/ceph/summary` only read Proxmox (`/cluster/ceph/status`, `/cluster/ceph/flags`, `/nodes/{node}/ceph/{osd,pool,mon,mgr,mds}`); there is no Ceph write path. The token needs `Sys.Audit`; without it the page says so (`reason: forbidden`) instead of failing.

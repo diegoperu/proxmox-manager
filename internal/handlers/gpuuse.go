@@ -527,11 +527,6 @@ func (g *gpuUseCollector) cycle(clusters []config.ClusterConfig) {
 func StartGPUUse(ctx context.Context, store *history.Store) {
 	gpuUse.store = store
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("gpu usage: interrotto da un errore interno: %v", r)
-			}
-		}()
 		timer := time.NewTimer(gpuUseStartIn)
 		defer timer.Stop()
 		for {
@@ -539,13 +534,24 @@ func StartGPUUse(ctx context.Context, store *history.Store) {
 			case <-ctx.Done():
 				return
 			case <-timer.C:
-				if cfg := config.Get(); cfg.GPUUsage {
-					gpuUse.cycle(cfg.Clusters)
-				}
+				gpuUseTick()
 				timer.Reset(gpuUseEvery)
 			}
 		}
 	}()
+}
+
+// gpuUseTick runs one cycle if enabled. A panic ends only this cycle, never the loop.
+func gpuUseTick() {
+	defer func() {
+		if r := recover(); r != nil {
+			gpuUse.running.Store(false)
+			log.Printf("gpu usage: giro interrotto da un errore interno: %v", r)
+		}
+	}()
+	if cfg := config.Get(); cfg.GPUUsage {
+		gpuUse.cycle(cfg.Clusters)
+	}
 }
 
 // snapshotLive returns the cluster's last samples, sorted by VMID, with Stale set.

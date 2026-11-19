@@ -1174,3 +1174,12 @@ Contesto: le schede sono in passthrough (vfio), quindi l'host Proxmox non vede n
 **Suggerimento**: A (un modello caricato e fermo occupa memoria: e' "riservata", non "ferma").
 **Risposta utente**: (vuoto) — assunzione provvisoria: A, modificabile come le soglie D32.
 
+### D114 — La memoria occupata conta come "al lavoro"?
+**Stato**: APERTA
+**Bloccante**: no (decide cosa si accende)
+**Domanda**: Nella prova reale (VM 202) ollama tiene il modello in memoria dopo la generazione: utilizzo 0%, memoria al 38%. Con D113 quel campione e' "al lavoro" e con D111 la scheda non sara' mai "inutilizzata" finche' un servizio tiene un modello caricato, anche se nessuno lo usa da settimane (caso tipico dei server di inferenza dimenticati). Si cambia?
+**Perche' conta**: decide se il report trova davvero le schede abbandonate o solo quelle con il driver scarico.
+**Opzioni**: A) "al lavoro" e "inutilizzata" guardano solo l'utilizzo; la memoria resta mostrata e, se occupata con utilizzo basso, la scheda e' segnalata "riservata" (modello caricato, nessun calcolo); B) lasciare D111/D113 come sono (memoria = in uso); C) soglie diverse.
+**Suggerimento**: A: e' l'utilizzo che dice se qualcuno lavora; la memoria occupata senza calcolo e' proprio il segnale di una scheda tenuta ferma.
+**Risposta utente**: (vuoto)
+
