@@ -345,6 +345,106 @@ td.spk{width:130px}
 .rp-techdoc .rp-page{height:auto;min-height:210mm;box-shadow:none}
 .rp-techdoc table,.rp-techdoc th,.rp-techdoc td{color:var(--ink);border-color:var(--line);background:#fff}.rp-techdoc th .thb,.rp-techdoc .thb{color:var(--ink2)}
 .rp-techdoc .chip{color:var(--hot);border-color:var(--hot)}.rp-techdoc .rp-spark{stroke:var(--navy)}
+/* v3: the print document owns its palette, independently of the application theme. */
+.rp-doc.rv-doc{--paper:#fff;--ink3:#526074;--series1:var(--navy);--series2:#3d6fb6;--series3:#8fb0dd;--series4:#d5e0f0;--gpu-busy:var(--series1);--gpu-reserved:var(--series2);--gpu-quiet:var(--series3);--gpu-off:#b6c7de;--gpu-unknown:#e5eaf1;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.rv-doc .rv-page{padding:14mm 16mm 16mm;font-size:9.5pt;line-height:1.4;background:var(--paper)}
+.rv-doc .rv-page h2{font-size:16pt;line-height:1.2;margin:0 0 3mm;color:var(--navy)}
+.rv-doc .rv-page h3{font-size:10pt;line-height:1.3;margin:4mm 0 2mm;color:var(--navy)}
+.rv-doc .rv-page p{margin:0 0 2mm}
+.rv-doc .rv-page footer{left:16mm;right:16mm;bottom:7mm;border-top:1px solid var(--line);padding-top:2mm;font-size:7.5pt;line-height:1.3}
+.rv-doc .rv-page:last-child{break-after:auto;page-break-after:auto}
+.rv-doc .rv-header{display:flex;align-items:center;gap:7mm;border-bottom:2px solid var(--navy);padding-bottom:4mm}
+.rv-doc .rv-header img{width:37mm;height:auto;flex:none}
+.rv-doc .rv-header h1{font-size:18pt;line-height:1.15;color:var(--navy);margin:1.5mm 0 2mm;letter-spacing:-.015em}
+.rv-doc .rv-header p{font-size:8pt;color:var(--ink2);margin:0}
+.rv-doc .rv-condition{font-size:11pt;font-weight:600;margin:5mm 0;color:var(--navy)}
+.rv-doc .rv-kpis{display:grid;grid-template-columns:repeat(var(--tile-count),minmax(0,1fr));gap:3mm}
+.rv-doc .rv-kpi{border:1px solid var(--line);border-radius:2mm;padding:3mm;min-width:0}
+.rv-doc .rv-kpi span{display:block;font-size:8pt;color:var(--ink2)}
+.rv-doc .rv-kpi b{display:block;font-size:19pt;letter-spacing:-.03em;color:var(--navy);line-height:1.2;margin:1.5mm 0}
+.rv-doc .rv-kpi small{display:block;font-size:7.5pt;line-height:1.35;color:var(--ink2)}
+.rv-doc .rv-kpi.rv-value-tile{background:var(--navy)}
+.rv-doc .rv-value-tile span,.rv-doc .rv-value-tile small,.rv-doc .rv-value-tile b{color:var(--paper)}
+.rv-doc .rv-value-tile b{font-size:14pt;line-height:1.35}
+.rv-doc .rv-alert,.rv-doc .rv-kpi.rv-alert b{color:var(--hot)}
+.rv-doc .rv-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7mm;align-items:start}
+.rv-doc .rv-two>div{min-width:0}
+.rv-doc .rv-chart{display:block;width:100%;height:auto;overflow:visible}
+.rv-doc .rv-axis{font-size:8px;fill:var(--ink3);font-family:inherit}
+.rv-doc .rv-value{font-size:9px;font-weight:600;fill:var(--navy);font-family:inherit}
+.rv-doc .rv-grid{stroke:var(--line);stroke-width:.6}
+.rv-doc .rv-line{fill:none;stroke:var(--navy);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rv-doc .rv-dot{fill:var(--navy)}
+.rv-doc .rv-threshold{stroke:var(--hot);stroke-width:1;stroke-dasharray:2 3}
+.rv-doc .rv-donut-base{fill:none;stroke:var(--soft);stroke-width:23}
+.rv-doc .rv-donut{display:flex;align-items:center;gap:3mm;min-height:35mm}
+.rv-doc .rv-donut>.rv-chart{width:31mm;height:31mm;flex:none}
+.rv-doc .rv-donut ul{list-style:none;padding:0;margin:0;font-size:8pt;line-height:1.55}
+.rv-doc .rv-donut li{margin-bottom:1mm}
+.rv-doc .rv-donut li i,.rv-doc .rv-legend i{display:inline-block;width:2.5mm;height:2.5mm;margin-right:1.2mm;vertical-align:-.3mm;border-radius:.4mm}
+.rv-doc .rv-donut li span{color:var(--ink2)}
+.rv-doc .rv-note{font-size:7.5pt;line-height:1.35;color:var(--ink3)}
+.rv-doc .rv-lead{font-size:9.5pt;color:var(--ink2);margin-bottom:3mm}
+.rv-doc .rv-empty{min-height:18mm;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--ink3);font-size:9pt;padding:3mm}
+.rv-doc .rv-messages ol{padding-left:5mm;margin:0;font-size:9.5pt;line-height:1.45}
+.rv-doc .rv-messages li{padding-left:.5mm;margin-bottom:2mm}
+.rv-doc .rv-need{margin-top:4mm;padding:3mm 4mm;border-left:3px solid var(--navy);background:var(--soft);font-size:9pt}
+.rv-doc .rv-need-hot{border-left-color:var(--hot)}
+.rv-doc .rv-table{width:100%;border-collapse:collapse;font-size:8.5pt;line-height:1.35;table-layout:fixed}
+.rv-doc .rv-table th,.rv-doc .rv-table td{padding:2mm 1.5mm;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere;text-align:left;vertical-align:top}
+.rv-doc .rv-table th{text-transform:none;letter-spacing:normal;font-size:inherit;font-weight:500}
+.rv-doc .rv-table thead th{font-size:7.5pt;color:var(--ink3);font-weight:600}
+.rv-doc .rv-table td:last-child{text-align:right;font-weight:600}
+.rv-doc .rv-usage-bottom .rv-table th{width:64%}
+.rv-doc .rv-usage-bottom .rv-table td{width:36%}
+.rv-doc .rv-hbar{display:grid;grid-template-columns:35mm 1fr 7mm;gap:2mm;align-items:center;font-size:8.5pt;margin:3mm 0}
+.rv-doc .rv-hbar b{text-align:right}
+.rv-doc .rv-sizing-detail{margin-top:6mm}
+.rv-doc .rv-method-callout{margin-top:5mm!important;border-left:2px solid var(--navy);padding:3mm 4mm;background:var(--soft);font-size:9pt}
+.rv-doc .rv-gpu-row{display:grid;grid-template-columns:30mm 1fr;gap:3mm;align-items:center;margin:2mm 0}
+.rv-doc .rv-gpu-row b{font-size:8.5pt;font-weight:600}
+.rv-doc .rv-gpu-row small{display:block;font-size:7.5pt;color:var(--ink3)}
+.rv-doc .rv-gpu-row .rv-note{margin:1mm 0 0;font-size:7.5pt}
+.rv-doc .rv-legend{list-style:none;display:flex;gap:1mm 3mm;flex-wrap:wrap;padding:0;margin:2mm 0;font-size:7.5pt;color:var(--ink2)}
+.rv-doc .rv-reliability-section{margin-top:4mm}
+.rv-doc .rv-reliability-section h3{margin-top:2mm}
+.rv-doc .rv-backups{gap:5mm;margin-top:2mm}
+.rv-doc .rv-backups p{font-size:8.5pt}
+.rv-doc .rv-backups p.rv-note{font-size:7.5pt}
+.rv-doc .rv-backups b{font-size:12pt;color:var(--navy)}
+.rv-doc .rv-economic{font-size:8pt}
+.rv-doc .rv-economic th:first-child{width:30%}
+.rv-doc .rv-economic td{font-variant-numeric:tabular-nums}
+.rv-doc .rv-method{margin-top:5mm}
+.rv-doc .rv-method ul{margin:0;padding-left:4.5mm;font-size:8.5pt;line-height:1.4}
+.rv-doc .rv-method li{margin-bottom:2mm}
+/* Landscape keeps A1 trends full width and stacked; other pages use the extra width. */
+.rv-doc.rp-land .rv-page{padding:10mm 14mm 14mm;font-size:9pt}
+.rv-doc.rp-land .rv-page footer{left:14mm;right:14mm;bottom:6mm}
+.rv-doc.rp-land .rv-header{gap:6mm;padding-bottom:3mm}
+.rv-doc.rp-land .rv-header img{width:30mm}
+.rv-doc.rp-land .rv-header h1{font-size:17pt}
+.rv-doc.rp-land .rv-condition{margin:3mm 0;font-size:10.5pt}
+.rv-doc.rp-land .rv-kpi{padding:2mm 3mm}
+.rv-doc.rp-land .rv-kpi b{font-size:18pt;margin:1mm 0}
+.rv-doc.rp-land .rv-value-tile b{font-size:14pt}
+.rv-doc.rp-land .rv-usage .rv-growth>.rv-chart{width:100%;height:auto}
+.rv-doc.rp-land .rv-usage h3{margin:2mm 0 1mm}
+.rv-doc.rp-land .rv-usage .rv-lead{margin-bottom:1mm}
+.rv-doc.rp-land .rv-usage-bottom{grid-template-columns:1fr 1fr;gap:9mm}
+.rv-doc.rp-land .rv-usage-bottom .rv-donut{min-height:0}
+.rv-doc.rp-land .rv-usage-bottom .rv-donut>.rv-chart{width:23mm;height:23mm}
+.rv-doc.rp-land .rv-usage-bottom .rv-table{font-size:8pt}
+.rv-doc.rp-land .rv-usage-bottom .rv-table th,.rv-doc.rp-land .rv-usage-bottom .rv-table td{padding:1mm 1.5mm}
+.rv-doc.rp-land .rv-sizing-detail{margin-top:3mm}
+.rv-doc.rp-land .rv-reliability{display:grid;grid-template-columns:.9fr 1.1fr;gap:7mm;align-content:start}
+.rv-doc.rp-land .rv-reliability-section{margin-top:0}
+.rv-doc.rp-land .rv-reliability .rv-gpu-row{grid-template-columns:26mm 1fr}
+.rv-doc.rp-land .rv-reliability .rv-backups{grid-template-columns:1fr}
+.rv-doc.rp-land .rv-reliability .rv-reliability-section>.rv-chart{height:auto}
+.rv-doc.rp-land .rv-funding{display:grid;grid-template-columns:1.4fr 1fr;gap:8mm;align-content:start}
+.rv-doc.rp-land .rv-method{margin-top:0}
+.rv-doc.rp-land .rv-method ul{font-size:8.5pt;line-height:1.4}
 #rpt-print{display:none}
 @media print{
   html.rp-printing{background:#fff}
@@ -888,7 +988,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.194.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.195.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -5361,58 +5461,46 @@ const RPT_PRESETS=[{id:'30',label:'30 giorni',days:30},{id:'91',label:'Trimestre
 const RPT_GPU_DEFAULTS={idle_util:5,idle_mem:5,idle_days:14};
 const RPT_GPU_STATES={in_use:'Al lavoro',idle:'Inutilizzata',reserved:'Riservata',vm_off:'VM spenta',no_driver:'Driver assente',driver_error:'Driver in errore',insufficient:'Dati insufficienti'};
 const RPT_TXT={
-  it:{loc:'it-IT',title:'Rapporto sul servizio',sub:'Infrastruttura cloud IaaS per la ricerca',gen:'Generato il',s1:'In sintesi',
+  it:{loc:'it-IT',lang:'Italiano',title:'Rapporto sul servizio',heading:'DataCloud, infrastruttura di calcolo per la ricerca',anonymous:'dati aggregati e anonimi',summary:'Pagina di sintesi',
     lvl:{ok:'Servizio in buona salute',warn:'Servizio stabile, alcuni indicatori da tenere sotto controllo',bad:'Servizio in difficoltà: servono interventi'},
-    reason:{ram_exhaustion:(v)=>`la memoria raggiungerà la soglia di attenzione entro circa ${rptMonths(v)} mesi al ritmo attuale`,
-      storage_exhaustion:(v)=>`lo spazio di archiviazione raggiungerà la soglia di attenzione entro circa ${rptMonths(v)} mesi`,
-      availability:(v)=>`la disponibilità stimata è del ${v}%`,gpu_full:()=>'tutte le schede GPU sono assegnate',task_failures:(v)=>`il ${v}% delle operazioni automatiche è fallito`},
-    none:'nessuna criticità rilevata nel periodo',
-    intro:(d,k)=>`Dal ${d.from} al ${d.to} il servizio ha ${k.vms_running} macchine virtuali attive (su ${k.vms_total}) usate da ${k.groups} gruppi di ricerca, su ${k.nodes} nodi.`,
-    k:{vms:'VM attive',groups:'Gruppi di ricerca',gpu:'GPU assegnate',mem:'Memoria assegnata',avail:'Disponibilità',sto:'Storage Ceph'},
-    since:(d)=>`dato storico dal ${d}`,grew:(n,d)=>`${n>=0?'+':''}${n} dal ${d}`,gpuFull:(d)=>`tutte assegnate dal ${d}`,gpuFree:(n)=>`${n} libere`,
-    thr:'soglia di attenzione 85%',availSub:'stimata dai dati di monitoraggio',stoSub:(u,t)=>`${u} su ${t}`,
-    s2:'Capacità nel tempo',s2p:'Andamento nel periodo. La linea tratteggiata è la previsione al ritmo attuale; la linea punteggiata è la soglia di attenzione (85%).',
-    c:{cpu:'Processori (CPU)',mem:'Memoria (RAM)',sto:'Storage Ceph',gpu:'GPU assegnate'},
-    avgSub:'media sul cluster',noTrend:'nessuna tendenza di esaurimento',exh:(m)=>`esaurimento stimato tra circa ${m} mesi`,exh0:'soglia già raggiunta',gpuSub:(t)=>`${t} schede in totale`,
-    s3:'Chi usa il servizio',s3p:(n)=>`Memoria assegnata per gruppo di ricerca (primi 10 su ${n}). Il gruppo è ricavato dal nome della macchina virtuale.`,
-    s4:'Fabbisogno e uso delle risorse',needs:'Stato delle risorse',eff:'Efficienza',
-    trendLine:(e)=>`Macchine virtuali: ${e.abandoned} abbandonate, ${e.off_long} spente da almeno 3 mesi e ${e.oversized} sovradimensionate; recuperabili circa ${e.mem} di RAM e ${e.cores} core.`,
-    effLine:(e)=>`${e.inactive} macchine virtuali risultano inattive e ${e.oversized} sovradimensionate: liberarle recupererebbe fino a ${e.mem} di memoria e ${e.cores} processori.`,
-    effRule:'Inattiva: accesa ma con CPU media sotto il 2% e rete sotto 1 KB/s per almeno 7 giorni. Sovradimensionata: memoria usata (95° percentile) sotto il 25% di quella assegnata, oppure CPU (95° percentile) sotto il 10%, per almeno 14 giorni.',
-    effNone:'Il dato di efficienza non è disponibile per questo periodo.',
-    gpuUse:(d,t)=>`Schede GPU: ${d.gpu_idle} inutilizzate, ${d.gpu_reserved} occupate da un modello senza calcolo e ${d.gpu_vm_off} assegnate a VM spente negli ultimi ${t.idle_days} giorni (utilizzo medio < ${t.idle_util}%; memoria < ${t.idle_mem}% per le inutilizzate, ≥ ${t.idle_mem}% per le riservate). Dati insufficienti: ${d.gpu_insufficient}.`,
-    gpuUseNone:'Dati sull’uso delle GPU non ancora disponibili',gpuUseTitle:'Uso delle GPU per gruppo',
-    gpuUseCols:['Gruppo','Schede','Utilizzo medio','Ore al lavoro'],gpuNoGroup:'senza gruppo',gpuOthers:'Altri gruppi',
-    inv:(d)=>`Lo storico dell'inventario (numero di VM, gruppi, GPU) è disponibile dal ${d}: le variazioni nel tempo si completeranno col passare dei mesi.`,
-    rule:(d)=>`Dal ${d} i gruppi di ricerca sono quelli indicati nell'inventario del servizio; prima erano dedotti dal nome delle macchine: il confronto tra gruppi a cavallo di quella data è indicativo.`,
-    method:'Fonti: statistiche di Proxmox VE e fotografia giornaliera dell\'inventario. Previsioni lineari sulle medie settimanali. Nessun dato personale.',
-    land:'orizzontale',port:'verticale',lang:'Italiano'},
-  en:{loc:'en-GB',title:'Service report',sub:'IaaS cloud infrastructure for research',gen:'Generated on',s1:'Summary',
+    na:'non disponibile',noData:'Dati insufficienti nel periodo',k:{vms:'Macchine virtuali attive',mem:'Memoria assegnata',avail:'Disponibilità',value:'Valore del servizio'},
+    growth:(v)=>`${v} nel confronto tra mesi completi`,total:v=>`${v} in totale`,capacity:v=>`${v} della capacità`,periodTotal:'totale del periodo',net:v=>`${v} al netto delle interruzioni esterne`,
+    economicTile:(a,b)=>`${a} al mese a prezzi di mercato; costo interno ${b}`,thousand:'mila €',
+    memoryChart:'Memoria assegnata alle macchine attive',sizingChart:'Come sono dimensionate le macchine',sizingWindow:'Ultimi sei mesi del periodo, o finestra disponibile se più breve.',
+    sizingLabels:['in uso','sovradimensionate','spente da oltre 3 mesi'],sizingScope:'Percentuali sui soli tre stati mostrati; gli altri stati sono esclusi.',insufficient:v=>`${v} macchine con dati insufficienti.`,
+    messages:'Messaggi chiave',usageMsg:(n,g)=>`In media ${n} macchine attive per mese completo; variazione nel periodo: ${g}.`,gpuMsg:(a,t,f)=>`GPU: ${a} su ${t} assegnate oggi; ${f} libere.`,
+    economicMsg:(a,b,r)=>`Le stesse risorse valgono ${a}–${b} al mese sul mercato europeo${r?`; ${r} volte il listino interno`:''}.`,
+    sizingMsg:(n,m,c)=>`${n} macchine sovradimensionate: la proposta recupera ${m} e ${c} core.`,need:'Cosa serve',noTrend:'nessuna tendenza di esaurimento stimabile',atThreshold:'soglia dell’85% già raggiunta',thresholdDate:d=>`soglia dell’85% verso ${d}`,fullDate:d=>`capacità piena verso ${d}`,gpuFull:'tutte le GPU sono assegnate',gpuFree:n=>`${n} schede libere oggi`,forecastNote:'Previsioni lineari al ritmo attuale.',
+    a1:'A1 · Uso e crescita',a1lead:'Andamento mensile del servizio: macchine attive, risorse assegnate e memoria fisica occupata.',vmsChart:'Macchine virtuali attive per mese',nodeMemory:'Memoria occupata sui nodi',thresholdNote:'Media mensile della memoria fisica in uso; linea rossa: soglia di attenzione dell’85%.',
+    concentration:'Quanto è concentrato l’uso',concentrationLabels:['primi 5 gruppi','successivi 15 gruppi','altri gruppi','senza gruppo'],groupsNote:n=>`Quota della memoria assegnata. ${n} gruppi serviti, nessun nome.`,numbers:'In numeri',groups:'Gruppi di ricerca serviti',runningTotal:'VM accese / totali oggi',nodes:'Nodi di calcolo',storage:'Storage condiviso',
+    a2:'A2 · Come vengono dimensionate le macchine',a2lead:'Confronto tra le risorse scelte dagli utenti e il loro uso reale.',cpuChart:m=>`Uso medio della CPU · ${m}`,cpuBands:['meno del 5%','dal 5% a meno del 25%','dal 25% a meno del 50%','50% e oltre'],cpuNote:'Ultimo mese completo: CPU media rispetto ai core assegnati, sulle macchine attive nel mese.',
+    reclaim:'Risorse che si potrebbero liberare',reclaimRows:['Riducendo le macchine sovradimensionate (proposta di riduzione)','Su macchine spente da oltre 3 mesi'],ram:'Memoria (RAM)',cores:'Core',
+    sizingRule:'La classificazione confronta i picchi mensili con le soglie configurate; le VM con GPU non sono giudicate sulla CPU. La proposta applica il margine configurato ai picchi osservati.',
+    ramNote:'Nota di metodo: Proxmox misura la RAM occupata compresa la cache del sistema operativo. Una memoria piena non indica una macchina troppo piccola: il rapporto segnala solo il sovradimensionamento.',
+    a3:'A3 · GPU per taglia di memoria',gpuLead:'Uso nel periodo, incluse le schede successivamente rimosse; conteggi attuali separati.',gpuClasses:{'16':'16 GB','24':'24 GB','48':'40–48 GB','80+':'80 GB e oltre','unknown':'taglia non nota'},
+    gpuStates:['al lavoro','modello caricato senza calcolo','assegnata, ferma','VM spenta','senza dato'],now:'schede oggi',free:'libere oggi',busyHours:'ore al lavoro',offDays:'giorni-scheda a VM spenta',coverage:'copertura dei campioni a VM accesa',validShares:'quote sui campioni validi',timeShares:'quote temporali stimate',
+    gpuMethod:'Quote temporali ricostruite da ore al lavoro, percentuali e copertura, quando disponibili (arrotondate). Altrimenti: quote sui campioni validi e giorni a VM spenta separati. Le schede libere oggi non sono ore libere nel periodo. Per VM con più schede il campione della più occupata è pesato per il numero di schede.',
+    a4:'A4 · Affidabilità',availabilityChart:'Disponibilità dei nodi per mese',totalLabel:'totale',netLabel:'al netto di cause esterne e manutenzione',availabilityNote:'Dal primo campione di ciascun nodo; in rosso i mesi sotto il 99%.',
+    fixedOutage:'Le interruzioni sono dovute di norma a cause esterne (ad esempio mancanze di corrente) che il sistema non distingue se non sono registrate nel registro delle interruzioni.',
+    interruption:'Interruzioni registrate',causes:{external:'causa esterna',maintenance:'manutenzione programmata',fault:'guasto del servizio'},backups:'Salvataggi (backup)',backupCoverage:'VM con un backup negli ultimi 7 giorni',backupChart:'Notti con backup riuscito per mese',backupMethod:'Job notturni di nodo riusciti / totali: non è il numero di VM salvate. Copertura riferita a oggi.',backupCauses:['archivio di backup non raggiungibile','errore su singole macchine','interrotto','altro'],
+    a5:'A5 · Fabbisogno e finanziamento',resource:'Risorsa',today:'Oggi',outlook:'Prospettiva',gpu:'GPU',assigned:'assegnata',used:'occupato',economicTitle:'Valore economico del servizio (€/mese)',economicCols:['Riferimento','Calcolo e memoria','GPU','Storage','Totale'],economicRows:['Costo interno (listino DataCloud)','Mercato europeo · fascia bassa','Hyperscaler europeo · fascia alta'],internalCombined:'Calcolo e storage inclusi insieme',prices:'Data dei prezzi',sources:'Fonti',
+    economicMethod:n=>`Mercato: risorse assegnate × ore di accensione degli ultimi 30 giorni completi, normalizzate a 30 giorni su ${n} giorni osservati; storage per capacità assegnata. Media dei listini per fascia, on-demand senza IVA, cambio configurato. Listino interno mensile a blocchi, distinto dalla spesa effettiva del servizio; calcolo e storage interni sono inclusi insieme.`,
+    a6:'A6 · Metodo e fonti',method:[['Fonti','Statistiche Proxmox VE (RRD), storico giornaliero per VM, fotografie dell’inventario e monitoraggio GPU; backup dal contenuto dello storage e dai task.'],['Anonimato','Nessun nome di macchina, gruppo, nodo o persona; concentrazione per fasce.'],['Mesi','Grafici sui mesi di calendario completi. Crescita tra primo e ultimo mese completo; se mancano dati la variazione non è disponibile. Prima dello storico giornaliero: medie RRD di 6 ore o settimanali; assegnazioni storiche basate sull’ultima configurazione nota.'],['Disponibilità','Campioni RRD pesati per durata, dal primo campione di ciascun nodo. Il valore netto esclude cause esterne e manutenzioni registrate; non esclude i guasti del servizio.']],economicMethodShort:'Valore economico: confronto tra listino interno e prezzi pubblici europei; data e fonti riportate sopra.',
+  },
+  en:{loc:'en-GB',lang:'English',title:'Service report',heading:'DataCloud, computing infrastructure for research',anonymous:'aggregated and anonymous data',summary:'Executive summary',
     lvl:{ok:'Service in good health',warn:'Stable service, a few indicators need watching',bad:'Service under strain: action needed'},
-    reason:{ram_exhaustion:(v)=>`memory will reach the warning threshold within about ${rptMonths(v)} months at the current pace`,
-      storage_exhaustion:(v)=>`storage will reach the warning threshold within about ${rptMonths(v)} months`,
-      availability:(v)=>`estimated availability is ${v}%`,gpu_full:()=>'all GPU cards are assigned',task_failures:(v)=>`${v}% of automated operations failed`},
-    none:'no issues detected in the period',
-    intro:(d,k)=>`From ${d.from} to ${d.to} the service had ${k.vms_running} active virtual machines (out of ${k.vms_total}) used by ${k.groups} research groups, on ${k.nodes} nodes.`,
-    k:{vms:'Active VMs',groups:'Research groups',gpu:'GPUs assigned',mem:'Memory allocated',avail:'Availability',sto:'Ceph storage'},
-    since:(d)=>`history since ${d}`,grew:(n,d)=>`${n>=0?'+':''}${n} since ${d}`,gpuFull:(d)=>`all assigned since ${d}`,gpuFree:(n)=>`${n} free`,
-    thr:'warning threshold 85%',availSub:'estimated from monitoring data',stoSub:(u,t)=>`${u} of ${t}`,
-    s2:'Capacity over time',s2p:'Trend over the period. The dashed line is the forecast at the current pace; the dotted line is the warning threshold (85%).',
-    c:{cpu:'Processors (CPU)',mem:'Memory (RAM)',sto:'Ceph storage',gpu:'GPUs assigned'},
-    avgSub:'cluster average',noTrend:'no exhaustion trend',exh:(m)=>`estimated exhaustion in about ${m} months`,exh0:'threshold already reached',gpuSub:(t)=>`${t} cards in total`,
-    s3:'Who uses the service',s3p:(n)=>`Memory allocated per research group (top 10 of ${n}). The group is derived from the virtual machine name.`,
-    s4:'Requirements and resource use',needs:'Resource status',eff:'Efficiency',
-    trendLine:(e)=>`Virtual machines: ${e.abandoned} abandoned, ${e.off_long} powered off for at least 3 months and ${e.oversized} oversized; approximately ${e.mem} of RAM and ${e.cores} cores recoverable.`,
-    effLine:(e)=>`${e.inactive} virtual machines are idle and ${e.oversized} are oversized: releasing them would recover up to ${e.mem} of memory and ${e.cores} processors.`,
-    effRule:'Idle: running with average CPU below 2% and network below 1 KB/s for at least 7 days. Oversized: memory used (95th percentile) below 25% of the assigned amount, or CPU (95th percentile) below 10%, for at least 14 days.',
-    effNone:'Efficiency data is not available for this period.',
-    gpuUse:(d,t)=>`GPU cards: ${d.gpu_idle} idle, ${d.gpu_reserved} reserved by a model without compute and ${d.gpu_vm_off} assigned to powered-off VMs over the last ${t.idle_days} days (average utilisation < ${t.idle_util}%; memory < ${t.idle_mem}% for idle cards, ≥ ${t.idle_mem}% for reserved cards). Insufficient data: ${d.gpu_insufficient}.`,
-    gpuUseNone:'GPU usage data not yet available',gpuUseTitle:'GPU usage by group',
-    gpuUseCols:['Group','Cards','Average utilisation','Hours at work'],gpuNoGroup:'without group',gpuOthers:'Other groups',
-    inv:(d)=>`Inventory history (number of VMs, groups, GPUs) is available since ${d}: changes over time will fill in as months go by.`,
-    rule:(d)=>`From ${d} research groups come from the service inventory; before that they were inferred from machine names: comparing groups across that date is indicative only.`,
-    method:'Sources: Proxmox VE statistics and the daily inventory snapshot. Linear forecasts on weekly averages. No personal data.',
-    land:'landscape',port:'portrait',lang:'English'},
+    na:'not available',noData:'Insufficient data for the period',k:{vms:'Active virtual machines',mem:'Memory assigned',avail:'Availability',value:'Service value'},
+    growth:v=>`${v} between complete months`,total:v=>`${v} in total`,capacity:v=>`${v} of capacity`,periodTotal:'period total',net:v=>`${v} excluding external interruptions`,economicTile:(a,b)=>`${a} per month at market prices; internal tariff ${b}`,thousand:'thousand €',
+    memoryChart:'Memory assigned to active machines',sizingChart:'How machines are sized',sizingWindow:'Last six months of the period, or the available shorter window.',sizingLabels:['in use','oversized','off for over 3 months'],sizingScope:'Shares cover only the three states shown; other states are excluded.',insufficient:v=>`${v} machines with insufficient data.`,
+    messages:'Key messages',usageMsg:(n,g)=>`An average of ${n} active machines per complete month; change over the period: ${g}.`,gpuMsg:(a,t,f)=>`GPUs: ${a} of ${t} assigned today; ${f} free.`,economicMsg:(a,b,r)=>`The same resources are worth ${a}–${b} per month on the European market${r?`; ${r} times the internal tariff`:''}.`,sizingMsg:(n,m,c)=>`${n} oversized machines: the proposal recovers ${m} and ${c} cores.`,
+    need:'What is needed',noTrend:'no estimable exhaustion trend',atThreshold:'85% threshold already reached',thresholdDate:d=>`85% threshold around ${d}`,fullDate:d=>`full capacity around ${d}`,gpuFull:'all GPUs are assigned',gpuFree:n=>`${n} cards free today`,forecastNote:'Linear forecasts at the current pace.',
+    a1:'A1 · Usage and growth',a1lead:'Monthly service trends: active machines, assigned resources and physical memory in use.',vmsChart:'Active virtual machines per month',nodeMemory:'Memory in use on nodes',thresholdNote:'Monthly average physical memory in use; red line: 85% warning threshold.',concentration:'How concentrated is usage?',concentrationLabels:['top 5 groups','next 15 groups','other groups','without a group'],groupsNote:n=>`Share of assigned memory. ${n} groups served, no names.`,numbers:'In numbers',groups:'Research groups served',runningTotal:'VMs running / total today',nodes:'Compute nodes',storage:'Shared storage',
+    a2:'A2 · How machines are sized',a2lead:'Resources requested by users compared with actual usage.',cpuChart:m=>`Average CPU usage · ${m}`,cpuBands:['below 5%','5% to below 25%','25% to below 50%','50% and above'],cpuNote:'Last complete month: average CPU relative to assigned cores, for machines active that month.',reclaim:'Resources that could be released',reclaimRows:['Reducing oversized machines (reduction proposal)','On machines off for over 3 months'],ram:'Memory (RAM)',cores:'Cores',sizingRule:'Classification compares monthly peaks with configured thresholds; GPU VMs are not assessed on CPU. The proposal applies the configured margin to observed peaks.',ramNote:'Method: Proxmox measures occupied RAM including the guest operating system cache. Full memory does not imply an undersized machine: this report identifies oversizing only.',
+    a3:'A3 · GPUs by memory size',gpuLead:'Usage over the period, including cards subsequently removed; current counts shown separately.',gpuClasses:{'16':'16 GB','24':'24 GB','48':'40–48 GB','80+':'80 GB and above','unknown':'unknown size'},gpuStates:['at work','model loaded without compute','assigned, idle','VM powered off','no data'],now:'cards now',free:'free now',busyHours:'hours at work',offDays:'card-days on powered-off VMs',coverage:'sample coverage while VMs run',validShares:'shares of valid samples',timeShares:'estimated time shares',gpuMethod:'Time shares reconstructed from busy hours, percentages and coverage where available (rounded). Otherwise: valid-sample shares and powered-off card-days shown separately. Cards free now do not measure free hours over the period. For multi-card VMs the busiest card sample is weighted by card count.',
+    a4:'A4 · Reliability',availabilityChart:'Node availability per month',totalLabel:'total',netLabel:'excluding external causes and maintenance',availabilityNote:'From each node’s first sample; months below 99% are red.',fixedOutage:'Interruptions are generally due to external causes (for example power failures), which the system cannot distinguish unless they are entered in the interruption register.',interruption:'Recorded interruptions',causes:{external:'external cause',maintenance:'planned maintenance',fault:'service fault'},backups:'Backups',backupCoverage:'VMs with a backup in the last 7 days',backupChart:'Successful backup nights per month',backupMethod:'Successful / total nightly node jobs: this is not a count of VMs backed up. Coverage refers to today.',backupCauses:['backup storage unreachable','errors on individual machines','interrupted','other'],
+    a5:'A5 · Requirements and funding',resource:'Resource',today:'Today',outlook:'Outlook',gpu:'GPUs',assigned:'assigned',used:'used',economicTitle:'Economic value of the service (€/month)',economicCols:['Reference','Compute and memory','GPU','Storage','Total'],economicRows:['Internal cost (DataCloud tariff)','European market · low range','European hyperscaler · high range'],internalCombined:'Compute and storage included together',prices:'Price date',sources:'Sources',economicMethod:n=>`Market: assigned resources × running hours over the last 30 complete days, normalised to 30 days using ${n} observed days; storage by assigned capacity. Average of tariffs in each range, on-demand excluding VAT, configured exchange rate. Monthly internal block tariff, distinct from actual service expenditure; internal compute and storage are included together.`,
+    a6:'A6 · Method and sources',method:[['Sources','Proxmox VE statistics (RRD), daily VM history, inventory snapshots and GPU monitoring; backup storage contents and tasks.'],['Anonymity','No machine, group, node or person names; concentration shown in bands.'],['Months','Charts show complete calendar months. Growth compares the first and last complete months; missing evidence means unavailable growth. Before daily history: 6-hour or weekly RRD averages; historical allocations use the latest known configuration.'],['Availability','RRD samples weighted by duration, from each node’s first sample. Net availability excludes recorded external causes and maintenance; service faults remain included.']],economicMethodShort:'Economic value: internal tariff compared with public European prices; date and sources shown above.',
+  },
 };
 function rptMonths(days){return Math.max(1,Math.round(days/30));}
 // Excel/CSV: una cella testuale che inizia con = + - @ (o tab/CR) verrebbe letta come formula: si antepone un apice.
@@ -5459,6 +5547,98 @@ function rptChart(points,opt){
     if(f){const k=Math.max(8,Math.floor(n/2)); const y0=f.b+f.m*(k-1), y1=f.b+f.m*(k-1+ext);
       out+=`<polyline class="fc" points="${X(n-1)},${Y(y0)} ${X(n-1+ext)},${Y(y1)}"/>`;}}
   return out+'</svg>';
+}
+// Manager charts accept finite numbers only. Missing months break lines, never imply zero.
+function rptV3Number(v){return typeof v==='number'&&Number.isFinite(v)?v:null;}
+function rptV3Month(s,loc,long=false){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(s)))return '—';
+  const [y,m]=s.split('-').map(Number);
+  return new Date(y,m-1,1,12).toLocaleDateString(loc,{month:long?'long':'short',year:long?'numeric':'2-digit'}).replace('.', '');
+}
+function rptV3SVG(w,h,label,body){return `<svg class="rv-chart" viewBox="0 0 ${esc(w)} ${esc(h)}" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title>${body}</svg>`;}
+function rptV3Line(rows,key,opt){
+  const T=opt.T,N=opt.N,W=opt.full?560:300,H=opt.full?(opt.land?90:126):(opt.land?110:160),L=48,R=16,top=18,bottom=28;
+  const vals=rows.map(r=>rptV3Number(r[key])).filter(v=>v!==null);
+  if(!vals.length)return `<p class="rv-empty">${esc(T.noData)}</p>`;
+  const scale=opt.scale||1,hi=opt.max||Math.max(1,...vals.map(v=>v/scale))*1.2;
+  const X=i=>L+i*(W-L-R)/Math.max(1,rows.length-1),Y=v=>H-bottom-Math.max(0,Math.min(hi,v))*(H-top-bottom)/hi;
+  let body='';
+  for(let i=0;i<=4;i++){
+    const v=hi*i/4,y=Y(v);
+    body+=`<line class="rv-grid" x1="${esc(L)}" x2="${esc(W-R)}" y1="${esc(y)}" y2="${esc(y)}"/><text class="rv-axis" x="${esc(L-5)}" y="${esc(y+3)}" text-anchor="end">${esc(N(v,opt.dec||0)+(opt.unit||''))}</text>`;
+  }
+  if(opt.thr!=null)body+=`<line class="rv-threshold" x1="${esc(L)}" x2="${esc(W-R)}" y1="${esc(Y(opt.thr))}" y2="${esc(Y(opt.thr))}"/>`;
+  let path='',last=null;
+  rows.forEach((r,i)=>{
+    const v=rptV3Number(r[key]);
+    if(v===null){path+=' ';return;}
+    const previous=i>0&&rptV3Number(rows[i-1][key])!==null;
+    path+=`${previous?'L':'M'}${X(i).toFixed(2)},${Y(v/scale).toFixed(2)} `;last={i,v:v/scale};
+    if(!previous)body+=`<circle class="rv-dot" cx="${esc(X(i))}" cy="${esc(Y(v/scale))}" r="2"/>`;
+  });
+  body+=`<path class="rv-line" d="${esc(path)}"/>`;
+  rows.forEach((r,i)=>{if(opt.full||i%2===0)body+=`<text class="rv-axis" x="${esc(X(i))}" y="${esc(H-8)}" text-anchor="middle">${esc(rptV3Month(r.month,T.loc))}</text>`;});
+  body+=`<circle class="rv-dot" cx="${esc(X(last.i))}" cy="${esc(Y(last.v))}" r="3"/><text class="rv-value" x="${esc(X(last.i)-5)}" y="${esc(Math.max(12,Y(last.v)-7))}" text-anchor="end">${esc(N(last.v,opt.dec||0)+(opt.unit||''))}</text>`;
+  return rptV3SVG(W,H,opt.title+'; '+rptV3Month(rows[last.i].month,T.loc,true)+': '+N(last.v,opt.dec||0)+(opt.unit||''),body);
+}
+function rptV3Donut(parts,T,N,percent=false){
+  const known=parts.every(p=>rptV3Number(p.value)!==null&&p.value>=0),sum=parts.reduce((s,p)=>s+(rptV3Number(p.value)||0),0);
+  if(!known||sum<=0)return `<p class="rv-empty">${esc(T.noData)}</p>`;
+  let offset=0,body='<circle cx="60" cy="60" r="43" class="rv-donut-base"/>';
+  const legend=parts.map((p,i)=>{
+    const share=p.value/sum*100;
+    if(p.value>0)body+=`<circle cx="60" cy="60" r="43" pathLength="100" fill="none" stroke="var(--series${esc(i+1)})" stroke-width="23" stroke-dasharray="${esc(share)} ${esc(100-share)}" stroke-dashoffset="${esc(-offset)}" transform="rotate(-90 60 60)"/>`;
+    offset+=share;
+    return `<li><i style="background:var(--series${esc(i+1)})"></i><b>${esc(N(percent?p.value:share,0))}%</b> ${esc(p.label)}${percent?'':` <span>(${esc(N(p.value))})</span>`}</li>`;
+  }).join('');
+  const label=parts.map(p=>`${p.label}: ${N(p.value,percent?1:0)}${percent?'%':''}`).join('; ');
+  return `<div class="rv-donut">${rptV3SVG(120,120,label,body)}<ul>${legend}</ul></div>`;
+}
+function rptV3Bars(rows,opt){
+  const {T,N}=opt,sets=opt.sets||[{key:'value',label:opt.title}],W=opt.full?560:300,H=opt.height||110,L=30,R=8,top=20,bottom=26;
+  const values=rows.flatMap(r=>sets.map(s=>rptV3Number(r[s.key]))).filter(v=>v!==null);
+  if(!values.length)return `<p class="rv-empty">${esc(T.noData)}</p>`;
+  const max=opt.max||Math.max(1,...values)*1.1,cw=(W-L-R)/Math.max(1,rows.length),bw=Math.min(25,cw*.7/sets.length),Y=v=>H-bottom-Math.max(0,Math.min(max,v))*(H-top-bottom)/max;
+  let body=`<line class="rv-grid" x1="${esc(L)}" x2="${esc(W-R)}" y1="${esc(H-bottom)}" y2="${esc(H-bottom)}"/>`;
+  for(const v of [0,max])body+=`<text class="rv-axis" x="${esc(L-4)}" y="${esc(Y(v)+3)}" text-anchor="end">${esc(N(v,0))}</text>`;
+  rows.forEach((r,i)=>{
+    const center=L+cw*(i+.5);
+    sets.forEach((s,j)=>{
+      const v=rptV3Number(r[s.key]),x=center+(j-sets.length/2)*bw;
+      if(v===null){body+=`<text class="rv-axis" x="${esc(x+bw/2)}" y="${esc(H-bottom-3)}" text-anchor="middle">—</text>`;return;}
+      const color=opt.warnBelow!=null&&v<opt.warnBelow?'var(--hot)':`var(--series${j+1})`;
+      body+=`<rect x="${esc(x)}" y="${esc(Y(v))}" width="${esc(Math.max(1,bw-1))}" height="${esc(H-bottom-Y(v))}" fill="${esc(color)}"><title>${esc(r.label||rptV3Month(r.month,T.loc))}: ${esc(s.label)} ${esc(N(v,opt.dec||0)+(opt.unit||''))}</title></rect>`;
+      // One label per month keeps grouped bars readable; both exact values remain in SVG titles and summary.
+      if(j===0&&(opt.full||i%2===0))body+=`<text class="rv-axis" x="${esc(center)}" y="${esc(Math.max(10,Y(v)-4))}" text-anchor="middle">${esc(r.caption||N(v,opt.dec||0)+(opt.unit||''))}</text>`;
+    });
+    if(opt.full||i%2===0)body+=`<text class="rv-axis" x="${esc(center)}" y="${esc(H-8)}" text-anchor="middle">${esc(r.label||rptV3Month(r.month,T.loc))}</text>`;
+  });
+  const label=opt.title+'; '+rows.map(r=>(r.label||rptV3Month(r.month,T.loc))+': '+sets.map(s=>s.label+' '+(rptV3Number(r[s.key])===null?T.na:N(r[s.key],opt.dec||0)+(opt.unit||''))).join(', ')).join('; ');
+  return rptV3SVG(W,H,label,body);
+}
+// Busy/quiet/reserved percentages use valid running samples, not elapsed time.
+// Reconstruct elapsed shares only when the aggregate fields determine their denominator.
+function rptV3GPUShare(g){
+  const busy=rptV3Number(g.busy_pct),reserved=rptV3Number(g.reserved_pct),quiet=rptV3Number(g.quiet_pct),coverage=rptV3Number(g.coverage_pct),hours=rptV3Number(g.busy_hours),off=rptV3Number(g.vm_off_days);
+  if(busy===null||reserved===null||quiet===null)return coverage===null&&off>0?{values:[0,0,0,100,0],time:true}:{values:null,time:false};
+  if(coverage>0&&off!==null&&(off===0||busy>0&&hours>0)){
+    const valid=busy>0&&hours>0?hours/(busy/100):1,expected=valid/(coverage/100),offHours=off*24,total=expected+offHours;
+    return {values:[busy,reserved,quiet].map(v=>v/100*valid/total*100).concat([offHours/total*100,Math.max(0,expected-valid)/total*100]),time:true};
+  }
+  return {values:[busy,reserved,quiet,0,0],time:false};
+}
+function rptV3GPU(g,T,N){
+  const share=rptV3GPUShare(g),keys=['busy','reserved','quiet','off','unknown'];
+  let body='';
+  if(share.values){
+    let x=0;
+    share.values.forEach((v,i)=>{const width=Math.max(0,Math.min(100,v))*3;
+      body+=`<rect x="${esc(x)}" y="1" width="${esc(width)}" height="14" fill="var(--gpu-${esc(keys[i])})"><title>${esc(T.gpuStates[i]+': '+N(v,1)+'%')}</title></rect>`;x+=width;
+    });
+  }
+  const stateText=share.values?share.values.map((v,i)=>`${T.gpuStates[i]} ${N(v,1)}%`).join('; '):T.noData;
+  const details=[`${N(g.cards_now)} ${T.now}`,`${N(g.free_now)} ${T.free}`,`${N(g.busy_hours,1)} ${T.busyHours}`,`${N(g.vm_off_days,1)} ${T.offDays}`,`${N(g.coverage_pct,1)}% ${T.coverage}`].join(' · ');
+  return `<div class="rv-gpu-row"><div><b>${esc(T.gpuClasses[g.class]||T.gpuClasses.unknown)}</b><small>${esc(share.time?T.timeShares:T.validShares)}</small></div><div>${share.values?rptV3SVG(300,16,stateText,body):`<p class="rv-note">${esc(T.noData)}</p>`}<p class="rv-note">${esc(details)}</p></div></div>`;
 }
 function rptTrendMonth(s,short=false){
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(s)))return '—';
@@ -5556,10 +5736,6 @@ const Reports={
     try{
       Reports.data=await Reports.fetchModel(Reports.model,q);
       Reports.eff=null;
-      if(Reports.isManager()){ // l'efficienza (VM inattive/sovradimensionate) serve anche al manageriale; un report alla volta per cluster
-        const eq=new URLSearchParams({from:q.get('from'),to:q.get('to')});
-        try{Reports.eff=await Reports.fetchModel('vms',eq);}catch(e){Reports.eff=null;}
-      }
       if(seq!==Reports.seq)return;
       st.innerHTML='';
       Reports.paint();
@@ -5736,7 +5912,7 @@ const Reports={
   paintManager(forPrint){
     const d=Reports.data; if(!d)return;
     const doc=(l)=>Reports.docHTML(l,d,Reports.eff);
-    const html=`<div class="rp-doc ${Reports.orient==='landscape'?'rp-land':''}">${doc('it')}${doc('en')}</div>`;
+    const html=`<div class="rp-doc rv-doc ${Reports.orient==='landscape'?'rp-land':''}">${doc('it')}${doc('en')}</div>`;
     document.getElementById('rpt-print').innerHTML=html;
     document.getElementById('rp-preview').innerHTML=`<div class="rp-previewbar"><span>Anteprima (${Reports.orient==='landscape'?'orizzontale':'verticale'} · italiano, poi inglese)</span></div><div class="rp-sheetwrap">${html}</div>`;
     const lvl=d.condition.level;
@@ -5744,50 +5920,95 @@ const Reports={
     document.getElementById('rp-status').innerHTML=`<p class="cnote">Condizione: <b>${esc(RPT_TXT.it.lvl[lvl])}</b>. Usa «PDF…» per stampare o salvare il documento (scegli «Salva come PDF» e, se serve, «Sfondi grafici»).</p>${Reports.notes(d)}`;
   },
   docHTML(L,d,eff){
-    const T=RPT_TXT[L], loc=T.loc, N=(v,dec)=>Reports.fmtNum(v,dec,loc), B=v=>rptBytes(v,loc), k=d.kpi, inv=d.inventory;
+    const T=RPT_TXT[L],loc=T.loc,v=d.v3,k=d.kpi||{},f=d.forecast||{};
+    if(!v)return `<section class="rp-page rv-page" lang="${esc(L)}"><h2>${esc(T.title)}</h2><p>${esc(T.noData)}</p></section>`;
+    const N=(n,dec=0)=>rptV3Number(n)===null?'—':n.toLocaleString(loc,{minimumFractionDigits:dec,maximumFractionDigits:dec,useGrouping:'always'});
+    const P=n=>rptV3Number(n)===null?T.na:N(n,1)+'%',B=n=>rptV3Number(n)===null?'—':n>=1099511627776?N(n/1099511627776,1)+' TiB':N(n/1073741824,0)+' GiB';
     const dateFmt=s=>rptDate(s,loc);
-    const per={from:dateFmt(d.meta.from),to:dateFmt(d.meta.to)};
-    const foot=(n)=>`<footer><span>${esc(RPT_ID.name)} · ${esc(T.title)} · ${esc(per.from)} – ${esc(per.to)}</span><span>${n}</span></footer>`;
-    const reasons=d.condition.reasons.map(r=>(T.reason[r.code]||(()=>r.code))(r.code==='availability'||r.code==='task_failures'?N(r.value,1):r.value));
-    const condP=reasons.length?reasons.map((x,i)=>i?x:x.charAt(0).toUpperCase()+x.slice(1)).join('; ')+'.':T.none.charAt(0).toUpperCase()+T.none.slice(1)+'.';
-    const span=inv.span_days>=7;
-    const tile=(label,val,sub,hot)=>`<div class="rp-kt${hot?' hot':''}"><span>${esc(label)}</span><b>${val}</b><small>${esc(sub||'')}</small></div>`;
-    const growVMs=span?T.grew(inv.vms_last-inv.vms_first,dateFmt(inv.first_day)):(inv.first_day?T.since(dateFmt(inv.first_day)):'');
-    const growGrp=span?T.grew(inv.groups_last-inv.groups_first,dateFmt(inv.first_day)):(inv.first_day?T.since(dateFmt(inv.first_day)):'');
-    const gpuSub=k.gpu_total?(d.gpu_full_since?T.gpuFull(dateFmt(d.gpu_full_since)):T.gpuFree(k.gpu_total-k.gpu_assigned)):'';
-    const tiles=[
-      tile(T.k.vms,N(k.vms_running)+` <small class="u">/ ${N(k.vms_total)}</small>`,growVMs),
-      tile(T.k.groups,N(k.groups),growGrp),
-      tile(T.k.gpu,k.gpu_total?`${N(k.gpu_assigned)} <small class="u">/ ${N(k.gpu_total)}</small>`:'—',gpuSub,k.gpu_total&&k.gpu_assigned>=k.gpu_total),
-      tile(T.k.mem,k.mem_alloc_pct==null?'—':N(k.mem_alloc_pct,0)+'%',T.thr,k.mem_alloc_pct>=85),
-      tile(T.k.avail,k.availability_pct==null?'—':N(k.availability_pct,1)+'%',T.availSub,k.availability_pct!=null&&k.availability_pct<99),
-      tile(T.k.sto,k.storage_pct==null?'—':N(k.storage_pct,0)+'%',k.storage_total?T.stoSub(B(k.storage_used),B(k.storage_total)):'',k.storage_pct>=85),
-    ].join('');
-    const f=d.forecast, exh=(d85,d100)=>d85===0||d100===0?T.exh0:(d85!=null&&d85<=720)?T.exh(rptMonths(d85)):T.noTrend;
-    const card=(title,val,svg,note,hot)=>`<div class="rp-cc"><div class="rp-cch"><span>${esc(title)}</span><b>${val}</b></div>${svg}<small${hot?' class="hot"':''}>${esc(note)}</small></div>`;
-    const gpuPts=(inv.days||[]).filter(x=>x.gpu_total>0).map((x,i)=>({t:i,v:x.gpu_assigned}));
-    const cards=[
-      card(T.c.cpu,d.stats.cpu.n?N(d.stats.cpu.avg,0)+'%':'—',rptChart(d.series.cpu_pct,{thr:85,forecast:true,label:T.c.cpu}),T.avgSub),
-      card(T.c.mem,d.stats.mem.n?N(d.stats.mem.avg,0)+'%':'—',rptChart(d.series.mem_used_pct,{thr:85,forecast:true,label:T.c.mem,hot:f.mem_days_to_85!=null&&f.mem_days_to_85<=180}),exh(f.mem_days_to_85,f.mem_days_to_100),f.mem_days_to_85!=null&&f.mem_days_to_85<=180),
-      card(T.c.sto,k.storage_pct==null?'—':N(k.storage_pct,0)+'%',rptChart(d.series.storage_used_pct,{thr:85,forecast:true,label:T.c.sto,hot:f.storage_days_to_85!=null&&f.storage_days_to_85<=180}),exh(f.storage_days_to_85,f.storage_days_to_100),f.storage_days_to_85!=null&&f.storage_days_to_85<=180),
-      card(T.c.gpu,k.gpu_total?`${N(k.gpu_assigned)} / ${N(k.gpu_total)}`:'—',rptChart(gpuPts,{max:Math.max(1,k.gpu_total||1),thr:k.gpu_total,label:T.c.gpu,empty:inv.first_day?T.since(dateFmt(inv.first_day)):''}),k.gpu_total?T.gpuSub(k.gpu_total):''),
-    ].join('');
-    const gmax=Math.max(1,...d.top_groups.map(g=>g.mem_bytes));
-    const bars=d.top_groups.map(g=>`<div class="rp-br"><span>${esc(g.group)}</span><i><u style="width:${(g.mem_bytes/gmax*100).toFixed(1)}%"></u></i><em>${esc(B(g.mem_bytes))}</em></div>`).join('')||`<p class="rp-lead">${esc(T.since(inv.first_day?dateFmt(inv.first_day):'—'))}</p>`;
-    const need=(label,text,hot)=>`<tr><td>${esc(label)}</td><td${hot?' class="hot"':''}>${esc(text)}</td></tr>`;
-    const needs=[need(T.c.mem,exh(f.mem_days_to_85,f.mem_days_to_100),f.mem_days_to_85!=null&&f.mem_days_to_85<=180),need(T.c.sto,exh(f.storage_days_to_85,f.storage_days_to_100),f.storage_days_to_85!=null&&f.storage_days_to_85<=180),
-      need(T.c.gpu,k.gpu_total?`${N(k.gpu_assigned)} / ${N(k.gpu_total)}`+(d.gpu_full_since?` — ${T.gpuFull(dateFmt(d.gpu_full_since))}`:''):'—',k.gpu_total&&k.gpu_assigned>=k.gpu_total),
-      need(T.c.cpu,`${N(d.stats.cpu.avg,0)}% ${T.avgSub}`)].join('');
-    const e=eff&&eff.totals?{inactive:eff.totals.inactive,oversized:eff.totals.oversized,mem:B(eff.totals.reclaimable_mem_bytes),cores:N(eff.totals.reclaimable_cores)}:null;
-    const trend=d.vm_trend, trendHTML=trend?`<p class="rp-rule">${esc(T.trendLine({...trend,abandoned:N(trend.abandoned),off_long:N(trend.off_long),oversized:N(trend.oversized),mem:rptTrendBytes(trend.reclaimable_mem_bytes,loc),cores:trend.reclaimable_cores<0?'—':N(trend.reclaimable_cores)}))}</p>`:'';
-    const effHTML=e?`<p class="rp-eff">${esc(T.effLine(e))}</p><p class="rp-rule">${esc(T.effRule)}</p>`:`<p class="rp-rule">${esc(T.effNone)}</p>`;
-    const gpuUseHTML=d.gpu_use_known?`<p class="rp-rule">${esc(T.gpuUse(d,RPT_GPU_DEFAULTS))}</p><h3 class="rp-h3">${esc(T.gpuUseTitle)}</h3><table class="rp-gpu-use"><thead><tr>${T.gpuUseCols.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>${(d.gpu_use_by_group||[]).map(g=>`<tr><td>${esc(g.others?T.gpuOthers:g.group==='altro'?T.gpuNoGroup:g.group)}</td><td class="n">${esc(N(g.cards))}</td><td class="n">${esc(N(g.util_avg,1))}%</td><td class="n">${esc(N(g.busy_hours,1))}</td></tr>`).join('')}</tbody></table>`:`<p class="rp-rule">${esc(T.gpuUseNone)}</p>`;
-    const notes=[d.meta.notes.includes('inventory_since')&&inv.first_day?T.inv(dateFmt(inv.first_day)):'',d.meta.notes.includes('group_rule_changed')&&inv.group_rule_change?T.rule(dateFmt(inv.group_rule_change)):'',T.method].filter(Boolean).join(' ');
-    return`
-<section class="rp-page rp-cover"><span class="rp-lang">${esc(T.lang)}</span><img src="${esc(RPT_ID.logo)}" class="rp-logo" alt="${esc(RPT_ID.name)}"><div class="rp-ct"><h1>${esc(T.title)}</h1><p class="rp-per">${esc(per.from)} – ${esc(per.to)}</p><p>${esc(T.sub)}<br>${esc(RPT_ID.org)}</p></div><div class="rp-cf">${esc(T.gen)} ${esc(new Date().toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'}))} · ${esc(RPT_ID.mail)}</div></section>
-<section class="rp-page"><h2>${esc(T.s1)}</h2><div class="rp-sum"><div><div class="rp-cond"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${d.condition.level}">${Dashboard.ICONS[d.condition.level==='ok'?'ok':d.condition.level==='bad'?'bad':'warn']}</svg><div><h3>${esc(T.lvl[d.condition.level])}</h3><p>${esc(T.intro(per,k))} ${esc(condP)}</p></div></div></div><div class="rp-kg">${tiles}</div></div>${foot(2)}</section>
-<section class="rp-page"><h2>${esc(T.s2)}</h2><p class="rp-lead">${esc(T.s2p)}</p><div class="rp-cg">${cards}</div>${foot(3)}</section>
-<section class="rp-page rp-resource-page"><div class="rp-two"><div><h2>${esc(T.s3)}</h2><p class="rp-lead">${esc(T.s3p(d.group_count))}</p><div class="rp-bars">${bars}</div></div><div><h2>${esc(T.s4)}</h2><table class="rp-need">${needs}</table><h3 class="rp-h3">${esc(T.eff)}</h3>${effHTML}${trendHTML}${gpuUseHTML}</div></div><p class="rp-meth">${esc(notes)}</p>${foot(4)}</section>`;
+    const period=`${dateFmt(d.meta.from)} – ${dateFmt(d.meta.to)}`;
+    const foot=n=>`<footer><span>${esc(RPT_ID.name)} · ${esc(T.title)} · ${esc(period)}</span><span>${esc(n)}</span></footer>`;
+    const page=(n,cls,body)=>`<section class="rp-page rv-page ${cls}" lang="${esc(L)}">${body}${foot(n)}</section>`;
+    const h=s=>`<h3>${esc(s)}</h3>`,note=s=>`<p class="rv-note">${esc(s)}</p>`;
+    const table=(heads,rows,cls='')=>`<table class="rv-table ${cls}">${heads?`<thead><tr>${heads.map(s=>`<th scope="col">${esc(s)}</th>`).join('')}</tr></thead>`:''}<tbody>${rows.map(row=>`<tr>${row.map((s,i)=>i===0?`<th scope="row">${esc(s)}</th>`:`<td>${esc(s)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const months=(v.growth||[]).filter(r=>!r.partial),last=months[months.length-1]||{},s=v.sizing||{},counts=s.counts||{},a=v.availability||{},c=v.concentration||{},backup=v.backups||{},e=v.economic;
+    const signed=n=>rptV3Number(n)===null?T.na:(n>=0?'+':'')+N(n,1)+'%';
+    const sizingParts=T.sizingLabels.map((label,i)=>({label,value:[counts.in_use,counts.oversized,counts.off_long][i]}));
+    const sizing=()=>rptV3Donut(sizingParts,T,N);
+    const chart=(key,title,opt={})=>rptV3Line(months,key,{T,N,title,land:Reports.orient==='landscape',...opt});
+    const tile=(label,value,sub,cls='')=>`<div class="rv-kpi ${cls}"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(sub)}</small></div>`;
+    const money=n=>rptV3Number(n)===null?T.na:N(n/1000,1)+' '+T.thousand;
+    const range=e?`${rptV3Number(e.low_eur_month)===null?'—':N(e.low_eur_month/1000,1)}–${money(e.high_eur_month)}`:'';
+    const tiles=[tile(T.k.vms,N(k.vms_running),`${T.growth(signed(v.vm_growth_pct))} · ${T.total(N(k.vms_total))}`),
+      tile(T.k.mem,rptV3Number(last.mem_assigned_bytes)===null?'—':N(last.mem_assigned_bytes/1099511627776,1)+' TiB',`${T.growth(signed(v.mem_growth_pct))} · ${T.capacity(P(k.mem_alloc_pct))}`,k.mem_alloc_pct>=85?'rv-alert':''),
+      tile(T.k.avail,P(a.total_pct),T.periodTotal+(rptV3Number(a.net_pct)!==null&&a.net_pct!==a.total_pct?`; ${T.net(P(a.net_pct))}`:''),rptV3Number(a.total_pct)!==null&&a.total_pct<99?'rv-alert':'')];
+    if(e)tiles.push(tile(T.k.value,range,T.economicTile(range,money(e.internal_eur_month)),'rv-value-tile'));
+    // Forecast days start at the end of each observed series, including historical report periods.
+    const forecastDate=(days,key)=>{
+      const points=d.series?.[key]||[],lastPoint=points[points.length-1];
+      const when=rptV3Number(lastPoint?.t)!==null?new Date(lastPoint.t*1000):new Date(String(d.meta.to)+'T12:00:00');
+      when.setDate(when.getDate()+days);
+      return Number.isNaN(when.getTime())?T.na:when.toLocaleDateString(loc,{month:'long',year:'numeric'});
+    };
+    const forecast=(d85,d100,key)=>{
+      const parts=[];
+      if(rptV3Number(d85)!==null)parts.push(d85===0?T.atThreshold:T.thresholdDate(forecastDate(d85,key)));
+      if(rptV3Number(d100)!==null)parts.push(T.fullDate(forecastDate(d100,key)));
+      return parts.length?parts.join('; '):T.noTrend;
+    };
+    const candidates=[{label:T.ram,key:'mem_used_pct',days:rptV3Number(f.mem_days_to_85)},{label:T.storage,key:'storage_used_pct',days:rptV3Number(f.storage_days_to_85)}].filter(r=>r.days!==null&&r.days>=0).sort((x,y)=>x.days-y.days);
+    const gpuFull=k.gpu_total>0&&k.gpu_assigned>=k.gpu_total;
+    const need=(candidates.length?`${candidates[0].label}: ${candidates[0].days===0?T.atThreshold:T.thresholdDate(forecastDate(candidates[0].days,candidates[0].key))}`:T.noTrend)+(gpuFull?`; ${T.gpuFull}`:'')+'. '+T.forecastNote;
+    const active=months.map(r=>rptV3Number(r.vms_active)).filter(n=>n!==null);
+    const avg=active.length?active.reduce((sum,n)=>sum+n,0)/active.length:null;
+    const messages=[T.usageMsg(N(avg,0),signed(v.vm_growth_pct)),T.gpuMsg(N(k.gpu_assigned),N(k.gpu_total),N(rptV3Number(k.gpu_total)!==null&&rptV3Number(k.gpu_assigned)!==null?Math.max(0,k.gpu_total-k.gpu_assigned):null))];
+    const ratio=e&&e.internal_eur_month>0&&rptV3Number(e.low_eur_month)!==null&&rptV3Number(e.high_eur_month)!==null?`${N(e.low_eur_month/e.internal_eur_month,1)}–${N(e.high_eur_month/e.internal_eur_month,1)}`:'';
+    messages.push(e?T.economicMsg(money(e.low_eur_month),money(e.high_eur_month),ratio):T.sizingMsg(N(counts.oversized),B(s.reclaimable_oversized?.mem_bytes),N(s.reclaimable_oversized?.cores)));
+    const executive=page(1,'rv-exec',`
+      <header class="rv-header"><img src="${esc(RPT_ID.logo)}" alt="${esc(RPT_ID.name)}"><div><p>${esc(T.title)} · ${esc(T.summary)} · ${esc(T.lang)}</p><h1>${esc(T.heading)}</h1><p>${esc(period)} · ${esc(T.anonymous)}</p></div></header>
+      <p class="rv-condition${d.condition?.level==='bad'?' rv-alert':''}">${esc(T.lvl[d.condition?.level]||T.na)}.</p>
+      <div class="rv-kpis" style="--tile-count:${esc(tiles.length)}">${tiles.join('')}</div>
+      <div class="rv-exec-charts rv-two"><div>${h(T.memoryChart)}${chart('mem_assigned_bytes',T.memoryChart,{scale:1099511627776,unit:' TiB',dec:1})}</div><div>${h(T.sizingChart)}${sizing()}${note(T.sizingWindow+' '+T.sizingScope)}</div></div>
+      <div class="rv-messages">${h(T.messages)}<ol>${messages.map(m=>`<li>${esc(m)}</li>`).join('')}</ol></div>
+      <div class="rv-need${gpuFull||candidates[0]?.days<=180?' rv-need-hot':''}"><b>${esc(T.need)}:</b> ${esc(need)}</div>`);
+    const concentration=rptV3Donut(T.concentrationLabels.map((label,i)=>({label,value:[c.top5_pct,c.next15_pct,c.rest_pct,c.nogroup_pct][i]})),T,N,true);
+    const numbers=table(null,[[T.groups,N(c.groups)],[T.runningTotal,`${N(k.vms_running)} / ${N(k.vms_total)}`],[T.nodes,N(k.nodes)],[T.memoryChart,B(last.mem_assigned_bytes)],[T.storage,`${P(k.storage_pct)} / ${B(k.storage_total)}`]]);
+    const usage=page(2,'rv-usage',`<h2>${esc(T.a1)}</h2><p class="rv-lead">${esc(T.a1lead)}</p>
+      <div class="rv-growth">${h(T.vmsChart)}${chart('vms_active',T.vmsChart,{full:true})}${h(T.nodeMemory)}${chart('node_mem_used_pct',T.nodeMemory,{full:true,max:100,thr:85,unit:'%'})}${note(T.thresholdNote)}</div>
+      <div class="rv-two rv-usage-bottom"><div>${h(T.concentration)}${concentration}${note(T.groupsNote(N(c.groups)))}</div><div>${h(T.numbers)}${numbers}</div></div>`);
+    const bands=s.cpu_bands,bandRows=T.cpuBands.map((label,i)=>({label,value:bands?bands[['lt5','5_25','25_50','gt50'][i]]:null}));
+    const bandMax=Math.max(1,...bandRows.map(r=>rptV3Number(r.value)||0));
+    const cpuBars=bandRows.map(r=>`<div class="rv-hbar"><span>${esc(r.label)}</span>${rptV3SVG(140,14,r.label+': '+N(r.value),`<rect width="140" height="14" fill="var(--soft)"/><rect width="${esc((rptV3Number(r.value)||0)/bandMax*140)}" height="14" fill="var(--series2)"/>`)}<b>${esc(N(r.value))}</b></div>`).join('');
+    const reclaim=table([T.resource,T.ram,T.cores],[s.reclaimable_oversized,s.reclaimable_off_long].map((r,i)=>[T.reclaimRows[i],B(r?.mem_bytes),N(r?.cores)]));
+    const sizingPage=page(3,'rv-sizing',`<h2>${esc(T.a2)}</h2><p class="rv-lead">${esc(T.a2lead+' '+T.sizingWindow)}</p>
+      <div class="rv-two"><div>${h(T.sizingChart)}${sizing()}${note(T.sizingScope)}${note(T.insufficient(N(counts.insufficient)))}</div><div>${h(T.cpuChart(last.month?rptV3Month(last.month,loc,true):T.na))}${bands?cpuBars:note(T.noData)}${note(T.cpuNote)}</div></div>
+      <div class="rv-sizing-detail">${h(T.reclaim)}${reclaim}${note(T.sizingRule)}<p class="rv-method-callout">${esc(T.ramNote)}</p></div>`);
+    // A class with no card today and no history in the period (e.g. "unknown") is not shown.
+    const gpuRows=(v.gpu_classes||[]).filter(g=>Object.hasOwn(T.gpuClasses,g.class)&&((rptV3Number(g.cards_now)||0)>0||(rptV3Number(g.card_days)||0)>0));
+    const gpuLegend=`<ul class="rv-legend">${T.gpuStates.map((label,i)=>`<li><i style="background:var(--gpu-${['busy','reserved','quiet','off','unknown'][i]})"></i>${esc(label)}</li>`).join('')}</ul>`;
+    const availRows=(a.months||[]).filter(r=>months.some(m=>m.month===r.month));
+    const netDiff=availRows.some(r=>rptV3Number(r.net_pct)!==null&&r.net_pct!==r.total_pct);
+    const availSets=[{key:'total_pct',label:T.totalLabel}];if(netDiff)availSets.push({key:'net_pct',label:T.netLabel});
+    const avail=rptV3Bars(availRows,{T,N,title:T.availabilityChart,sets:availSets,max:100,warnBelow:99,unit:'%',dec:1,full:Reports.orient!=='landscape',height:100});
+    const availLegend=`<ul class="rv-legend">${availSets.map((set,i)=>`<li><i style="background:var(--series${esc(i+1)})"></i>${esc(set.label)}</li>`).join('')}</ul>`;
+    const interruptionMap=new Map();
+    for(const i of a.interruptions||[]){if(!Object.hasOwn(T.causes,i.cause))continue;const key=i.month+'|'+i.cause;const prev=interruptionMap.get(key)||{...i,hours:0};prev.hours+=rptV3Number(i.hours)||0;interruptionMap.set(key,prev);}
+    const interruptions=[...interruptionMap.values()].map(i=>`${rptV3Month(i.month,loc,true)}: ${T.causes[i.cause]}, ${N(i.hours,1)} h`).join('; ');
+    const nights=(backup.nights||[]).filter(r=>months.some(m=>m.month===r.month)).map(r=>({...r,value:r.jobs>0?r.ok/r.jobs*100:null,caption:`${N(r.ok)}/${N(r.jobs)}`}));
+    const causes=backup.causes?T.backupCauses.map((label,i)=>`${label}: ${N(backup.causes[['storage_unreachable','vm_errors','interrupted','other'][i]])}`).join('; '):T.na;
+    const reliability=page(4,'rv-reliability',`<div class="rv-gpu-section"><h2>${esc(T.a3)}</h2>${note(T.gpuLead)}${gpuRows.map(g=>rptV3GPU(g,T,N)).join('')}${gpuLegend}${note(T.gpuMethod)}</div>
+      <div class="rv-reliability-section"><h2>${esc(T.a4)}</h2>${h(T.availabilityChart)}${avail}${availLegend}${note(T.availabilityNote)}${note(T.fixedOutage)}${interruptions?note(T.interruption+': '+interruptions):''}
+      <div class="rv-two rv-backups"><div>${h(T.backups)}<p><b>${esc(P(backup.coverage_pct))}</b> · ${esc(T.backupCoverage)}</p>${note(causes)}</div><div>${h(T.backupChart)}${rptV3Bars(nights,{T,N,title:T.backupChart,max:100,height:90})}${note(T.backupMethod)}</div></div></div>`);
+    const needs=table([T.resource,T.today,T.outlook],[[T.ram,`${P(k.mem_alloc_pct)} ${T.assigned}`,forecast(f.mem_days_to_85,f.mem_days_to_100,'mem_used_pct')],[T.storage,`${P(k.storage_pct)} ${T.used}`,forecast(f.storage_days_to_85,f.storage_days_to_100,'storage_used_pct')],[T.gpu,`${N(k.gpu_assigned)} / ${N(k.gpu_total)}`,gpuFull?T.gpuFull:T.gpuFree(N(rptV3Number(k.gpu_total)!==null&&rptV3Number(k.gpu_assigned)!==null?Math.max(0,k.gpu_total-k.gpu_assigned):null))]]);
+    let economic='';
+    if(e){
+      const euro=n=>rptV3Number(n)===null?'—':N(n,0)+' €';
+      const internalBase=rptV3Number(e.internal_eur_month)!==null&&rptV3Number(e.internal_gpu_eur_month)!==null?e.internal_eur_month-e.internal_gpu_eur_month:null;
+      const marketRows=['low','high'].map((level,i)=>{const b=e.breakdown?.[level];return [T.economicRows[i+1],euro(b?.compute),euro(b?.gpu),euro(b?.storage),euro(e[level+'_eur_month'])];});
+      economic=h(T.economicTitle)+table(T.economicCols,[[T.economicRows[0],euro(internalBase)+' *',euro(e.internal_gpu_eur_month),'*',euro(e.internal_eur_month)],...marketRows],'rv-economic')+note('* '+T.internalCombined+'. '+T.prices+': '+dateFmt(e.prices_date)+'. '+T.sources+': '+(e.sources||[]).join(', '))+note(T.economicMethod(N(e.days_used)));
+    }
+    const method=T.method.map(([label,text])=>`<li><b>${esc(label)}:</b> ${esc(text)}</li>`).join('')+(e?`<li>${esc(T.economicMethodShort)}</li>`:'');
+    const funding=page(5,'rv-funding',`<div class="rv-funding-main"><h2>${esc(T.a5)}</h2>${needs}${note(T.forecastNote)}${economic}</div><div class="rv-method"><h2>${esc(T.a6)}</h2><ul>${method}</ul></div>`);
+    return executive+usage+sizingPage+reliability+funding;
   },
 };
 
