@@ -199,6 +199,8 @@ func TestTrendClassification(t *testing.T) {
 		{name: "only memory", state: "oversized", months: []trendMonth{trendEvidence(true, 5, 100, 20, 10, "09"), small("10"), small("11")}, mem: true, last: "11"},
 		{name: "only cpu", state: "oversized", months: []trendMonth{trendEvidence(true, 5, 100, 5, 40, "09"), small("10"), small("11")}, cpu: true, last: "11"},
 		{name: "unknown peaks never oversized", state: "in_use", months: []trendMonth{trendEvidence(true, 5, 100, -1, -1, "09"), small("10"), small("11")}, last: "11"},
+		{name: "D122 idle with monthly peaks is not abandoned", state: "in_use", months: []trendMonth{busy("08"), trendEvidence(true, 1, 100, 30, 88, "09"), trendEvidence(true, 1, 100, 25, 88, "10"), trendEvidence(true, 1, 100, 32, 88, "11")}, last: "08"},
+		{name: "D122 one peak month breaks abandonment", state: "in_use", months: []trendMonth{busy("08"), idle("09"), trendEvidence(true, 1, 100, 10, 10, "10"), idle("11")}, last: "08"},
 		{name: "unknown network never abandoned", state: "in_use", months: []trendMonth{trendEvidence(true, 1, -1, 30, 40, "09"), idle("10"), idle("11")}},
 	}
 	for _, tt := range tests {
@@ -230,6 +232,28 @@ func TestTrendClassification(t *testing.T) {
 	classifyTrend(&row, th)
 	if row.State != "insufficient" {
 		t.Fatalf("one month: too early to judge: %+v", row)
+	}
+}
+
+// D122: a VM with a passthrough device (GPU) is never judged oversized on CPU; RAM is still judged.
+func TestTrendPCIVMCPUNotOversized(t *testing.T) {
+	th := defaultTrendThresholds()
+	lowCPUhighMem := func(m string) trendMonth { return trendEvidence(true, 0.2, 100, 4, 97, m) }
+	row := trendRow{Status: "running", Cores: 64, MemBytes: 96 * gib, PCI: true, Months: []trendMonth{lowCPUhighMem("10"), lowCPUhighMem("11")}}
+	classifyTrend(&row, th)
+	if row.State == "oversized" || row.OversizedCPU || row.Proposal != nil {
+		t.Fatalf("GPU VM proposed fewer cores: %+v", row)
+	}
+	small := func(m string) trendMonth { return trendEvidence(true, 4, 1024, 4, 10, m) }
+	row = trendRow{Status: "running", Cores: 64, MemBytes: 96 * gib, PCI: true, Months: []trendMonth{small("10"), small("11")}}
+	classifyTrend(&row, th)
+	if row.State != "oversized" || !row.OversizedMem || row.OversizedCPU || row.Proposal == nil || row.Proposal.Cores != 64 {
+		t.Fatalf("GPU VM: RAM must still be judged, cores untouched: %+v %+v", row, row.Proposal)
+	}
+	row.PCI = false
+	classifyTrend(&row, th)
+	if !row.OversizedCPU {
+		t.Fatal("without PCI the same VM is CPU-oversized")
 	}
 }
 

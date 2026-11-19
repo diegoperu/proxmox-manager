@@ -879,7 +879,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.185.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.186.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1373,7 +1373,7 @@ html.spiderman{
         <div class="rp-thr-g">
           <label>CPU media inattiva (%)<input class="inp" id="th-tcpu" inputmode="decimal" placeholder="2"></label>
           <label>Rete inattiva (KB/s)<input class="inp" id="th-tnet" inputmode="decimal" placeholder="1"></label>
-          <label>Mesi consecutivi<input class="inp" id="th-tmonths" inputmode="numeric" placeholder="3"></label>
+          <label>Mesi consecutivi<input class="inp" id="th-tmonths" inputmode="numeric" placeholder="3"></label><label>Picco CPU sotto (%)<input class="inp" id="th-tpeak" inputmode="decimal" placeholder="10" title="Una VM abbandonata non supera mai questo picco di CPU in nessun mese (D122)"></label>
           <label>RAM picco sotto (%)<input class="inp" id="th-tmem" inputmode="decimal" placeholder="25"></label>
           <label>CPU picco sotto (%)<input class="inp" id="th-tovercpu" inputmode="decimal" placeholder="10"></label>
           <label>Margine proposta (%)<input class="inp" id="th-tmargin" inputmode="decimal" placeholder="25"></label>
@@ -5511,7 +5511,7 @@ const Reports={
       if(grp){if(!/^[a-z0-9]{1,32}$/.test(grp)){toast('Il gruppo è formato da lettere minuscole e cifre','err');return null;}q.set('group',grp);}
       if(txt)q.set('q',txt);
       if(Reports.model==='vms')for(const [id,k] of [['th-icpu','inactive_cpu'],['th-inet','inactive_net'],['th-idays','inactive_days'],['th-omem','oversized_mem'],['th-ocpu','oversized_cpu'],['th-odays','oversized_days']]){const v=val(id);if(v!==''){if(!/^\d+(\.\d+)?$/.test(v)){toast('Soglia non valida','err');return null;}q.set(k,v);}}
-      if(Reports.model==='trend')for(const [id,key,min,max,integer,mult] of [['th-tcpu','abandon_cpu',0,50,false,1],['th-tnet','abandon_net',0,1024,false,1024],['th-tmonths','abandon_months',1,12,true,1],['th-tmem','over_mem',1,90,false,1],['th-tovercpu','over_cpu',1,90,false,1],['th-tmargin','margin',0,200,false,1]]){
+      if(Reports.model==='trend')for(const [id,key,min,max,integer,mult] of [['th-tcpu','abandon_cpu',0,50,false,1],['th-tnet','abandon_net',0,1024,false,1024],['th-tmonths','abandon_months',1,12,true,1],['th-tpeak','abandon_peak',1,90,false,1],['th-tmem','over_mem',1,90,false,1],['th-tovercpu','over_cpu',1,90,false,1],['th-tmargin','margin',0,200,false,1]]){
         const v=val(id);if(v==='')continue;
         if(!/^\d+(\.\d+)?$/.test(v)||!Number.isFinite(Number(v))||Number(v)<min||Number(v)>max||(integer&&!/^\d+$/.test(v))){toast('Soglia andamento non valida: '+key+' ('+min+'–'+max+')','err');return null;}
         q.set(key,String(Number(v)*mult));

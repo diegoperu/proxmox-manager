@@ -11,13 +11,14 @@ type trendThresholds struct {
 	AbandonCPU    float64 `json:"abandon_cpu"`
 	AbandonNet    float64 `json:"abandon_net"`
 	AbandonMonths int     `json:"abandon_months"`
+	AbandonPeak   float64 `json:"abandon_peak"` // D122: an abandoned VM never peaks at or above this CPU %
 	OverMem       float64 `json:"over_mem"`
 	OverCPU       float64 `json:"over_cpu"`
 	Margin        float64 `json:"margin"`
 }
 
 func defaultTrendThresholds() trendThresholds {
-	return trendThresholds{AbandonCPU: 2, AbandonNet: 1024, AbandonMonths: 3, OverMem: 25, OverCPU: 10, Margin: 25}
+	return trendThresholds{AbandonCPU: 2, AbandonNet: 1024, AbandonMonths: 3, AbandonPeak: 10, OverMem: 25, OverCPU: 10, Margin: 25}
 }
 
 // Calendar arithmetic retains local midnight across DST and short months.
@@ -65,6 +66,7 @@ type trendRow struct {
 	State           string         `json:"state"`
 	OversizedMem    bool           `json:"oversized_mem"`
 	OversizedCPU    bool           `json:"oversized_cpu"`
+	PCI             bool           `json:"pci"` // D122: has a passthrough device (GPU): its CPU is never judged oversized
 	LastActiveMonth *string        `json:"last_active_month"`
 	Proposal        *trendProposal `json:"proposal"`
 	Months          []trendMonth   `json:"months"`
@@ -291,12 +293,17 @@ func classifyTrend(row *trendRow, th trendThresholds) {
 		row.State = "deleted"
 		return
 	}
+	if row.PCI {
+		cpuSmall = false // D122: on GPU VMs the work is on the card; cores feed it in bursts
+	}
 	window := len(row.Months) - th.AbandonMonths
 	off, abandoned := window >= 0, window >= 0
 	for i := max(0, window); i < len(row.Months); i++ {
 		m := row.Months[i]
 		off = off && !m.data
-		abandoned = abandoned && m.data && !active[i] && m.CPUAvg != nil && m.NetBytes != nil && m.netSeconds > 0
+		// D122: a VM that peaks (a controller woken by jobs, a periodic batch) is not abandoned.
+		abandoned = abandoned && m.data && !active[i] && m.CPUAvg != nil && m.NetBytes != nil && m.netSeconds > 0 &&
+			m.CPUMax != nil && *m.CPUMax < th.AbandonPeak
 	}
 	switch {
 	case off:

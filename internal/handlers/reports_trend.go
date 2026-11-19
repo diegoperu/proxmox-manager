@@ -34,6 +34,10 @@ func parseTrendThresholds(q func(string) string, p *reportParams) error {
 	if err != nil {
 		return err
 	}
+	p.Trend.AbandonPeak, err = floatParam(q("abandon_peak"), 10, 1, 90)
+	if err != nil {
+		return err
+	}
 	for _, f := range []struct {
 		name   string
 		dst    *float64
@@ -194,6 +198,7 @@ func buildTrendReport(c reportAPI, hist *history.Store, cluster string, p report
 		return rep, errors.New(errTooManyGuests)
 	}
 	insts := make([]string, len(guests))
+	pci := make([]bool, len(guests))
 	errs := make([]error, len(guests))
 	jobs := []func(){}
 	for i, g := range guests {
@@ -215,6 +220,11 @@ func buildTrendReport(c reportAPI, hist *history.Store, cluster string, p report
 					return
 				}
 				insts[i] = vmInstance(cfg)
+				for k := range cfg {
+					if hostpciKey.MatchString(k) {
+						pci[i] = true
+					}
+				}
 			}
 			if insts[i] == "" && hist != nil {
 				last, found, err := hist.VMUseLastBefore(cluster, g.VMID, g.Kind, p.To.AddDate(0, 0, 1).Format("2006-01-02"))
@@ -248,6 +258,7 @@ func buildTrendReport(c reportAPI, hist *history.Store, cluster string, p report
 			byInstance[key] = in
 		}
 		in.row = trendGuestRow(g)
+		in.row.PCI = pci[i]
 		g := g
 		in.current = &g
 	}
