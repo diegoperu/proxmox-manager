@@ -153,8 +153,10 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(`UPDATE inv_group SET cores_milli=cores*1000 WHERE cores_milli=0 AND cores<>0`); err != nil {
 		return err
 	}
-	_, err = s.db.Exec(`UPDATE inv_gpu SET cards_milli=cards*1000 WHERE cards_milli=0 AND cards<>0`)
-	return err
+	if _, err := s.db.Exec(`UPDATE inv_gpu SET cards_milli=cards*1000 WHERE cards_milli=0 AND cards<>0`); err != nil {
+		return err
+	}
+	return s.migrateGPUUse()
 }
 
 // addColumn adds a column if missing. table, col and ddl are constants of this package, never request data.

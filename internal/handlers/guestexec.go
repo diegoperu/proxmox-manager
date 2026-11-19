@@ -200,6 +200,9 @@ var diskScriptSrc string
 //go:embed guestscripts/dmesg.sh
 var dmesgScriptSrc string
 
+//go:embed guestscripts/gpuuse.sh
+var gpuUseScriptSrc string
+
 const guestHelperDir = "/usr/local/libexec/pmgr"
 
 // guestTool describes one script: helper file name and the embedded inline fallback.
@@ -212,6 +215,7 @@ var (
 	addUserTool = guestTool{name: "adduser.sh", inline: addUserScriptSrc}
 	diskTool    = guestTool{name: "disk.sh", inline: diskScriptSrc}
 	dmesgTool   = guestTool{name: "dmesg.sh", inline: dmesgScriptSrc}
+	gpuUseTool  = guestTool{name: "gpuuse.sh", inline: gpuUseScriptSrc}
 )
 
 func (t guestTool) helperPath() string { return guestHelperDir + "/" + t.name }

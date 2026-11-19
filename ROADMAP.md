@@ -30,7 +30,8 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 17 | **Rollout sulle VM esistenti: HOSTING** (firewall, fail2ban, hardening SSH, aggiornamenti, riavvii) | VM esposte a Internet messe in sicurezza | L | stessi strumenti, profilo hosting | **fatto in gran parte** (2026-11-12); restano 108 (in pausa), VM con sola password, porte pubblicate da Docker (D103), Ubuntu 20.04; report per i proprietari generato. Vedi il dettaglio sotto |
 | 18 | Installare il nuovo tooling dei template sul cluster HOSTING (oggi i vecchi script in `/root/cloud-images`) e ricreare i template | le VM nuove di HOSTING nascono gia' conformi (firewall 22/80/443, SSH a sola chiave, hardening) | M | `pmgr-calcolo-install.sh` (profilo hosting con `PROFILE=hosting`), password dei template | da fare |
 | 19 | `disk.sh`: controllare i comandi necessari e dire quale manca (oggi `parted` assente = exit 127) e aggiornare gli helper dei template Rocky | "Aggiungi disco" robusto sulle VM Debian esistenti (senza `parted`) | S | helper nei template | da fare |
-| 20 | **Manager multiutente con livelli** e **macchina dedicata con IP proprio** | login e ruoli al posto della VPN come unico controllo; sblocca D95/D96 | L | decisione sull'architettura | da discutere (idee) |
+| 20 | **Deploy non locale e manager multiutente con livelli** (macchina dedicata con IP proprio, login, ruoli diversi; richiesta ribadita dall'utente il 2026-11-19) | login e ruoli al posto della VPN come unico controllo; il manager non gira piu' sulla postazione; sblocca D95/D96 | L | decisione sull'architettura (Opus) | **prossimo**, da discutere |
+| 21 | **Report: uso medio per VM su 1-12 mesi a scelta** (richiesta utente 2026-11-19) | capire se una VM e' sovradimensionata o abbandonata guardando l'andamento mese per mese | M | Report v2 (RRD a 6 ore fino a ~90 giorni, poi settimanale), D32 | **prossimo**, da discutere |
 
 ## Dettaglio
 
@@ -124,3 +125,19 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 1. Cambia lo stato nella tabella e aggiungi una riga al registro modifiche di `CLAUDE.md`.
 2. Quando un lavoro parte, crea il branch e le domande in `DOMANDE.md`.
 3. A lavoro finito sposta la riga in "fatto" (o rimuovila) e tieni le decisioni in `CLAUDE.md`.
+
+### 20. Deploy non locale e manager multiutente con livelli
+- **Richiesta (ribadita 2026-11-19):** portare il manager fuori dalla postazione (macchina dedicata, IP proprio) con utenti a diversi livelli.
+- **Da discutere prima del codice (Opus):** autenticazione (account locali con argon2id, oppure SSO/LDAP di ateneo), ruoli (es. sola lettura, operatore VM, amministratore cluster) e quali azioni ciascuno puo' fare, sessioni e CSRF con login, audit log di chi fa cosa, TLS e certificato, dove stanno token Proxmox e segreti, rete (chi raggiunge la macchina), aggiornamento e backup del servizio, collector (fotografie, uso GPU) che girano lato server. Sblocca D95 (chi puo' sincronizzare gli snippet) e D96 (`from=` della chiave SSH).
+- **Rischi:** oggi la difesa e' solo la rete fidata + guardia `/api`; esporre il servizio senza login renderebbe raggiungibili scritture su VM e cluster.
+
+### 21. Report: uso medio per VM su 1-12 mesi
+- **Richiesta (2026-11-19):** report dell'uso medio di ogni VM su un periodo scelto da 1 a 12 mesi, per capire se e' sovradimensionata o abbandonata.
+- **Gia' esistente da cui partire:** il report tecnico "VM e container" (periodi 30 giorni / trimestre / semestre / 12 mesi / personalizzato, CPU e RAM medie e p95, segnalazioni D32 "inattiva" e "sovradimensionata").
+- **Cosa aggiungerebbe (da confermare):** scelta del periodo in mesi (1-12), andamento **mese per mese** per VM (media di CPU, RAM, rete, disco per ogni mese) per vedere quando una VM ha smesso di lavorare, ultimo mese con attivita', proposta di ridimensionamento (RAM/core suggeriti dal p95). Vincolo dell'RRD: oltre ~90 giorni solo dati settimanali, quindi niente p95 vero sui mesi vecchi.
+- **Da valutare (richiesta utente 2026-11-19): pro e contro di un salvataggio proprio dei dati di consumo**, finora escluso ("niente collector": lo storico viene dall'RRD di Proxmox; eccezioni solo D28 per l'inventario e ROADMAP 4 per le GPU).
+  - *Pro:* risoluzione fine anche sui mesi vecchi (p95 vero su 12 mesi, oggi impossibile oltre ~90 giorni); i dati delle VM cancellate restano (l'RRD sparisce con la VM); storico indipendente da Proxmox (reinstallazioni, migrazioni tra cluster, ROADMAP 15); aggregati gia' pronti (report piu' veloci, meno chiamate a Proxmox); stesso meccanismo del collector GPU gia' scritto.
+  - *Contro:* un servizio che deve girare sempre (oggi il manager sta sulla postazione: buchi nei dati quando e' spento, si risolve solo con la macchina dedicata della ROADMAP 20); crescita del database (stima da fare: ~110 VM x campioni x 12 mesi; con aggregati giornalieri e' piccola, con campioni a 5 minuti no); carico costante su Proxmox (una lettura RRD o di stato per VM a ogni giro); retention, backup e privacy da decidere (consumi per VM = attivita' dei gruppi); il giorno di attivazione e' il primo dato (nessuno storico all'indietro, a differenza dell'RRD).
+  - *Via di mezzo da considerare:* nessun campionamento proprio, ma ogni notte si salvano gli aggregati giornalieri per VM ricavati dall'RRD del giorno (risoluzione a 1 minuto disponibile per le ultime 24 ore): p95 giornaliero vero per sempre, poche righe, nessun carico continuo, buchi recuperabili finche' l'RRD ha il giorno.
+  - Decisione da prendere con una domanda in `DOMANDE.md` all'avvio del lavoro; il "niente collector" in `CLAUDE.md` va aggiornato solo dopo la risposta.
+

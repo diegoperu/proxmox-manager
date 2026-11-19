@@ -1107,3 +1107,79 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Suggerimento**: 60 s, entrambi i controlli, solo pagine di lettura.
 **Risposta utente**: (2026-11-19) 60 secondi; Impostazioni piu' scelta rapida nella barra; solo pagine di lettura. `cache_seconds`, letto ma mai usato, e' stato tolto (2026-11-19).
 
+## Monitoraggio delle GPU (ROADMAP 4, 2026-11-19)
+
+Contesto: le schede sono in passthrough (vfio), quindi l'host Proxmox non vede ne' utilizzo ne' memoria in uso: si leggono solo **dentro il guest** (`nvidia-smi`). Oggi l'app sa quale VM ha quale scheda (pagina GPU) ma non quanto la usa; D34 (2026-11-03) aveva rinviato la misura "a quando si aggiunge l'helper `nvidia-smi`". Fatti verificati: 20 VM con scheda raggiungibili (inventario del rollout), driver di tre tipi (DKMS, moduli precompilati legati al kernel, installer `.run`), 5-8 VM con job in corso nel momento dell'indagine, `guest-exec` gia' usato dal manager con helper o script inline. Nessuna decisione tecnica e' stata presa: le risposte qui sotto servono a fissare l'obiettivo prima dell'architettura e del threat model.
+
+### D107 — Che cosa si vuole ottenere
+**Stato**: RISPOSTA
+**Bloccante**: si
+**Domanda**: Il monitoraggio serve a (a) vedere lo stato **adesso** nella pagina GPU, (b) avere uno **storico** per i report (schede assegnate ma inutilizzate, utilizzo per gruppo), (c) ricevere **avvisi**?
+**Perche' conta**: (a) si fa leggendo a richiesta, senza salvare niente; (b) richiede un collector che campiona nel tempo e una nuova eccezione alla regola "niente collector" (come D28); (c) richiede anche una soglia e un posto dove mostrarli.
+**Opzioni**: A) solo adesso; B) adesso + storico per i report; C) adesso + storico + avvisi.
+**Suggerimento**: B: l'avviso si aggiunge dopo, sullo stesso storico; il solo "adesso" non risponde a "assegnate ma inutilizzate".
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D108 — Cosa si misura (e cosa no)
+**Stato**: RISPOSTA
+**Bloccante**: si
+**Domanda**: Quali grandezze si leggono per scheda: utilizzo %, memoria usata/totale, temperatura, potenza? E i **processi** in esecuzione (nome del comando di chi usa la GPU) si leggono o si escludono?
+**Perche' conta**: i nomi dei processi rivelano il lavoro dei ricercatori (privacy, dati di altri gruppi visibili a chiunque raggiunga l'app, che non ha login) e allungano l'output letto da un guest non fidato.
+**Opzioni**: A) utilizzo e memoria; B) A + temperatura e potenza; C) B + processi.
+**Suggerimento**: B, senza processi: bastano a distinguere "ferma", "in uso" e "satura/surriscaldata".
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D109 — Frequenza e durata dello storico
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Ogni quanto si campiona (solo VM accese con scheda, circa 22) e quanto si conserva?
+**Perche' conta**: ogni lettura e' un `guest-exec` per VM (2-3 chiamate a Proxmox e qualche secondo di agent); una frequenza alta carica agent e cluster, una bassa perde i picchi. Lo storico va deciso come D28: cosa si salva (per gruppo / per VMID / per modello di scheda) e per quanto.
+**Opzioni**: A) ogni 5 minuti, aggregati giornalieri (media, picco, minuti oltre soglia) tenuti 13 mesi; B) ogni minuto, stesso aggregato; C) ogni 15 minuti.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D110 — Chi vede cosa
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Nei report il manageriale mostra solo aggregati e gruppi (D30), il tecnico tutto. Vale anche per l'uso delle GPU: utilizzo per VM (nome) solo nel tecnico, per gruppo nel manageriale?
+**Perche' conta**: "il gruppo X usa la GPU al 3%" e' un giudizio su una persona o un laboratorio; va deciso a chi lo si mostra.
+**Opzioni**: A) come D30 (VM nel tecnico, gruppi nel manageriale); B) solo gruppi ovunque; C) tutto visibile ovunque.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D111 — Quando una scheda e' "inutilizzata"
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Quale regola? Proposta: VM **accesa**, scheda con utilizzo medio < 5% **e** memoria usata < 5% della totale per almeno 14 giorni. Va tenuto separato il caso "scheda assegnata a una VM **spenta**", che si legge gia' da Proxmox senza `nvidia-smi` e si puo' mostrare subito.
+**Perche' conta**: una soglia sbagliata etichetta come "sprecata" una scheda usata a raffiche (addestramento notturno); senza driver installato `nvidia-smi` non c'e' e non e' lo stesso di "scheda ferma".
+**Opzioni**: A) la regola proposta, con stati distinti (in uso, ferma, VM spenta, driver assente); B) soglie diverse; C) solo "VM spenta" per ora.
+**Suggerimento**: A, con le soglie modificabili come per D32.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D112 — Installazione nei guest
+**Stato**: RISPOSTA
+**Bloccante**: si
+**Domanda**: Come arriva la lettura nei guest? Su Debian/Ubuntu il manager puo' eseguire lo script **inline** (nessun file da installare); sulle Rocky con SELinux serve l'helper etichettato come gli altri. Si accetta di installare l'helper sulle VM con scheda esistenti (con il tuo via, VM per VM, mai su quelle con job in corso) e negli snippet dei template?
+**Perche' conta**: toccare VM di produzione con GPU e' il punto piu' delicato (D99: job in corso, driver legati al kernel); l'helper e' un file in piu' e non riavvia niente, ma gira non confinato.
+**Opzioni**: A) inline dove basta, helper solo dove serve (Rocky), rollout dopo il tuo via; B) helper ovunque; C) niente helper: lettura solo dove l'inline funziona.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D113 — Soglia di "scheda al lavoro" per i minuti di uso (assunzione provvisoria)
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Per contare i minuti di uso al giorno si considera "al lavoro" un campione con utilizzo >= 10% oppure memoria usata >= 10% della totale?
+**Perche' conta**: e' il numero che distingue un uso a raffiche da una scheda ferma; il 5% di D111 e' una media su 14 giorni, questa e' la soglia del singolo campione.
+**Opzioni**: A) 10% utilizzo o memoria; B) solo utilizzo >= 10%; C) un'altra soglia.
+**Suggerimento**: A (un modello caricato e fermo occupa memoria: e' "riservata", non "ferma").
+**Risposta utente**: (vuoto) — assunzione provvisoria: A, modificabile come le soglie D32. **Superata in parte da D114 (2026-11-19):** la memoria non rende piu' un campione "al lavoro".
+
+### D114 — La memoria occupata conta come "al lavoro"?
+**Stato**: RISPOSTA
+**Bloccante**: no (decide cosa si accende)
+**Domanda**: Nella prova reale (VM 202) ollama tiene il modello in memoria dopo la generazione: utilizzo 0%, memoria al 38%. Con D113 quel campione e' "al lavoro" e con D111 la scheda non sara' mai "inutilizzata" finche' un servizio tiene un modello caricato, anche se nessuno lo usa da settimane (caso tipico dei server di inferenza dimenticati). Si cambia?
+**Perche' conta**: decide se il report trova davvero le schede abbandonate o solo quelle con il driver scarico.
+**Opzioni**: A) "al lavoro" e "inutilizzata" guardano solo l'utilizzo; la memoria resta mostrata e, se occupata con utilizzo basso, la scheda e' segnalata "riservata" (modello caricato, nessun calcolo); B) lasciare D111/D113 come sono (memoria = in uso); C) soglie diverse.
+**Suggerimento**: A: e' l'utilizzo che dice se qualcuno lavora; la memoria occupata senza calcolo e' proprio il segnale di una scheda tenuta ferma.
+**Risposta utente**: (2026-11-19) "sono d'accordo con te": opzione A. Sostituisce la parte "memoria" di D113: un campione e' "al lavoro" solo con utilizzo >= 10%; memoria >= 10% con utilizzo sotto = "riservata".
+

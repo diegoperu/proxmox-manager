@@ -42,6 +42,8 @@ func main() {
 	defer hist.Close()
 	h.SetHistory(hist)
 	handlers.StartSnapshots(context.Background(), hist)
+	// GPU usage sampling (ROADMAP 4): runs only when config gpu_usage is true.
+	handlers.StartGPUUse(context.Background(), hist)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -122,6 +124,7 @@ func main() {
 		r.Get("/top", h.GetTopVMs)
 		r.Get("/ceph/summary", h.GetCephSummary())
 		r.Get("/gpus", h.GetGPUs())
+		r.Get("/gpu-usage", h.GetGPUUsage)
 		r.Get("/reports/{model}", h.GetReport)
 		r.Get("/provision/advice", h.GetProvisionAdvice)
 		r.Put("/gpu-models", h.PutGPUModel)
