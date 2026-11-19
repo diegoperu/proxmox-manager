@@ -332,6 +332,13 @@ td.spk{width:130px}
 .rp-br i{height:3.2mm;background:var(--soft);border-radius:2mm;overflow:hidden;display:block}.rp-br u{display:block;height:100%;background:var(--navy);border-radius:2mm}
 .rp-need{width:100%;border-collapse:collapse}.rp-need td{padding:3mm 2mm;border-bottom:1px solid var(--line);vertical-align:baseline}.rp-need td:first-child{font-weight:600;width:38mm}
 .rp-eff{margin:1mm 0 2mm}.rp-rule{font-size:8.5pt;color:var(--ink3)}
+.rp-resource-page{font-size:9pt;line-height:1.3}.rp-resource-page h2{font-size:15pt;margin-bottom:3mm}
+.rp-resource-page .rp-two>div+div{margin-top:5mm}.rp-land .rp-resource-page .rp-two>div+div{margin-top:0}
+.rp-resource-page .rp-h3{margin:3mm 0 1.5mm}.rp-resource-page .rp-need td{padding:1.5mm 2mm}
+.rp-resource-page .rp-rule{font-size:8pt}.rp-gpu-use{width:100%;border-collapse:collapse;font-size:8pt;line-height:1.2;margin-top:2mm;table-layout:fixed}
+.rp-gpu-use th,.rp-gpu-use td{padding:.8mm 1.5mm;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}
+.rp-gpu-use th{text-align:left;font-size:8pt;letter-spacing:0;text-transform:none}.rp-gpu-use .n{text-align:right}
+.rp-gpu-use th:first-child{width:40%}.rp-gpu-use th:nth-child(2){width:14%}
 .rp-meth{position:absolute;bottom:18mm;left:18mm;right:18mm;font-size:8.5pt;color:var(--ink3);border-top:1px solid var(--line);padding-top:3mm}.rp-land .rp-meth{bottom:16mm}
 .rp-page footer{position:absolute;left:18mm;right:18mm;bottom:8mm;display:flex;justify-content:space-between;font-size:8pt;color:var(--ink3)}
 .rp-techdoc .rp-page{height:auto;min-height:210mm;box-shadow:none}
@@ -871,7 +878,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.182.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.183.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1357,6 +1364,14 @@ html.spiderman{
           <label>RAM p95 sovradim.<input class="inp" id="th-omem" inputmode="decimal" placeholder="0.25"></label>
           <label>CPU p95 sovradim.<input class="inp" id="th-ocpu" inputmode="decimal" placeholder="0.10"></label>
           <label>Giorni minimi (sovradim.)<input class="inp" id="th-odays" inputmode="decimal" placeholder="14"></label>
+        </div>
+      </details>
+      <details class="rp-thr" id="rp-gpu-thr" hidden>
+        <summary>Soglie per GPU «inutilizzate» (valide solo per questo report; vuoto = predefinita)</summary>
+        <div class="rp-thr-g">
+          <label>Utilizzo medio sotto (%)<input class="inp" id="th-gutil" inputmode="decimal" placeholder="5"></label>
+          <label>Memoria media sotto (%)<input class="inp" id="th-gmem" inputmode="decimal" placeholder="5"></label>
+          <label>Giorni consecutivi<input class="inp" id="th-gdays" inputmode="numeric" placeholder="14"></label>
         </div>
       </details>
       <div id="rp-status"></div>
@@ -5310,6 +5325,8 @@ const RPT_MODELS=[
   {id:'reliability',kind:'tech',label:'Affidabilità',sub:'task falliti e backup'},
 ];
 const RPT_PRESETS=[{id:'30',label:'30 giorni',days:30},{id:'91',label:'Trimestre',days:91},{id:'182',label:'Semestre',days:182},{id:'365',label:'12 mesi',days:365},{id:'custom',label:'Personalizzato',days:0}];
+const RPT_GPU_DEFAULTS={idle_util:5,idle_mem:5,idle_days:14};
+const RPT_GPU_STATES={in_use:'Al lavoro',idle:'Inutilizzata',vm_off:'VM spenta',no_driver:'Driver assente',driver_error:'Driver in errore',insufficient:'Dati insufficienti'};
 const RPT_TXT={
   it:{loc:'it-IT',title:'Rapporto sul servizio',sub:'Infrastruttura cloud IaaS per la ricerca',gen:'Generato il',s1:'In sintesi',
     lvl:{ok:'Servizio in buona salute',warn:'Servizio stabile, alcuni indicatori da tenere sotto controllo',bad:'Servizio in difficoltà: servono interventi'},
@@ -5329,6 +5346,9 @@ const RPT_TXT={
     effLine:(e)=>`${e.inactive} macchine virtuali risultano inattive e ${e.oversized} sovradimensionate: liberarle recupererebbe fino a ${e.mem} di memoria e ${e.cores} processori.`,
     effRule:'Inattiva: accesa ma con CPU media sotto il 2% e rete sotto 1 KB/s per almeno 7 giorni. Sovradimensionata: memoria usata (95° percentile) sotto il 25% di quella assegnata, oppure CPU (95° percentile) sotto il 10%, per almeno 14 giorni.',
     effNone:'Il dato di efficienza non è disponibile per questo periodo.',
+    gpuUse:(d,t)=>`Schede GPU: ${d.gpu_idle} inutilizzate e ${d.gpu_vm_off} assegnate a VM spente negli ultimi ${t.idle_days} giorni (utilizzo medio < ${t.idle_util}% e memoria < ${t.idle_mem}%). Dati insufficienti: ${d.gpu_insufficient}.`,
+    gpuUseNone:'Dati sull’uso delle GPU non ancora disponibili',gpuUseTitle:'Uso delle GPU per gruppo',
+    gpuUseCols:['Gruppo','Schede','Utilizzo medio','Ore al lavoro'],gpuNoGroup:'senza gruppo',gpuOthers:'Altri gruppi',
     inv:(d)=>`Lo storico dell'inventario (numero di VM, gruppi, GPU) è disponibile dal ${d}: le variazioni nel tempo si completeranno col passare dei mesi.`,
     rule:(d)=>`Dal ${d} i gruppi di ricerca sono quelli indicati nell'inventario del servizio; prima erano dedotti dal nome delle macchine: il confronto tra gruppi a cavallo di quella data è indicativo.`,
     method:'Fonti: statistiche di Proxmox VE e fotografia giornaliera dell\'inventario. Previsioni lineari sulle medie settimanali. Nessun dato personale.',
@@ -5351,6 +5371,9 @@ const RPT_TXT={
     effLine:(e)=>`${e.inactive} virtual machines are idle and ${e.oversized} are oversized: releasing them would recover up to ${e.mem} of memory and ${e.cores} processors.`,
     effRule:'Idle: running with average CPU below 2% and network below 1 KB/s for at least 7 days. Oversized: memory used (95th percentile) below 25% of the assigned amount, or CPU (95th percentile) below 10%, for at least 14 days.',
     effNone:'Efficiency data is not available for this period.',
+    gpuUse:(d,t)=>`GPU cards: ${d.gpu_idle} idle and ${d.gpu_vm_off} assigned to powered-off VMs over the last ${t.idle_days} days (average utilisation < ${t.idle_util}% and memory < ${t.idle_mem}%). Insufficient data: ${d.gpu_insufficient}.`,
+    gpuUseNone:'GPU usage data not yet available',gpuUseTitle:'GPU usage by group',
+    gpuUseCols:['Group','Cards','Average utilisation','Hours at work'],gpuNoGroup:'without group',gpuOthers:'Other groups',
     inv:(d)=>`Inventory history (number of VMs, groups, GPUs) is available since ${d}: changes over time will fill in as months go by.`,
     rule:(d)=>`From ${d} research groups come from the service inventory; before that they were inferred from machine names: comparing groups across that date is indicative only.`,
     method:'Sources: Proxmox VE statistics and the daily inventory snapshot. Linear forecasts on weekly averages. No personal data.',
@@ -5406,7 +5429,7 @@ function rptBytes(v,loc){
   return v.toLocaleString(loc||'it-IT',{minimumFractionDigits:i?1:0,maximumFractionDigits:i?1:0})+' '+u[i];
 }
 const Reports={
-  model:'service', preset:'365', orient:'portrait', data:null, eff:null, seq:0, sort:{k:null,dir:1}, flag:'', busy:false,
+  model:'service', preset:'365', orient:'portrait', data:null, eff:null, seq:0, sort:{k:null,dir:1}, usageSort:{k:null,dir:1}, flag:'', busy:false,
   fmtNum(v,dec,loc){return v==null?'—':Number(v).toLocaleString(loc||'it-IT',{minimumFractionDigits:dec||0,maximumFractionDigits:dec==null?0:dec});},
   pct(v){return v==null?'—':Reports.fmtNum(v,1)+'%';},
   isManager(){return Reports.model==='service';},
@@ -5429,7 +5452,7 @@ const Reports={
     document.getElementById('rp-from').disabled=document.getElementById('rp-to').disabled=id!=='custom';
   },
   pickModel(id){
-    Reports.model=id; Reports.data=null; Reports.eff=null; Reports.sort={k:null,dir:1}; Reports.flag='';
+    Reports.model=id; Reports.data=null; Reports.eff=null; Reports.sort={k:null,dir:1}; Reports.usageSort={k:null,dir:1}; Reports.flag='';
     Reports.buildModels(); Reports.syncControls(); Reports.clear();
   },
   syncControls(){
@@ -5437,6 +5460,7 @@ const Reports={
     document.getElementById('rp-filters').hidden=mgr;
     document.getElementById('rp-vmfilters').hidden=!vms;
     document.getElementById('rp-thr').hidden=!vms;
+    document.getElementById('rp-gpu-thr').hidden=Reports.model!=='gpu';
     document.getElementById('rp-orient').hidden=!mgr;
     document.getElementById('rp-xl').hidden=mgr; document.getElementById('rp-csv').hidden=mgr;
     document.getElementById('rp-pdf').hidden=false;
@@ -5456,10 +5480,15 @@ const Reports={
     if(!Reports.isManager()){
       const node=val('rp-node'),type=val('rp-type'),grp=val('rp-group').toLowerCase(),txt=val('rp-q');
       if(node)q.set('nodes',node);
-      if(type&&type!=='all')q.set('type',type);
+      if(Reports.model==='vms'&&type&&type!=='all')q.set('type',type);
       if(grp){if(!/^[a-z0-9]{1,32}$/.test(grp)){toast('Il gruppo è formato da lettere minuscole e cifre','err');return null;}q.set('group',grp);}
       if(txt)q.set('q',txt);
       if(Reports.model==='vms')for(const [id,k] of [['th-icpu','inactive_cpu'],['th-inet','inactive_net'],['th-idays','inactive_days'],['th-omem','oversized_mem'],['th-ocpu','oversized_cpu'],['th-odays','oversized_days']]){const v=val(id);if(v!==''){if(!/^\d+(\.\d+)?$/.test(v)){toast('Soglia non valida','err');return null;}q.set(k,v);}}
+      if(Reports.model==='gpu')for(const [id,k,min,max] of [['th-gutil','idle_util',0,50],['th-gmem','idle_mem',0,50],['th-gdays','idle_days',7,60]]){
+        const v=val(id);if(v==='')continue;
+        if(!/^\d+(\.\d+)?$/.test(v)||Number(v)<min||Number(v)>max||(k==='idle_days'&&!/^\d+$/.test(v))){toast(k==='idle_days'?'Giorni GPU: intero da 7 a 60':'Soglia GPU: percentuale da 0 a 50','err');return null;}
+        q.set(k,v);
+      }
     }
     return q;
   },
@@ -5493,8 +5522,16 @@ const Reports={
   // ── tecnici ──
   kpi(label,val,sub,cls){return`<div class="kcell"><div class="kl">${esc(label)}</div><div class="kv ${cls||''}">${val}</div><div class="ks">${sub||''}</div></div>`;},
   notes(d){return(d.meta&&d.meta.notes&&d.meta.notes.length)?`<p class="cnote" style="margin-top:12px">${d.meta.notes.map(n=>esc(n==='inventory_since'?"Lo storico dell'inventario parte dal giorno di attivazione della fotografia giornaliera.":n==='group_rule_changed'?`Dal ${d.inventory&&d.inventory.group_rule_change?dateFmt(d.inventory.group_rule_change):'—'} i gruppi sono presi dai tag di Proxmox; prima dal nome della VM: il confronto tra gruppi a cavallo di quella data non e' esatto.`:n)).join('<br>')}</p>`:'';},
-  cols(){
+  cols(usage=false){
     const n=(v,d)=>Reports.fmtNum(v,d), p=v=>Reports.pct(v), mb=v=>v==null?'—':rptBytes(v);
+    if(usage)return[
+      {k:'vm',l:'VM',get:r=>r.name?`${r.vmid} · ${r.name}`:String(r.vmid)},
+      {k:'group',l:'Gruppo',get:r=>r.group==='altro'?'senza gruppo':r.group},{k:'model',l:'Modello'},
+      {k:'state',l:'Stato d’uso',get:r=>RPT_GPU_STATES[r.state]||'Dati insufficienti',chip:r=>r.state==='idle'},
+      // Senza campioni validi (VM spenta, driver assente) i numeri non esistono: "—", mai 0%.
+      {k:'util_avg',l:'Utilizzo medio %',num:1,get:r=>r.valid?r.util_avg:null,fmt:p},{k:'util_p95_day',l:'p95 del giorno peggiore %',num:1,get:r=>r.valid?r.util_p95_day:null,fmt:p},
+      {k:'util_max',l:'Picco %',num:1,get:r=>r.valid?r.util_max:null,fmt:p},{k:'mem_avg',l:'Memoria media %',num:1,get:r=>r.valid?r.mem_avg:null,fmt:p},{k:'mem_max',l:'Memoria massima %',num:1,get:r=>r.valid?r.mem_max:null,fmt:p},
+      {k:'busy_hours',l:'Ore al lavoro',num:1,fmt:v=>n(v,1)},{k:'coverage',l:'Copertura %',num:1,get:r=>r.coverage*100,fmt:p},{k:'days',l:'Giorni',num:1}];
     const C={
       nodes:[
         {k:'node',l:'Nodo'},{k:'online',l:'Stato',get:r=>r.online?'Operativo':'Non risponde'},
@@ -5521,16 +5558,17 @@ const Reports={
     };
     return C[Reports.model];
   },
-  rows(){
+  rows(usage=false){
     const d=Reports.data; if(!d)return[];
+    if(usage){const rows=d.usage&&d.usage.rows||[];return Reports.flag?rows.filter(r=>r.state===Reports.flag):rows;}
     let rows=Reports.model==='gpu'?d.models:Reports.model==='reliability'?d.by_type:d.rows;
     rows=rows||[];
     if(Reports.model==='vms'&&Reports.flag)rows=rows.filter(r=>r.flag===Reports.flag);
     return rows;
   },
   val(col,r){return col.get?col.get(r):r[col.k];},
-  sortBy(k){const s=Reports.sort;s.dir=s.k===k?-s.dir:1;s.k=k;Reports.paintTable();},
-  setFlag(f){Reports.flag=f;Reports.paintTable();},
+  sortBy(k,usage=false){const s=usage?Reports.usageSort:Reports.sort;s.dir=s.k===k?-s.dir:1;s.k=k;Reports.paintTable(usage);},
+  setFlag(f){Reports.flag=f;Reports.paintTech();},
   paintTech(){
     const d=Reports.data, m=Reports.model, K=Reports.kpi;
     let k='';
@@ -5538,31 +5576,35 @@ const Reports={
     if(m==='vms')k=K('VM nel report',d.totals.vms,d.totals.running+' accese')+K('Inattive',d.totals.inactive,'libererebbero '+rptBytes(d.totals.reclaimable_mem_bytes)+' · '+d.totals.reclaimable_cores+' core',d.totals.inactive?'w':'')+K('Sovradimensionate',d.totals.oversized,'RAM p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedMem*100)+'% o CPU p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedCPU*100)+'%',d.totals.oversized?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     if(m==='storage'){const ceph=(d.rows||[]).filter(r=>r.type==='rbd');k=K('Storage',d.rows.length,ceph.length+' Ceph')+K('Più pieno',Reports.pct(Math.max(0,...d.rows.map(r=>r.used_pct))),'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));}
     if(m==='gpu')k=K('Schede',d.total,'')+K('Assegnate',d.assigned,d.total-d.assigned+' libere',d.total&&d.assigned>=d.total?'w':'')+K('Da correggere',d.problems,'conflitti e incoerenze',d.problems?'w':'')+K('Tutte assegnate dal',d.full_since?esc(d.full_since):'—','storico dal '+esc(d.snapshot_from||'—'));
+    if(m==='gpu'&&d.usage){const u=d.usage, known=u.known;k+=K('Inutilizzate',known?Reports.fmtNum(u.idle_count):'—','schede',known&&u.idle_count?'w':'')+K('Assegnate a VM spente',known?Reports.fmtNum(u.vm_off_count):'—','schede',known&&u.vm_off_count?'w':'')+K('Dati insufficienti',known?Reports.fmtNum(u.insufficient_count):'—','schede',known&&u.insufficient_count?'w':'');}
     if(m==='reliability')k=K('Operazioni',Reports.fmtNum(d.totals.tasks),'copertura '+Reports.fmtNum(d.coverage_days,0)+' giorni')+K('Fallite',Reports.fmtNum(d.totals.failed),Reports.fmtNum(d.totals.fail_pct,1)+'%',d.totals.fail_pct>=5?'w':'')+K('Backup',Reports.fmtNum(d.totals.backups),Reports.fmtNum(d.totals.backups_failed)+' falliti',d.totals.backups_failed?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     document.getElementById('rp-kpis').innerHTML=k;
     let extra='';
     if(m==='vms')extra=`<div class="seg" role="group" aria-label="Filtra per segnalazione" style="margin-bottom:10px">${[['','Tutte'],['inactive','Inattive'],['oversized','Sovradimensionate']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${l}</button>`).join('')}</div>`;
     if(m==='gpu'&&d.by_group&&Object.keys(d.by_group).length)extra=`<p class="cnote" style="margin-bottom:10px">Per gruppo: ${Object.entries(d.by_group).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
     if(m==='reliability'&&d.failed_by_node&&Object.keys(d.failed_by_node).length)extra=`<p class="cnote" style="margin-bottom:10px">Fallite per nodo: ${Object.entries(d.failed_by_node).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
-    document.getElementById('rp-body').innerHTML=`${extra}<div class="panel"><div class="tw" id="rp-tbl"></div></div><p class="cnote" style="margin-top:8px">Report tecnico — uso interno.</p>${Reports.notes(d)}`;
+    const gpuUsage=m!=='gpu'?'':d.usage&&d.usage.known?`<section style="margin-top:20px"><h3>Uso delle schede</h3><div class="seg" role="group" aria-label="Filtra per uso delle GPU" style="margin:10px 0">${[['','Tutte'],['idle','Inutilizzate'],['vm_off','VM spente']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${esc(l)}</button>`).join('')}</div><div class="panel"><div class="tw" id="rp-gpu-use-tbl"></div></div></section>`:`<p class="cnote" style="margin-top:12px">Nessun dato sull'uso delle GPU nel periodo: il monitoraggio raccoglie un campione ogni 5 minuti da quando e' attivo (gpu_usage in config.json).</p>`;
+    document.getElementById('rp-body').innerHTML=`${extra}<div class="panel"><div class="tw" id="rp-tbl"></div></div>${gpuUsage}<p class="cnote" style="margin-top:8px">Report tecnico — uso interno.</p>${Reports.notes(d)}`;
     Reports.paintTable();
+    if(m==='gpu'&&d.usage&&d.usage.known)Reports.paintTable(true);
   },
-  paintTable(){
-    const cols=Reports.cols(); if(!cols)return;
-    let rows=[...Reports.rows()];
-    const s=Reports.sort, sc=cols.find(c=>c.k===s.k);
+  paintTable(usage=false){
+    const cols=Reports.cols(usage); if(!cols)return;
+    let rows=[...Reports.rows(usage)];
+    const s=usage?Reports.usageSort:Reports.sort, sc=cols.find(c=>c.k===s.k);
     if(sc)rows.sort((a,b)=>{const x=Reports.val(sc,a),y=Reports.val(sc,b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return-1;return(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),undefined,{numeric:true}))*s.dir;});
-    const head=cols.map(c=>`<th${c.num?' class="n"':''}${c.noexp?'':` aria-sort="${s.k===c.k?(s.dir>0?'ascending':'descending'):'none'}"`}>${c.noexp?esc(c.l):`<button type="button" class="thb${s.k===c.k?' on '+(s.dir>0?'asc':'desc'):''}" onclick="Reports.sortBy(${js(c.k)})">${esc(c.l)}</button>`}</th>`).join('');
+    const head=cols.map(c=>`<th${c.num?' class="n"':''}${c.noexp?'':` aria-sort="${s.k===c.k?(s.dir>0?'ascending':'descending'):'none'}"`}>${c.noexp?esc(c.l):`<button type="button" class="thb${s.k===c.k?' on '+(s.dir>0?'asc':'desc'):''}" onclick="Reports.sortBy(${js(c.k)},${usage})">${esc(c.l)}</button>`}</th>`).join('');
     const body=rows.map(r=>`<tr>${cols.map(c=>{
       if(c.spark)return`<td class="spk">${rptSpark(r[c.k],120,24)}</td>`;
       const v=Reports.val(c,r), t=c.fmt?c.fmt(v,r):(v==null||v===''?'—':typeof v==='number'?Reports.fmtNum(v,v%1?1:0):String(v));
       if(c.flag)return`<td>${v?`<span class="chip">${esc(v)}</span>`:''}</td>`;
+      if(c.chip&&c.chip(r))return`<td><span class="chip">${esc(t)}</span></td>`;
       return`<td${c.num?' class="n"':''}>${esc(t)}</td>`;}).join('')}</tr>`).join('');
-    document.getElementById('rp-tbl').innerHTML=`<table><thead><tr>${head}</tr></thead><tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Nessun dato con questi filtri</td></tr>`}</tbody></table>`;
+    document.getElementById(usage?'rp-gpu-use-tbl':'rp-tbl').innerHTML=`<table><thead><tr>${head}</tr></thead><tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Nessun dato con questi filtri</td></tr>`}</tbody></table>`;
   },
-  exportData(){
-    const cols=(Reports.cols()||[]).filter(c=>!c.noexp&&!c.spark);
-    const rows=Reports.rows().map(r=>cols.map(c=>{const v=Reports.val(c,r);return v==null?'':v;}));
+  exportData(usage=false){
+    const cols=(Reports.cols(usage)||[]).filter(c=>!c.noexp&&!c.spark);
+    const rows=Reports.rows(usage).map(r=>cols.map(c=>{const v=Reports.val(c,r);return v==null?'':v;}));
     return{header:cols.map(c=>c.l),rows};
   },
   fileName(ext){const q=Reports.data&&Reports.data.meta;return`report-${Reports.model}-${q?q.from+'_'+q.to:rptIso(new Date())}.${ext}`;},
@@ -5570,14 +5612,17 @@ const Reports={
   csv(){
     if(!Reports.data||Reports.isManager()){toast('Genera prima un report tecnico','info');return;}
     const{header,rows}=Reports.exportData();
-    Reports.download(new Blob(['﻿'+rptCsv([header,...rows])],{type:'text/csv;charset=utf-8'}),Reports.fileName('csv'));
+    const tables=[header,...rows];
+    if(Reports.model==='gpu'&&Reports.data.usage&&Reports.data.usage.known){const u=Reports.exportData(true);tables.push([],['Uso delle schede'],u.header,...u.rows);}
+    Reports.download(new Blob(['﻿'+rptCsv(tables)],{type:'text/csv;charset=utf-8'}),Reports.fileName('csv'));
   },
   async xlsx(){
     if(!Reports.data||Reports.isManager()){toast('Genera prima un report tecnico','info');return;}
     try{await lib('xlsx');}catch(e){toast('Libreria Excel non caricata: '+e.message,'err');return;}
     const{header,rows}=Reports.exportData();
-    const ws=XLSX.utils.aoa_to_sheet([header,...rows]); // SheetJS scrive le stringhe come stringhe (mai come formule); il CSV invece e' neutralizzato
+    const ws=XLSX.utils.aoa_to_sheet([header,...rows].map(r=>r.map(rptSafeCell))); // SheetJS scrive le stringhe come stringhe (mai come formule); anche qui si neutralizzano le formule come nel CSV
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Report');
+    if(Reports.model==='gpu'&&Reports.data.usage&&Reports.data.usage.known){const u=Reports.exportData(true);XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([u.header,...u.rows].map(r=>r.map(rptSafeCell))),'Uso delle schede');}
     XLSX.writeFile(wb,Reports.fileName('xlsx'));
   },
   print(){
@@ -5599,7 +5644,8 @@ const Reports={
   // Stampa di un report tecnico: la tabella cosi' com'e', su A4 orizzontale, con intestazione "uso interno".
   printTech(){
     const tbl=document.getElementById('rp-tbl'), d=Reports.data, m=RPT_MODELS.find(x=>x.id===Reports.model);
-    document.getElementById('rpt-print').innerHTML=`<div class="rp-doc rp-land rp-techdoc"><section class="rp-page"><h2>${esc(RPT_ID.name)} — ${esc(m.label)}</h2><p class="rp-lead">${esc(d.meta.cluster)} · ${esc(d.meta.from)} → ${esc(d.meta.to)} · uso interno</p>${tbl.innerHTML}</section></div>`;
+    const usage=document.getElementById('rp-gpu-use-tbl');
+    document.getElementById('rpt-print').innerHTML=`<div class="rp-doc rp-land rp-techdoc"><section class="rp-page"><h2>${esc(RPT_ID.name)} — ${esc(m.label)}</h2><p class="rp-lead">${esc(d.meta.cluster)} · ${esc(d.meta.from)} → ${esc(d.meta.to)} · uso interno</p>${tbl.innerHTML}${usage?`<h3 class="rp-h3">Uso delle schede</h3>${usage.innerHTML}`:''}</section></div>`;
     Reports.orient='landscape'; Reports.doPrint();
   },
 
@@ -5651,12 +5697,13 @@ const Reports={
       need(T.c.cpu,`${N(d.stats.cpu.avg,0)}% ${T.avgSub}`)].join('');
     const e=eff&&eff.totals?{inactive:eff.totals.inactive,oversized:eff.totals.oversized,mem:B(eff.totals.reclaimable_mem_bytes),cores:N(eff.totals.reclaimable_cores)}:null;
     const effHTML=e?`<p class="rp-eff">${esc(T.effLine(e))}</p><p class="rp-rule">${esc(T.effRule)}</p>`:`<p class="rp-rule">${esc(T.effNone)}</p>`;
+    const gpuUseHTML=d.gpu_use_known?`<p class="rp-rule">${esc(T.gpuUse(d,RPT_GPU_DEFAULTS))}</p><h3 class="rp-h3">${esc(T.gpuUseTitle)}</h3><table class="rp-gpu-use"><thead><tr>${T.gpuUseCols.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>${(d.gpu_use_by_group||[]).map(g=>`<tr><td>${esc(g.others?T.gpuOthers:g.group==='altro'?T.gpuNoGroup:g.group)}</td><td class="n">${esc(N(g.cards))}</td><td class="n">${esc(N(g.util_avg,1))}%</td><td class="n">${esc(N(g.busy_hours,1))}</td></tr>`).join('')}</tbody></table>`:`<p class="rp-rule">${esc(T.gpuUseNone)}</p>`;
     const notes=[d.meta.notes.includes('inventory_since')&&inv.first_day?T.inv(dateFmt(inv.first_day)):'',d.meta.notes.includes('group_rule_changed')&&inv.group_rule_change?T.rule(dateFmt(inv.group_rule_change)):'',T.method].filter(Boolean).join(' ');
     return`
 <section class="rp-page rp-cover"><span class="rp-lang">${esc(T.lang)}</span><img src="${esc(RPT_ID.logo)}" class="rp-logo" alt="${esc(RPT_ID.name)}"><div class="rp-ct"><h1>${esc(T.title)}</h1><p class="rp-per">${esc(per.from)} – ${esc(per.to)}</p><p>${esc(T.sub)}<br>${esc(RPT_ID.org)}</p></div><div class="rp-cf">${esc(T.gen)} ${esc(new Date().toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'}))} · ${esc(RPT_ID.mail)}</div></section>
 <section class="rp-page"><h2>${esc(T.s1)}</h2><div class="rp-sum"><div><div class="rp-cond"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${d.condition.level}">${Dashboard.ICONS[d.condition.level==='ok'?'ok':d.condition.level==='bad'?'bad':'warn']}</svg><div><h3>${esc(T.lvl[d.condition.level])}</h3><p>${esc(T.intro(per,k))} ${esc(condP)}</p></div></div></div><div class="rp-kg">${tiles}</div></div>${foot(2)}</section>
 <section class="rp-page"><h2>${esc(T.s2)}</h2><p class="rp-lead">${esc(T.s2p)}</p><div class="rp-cg">${cards}</div>${foot(3)}</section>
-<section class="rp-page"><div class="rp-two"><div><h2>${esc(T.s3)}</h2><p class="rp-lead">${esc(T.s3p(d.group_count))}</p><div class="rp-bars">${bars}</div></div><div><h2>${esc(T.s4)}</h2><table class="rp-need">${needs}</table><h3 class="rp-h3">${esc(T.eff)}</h3>${effHTML}</div></div><p class="rp-meth">${esc(notes)}</p>${foot(4)}</section>`;
+<section class="rp-page rp-resource-page"><div class="rp-two"><div><h2>${esc(T.s3)}</h2><p class="rp-lead">${esc(T.s3p(d.group_count))}</p><div class="rp-bars">${bars}</div></div><div><h2>${esc(T.s4)}</h2><table class="rp-need">${needs}</table><h3 class="rp-h3">${esc(T.eff)}</h3>${effHTML}${gpuUseHTML}</div></div><p class="rp-meth">${esc(notes)}</p>${foot(4)}</section>`;
   },
 };
 

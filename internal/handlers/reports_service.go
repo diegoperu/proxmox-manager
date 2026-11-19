@@ -90,10 +90,15 @@ type serviceReport struct {
 		RuleChange string `json:"group_rule_change"`
 		GroupRule  string `json:"group_rule"`
 	} `json:"inventory"`
-	TopGroups    []groupUse `json:"top_groups"`
-	GroupCount   int        `json:"group_count"`
-	GPUFullSince string     `json:"gpu_full_since"`
-	Tasks        struct {
+	TopGroups       []groupUse      `json:"top_groups"`
+	GroupCount      int             `json:"group_count"`
+	GPUFullSince    string          `json:"gpu_full_since"`
+	GPUUseKnown     bool            `json:"gpu_use_known"`
+	GPUIdle         int             `json:"gpu_idle"`
+	GPUVMOff        int             `json:"gpu_vm_off"`
+	GPUInsufficient int             `json:"gpu_insufficient"`
+	GPUUseByGroup   []gpuGroupUsage `json:"gpu_use_by_group"`
+	Tasks           struct {
 		Total         int     `json:"total"`
 		Failed        int     `json:"failed"`
 		FailPct       float64 `json:"fail_pct"`
@@ -145,6 +150,13 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 	if err != nil {
 		return rep, err
 	}
+	usage, err := loadGPUUsage(hist, cluster, pp)
+	if err != nil {
+		return rep, err
+	}
+	rep.GPUUseKnown = usage.Known
+	rep.GPUIdle, rep.GPUVMOff, rep.GPUInsufficient = usage.IdleCount, usage.VMOffCount, usage.InsufficientCount
+	rep.GPUUseByGroup = gpuUsageGroups(usage.Rows)
 	rep.KPI.Nodes = len(res.Nodes)
 
 	// capacity: node RRD aggregated over the online nodes

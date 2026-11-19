@@ -55,6 +55,7 @@ type reportParams struct {
 	Group    string          // "" = all
 	Query    string
 	TH       VMThresholds
+	GPUIdle  gpuIdleThresholds
 }
 
 func (p reportParams) days() float64 { return p.To.Sub(p.From).Hours() / 24 }
@@ -65,7 +66,7 @@ func (p reportParams) key() string {
 		nodes = append(nodes, n)
 	}
 	sort.Strings(nodes)
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%+v", p.From.Format("2006-01-02"), p.To.Format("2006-01-02"), strings.Join(nodes, ","), p.Kind, p.Group, p.Query, p.TH)
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%+v|%+v", p.From.Format("2006-01-02"), p.To.Format("2006-01-02"), strings.Join(nodes, ","), p.Kind, p.Group, p.Query, p.TH, p.GPUIdle)
 }
 
 func floatParam(v string, def, lo, hi float64) (float64, error) {
@@ -81,7 +82,7 @@ func floatParam(v string, def, lo, hi float64) (float64, error) {
 
 // parseReportParams validates every query parameter against a whitelist.
 func parseReportParams(q func(string) string, now time.Time) (reportParams, error) {
-	p := reportParams{Kind: "all", TH: defaultVMThresholds()}
+	p := reportParams{Kind: "all", TH: defaultVMThresholds(), GPUIdle: defaultGPUIdleThresholds()}
 	loc := now.Location()
 	to := now
 	if s := q("to"); s != "" {
@@ -153,6 +154,23 @@ func parseReportParams(q func(string) string, now time.Time) (reportParams, erro
 			return p, fmt.Errorf("%s: %w", f.name, err)
 		}
 		*f.dst = v
+	}
+	for _, f := range []struct {
+		name string
+		dst  *float64
+	}{{"idle_util", &p.GPUIdle.Util}, {"idle_mem", &p.GPUIdle.Mem}} {
+		v, err := floatParam(q(f.name), *f.dst, 0, 50)
+		if err != nil {
+			return p, fmt.Errorf("%s: %w", f.name, err)
+		}
+		*f.dst = v
+	}
+	if s := q("idle_days"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 7 || n > 60 {
+			return p, errors.New("idle_days: soglia non valida (7-60 giorni interi)")
+		}
+		p.GPUIdle.Days = n
 	}
 	return p, nil
 }
@@ -823,6 +841,7 @@ type gpuReport struct {
 	Days         []gpuDay           `json:"days"`
 	FullSince    string             `json:"full_since"` // first day of the current streak with every card assigned
 	SnapshotFrom string             `json:"snapshot_from"`
+	Usage        gpuUsageReport     `json:"usage"`
 }
 type gpuDay struct {
 	Day      string `json:"day"`
@@ -857,6 +876,34 @@ func buildGPUReport(c reportAPI, hist *history.Store, cluster string, p reportPa
 		return gpuReport{}, err
 	}
 	rep := gpuReport{Meta: metaFor(cluster, p, now), ByGroup: map[string]float64{}, Models: []gpuModelRow{}, Days: []gpuDay{}, Problems: len(inv.Problems)}
+	usage, err := loadGPUUsage(hist, cluster, p)
+	if err != nil {
+		return rep, err
+	}
+	var names []struct {
+		VMID int    `json:"vmid"`
+		Name string `json:"name"`
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(rawRes, &names); err != nil {
+		return rep, err
+	}
+	byName := make(map[int]string)
+	for _, vm := range names {
+		if vm.Type == "qemu" {
+			byName[vm.VMID] = clampText(vm.Name, 64)
+		}
+	}
+	// Filter historical usage by its last assignment; deleted VMs keep their VMID and an empty name.
+	rep.Usage.Rows = []gpuUsageRow{}
+	for _, row := range usage.Rows {
+		row.Name = byName[row.VMID]
+		if p.Kind == "lxc" || (p.Query != "" && !strings.Contains(strings.ToLower(row.Name), p.Query)) {
+			continue
+		}
+		rep.Usage.add(row)
+	}
+	rep.Usage.Known = len(rep.Usage.Rows) > 0
 	type k struct{ node, model string }
 	agg := map[k]*gpuModelRow{}
 	for _, n := range inv.Nodes {
