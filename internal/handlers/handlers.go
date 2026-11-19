@@ -116,8 +116,9 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	// Pointers: a missing field leaves the saved value untouched, an empty string resets it to the default.
 	var body struct {
-		Theme   *string `json:"theme"`
-		Density *string `json:"density"`
+		Theme          *string `json:"theme"`
+		Density        *string `json:"density"`
+		RefreshSeconds *int    `json:"refresh_seconds"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
 		writeError(w, errors.New("richiesta non valida"), 400)
@@ -131,7 +132,14 @@ func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("densita non valida"), 400)
 		return
 	}
+	if body.RefreshSeconds != nil && !config.ValidRefresh(*body.RefreshSeconds) {
+		writeError(w, errors.New("intervallo non valido"), 400)
+		return
+	}
 	cfg := config.Get()
+	if body.RefreshSeconds != nil {
+		cfg.RefreshSeconds = *body.RefreshSeconds
+	}
 	if body.Theme != nil {
 		cfg.Theme = *body.Theme
 	}

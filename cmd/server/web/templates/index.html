@@ -818,7 +818,8 @@ html.spiderman{
   </nav>
   <button type="button" class="pal-btn" id="pal-btn" onclick="Palette.open()" aria-haspopup="dialog" aria-label="Cerca VM, nodi, pagine e azioni"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Cerca…</span><kbd id="pal-kbd">Ctrl K</kbd></button>
   <div class="conn" role="status"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
-  <button class="btn bg2 sm" onclick="App.refresh()" aria-label="Aggiorna i dati"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg><span class="rl-lbl">Aggiorna</span></button>
+  <select id="refresh-sel" aria-label="Aggiornamento automatico" onchange="AutoRefreshUI.save(this.value)"><option value="0">Auto: spento</option><option value="15">Auto: 15 s</option><option value="30">Auto: 30 s</option><option value="60">Auto: 1 min</option><option value="120">Auto: 2 min</option><option value="300">Auto: 5 min</option></select>
+  <button id="refresh-btn" class="btn bg2 sm" onclick="App.refresh()" aria-label="Aggiorna i dati"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg><span class="rl-lbl">Aggiorna</span></button>
 </header>
 
 <!-- MENU LATERALE -->
@@ -865,7 +866,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.177.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.176.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1392,6 +1393,7 @@ html.spiderman{
             <div style="margin-top:16px"><button class="btn ba" onclick="Settings.saveAppearance()">Salva aspetto</button></div>
           </div>
         </div>
+        <div class="panel"><div class="panel-h"><h2>Aggiornamento automatico</h2></div><div class="panel-b"><label for="refresh-settings">Aggiornamento automatico</label> <select id="refresh-settings" onchange="AutoRefreshUI.save(this.value)"><option value="0">Auto: spento</option><option value="15">Auto: 15 s</option><option value="30">Auto: 30 s</option><option value="60">Auto: 1 min</option><option value="120">Auto: 2 min</option><option value="300">Auto: 5 min</option></select></div></div>
         <div class="panel">
           <div class="panel-h"><h2>Informazioni</h2></div>
           <div class="panel-b">
@@ -1922,7 +1924,15 @@ function dropVmCache(node,vmid){const frag=`/nodes/${node}/qemu/${vmid}/`;for(co
 // Sortable table helper
 function mkSorter(tbodyId, headId){
   let key='', asc=true;
+  const cmp=(a,b)=>{
+    let va=a[key],vb=b[key];
+    if(typeof va==='string') va=va.toLowerCase();
+    if(typeof vb==='string') vb=vb.toLowerCase();
+    return(va<vb?-1:va>vb?1:0)*(asc?1:-1);
+  };
   return {
+    // Rimette l'ordine scelto senza invertirlo: dopo un filtro o un aggiornamento la tabella resta come l'utente l'ha ordinata.
+    apply(data){return key?[...data].sort(cmp):[...data];},
     sort(data, k){
       if(k===key) asc=!asc; else {key=k;asc=true;}
       // update header classes
@@ -1975,6 +1985,7 @@ const ClusterMgr={
     Nodes.clearCache&&Nodes.clearCache();
     Batch.clearCache&&Batch.clearCache();
     App.refresh();
+    AutoRefreshUI.reset();
   },
   async renderList(){
     await this.load();
@@ -2104,11 +2115,52 @@ const Route={
   }
 };
 window.addEventListener('popstate',()=>Route.apply());
+// pmgr:autorefresh:begin
+const AutoRefresh={
+  PAGES:['dashboard','nodes','vms','cluster','gpu','groups'],
+  CHOICES:[0,15,30,60,120,300],
+  shouldRun({page,hidden,modalOpen,busy,typing,blocked,now,busySince}){
+    return this.PAGES.includes(page)&&!hidden&&!modalOpen&&!typing&&!blocked&&(!busy||now-busySince>=120000);
+  }
+};
+// pmgr:autorefresh:end
+const AutoRefreshUI={
+  seconds:60, timer:null, busy:false, busySince:0, last:0, configured:false, started:false, generation:0, saving:false,
+  configure(value){
+    if(this.configured)return;
+    this.seconds=AutoRefresh.CHOICES.includes(value)?value:60; this.configured=true; this.sync();
+  },
+  sync(){for(const id of ['refresh-sel','refresh-settings']){const el=document.getElementById(id);el.value=String(this.seconds);el.disabled=this.saving;}},
+  async save(value){
+    const n=Number(value); if(this.saving||!AutoRefresh.CHOICES.includes(n)){this.sync();return;}
+    this.saving=true;this.sync();
+    try{await api('/config',{method:'POST',body:JSON.stringify({refresh_seconds:n}),quiet:true});this.seconds=n;this.reset();}
+    catch(e){toast(e.message,'err');}
+    finally{this.saving=false;this.sync();}
+  },
+  init(){this.started=true;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});this.reset();},
+  mark(){this.last=Date.now();const b=document.getElementById('refresh-btn');const t='Ultimo aggiornamento '+new Date(this.last).toLocaleTimeString('it-IT');b.title=t;},
+  reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
+  state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
+  canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
+  async tick(){
+    clearTimeout(this.timer);this.timer=null;
+    if(!this.started||!this.seconds)return;
+    const generation=this.generation, page=App.cur;
+    this.timer=setTimeout(()=>this.tick(),this.seconds*1000);
+    if(AutoRefresh.shouldRun(this.state())){
+      this.busy=true;this.busySince=Date.now();const token=this.busySince;
+      try{await ({dashboard:()=>Dashboard.load(true),nodes:()=>Nodes.load(true),vms:()=>VMs.load(true),cluster:()=>Cluster.load(true),gpu:()=>Gpu.load(true),groups:()=>Groups.load(false,true)})[page]();if(generation===this.generation&&this.canApply(page))this.mark();}
+      catch(e){console.error('Aggiornamento automatico non riuscito');}
+      finally{if(this.busySince===token)this.busy=false;}
+    }
+  }
+};
 const App={
   cur:'dashboard',
   init(){
     document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
-    ClusterMgr.load().then(()=>{Settings.load();Route.apply();App.checkConn();setInterval(App.checkConn,30000);});
+    ClusterMgr.load().then(async()=>{await Settings.load();Route.apply();AutoRefreshUI.init();App.checkConn();setInterval(App.checkConn,30000);});
   },
   nav(p,opts={}){
     document.querySelectorAll('.ni').forEach(el=>{const on=el.dataset.page===p;el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
@@ -2117,6 +2169,7 @@ const App={
     if(p!=='ceph')Ceph.stop();
     App.cur=p; if(!opts.silent)Route.push('#/'+p);
     App.refresh();
+    AutoRefreshUI.reset();
   },
   // Briciole: il cluster compare solo se c'è un solo cluster (con più cluster lo mostra già il selettore).
   crumb(){
@@ -2125,6 +2178,7 @@ const App={
     document.getElementById('crumb-sep').style.display=one&&ClusterMgr.currentLabel()?'':'none';
   },
   refresh(){
+    AutoRefreshUI.mark();
     App.crumb();
     const p=App.cur;
     if(p==='dashboard') Dashboard.load();
@@ -2835,13 +2889,14 @@ const Gpu={
   },
   async probe(){if(Gpu.availBy[ClusterMgr.current]===undefined)await Gpu.fetch();Gpu.syncNav();},
 
-  async load(){
+  async load(silent=false){
+    const generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
     const seq=++Gpu.seq, body=document.getElementById('gpu-body');
-    if(!Gpu.by[ClusterMgr.current]){document.getElementById('gpu-cond').innerHTML='';body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura delle schede (la prima volta richiede qualche secondo)…</div>';}
+    if(!silent&&!Gpu.by[ClusterMgr.current]){document.getElementById('gpu-cond').innerHTML='';body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura delle schede (la prima volta richiede qualche secondo)…</div>';}
     let d;
     try{d=await api('/gpus',{quiet:true,timeoutMs:30000});}
-    catch(e){if(seq===Gpu.seq&&!Gpu.by[ClusterMgr.current])body.innerHTML=errBox(e.message,'Gpu.load()');return;}
-    if(seq!==Gpu.seq)return;
+    catch(e){if(!silent&&seq===Gpu.seq&&!Gpu.by[ClusterMgr.current])body.innerHTML=errBox(e.message,'Gpu.load()');return;}
+    if(seq!==Gpu.seq||(silent&&!AutoRefreshUI.canApply('gpu',generation,cluster)))return;
     Gpu.note(d,ClusterMgr.current); Gpu.paint();
   },
 
@@ -2925,7 +2980,7 @@ const Gpu={
     try{
       await api('/gpu-models',{method:'PUT',body:JSON.stringify({model:ctx.model,name,memory_gb:gb}),quiet:true});
       Gpu.busy=false; closeModal('mgm'); toast(reset?'Valori predefiniti ripristinati':'Modello aggiornato','ok'); _tc.clear();
-      Gpu.load(true);
+      Gpu.load();
     }catch(e){Gpu.busy=false;msg.textContent=e.message;}
   },
 
@@ -3085,14 +3140,15 @@ const Groups={
   text(v){const dr=Groups.draft[Groups.key(v)];return dr&&dr.text!=null?dr.text:(v.source==='tag'?v.groups.join(' '):(v.proposal||''));},
   ticked(v){const dr=Groups.draft[Groups.key(v)];return!!(dr&&dr.on);},
 
-  async load(force){
+  async load(force,silent=false){
+    const generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
     const seq=++Groups.seq, body=document.getElementById('grp-body');
     if(!Groups.d)body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura dei gruppi…</div>';
     if(force)_tc.clear();
     let d;
     try{d=await api('/groups',{quiet:true,timeoutMs:30000});}
     catch(e){if(seq===Groups.seq&&!Groups.d)body.innerHTML=errBox(e.message,'Groups.load()');return;}
-    if(seq!==Groups.seq)return;
+    if(seq!==Groups.seq||(silent&&!AutoRefreshUI.canApply('groups',generation,cluster)))return;
     Groups.d=d; Groups.fill(); Groups.paint();
   },
   setView(v){
@@ -3568,13 +3624,13 @@ const Dashboard={
   topHours:6, _topSeq:0,
   _seq:0,                                    // scarta le risposte di un caricamento superato da uno più recente
 
-  async load(){
-    const seq=++Dashboard._seq;
+  async load(silent=false){
+    const seq=++Dashboard._seq, generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
     const cephP=Ceph.summary();
     let d;
     try{d=await api('/dashboard',{quiet:true});}
     catch(e){
-      if(seq!==Dashboard._seq)return;
+      if(seq!==Dashboard._seq||silent)return;
       document.getElementById('dash-cond').innerHTML='';
       document.getElementById('dash-nodes').innerHTML='';
       document.getElementById('dash-kpis').innerHTML=`<div style="grid-column:1/-1">${errBox(e.message+' — verifica il cluster in Impostazioni','Dashboard.load()')}</div>`;
@@ -3583,19 +3639,23 @@ const Dashboard={
       return;
     }
     if(seq!==Dashboard._seq)return;
+    if(silent&&!AutoRefreshUI.canApply('dashboard',generation,cluster))return;
     const res=d.resources||[];
     const vms=res.filter(r=>(r.type==='qemu'||r.type==='lxc'));
     const nodes=res.filter(r=>r.type==='node').sort((a,b)=>String(a.node).localeCompare(String(b.node),undefined,{numeric:true,sensitivity:'base'}));
     const live=vms.filter(v=>!isTemplate(v));
     // Prima passata con i soli dati istantanei, poi si completa con RRD e task senza bloccare la tabella.
     const stats=Dashboard.nodeStats(nodes,live);
-    Dashboard._last={stats,tasks:[]};
-    Dashboard.paintCondition(stats,[]);
-    Gpu.fetch().then(()=>{if(seq===Dashboard._seq)Dashboard.paintGpu();});
-    Dashboard.paintKpis(stats,live,null,null);
-    Dashboard.paintGpuKpi();
-    Dashboard.paintNodes(stats);
-    Dashboard.loadTop();
+    // Aggiornamento silenzioso: niente prima passata incompleta (la frase di condizione e i KPI lampeggerebbero a ogni giro).
+    if(!silent){
+      Dashboard._last={stats,tasks:[]};
+      Dashboard.paintCondition(stats,[]);
+      Gpu.fetch().then(()=>{if(seq===Dashboard._seq)Dashboard.paintGpu();});
+      Dashboard.paintKpis(stats,live,null,null);
+      Dashboard.paintGpuKpi();
+      Dashboard.paintNodes(stats);
+    }
+    Dashboard.loadTop(silent);
     const [metrics,tasks]=await Promise.all([
       api('/metrics?timeframe=day',{quiet:true}).catch(()=>null),
       api('/tasks',{quiet:true}).catch(()=>null),
@@ -3603,6 +3663,7 @@ const Dashboard={
       cephP,
     ]);
     if(seq!==Dashboard._seq)return;
+    if(silent&&!AutoRefreshUI.canApply('dashboard',generation,cluster))return;
     const list=Array.isArray(tasks)?tasks:null;
     Dashboard._last={stats,tasks:list||[]};
     Dashboard.paintCondition(stats,list||[]);
@@ -3812,13 +3873,13 @@ const Dashboard={
     document.querySelectorAll('#top-win button').forEach(b=>{const on=+b.dataset.h===h;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
     Dashboard.loadTop();
   },
-  async loadTop(){
+  async loadTop(silent=false){
     const seq=++Dashboard._topSeq, host=document.getElementById('dash-top'), h=Dashboard.topHours;
     document.getElementById('top-sub').textContent=`per lavoro svolto nelle ultime ${h} ore`;
     if(!host.querySelector('table'))host.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Calcolo della classifica…</div>';
     let d;
     try{d=await api(`/top?hours=${h}`,{quiet:true});}
-    catch(e){if(seq===Dashboard._topSeq)host.innerHTML=errBox(e.message,'Dashboard.loadTop()');return;}
+    catch(e){if(seq===Dashboard._topSeq&&!silent)host.innerHTML=errBox(e.message,'Dashboard.loadTop()');return;}
     if(seq!==Dashboard._topSeq)return;
     Dashboard.paintTop(d);
   },
@@ -3912,17 +3973,20 @@ const NodeVMs=(()=>{
 const Nodes={
   data:[], sel:null, pending:null,
   clearCache(){this.data=[];const s=document.getElementById('nfsel');if(s)s.innerHTML='<option value="">Tutti i nodi</option>';},
-  async load(){
+  async load(silent=false){
+    const generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
     let nodes;
     try{nodes=await api('/nodes',{quiet:true});}
-    catch(e){document.getElementById('ngrid').innerHTML=errBox(e.message,'Nodes.load()');return;}
+    catch(e){if(!silent)document.getElementById('ngrid').innerHTML=errBox(e.message,'Nodes.load()');return;}
+    if(silent&&!AutoRefreshUI.canApply('nodes',generation,cluster))return;
     if(!Array.isArray(nodes))return;
     nodes.sort((a,b)=>a.node.localeCompare(b.node,undefined,{numeric:true,sensitivity:'base'}));
     Nodes.data=nodes;
     const sel=document.getElementById('nfsel');
     const ex=[...sel.options].map(o=>o.value);
     for(const n of nodes) if(!ex.includes(n.node)) sel.add(new Option(n.node,n.node));
-    Nodes.renderGrid(nodes);
+    const filter=sel.value;
+    Nodes.renderGrid(filter?nodes.filter(n=>n.node===filter):nodes);
     if(Nodes.pending){const n=Nodes.pending;Nodes.pending=null;if(nodes.some(x=>x.node===n))Nodes.selNode(n);}
   },
   filter(){const v=document.getElementById('nfsel').value;Nodes.renderGrid(v?Nodes.data.filter(n=>n.node===v):Nodes.data);if(v)Nodes.selNode(v);},
@@ -4088,7 +4152,7 @@ const VMs=(()=>{
       if(search&&!String(v.vmid).includes(search)&&!(v.name||'').toLowerCase().includes(search)&&!(v.ip||'').includes(search)&&!(v.grp&&v.grp.groups.some(g=>g.includes(search)))&&!(hasGpu(v)&&v.gpus.some(g=>String(g&&g.name||'').toLowerCase().includes(search))))return false;
       return true;
     });
-    sortedData=[...filtered];
+    sortedData=S.apply(filtered);
     renderRows(sortedData);
     const run=filtered.filter(v=>v.status==='running').length, gpuN=filtered.filter(v=>Array.isArray(v.gpus)&&v.gpus.length).length;
     document.getElementById('vm-sum').textContent=`${filtered.length} ${filtered.length===1?'risorsa':'risorse'} · ${run} in esecuzione · ${filtered.length-run} ${filtered.length-run===1?'ferma':'ferme'}`+(gpuN?` · ${gpuN} con GPU`:'');
@@ -4213,10 +4277,14 @@ const VMs=(()=>{
       Batch.preselect(vms.map(keyOf),{action,tpl:vms.some(isTemplate)});
       App.nav('batch');
     },
-    async load(){
+    async load(silent=false){
+      const generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
       let data;
       try{data=await api('/vms',{quiet:true});}
-      catch(e){document.getElementById('vmtbody').innerHTML=errRow(12,e.message,'VMs.load()');return;}
+      catch(e){if(!silent)document.getElementById('vmtbody').innerHTML=errRow(12,e.message,'VMs.load()');return;}
+      if(silent&&!AutoRefreshUI.canApply('vms',generation,cluster))return;
+      // Aggiornamento silenzioso: le informazioni lette a parte (gruppo, sistema, IP dall'agent, disco) restano finche' non arrivano quelle nuove.
+      const prev=silent?new Map(all.map(v=>[keyOf(v),v])):new Map();
       all=[];
       if(Array.isArray(data)){
         for(const nd of data){
@@ -4224,7 +4292,13 @@ const VMs=(()=>{
           for(const v of (nd.lxcs||[])) all.push({...v,type:'lxc',node:nd.node});
         }
       }
-      for(const v of all){v.os=osFromType(v.ostype);v.osSrc='cfg';}
+      for(const v of all){
+        v.os=osFromType(v.ostype);v.osSrc='cfg';
+        const o=prev.get(keyOf(v));
+        if(!o)continue;
+        for(const f of ['grp','group','os','osSrc','osid','diskPct'])if(o[f]!==undefined)v[f]=o[f];
+        if(!v.ip&&o.ipSrc==='agent'&&o.ip){v.ip=o.ip;v.ipSrc='agent';}
+      }
       picked=new Set([...picked].filter(k=>all.some(v=>keyOf(v)===k)));
       // initialize node selection with all nodes
       const ns=allNodes();
@@ -5065,10 +5139,12 @@ const Batch=(()=>{
 // ════════════════════════════════════════════════════════════════════════════
 const Cluster={
   nodes:[], sel:new Set(),
-  async load(){
+  async load(silent=false){
+    const generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
     let ns;
     try{ns=await api('/nodes',{quiet:true});}
-    catch(e){document.getElementById('cnlist').innerHTML=errBox(e.message,'Cluster.load()');return;}
+    catch(e){if(!silent)document.getElementById('cnlist').innerHTML=errBox(e.message,'Cluster.load()');return;}
+    if(silent&&!AutoRefreshUI.canApply('cluster',generation,cluster))return;
     Cluster.nodes=(Array.isArray(ns)?ns:[]).sort((a,b)=>a.node.localeCompare(b.node,undefined,{numeric:true,sensitivity:'base'}));
     Cluster.render();
   },
@@ -5575,6 +5651,7 @@ const Settings={
     document.getElementById('ctheme').value=t;
     document.getElementById('cdensity').value=d;
     applyTheme(t); applyDensity(d); Settings.syncAppearance();
+    AutoRefreshUI.configure(cfg.refresh_seconds);
   },
   applyTheme(t){applyTheme(t);},
   applyDensity(d){applyDensity(d);},

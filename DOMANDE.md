@@ -1098,3 +1098,12 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Suggerimento**: A, perche' l'utente ha chiesto "esporta quelle accese" e l'utente SSH e' una scelta sua.
 **Risposta utente**: (2026-11-19) "Va bene cosi', procedi" sulla proposta A. Riaprire se serve `ansible_user`, IPv6 o i filtri.
 
+### D106 — Aggiornamento automatico dei dati
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Intervallo predefinito, dove si regola e quali pagine si aggiornano da sole?
+**Perche' conta**: la pagina VM costa oltre 100 chiamate a Proxmox (6 s a freddo su CALCOLO); un intervallo troppo corto carica il cluster, uno troppo lungo mostra dati vecchi. Le pagine con moduli o piani da confermare non vanno ricaricate mentre si lavora.
+**Opzioni**: default 60 s / 30 s / 5 min / spento; selettore in barra + Impostazioni / solo uno dei due; pagine di sola lettura / tutte / solo panoramica e VM.
+**Suggerimento**: 60 s, entrambi i controlli, solo pagine di lettura.
+**Risposta utente**: (2026-11-19) 60 secondi; Impostazioni piu' scelta rapida nella barra; solo pagine di lettura. Resta aperto: `cache_seconds` in `config.json` e' letto ma non usato (da togliere o collegare).
+

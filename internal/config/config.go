@@ -21,12 +21,13 @@ type ClusterConfig struct {
 }
 
 type Config struct {
-	Clusters     []ClusterConfig `json:"clusters"`
-	Theme        string          `json:"theme"`
-	Density      string          `json:"density"`
-	CacheSeconds int             `json:"cache_seconds"`
-	DBPath       string          `json:"db_path"`
-	ListenAddr   string          `json:"listen_addr"`
+	Clusters       []ClusterConfig `json:"clusters"`
+	Theme          string          `json:"theme"`
+	Density        string          `json:"density"`
+	RefreshSeconds int             `json:"refresh_seconds"`
+	CacheSeconds   int             `json:"cache_seconds"`
+	DBPath         string          `json:"db_path"`
+	ListenAddr     string          `json:"listen_addr"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
 	AllowedHosts []string `json:"allowed_hosts"`
 	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
@@ -66,15 +67,25 @@ func ValidTheme(t string) bool { return t == "" || themes[t] }
 // ValidDensity reports whether d is "" or a known density.
 func ValidDensity(d string) bool { return d == "" || densities[d] }
 
+// ValidRefresh reports whether the automatic refresh interval is allowed.
+func ValidRefresh(n int) bool {
+	switch n {
+	case 0, 15, 30, 60, 120, 300:
+		return true
+	}
+	return false
+}
+
 var cfgPath = "config.json" // a variable only so that tests can point it to a temporary directory
 
 func Load() error {
 	mu.Lock()
 	defer mu.Unlock()
 	current = Config{
-		CacheSeconds: 30,
-		DBPath:       "proxmox.db",
-		ListenAddr:   ":8080",
+		CacheSeconds:   30,
+		RefreshSeconds: 60,
+		DBPath:         "proxmox.db",
+		ListenAddr:     ":8080",
 	}
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -98,6 +109,11 @@ func Load() error {
 		}
 		if v, ok := raw["theme"]; ok {
 			json.Unmarshal(v, &current.Theme)
+		}
+		if v, ok := raw["refresh_seconds"]; ok {
+			if err := json.Unmarshal(v, &current.RefreshSeconds); err != nil {
+				return err
+			}
 		}
 		if v, ok := raw["cache_seconds"]; ok {
 			json.Unmarshal(v, &current.CacheSeconds)
