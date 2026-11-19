@@ -32,12 +32,12 @@ const base={page:'nodes',hidden:false,modalOpen:false,busy:false,typing:false,no
 for(const page of AutoRefresh.PAGES) assert(AutoRefresh.shouldRun({...base,page}));
 assert.deepEqual([...AutoRefresh.PAGES].sort(),['cluster','dashboard','gpu','groups','nodes','vms']);
 for(const page of ['provision','batch','balance','settings','ceph','reports','other']) assert(!AutoRefresh.shouldRun({...base,page}));
-for(const field of ['hidden','modalOpen','typing','blocked']) assert(!AutoRefresh.shouldRun({...base,[field]:true}));
+for(const field of ['hidden','modalOpen','typing','blocked','unsaved']) assert(!AutoRefresh.shouldRun({...base,[field]:true}));
 assert(!AutoRefresh.shouldRun({...base,busy:true}));
 assert(AutoRefresh.shouldRun({...base,busy:true,busySince:80000}));
-for(const hidden of [false,true]) for(const modalOpen of [false,true]) for(const typing of [false,true]) for(const blocked of [false,true]) for(const busy of [false,true]) for(const expired of [false,true]) {
- const state={...base,hidden,modalOpen,typing,blocked,busy,busySince:expired?80000:100000};
- assert.equal(AutoRefresh.shouldRun(state),!hidden&&!modalOpen&&!typing&&!blocked&&(!busy||expired));
+for(const hidden of [false,true]) for(const modalOpen of [false,true]) for(const typing of [false,true]) for(const blocked of [false,true]) for(const unsaved of [false,true]) for(const busy of [false,true]) for(const expired of [false,true]) {
+ const state={...base,hidden,modalOpen,typing,blocked,unsaved,busy,busySince:expired?80000:100000};
+ assert.equal(AutoRefresh.shouldRun(state),!hidden&&!modalOpen&&!typing&&!blocked&&!unsaved&&(!busy||expired));
 }
 assert.deepEqual(AutoRefresh.CHOICES,[0,15,30,60,120,300]);
 `

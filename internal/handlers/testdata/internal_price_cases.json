@@ -1,0 +1,25 @@
+{
+  "prices": {
+    "token_eur": 2.5, "gpu_token_eur": 15,
+    "base_tokens": 1, "base_cores": 16, "base_mem_gib": 32, "base_ssd_gb": 100,
+    "cores_block_tokens": 1, "mem_block_tokens": 2, "ssd_block_tokens": 0.5, "hdd_block_tokens": 0.25,
+    "gpu_tiers": [{"min_gib": 0, "tokens": 1}, {"min_gib": 24, "tokens": 3}, {"min_gib": 80, "tokens": 10}, {"min_gib": 89, "tokens": 11}]
+  },
+  "cases": [
+    {"name": "base VM", "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100}, "vm_tokens": 1, "gpu_tokens": 0, "tokens": 1, "eur": 2.5, "gpu_eur": 0},
+    {"name": "bigger VM", "guest": {"cores": 32, "mem_gib": 128, "ssd_gb": 500}, "vm_tokens": 10, "gpu_tokens": 0, "tokens": 10, "eur": 25, "gpu_eur": 0},
+    {"name": "VM with 80 GB GPU", "guest": {"cores": 32, "mem_gib": 128, "ssd_gb": 500, "gpu_memory_gib": [80]}, "vm_tokens": 10, "gpu_tokens": 10, "tokens": 20, "eur": 175, "gpu_eur": 150},
+    {"name": "96 GiB GPU above 89 GiB tier", "guest": {"cores": 32, "mem_gib": 128, "ssd_gb": 500, "gpu_memory_gib": [96]}, "vm_tokens": 10, "gpu_tokens": 11, "tokens": 21, "eur": 190, "gpu_eur": 165},
+    {"name": "incomplete settings", "prices": {"token_eur": 0}, "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100}, "vm_tokens": 1, "gpu_tokens": 0, "tokens": 1, "eur": null, "gpu_eur": 0},
+    {"name": "each partial block rounds up", "guest": {"cores": 17, "mem_gib": 32.5, "ssd_gb": 100.5, "hdd_gb": 1000.5}, "vm_tokens": 5, "gpu_tokens": 0, "tokens": 5, "eur": 12.5, "gpu_eur": 0},
+    {"name": "explicit block sizes", "prices": {"cores_block": 4, "mem_block_gib": 16, "ssd_block_gb": 50, "hdd_block_gb": 500}, "guest": {"cores": 21, "mem_gib": 49, "ssd_gb": 151, "hdd_gb": 501}, "vm_tokens": 8.5, "gpu_tokens": 0, "tokens": 8.5, "eur": 21.25, "gpu_eur": 0},
+    {"name": "GPU exactly at inclusive tier", "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [89]}, "vm_tokens": 1, "gpu_tokens": 11, "tokens": 12, "eur": 167.5, "gpu_eur": 165},
+    {"name": "multiple GPUs", "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [24, 96]}, "vm_tokens": 1, "gpu_tokens": 14, "tokens": 15, "eur": 212.5, "gpu_eur": 210},
+    {"name": "missing GPU token value", "prices": {"gpu_token_eur": 0}, "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [80]}, "vm_tokens": 1, "gpu_tokens": null, "tokens": null, "eur": null, "gpu_eur": null},
+    {"name": "missing GPU tiers", "prices": {"gpu_tiers": []}, "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [80]}, "vm_tokens": 1, "gpu_tokens": null, "tokens": null, "eur": null, "gpu_eur": null},
+    {"name": "no matching GPU tier", "prices": {"gpu_tiers": [{"min_gib": 24, "tokens": 3}]}, "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [16]}, "vm_tokens": 1, "gpu_tokens": null, "tokens": null, "eur": null, "gpu_eur": null},
+    {"name": "zero GPU tokens are free", "prices": {"gpu_tiers": [{"min_gib": 89, "tokens": 0}]}, "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [16]}, "vm_tokens": 1, "gpu_tokens": 0, "tokens": 1, "eur": 2.5, "gpu_eur": 0},
+    {"name": "zero block tokens are free", "prices": {"cores_block_tokens": 0, "mem_block_tokens": 0, "ssd_block_tokens": 0, "hdd_block_tokens": 0}, "guest": {"cores": 32, "mem_gib": 128, "ssd_gb": 500, "hdd_gb": 2000}, "vm_tokens": 1, "gpu_tokens": 0, "tokens": 1, "eur": 2.5, "gpu_eur": 0},
+    {"name": "round combined money once", "prices": {"token_eur": 0.125, "gpu_token_eur": 0.125}, "guest": {"cores": 16, "mem_gib": 32, "ssd_gb": 100, "gpu_memory_gib": [16]}, "vm_tokens": 1, "gpu_tokens": 1, "tokens": 2, "eur": 0.25, "gpu_eur": 0.13}
+  ]
+}
