@@ -110,6 +110,10 @@ When `gpu_usage` is true in `config.json` (off by default), the server runs `gue
 - **Stored data:** table `gpu_use_day`, one row per cluster, day and VMID with daily aggregates (samples, utilization, memory, minutes at work, temperature, power); no names, no processes, no IP; rows validated before writing, parameterised SQL, kept 396 days. The manager report only receives per-group aggregates through a type that cannot carry names, VMIDs or nodes.
 - **Measured on CALCOLO (2026-11-19, VM 202 A100 and VM 170 L4):** `nvidia-smi` query 30-55 ms with persistence mode off; an LLM generation ran at 74.8 tokens/s without reads and 74.7 with a read every second (300 times the collector's rate); during a guest reboot the VM went no_data, then paused, and was read again after it came back.
 
+## Daily VM usage history (ROADMAP 21)
+
+Unless `vm_usage` is false in `config.json`, the server stores one row per cluster, day, VMID and instance with the day's usage computed from Proxmox's RRD (CPU and RAM average, p95 of the 30-minute averages and peak; network and disk byte totals; allocated resources). It only reads the RRD and the VM config (for the `smbios1` uuid): nothing runs in the guests. Stored: VM name, VMID, instance id, group, node; never IPs or guest data. VMIDs and IPs are reused after a VM is deleted, so history is keyed by the instance id and a new VM never inherits the history of a deleted one; the current name is shown only for the matching instance. Rows are validated before writing (patterns for every key, ranges for every number), statements are parameterised, a day is written in one transaction, rows are kept 396 days. The data describes the activity of research groups: the technical report stays "internal use"; the manager document receives aggregates only.
+
 ## Ceph status (read only)
 
 `GET /api/ceph` and `GET /api/ceph/summary` only read Proxmox (`/cluster/ceph/status`, `/cluster/ceph/flags`, `/nodes/{node}/ceph/{osd,pool,mon,mgr,mds}`); there is no Ceph write path. The token needs `Sys.Audit`; without it the page says so (`reason: forbidden`) instead of failing.

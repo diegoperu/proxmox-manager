@@ -1183,3 +1183,71 @@ Contesto: le schede sono in passthrough (vfio), quindi l'host Proxmox non vede n
 **Suggerimento**: A: e' l'utilizzo che dice se qualcuno lavora; la memoria occupata senza calcolo e' proprio il segnale di una scheda tenuta ferma.
 **Risposta utente**: (2026-11-19) "sono d'accordo con te": opzione A. Sostituisce la parte "memoria" di D113: un campione e' "al lavoro" solo con utilizzo >= 10%; memoria >= 10% con utilizzo sotto = "riservata".
 
+## Andamento dell'uso per VM su 1-12 mesi (ROADMAP 21, 2026-11-19)
+
+Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi; CPU e RAM medie, massime e p95; rete; giorni di dati; segnalazioni D32 "inattiva" e "sovradimensionata"; andamento in miniatura). Mancano: la vista **mese per mese**, l'**ultimo mese con attivita'**, l'I/O dei dischi, una **proposta di ridimensionamento**, i dati delle **VM cancellate**. Limiti dell'RRD di Proxmox (misurati il 2026-11-03): 1 minuto per le ultime 24 ore, 30 minuti fino a 30 giorni, 6 ore fino a ~90 giorni, poi **settimanale** fino a 488 giorni; per ogni intervallo esistono media e massimo (`cf=AVERAGE|MAX`), quindi un picco settimanale c'e' ma un p95 vero oltre 30 giorni no. Il database del servizio oggi pesa 3,8 MB.
+
+### D115 — Forma del report
+**Stato**: RISPOSTA
+**Bloccante**: si
+**Domanda**: Un nuovo modello di report "Andamento delle VM" (una riga per VM, una colonna per mese con media/picco, piu' "ultimo mese attivo" e proposta) accanto a "VM e container", oppure si estende il report esistente?
+**Perche' conta**: il report attuale e' una fotografia del periodo; l'andamento mese per mese e' una tabella diversa (fino a 12 colonne per metrica) e un export diverso.
+**Opzioni**: A) nuovo modello "Andamento delle VM" con gli stessi filtri; B) una scheda in piu' dentro "VM e container"; C) solo colonne in piu' nel report esistente.
+**Suggerimento**: A: non appesantisce il report che gia' funziona e ha un suo export.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D116 — Periodo e metriche
+**Stato**: RISPOSTA
+**Bloccante**: si
+**Domanda**: Il periodo si sceglie in **mesi di calendario** (da 1 a 12, il mese in corso parziale e indicato come tale) o come "ultimi N x 30 giorni"? Per ogni mese quali grandezze: CPU media e picco, RAM media e picco, rete, I/O dei dischi?
+**Perche' conta**: i mesi di calendario si leggono meglio in una riunione; le grandezze decidono quante colonne e quante chiamate a Proxmox.
+**Opzioni**: A) mesi di calendario, CPU e RAM (media e picco) + rete e disco come totale del mese; B) ultimi N x 30 giorni, stesse grandezze; C) solo CPU e RAM.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D117 — "Abbandonata" e "sovradimensionata" sul lungo periodo
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Proposta: **abbandonata** = VM accesa con CPU media < 2% e rete < 1 KB/s (le soglie D32 di "inattiva") per **almeno 3 mesi consecutivi** fino a oggi, con "ultimo mese attivo"; **spenta da tempo** = nessun dato di utilizzo da N mesi (da verificare come l'RRD registra le VM spente); **sovradimensionata** = picco di RAM < 25% o picco di CPU < 10% della risorsa assegnata in **ogni** mese del periodo (piu' prudente di D32, che usa il p95 delle ultime 4 settimane). Va bene?
+**Perche' conta**: sul lungo periodo una VM usata solo a fine semestre non deve risultare abbandonata.
+**Opzioni**: A) le regole proposte, soglie modificabili; B) soglie diverse; C) nessuna classificazione, solo numeri.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D118 — Salvare dati di consumo propri (finora escluso)
+**Stato**: RISPOSTA
+**Bloccante**: si
+**Domanda**: Si salva qualcosa oltre all'RRD di Proxmox? Pro e contro in `ROADMAP.md` voce 21.
+**Perche' conta**: senza salvataggio il report vede bene solo gli ultimi ~90 giorni (oltre, medie e picchi settimanali, niente p95) e perde le VM cancellate; con un campionamento continuo servirebbe un servizio sempre acceso e un database che cresce.
+**Opzioni**: A) nessun salvataggio: tutto dall'RRD a richiesta; B) **aggregati giornalieri per VM** calcolati ogni notte dall'RRD del giorno (media, p95, picco di CPU e RAM; rete e disco), con recupero dei giorni persi finche' l'RRD a 30 minuti li contiene (30 giorni): stimati ~40.000 righe l'anno per CALCOLO, pochi MB; C) campionamento continuo proprio (come le GPU).
+**Suggerimento**: B: p95 vero per sempre, carico trascurabile (una lettura RRD per VM al giorno, ~20 s), buchi recuperabili anche col manager spento fino a 30 giorni. Il report usa i dati salvati dove ci sono e l'RRD prima della data di attivazione, dicendolo.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D119 — Con il salvataggio: cosa e per quanto (solo se D118 B o C)
+**Nota dell'utente (2026-11-19):** VMID **e** IP vengono **riutilizzati** dopo la cancellazione di una VM: ne' l'uno ne' l'altro identificano una VM nel tempo.
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Per riconoscere una VM cancellata serve almeno il nome. Si salva VMID + nome + gruppo + risorse assegnate (core, RAM, disco) ogni giorno, oppure solo il VMID come per le GPU? Retention 5 anni come la fotografia D28 o 13 mesi?
+**Perche' conta**: finora i nomi delle VM non sono mai stati salvati (D28); i nomi contengono spesso cognomi.
+**Opzioni**: A) VMID + nome + gruppo + risorse, 5 anni; B) VMID + gruppo + risorse, senza nome, 5 anni; C) A con 13 mesi.
+**Suggerimento**: A con 13 mesi: il nome serve proprio per le VM sparite; oltre un anno basta la fotografia per gruppo.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D120 — Proposta di ridimensionamento
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Il report propone RAM e core per le VM sovradimensionate (es. picco del periodo + 25% di margine, arrotondato a 2 GB / 1 core, mai sotto un minimo)? Solo come testo nel report tecnico, mai applicata dall'app.
+**Perche' conta**: trasforma la segnalazione in un'azione da proporre al gruppo; un margine troppo stretto fa soffrire la VM.
+**Opzioni**: A) si', come proposto; B) si', margine diverso; C) no, solo segnalazione.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
+
+### D121 — Identita' di una VM nel tempo (conseguenza della nota su D119)
+**Stato**: RISPOSTA
+**Bloccante**: no (proposta da verificare con le misure dello step 1)
+**Domanda**: Poiche' VMID e IP si riusano, ogni riga salvata porta anche un **identificativo di istanza**: per le VM QEMU il `ctime` di `meta: creation-qemu=...,ctime=<epoch>` nella configurazione (scritto da Proxmox alla creazione e al clone) e, se manca, l'`uuid` di `smbios1`; per gli LXC (che non hanno ne' l'uno ne' l'altro) il primo giorno in cui il VMID compare con quel nome, con una nuova istanza quando il VMID ricompare dopo essere sparito o cambia nome mentre c'e' un buco. L'IP non si salva e non si usa mai per collegare dati. La stessa correzione va applicata alla tabella `gpu_use_day` (oggi chiave giorno+cluster+VMID). Va bene?
+**Perche' conta**: senza, una VM nuova che riceve il VMID di una cancellata erediterebbe la sua storia ("ultimo mese attivo", "abbandonata", uso delle GPU).
+**Opzioni**: A) come proposto; B) solo VMID + nome (una VM rinominata diventa un'altra); C) solo VMID (storia mescolata).
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "Ottima proposta": A. **Corretta dalle misure dello step 1 (2026-11-19):** il `ctime` di `meta` NON e' utilizzabile (i cloni copiano quello del template: ripetuto 16 volte su CALCOLO e 3 su HOSTING; assente su 7 VM di CALCOLO e 12 di HOSTING); l'`uuid` di `smbios1` e' presente su tutte le VM QEMU (107 CALCOLO, 28 HOSTING) e mai ripetuto, template compresi: e' l'identificativo di istanza. LXC (uno per cluster) con la regola del buco/cambio di nome. In piu': nei report si salvano comunque **nome della VM e VMID**, e l'identificativo di istanza serve a distinguere le VM che li condividono.
+

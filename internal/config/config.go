@@ -30,6 +30,9 @@ type Config struct {
 	// GPUUsage turns on the periodic nvidia-smi sampling inside the VMs that have a GPU (ROADMAP 4).
 	// Off by default: it runs a command in production guests every 5 minutes.
 	GPUUsage bool `json:"gpu_usage"`
+	// VMUsage controls the daily VM usage history (ROADMAP 21): nil/absent = on (it only reads the RRD),
+	// false = off. A pointer so that existing config files without the field keep the default.
+	VMUsage *bool `json:"vm_usage,omitempty"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
 	AllowedHosts []string `json:"allowed_hosts"`
 	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
@@ -68,6 +71,9 @@ func ValidTheme(t string) bool { return t == "" || themes[t] }
 
 // ValidDensity reports whether d is "" or a known density.
 func ValidDensity(d string) bool { return d == "" || densities[d] }
+
+// VMUsageEnabled: the daily VM usage history runs unless vm_usage is explicitly false.
+func (c Config) VMUsageEnabled() bool { return c.VMUsage == nil || *c.VMUsage }
 
 // ValidRefresh reports whether the automatic refresh interval is allowed.
 func ValidRefresh(n int) bool {

@@ -894,10 +894,25 @@ func buildGPUReport(c reportAPI, hist *history.Store, cluster string, p reportPa
 			byName[vm.VMID] = clampText(vm.Name, 64)
 		}
 	}
-	// Filter historical usage by its last assignment; deleted VMs keep their VMID and an empty name.
+	// D121: the current name belongs to a row only if the instance is the same; a VMID reused by a new VM
+	// must not lend its name to the deleted one. Older instances take the name stored in vm_use_day.
+	curInst := map[int]string{}
+	for _, n := range inv.Nodes {
+		for _, card := range n.Cards {
+			for _, u := range card.Uses {
+				curInst[u.VMID] = u.Inst
+			}
+		}
+	}
+	stored := storedVMNames(hist, cluster, p)
 	rep.Usage.Rows = []gpuUsageRow{}
 	for _, row := range usage.Rows {
-		row.Name = byName[row.VMID]
+		switch {
+		case row.Inst == "" || row.Inst == curInst[row.VMID]:
+			row.Name = byName[row.VMID]
+		default:
+			row.Name = stored[vmInstKey{row.VMID, row.Inst}]
+		}
 		if p.Kind == "lxc" || (p.Query != "" && !strings.Contains(strings.ToLower(row.Name), p.Query)) {
 			continue
 		}

@@ -87,6 +87,7 @@ type gpuUseAcc struct {
 type gpuUseAccKey struct {
 	cluster, day string
 	vmid         int
+	inst         string // D121: a reused VMID is another VM
 }
 
 type gpuUseFail struct {
@@ -101,6 +102,7 @@ type gpuUseProbe struct {
 
 type gpuUseTarget struct {
 	vmid               int
+	inst               string
 	node, name, status string
 	group, model       string
 	cards              int
@@ -213,7 +215,7 @@ func gpuTargets(inv GPUInventory, resources json.RawMessage) ([]gpuUseTarget, er
 					if len(as.Groups) > 0 {
 						group = as.Groups[0]
 					}
-					t = &gpuUseTarget{vmid: u.VMID, node: node, name: clampText(name, 64), status: status,
+					t = &gpuUseTarget{vmid: u.VMID, inst: u.Inst, node: node, name: clampText(name, 64), status: status,
 						group: group, model: asciiText(card.Name, 80)}
 					targets[u.VMID] = t
 				}
@@ -301,7 +303,7 @@ func (g *gpuUseCollector) readGuest(c gpuUseAPI, key, node string, vmid int) (st
 
 // record adds one sample to the day's accumulator. Called with g.mu held.
 func (g *gpuUseCollector) record(cluster, day string, t gpuUseTarget, state string, cards []gpuCardUse) {
-	k := gpuUseAccKey{cluster, day, t.vmid}
+	k := gpuUseAccKey{cluster, day, t.vmid, t.inst}
 	a := g.acc[k]
 	if a == nil {
 		a = &gpuUseAcc{tempMax: -1}
@@ -357,7 +359,7 @@ func (g *gpuUseCollector) record(cluster, day string, t gpuUseTarget, state stri
 }
 
 func (a *gpuUseAcc) row(k gpuUseAccKey) history.GPUUseDay {
-	r := history.GPUUseDay{Day: k.day, Cluster: k.cluster, VMID: k.vmid, Node: a.node, Group: a.group, Model: a.model,
+	r := history.GPUUseDay{Day: k.day, Cluster: k.cluster, VMID: k.vmid, Inst: k.inst, Node: a.node, Group: a.group, Model: a.model,
 		Cards: a.cards, Expected: a.expected, Valid: a.valid, Off: a.off, NoDriver: a.noDriver, DriverError: a.driverError,
 		NoData: a.noData, Reserved: a.reserved, BusyMinutes: min(a.busy*int(gpuUseEvery/time.Minute), 24*60), TempMax: -1, PowerAvg: -1}
 	if n := len(a.utils); n > 0 {

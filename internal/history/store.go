@@ -156,7 +156,31 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(`UPDATE inv_gpu SET cards_milli=cards*1000 WHERE cards_milli=0 AND cards<>0`); err != nil {
 		return err
 	}
-	return s.migrateGPUUse()
+	if err := s.migrateGPUUse(); err != nil {
+		return err
+	}
+	return s.migrateVMUse()
+}
+
+// hasColumn reports whether table has col. table is a constant of this package, never request data.
+func (s *Store) hasColumn(table, col string) (bool, error) {
+	rows, err := s.db.Query(fmt.Sprintf(`PRAGMA table_info(%s)`, table))
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return false, err
+		}
+		if name == col {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // addColumn adds a column if missing. table, col and ddl are constants of this package, never request data.

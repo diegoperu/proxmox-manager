@@ -75,6 +75,7 @@ func ParsePCIMappingEntries(raw json.RawMessage) MappingSet {
 // GPUVM is what the inventory needs to know about one QEMU VM.
 type GPUVM struct {
 	VMID    int
+	Inst    string // instance id from smbios1 (D121), "" if missing
 	Name    string
 	Status  string
 	Lock    string
@@ -92,6 +93,7 @@ type GPUNodeInput struct {
 
 type GPUUse struct {
 	VMID     int    `json:"vmid"`
+	Inst     string `json:"-"` // instance id (D121): server side only
 	Name     string `json:"name"`
 	Status   string `json:"status"`
 	Lock     string `json:"lock,omitempty"`
@@ -210,7 +212,7 @@ func BuildGPUInventory(nodes []GPUNodeInput, maps MappingSet, now time.Time) GPU
 			seen := map[string]bool{}
 			for _, slot := range slots {
 				val := vm.HostPCI[slot]
-				use := GPUUse{VMID: vm.VMID, Name: clampText(vm.Name, 64), Status: vm.Status, Lock: clampText(vm.Lock, 32), Slot: slot,
+				use := GPUUse{VMID: vm.VMID, Inst: vm.Inst, Name: clampText(vm.Name, 64), Status: vm.Status, Lock: clampText(vm.Lock, 32), Slot: slot,
 					Options: normalizeHostpciOptions(val)}
 				if k, v, ok := strings.Cut(strings.SplitN(val, ",", 2)[0], "="); ok && k == "mapping" {
 					use.Kind, use.Mapping = "mapping", v
@@ -398,7 +400,7 @@ func loadGPUNodeVMs(c gpuAPI, node string, sem chan struct{}) (vms []GPUVM, fail
 			lock, _ := cfg["lock"].(string)
 			machine, _ := cfg["machine"].(string)
 			mu.Lock()
-			vms = append(vms, GPUVM{VMID: vmid, Name: name, Status: status, Lock: lock, Machine: machine, HostPCI: hp})
+			vms = append(vms, GPUVM{VMID: vmid, Inst: vmInstance(cfg), Name: name, Status: status, Lock: lock, Machine: machine, HostPCI: hp})
 			mu.Unlock()
 		}(int(vmid), name, status)
 	}
