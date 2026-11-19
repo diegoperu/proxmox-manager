@@ -1322,7 +1322,48 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 ### D127 — Listino interno DataCloud (costo per i gruppi)
 **Stato**: RISPOSTA
 **Bloccante**: no
-**Listino fornito dall'utente (2026-11-19), costo mensile:** VM Calcolo Base **8 gettoni** (comprende **16 core, 32 GiB di RAM, 100 GB su SSD**); +16 core **1 gettone**; +32 GiB RAM **4 gettoni**; +100 GB SSD **3 gettoni**; +1 TB HDD **2 gettoni**; GPU low end **1 gettone GPU**, mid range **3**, high end **10**. 1 gettone VM = 1 EUR, 1 gettone GPU = 35 EUR.
+**Listino fornito dall'utente (2026-11-19), costo mensile:** VM Calcolo Base **8 gettoni** (comprende **16 core, 32 GiB di RAM, 100 GB su SSD**); +16 core **1 gettone**; +32 GiB RAM **4 gettoni**; +100 GB SSD **3 gettoni**; +1 TB HDD **2 gettoni**; GPU low end **1 gettone GPU**, mid range **3**, high end **10**; **GPU da 89 GiB e oltre: 1 gettone GPU in piu'** (11; nota utente 2026-11-19). 1 gettone VM = 1 EUR, 1 gettone GPU = 35 EUR.
 **Regole (risposte dell'utente):** blocchi oltre la base **arrotondati per eccesso** (es. 20 core = base + 1 blocco); fasce GPU **per memoria**: low end = 16 GB (A2), mid range = 24 GB (L4, RTX 3090), high end = 40 GB e oltre (A100 40/80); il listino vale **solo per CALCOLO** (HOSTING: solo valore di mercato); SSD o HDD **dal nome dello storage** del disco nella configurazione della VM (`datacloud-ssd`, `datacloud-hdd`; altri storage da associare a una classe in `config.json`).
 **Uso nel report:** "quanto paga la ricerca" (listino interno) accanto a "quanto costerebbe sul mercato" (intervallo D123-bis).
+
+### D128 — Backup: cosa misurare e come spiegarlo
+**Stato**: APERTA
+**Bloccante**: no (per la pagina A4)
+**Fatti (lettura in sola lettura dei task di tutti i nodi di CALCOLO, 2026-11-19):** il report contava i **job notturni di nodo** (`vzdump` senza VMID: 546 su 548), non le VM; i fallimenti sono 70: **59 "could not activate storage 'datacloud-backup-calcolo'"** (archivio di backup non raggiungibile, nessuna VM salvata quella notte su quel nodo), 8 "job errors" (errore su una o piu' VM del job), 2 interruzioni, 1 stato inatteso; concentrati in pochi mesi (ago 2026 20/41, giu 2026 15/33, dic 2025-gen 2026 7/31 e 7/32), il resto dei mesi a zero.
+**Domanda**: Proposta per il manageriale: (1) **copertura**: % delle VM con almeno un backup riuscito negli ultimi 7 giorni (dal contenuto dello storage di backup, in sola lettura; fattibilita' da verificare); (2) **notti con backup riuscito** per mese (job riusciti/totali, grafico); (3) **cause dei fallimenti in parole**, raggruppate: "archivio di backup non raggiungibile", "errore su singole macchine", "interrotto", "altro", con il numero. Nel tecnico il dettaglio per nodo e per notte. Va bene?
+**Perche' conta**: "85,5% riusciti" senza spiegazione suona come un servizio inaffidabile, mentre quasi tutti i fallimenti sono notti in cui l'archivio non era raggiungibile.
+**Opzioni**: A) le tre misure proposte; B) solo (2) e (3); C) altro.
+**Suggerimento**: A (se la copertura non si puo' leggere in modo affidabile, B e lo si dichiara).
+**Risposta utente**: (vuoto)
+
+### D129 — Disponibilita': interruzioni esterne
+**Stato**: APERTA
+**Bloccante**: no
+**Nota dell'utente (2026-11-19):** le interruzioni sono di norma **mancanze di corrente non dipendenti da noi**, e il sistema non puo' saperlo perche' non e' collegato ai sistemi di monitoraggio dell'ateneo.
+**Domanda**: (A) solo una **nota fissa** nel documento ("le interruzioni sono dovute di norma a cause esterne, ad es. mancanze di corrente, che il sistema non distingue"); (B) A + un **registro delle interruzioni** in Impostazioni (periodo, causa: esterna/elettrica, manutenzione programmata, guasto del servizio) compilato dagli amministratori: il report mostra la disponibilita' totale e quella **al netto delle cause esterne e delle manutenzioni**, con i periodi annotati nel grafico; (C) collegamento ai sistemi di monitoraggio dell'ateneo (fuori portata oggi).
+**Suggerimento**: A subito, B nello stesso lavoro (piccolo e utile anche per spiegare i backup falliti delle stesse notti).
+**Risposta utente**: (vuoto)
+
+### D130 — Parametri economici e dei report in Impostazioni
+**Stato**: APERTA
+**Bloccante**: no
+**Richiesta dell'utente (2026-11-19):** listino e parametri in una sezione dedicata delle Impostazioni, aggiornabili facilmente.
+**Proposta**: sezione "Listini e parametri dei report": listino interno (valore dei gettoni, contenuto della VM base, prezzo dei blocchi, fasce GPU per memoria con i gettoni, soglia 89 GiB = +1), prezzi di mercato per provider (vCPU-ora, GB RAM-ora, GPU-ora per taglia, storage GB-mese) **con fonte e data**, cambio USD/EUR, associazione storage -> SSD/HDD, soglie dei report (D32, D111, D117). Salvati in `config.json` con validazione a whitelist e intervalli; ogni modifica registrata (chi/quando non c'e' ancora: senza login si registra solo quando e cosa); il report riporta la data dei prezzi usati.
+**Opzioni**: A) come proposto; B) solo i prezzi, soglie dove sono oggi; C) solo da `config.json` a mano.
+**Suggerimento**: A.
+**Risposta utente**: (vuoto)
+
+### D131 — Scaricare i listini aggiornati dei servizi esterni
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Fattibilita' (da verificare in implementazione): **Azure** ha un'API pubblica dei prezzi senza chiave (Retail Prices API, filtrabile per regione e taglia); **OVHcloud** ha un catalogo pubblico via API; **AWS** pubblica i listini in file pubblici per servizio e regione (molto grandi: serve leggere solo la parte necessaria); **Scaleway** ha un catalogo prodotti via API (da verificare se serve una chiave); **Aruba** non ha un'API (resta manuale). Proposta: pulsante "Controlla i listini" in Impostazioni che interroga **solo indirizzi fissi** di questi provider, mostra i valori nuovi accanto a quelli attuali con la differenza, e **salva solo dopo la conferma** dell'amministratore.
+**Perche' conta (sicurezza)**: sarebbe la prima chiamata del manager verso Internet: indirizzi fissi in whitelist (nessun indirizzo dalla richiesta, niente SSRF), TLS verificato, timeout, limite di dimensione, nessun dato inviato; il manager deve poter uscire su Internet (oggi sta in una rete interna).
+**Opzioni**: A) semi-automatico con conferma per Azure e OVHcloud, poi AWS se la lettura parziale regge, manuale per gli altri; B) solo manuale con link alle pagine ufficiali; C) aggiornamento automatico periodico senza conferma (sconsigliato).
+**Suggerimento**: A.
+**Risposta utente**: (vuoto)
+
+### D132 — Una GPU rimossa (guasta, obsoleta) non deve cancellare la storia
+**Stato**: APERTA (verifica tecnica, nessuna scelta richiesta)
+**Analisi**: le righe giornaliere (`gpu_use_day`, `inv_gpu`) restano dopo la rimozione e portano il modello come lo nominava Proxmox: la taglia si ricava ancora (tabella interna o correzioni di `gpu_models`, che restano valide per i modelli gia' corretti); il report usa le righe salvate, non l'inventario attuale; il totale delle schede scende dal giorno della rimozione nella fotografia. Da **provare con un test** (scheda che sparisce dall'inventario: storico intatto, report invariato per i giorni passati, conteggi giusti dopo) nello step del backend.
+**Risposta utente**: (vuoto)
 
