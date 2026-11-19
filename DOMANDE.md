@@ -1252,7 +1252,7 @@ Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi
 **Risposta utente**: (2026-11-19) "Ottima proposta": A. **Corretta dalle misure dello step 1 (2026-11-19):** il `ctime` di `meta` NON e' utilizzabile (i cloni copiano quello del template: ripetuto 16 volte su CALCOLO e 3 su HOSTING; assente su 7 VM di CALCOLO e 12 di HOSTING); l'`uuid` di `smbios1` e' presente su tutte le VM QEMU (107 CALCOLO, 28 HOSTING) e mai ripetuto, template compresi: e' l'identificativo di istanza. LXC (uno per cluster) con la regola del buco/cambio di nome. In piu': nei report si salvano comunque **nome della VM e VMID**, e l'identificativo di istanza serve a distinguere le VM che li condividono.
 
 ### D122 — Falsi positivi del report "Andamento delle VM" (dalla prova su CALCOLO, 2026-11-19)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (lo step 4, la pagina, non dipende da questa scelta)
 **Domanda**: Sui dati veri di 6 mesi il report trova 14 VM "abbandonate" e 4 "sovradimensionate". Due regole sembrano troppo larghe:
 (1) **abbandonata** usa solo CPU media < 2% e rete < 1 KB/s (come "inattiva" di D32): 11 delle 14 hanno picchi mensili di CPU >= 10% (es. `dinitto-slurm-1`: media 0,3% ma picchi 25-32% ogni mese e RAM all'88%: e' un controller Slurm che lavora a raffiche). Si aggiunge "e picco di CPU < 10% in ogni mese"?
@@ -1260,5 +1260,5 @@ Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi
 **Perche' conta**: il report serve a chiedere risorse indietro ai gruppi: un falso positivo costa credibilita'. I totali "recuperabili" (oggi 960 GB di RAM e 488 core) dipendono da queste regole.
 **Opzioni**: A) entrambe le correzioni; B) solo (1); C) solo (2); D) lasciare cosi'.
 **Suggerimento**: A.
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) "Ok su entrambe": A. Applicata: abbandonata solo con picco di CPU < `abandon_peak` (10%) in ogni mese della finestra; VM con un dispositivo in passthrough (`hostpciN`) mai giudicate sovradimensionate per la CPU (la RAM si'). Su CALCOLO (6 mesi): abbandonate 14 -> 5, nessuna VM con GPU proposta a meno core, recuperabili 894 GiB/488 core -> 796 GiB/356 core.
 
