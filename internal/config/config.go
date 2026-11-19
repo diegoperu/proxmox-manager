@@ -25,7 +25,6 @@ type Config struct {
 	Theme          string          `json:"theme"`
 	Density        string          `json:"density"`
 	RefreshSeconds int             `json:"refresh_seconds"`
-	CacheSeconds   int             `json:"cache_seconds"`
 	DBPath         string          `json:"db_path"`
 	ListenAddr     string          `json:"listen_addr"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
@@ -82,7 +81,6 @@ func Load() error {
 	mu.Lock()
 	defer mu.Unlock()
 	current = Config{
-		CacheSeconds:   30,
 		RefreshSeconds: 60,
 		DBPath:         "proxmox.db",
 		ListenAddr:     ":8080",
@@ -114,9 +112,6 @@ func Load() error {
 			if err := json.Unmarshal(v, &current.RefreshSeconds); err != nil {
 				return err
 			}
-		}
-		if v, ok := raw["cache_seconds"]; ok {
-			json.Unmarshal(v, &current.CacheSeconds)
 		}
 		if v, ok := raw["db_path"]; ok {
 			json.Unmarshal(v, &current.DBPath)
