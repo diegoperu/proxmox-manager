@@ -3,13 +3,13 @@
 Interfaccia web di amministrazione per cluster Proxmox VE.
 Browser → Go proxy (localhost:8080) → Proxmox API. Nessun CORS.
 
-## Dove siamo (2026-11-12)
+## Dove siamo (2026-11-19)
 
-**Applicazione.** Rilasciata e in servizio su `proxmox-manager-use/` (v0.172+): panoramica "Bollettino", VM e container con gruppi, GPU, Ceph, Bilanciamento (a caldo e a freddo), Gruppi dai tag, Nuova VM guidata dal server (consiglio del nodo, GPU, utente e disco aggiuntivi, pulsanti dei gruppi), Report v2 con fotografia giornaliera, tre cluster configurati (CALCOLO, HOSTING, Magi di prova). Branch di documentazione `docs/hosting-rollout-log` (PR #35) in revisione.
+**Applicazione.** In servizio su `proxmox-manager-use/` (`main`, PR fino alla #50): panoramica "Bollettino", VM e container con gruppi, export Inventory Ansible, aggiornamento automatico regolabile, GPU (assegnazione e **monitoraggio d'uso** con `nvidia-smi`), Ceph, Bilanciamento (a caldo e a freddo), Gruppi dai tag, Nuova VM guidata dal server, Report tecnici, **Andamento delle VM** (1-12 mesi, storico giornaliero per VM e istanza), **report manageriale v3** anonimo, **Impostazioni rifatte** (schede Generale / Report e listini, listini e parametri per cluster, controllo dei listini esterni). Tre cluster configurati (CALCOLO, HOSTING, Magi di prova). Da fare dall'utente: inserire il listino di CALCOLO e generare il primo manageriale v3.
 
 **Infrastruttura delle VM (strumenti locali in `SUPPORT-FILES/pmgr-scripts/`, fuori da git).** Snippet cloud-init, template (8 release) e moduli per le VM esistenti: fail2ban, aggiornamenti di sicurezza, SSH, firewall, hardening, agent-exec. **CALCOLO chiuso** (2026-11-12). **HOSTING messo in sicurezza il 2026-11-12**: firewall attivato su 104, 105, 108, 118; fail2ban su 20 VM; SSH a sola chiave + sysctl + recidive su 13; aggiornamenti automatici su 19 (esclusione Docker); riavvii su 10. Report per i proprietari: `~/rollout-hosting/REPORT-INTERVENTI-HOSTING.md` (fuori repo).
 
-**Cosa manca (in ordine).** (1) HOSTING: 108 in pausa (D104), VM con sola password (102, 103, 112, 114, 117, 118) con SSH a password e fail2ban, porte pubblicate da Docker (D103: 116 su 5000/9091, 103 su 5800), Ubuntu 20.04 (117, 118), disco 104, snapshot `pre-fw/pre-f2b/pre-ssh` da cancellare, porta 25 in uscita (D93.2 aperta). (2) Nuovo tooling dei template sul cluster HOSTING (ROADMAP 18). (3) Integrazione del manager con la sincronizzazione (ROADMAP 13: Opus per l'accesso SSH, poi pagina con Sonnet). (4) Valori di rete per cluster; `disk.sh` che dice quale comando manca (19). (5) Poi 14 (aggiornamento template) e 15 (migrazione tra cluster), manager multiutente (20), uso reale delle GPU (4), coda richieste (5).
+**Cosa manca (in ordine).** (1) **ROADMAP 20: deploy su macchina dedicata e manager multiutente con livelli** (prossimo, da discutere prima del codice). (2) HOSTING: 108 in pausa (D104), VM con sola password (102, 103, 112, 114, 117, 118), porte pubblicate da Docker (D103), Ubuntu 20.04 (117, 118), disco 104, snapshot `pre-fw/pre-f2b/pre-ssh` da cancellare, porta 25 in uscita (D93.2). (3) Nuovo tooling dei template su HOSTING (ROADMAP 18). (4) Integrazione del manager con la sincronizzazione degli snippet (ROADMAP 13). (5) Valori di rete per cluster; `disk.sh` che dice quale comando manca (19). (6) Poi 14, 15, coda richieste (5), sicurezza nel manageriale (D124, in pausa).
 
 **Promemoria aperto** (memoria `pending-vm-rollouts`): solo HOSTING, finche' l'utente non dice che e' finito. **Regole di lavoro**: sulle VM sempre l'utente `tecnico`, mai `diego`; mai `pkill -f` ne' `ls` (alias) nei comandi; mai scrivere la `cipassword`; `SUPPORT-FILES/` mai committata; nei nuovi deploy sempre l'ultima LTS; nessuna scrittura su cluster senza via esplicito (snapshot prima, verifica dopo). Modello: Sonnet alto per tooling e UI, **STOP e `/model` Opus** per l'accesso SSH del manager e per le revisioni di sicurezza. **Delega a Codex (solo questo progetto, 2026-11-19)**: i task da Sonnet (boilerplate, config, test ripetitivi, documentazione, script semplici, correzioni gia' diagnosticate, feature ben specificate) si delegano a `codex exec` (`-m <modello> -c model_reasoning_effort=<livello> -s workspace-write`); modello e impegno li sceglie l'assistente tra **6.1 terra** e **6.1 sol**, **mai Astra**; il risultato si rilegge e si verifica con la checklist di sicurezza prima di consegnarlo; i task da Opus (SSH del manager, revisioni di sicurezza, auth/crypto, concorrenza) non si delegano.
 
@@ -101,13 +101,17 @@ SheetJS: usare >= 0.20.2 (le 0.18.x hanno CVE note); l'app lo usa solo per **scr
   "db_path": "proxmox.db",
   "listen_addr": ":8080",
   "gpu_models": { "NVIDIA Corporation GA107GL [A2 / A16]": { "name": "NVIDIA A2", "memory_gb": 16 } },
-  "gpu_usage": false
+  "gpu_usage": false,
+  "vm_usage": true,
+  "allowed_hosts": []
 }
 ```
 
+Ogni cluster puo' avere `report` (scritto dalla pagina Impostazioni → Report e listini, `internal/config/report.go`): `internal_prices` (gettoni, VM base, blocchi, `gpu_tiers` per memoria), `market_prices` (livello `low|high`, valuta, prezzi orari, fasce GPU, fonte, data), `usd_eur`, `storage_classes` (`ssd|hdd|other`), `defaults` (soglie predefinite dei report, 0 = predefinito interno), `interruptions` (periodo, causa `external|maintenance|fault`, nota). Prezzi tutti a zero = niente parte economica. Il file si salva in modo atomico con permessi 0600.
+
 **Migrazione automatica**: se `config.json` ha ancora i campi flat `proxmox_url` + `api_token` (formato vecchio), `Load()` migra automaticamente creando `clusters[0]` con `label:"Default"` e salva nel nuovo formato.
 
-Autenticazione: **solo API Token**. Username/password rimossi.
+Autenticazione: tutte le API usano **solo il token**. `username`/`password` per cluster esistono solo per la console seriale (Proxmox non accetta token sul WebSocket della console; vedi README, utente dedicato con solo `VM.Console`).
 Token format Proxmox: `USER@REALM!TOKENID=UUID`.
 `theme`: `""` (segui OS), `"dark"`, `"light"`, `"eva01"`, `"catppuccino"`, `"spiderman"`.
 
@@ -115,10 +119,13 @@ Token format Proxmox: `USER@REALM!TOKENID=UUID`.
 
 ```go
 type ClusterConfig struct {
-    Label    string `json:"label"`
-    URL      string `json:"url"`
-    APIToken string `json:"api_token"`
-    Default  bool   `json:"default"`
+    Report   *ReportSettings `json:"report,omitempty"`
+    Label    string          `json:"label"`
+    URL      string          `json:"url"`
+    APIToken string          `json:"api_token"`
+    Username string          `json:"username"` // solo console seriale
+    Password string          `json:"password"` // solo console seriale
+    Default  bool            `json:"default"`
 }
 
 type Config struct {
@@ -128,6 +135,10 @@ type Config struct {
     RefreshSeconds int           `json:"refresh_seconds"`
     DBPath       string          `json:"db_path"`
     ListenAddr   string          `json:"listen_addr"`
+    GPUUsage     bool            `json:"gpu_usage"`
+    VMUsage      *bool           `json:"vm_usage,omitempty"` // assente = acceso
+    AllowedHosts []string        `json:"allowed_hosts"`
+    GPUModels    map[string]GPUModel `json:"gpu_models,omitempty"`
 }
 ```
 
@@ -146,6 +157,9 @@ PUT  /api/clusters/{idx}                            UpdateCluster (api_token vuo
 DELETE /api/clusters/{idx}                          DeleteCluster (rifiuta se ultimo)
 POST /api/clusters/{idx}/test                       TestCluster → GetNodes
 PUT  /api/clusters/{idx}/default                    SetDefaultCluster (toglie default agli altri)
+GET  /api/clusters/{idx}/report-settings            GetReportSettings: listini e parametri dei report del cluster (mai il token)
+PUT  /api/clusters/{idx}/report-settings            PutReportSettings: sostituisce `report` (body <= 64 KB, campi sconosciuti rifiutati, validazione a intervalli); la modifica di un cluster non puo' scriverlo
+POST /api/clusters/{idx}/report-settings/price-check  PriceCheck {sources:["azure","ovh"]}: legge i listini pubblici (indirizzi fissi, TLS verificato) e restituisce una PROPOSTA, non salva nulla; uno ogni 5 minuti (429)
 
 GET  /api/dashboard                                 GetClusterResources + GetClusterStatus
 GET  /api/nodes                                     GetNodes
@@ -377,7 +391,7 @@ Nessuna tabella metrics — storico dei consumi delegato a Proxmox RRD. Report v
 - `batch` — chip selector nodi (natural sort, modello esplicito), filtri tipo/stato/testo, tabella full-height con IP, 7 azioni, log real-time
 - `cluster` — gestione nodi (natural sort), dettaglio RRD, reboot/shutdown batch
 - `reports` (Report v2, 2026-11-03) — vedi "Report v2": sei modelli (1 manageriale, 5 tecnici), barra filtri, tabelle ordinabili, export, documento bilingue. [vecchia pagina scartata: periodo + grafici + Excel]
-- `settings` — config connessione (URL + API Token) + selettore tema + test
+- `settings` — due schede: **Generale** (`#/settings`: cluster con Test/Modifica e menu "Altro…" per Imposta predefinito/Elimina, tema e densita' salvati subito, aggiornamento automatico, informazioni) e **Report e listini** (`#/settings/report`, segue il cluster della barra in alto: riga di stato della parte economica, listino interno con anteprima che usa lo stesso calcolo del report, prezzi di mercato con "Controlla i listini", cambio, classi degli storage in tabella con proposte dal nome da applicare con un pulsante, registro delle interruzioni con `datetime-local`, soglie avanzate in % con il predefinito visibile; barra "Modifiche non salvate" e avviso uscendo). Predefiniti delle soglie in `REPORT_DEFAULTS` (marcatori `pmgr:report-defaults`, test di parita' con `handlers.BuiltinReportDefaults`), anteprima in `internalPrice` (marcatori `pmgr:internal-price`, casi condivisi Go/JS in `internal/handlers/testdata/internal_price_cases.json`)
 
 **Colonna IP nelle tabelle VM**:
 - Popolata dal backend in `GetAllVMs` (fetch config parallelo per ogni VM)
@@ -733,7 +747,7 @@ Domande D64-D67 in `DOMANDE.md` (fino a dove arriva il disco: collegato o anche 
 
 ## Lavori da fare
 
-Elenco unico e aggiornato in `ROADMAP.md` (tabella di priorita' e dettaglio). In sintesi, al 2026-11-12: integrazione del manager con la sincronizzazione degli snippet (ROADMAP 13), tooling dei template sul cluster HOSTING (18), valori di rete per cluster, uso reale delle GPU (4), coda richieste dell'intranet (5), conversione delle 22 assegnazioni GPU dirette ai mapping (2), aggiornamento template (14) e migrazione tra cluster (15) dal manager, manager multiutente e macchina dedicata (20). Il bilanciamento, il consiglio del nodo, i gruppi dai tag, il disco aggiuntivo e il rollout sul calcolo sono **fatti** (vedi registro).
+Elenco unico e aggiornato in `ROADMAP.md` (tabella di priorita' e dettaglio). Prossimo: ROADMAP 20 (deploy su macchina dedicata, multiutente con livelli). Sintesi precedente, al 2026-11-12: integrazione del manager con la sincronizzazione degli snippet (ROADMAP 13), tooling dei template sul cluster HOSTING (18), valori di rete per cluster, uso reale delle GPU (4), coda richieste dell'intranet (5), conversione delle 22 assegnazioni GPU dirette ai mapping (2), aggiornamento template (14) e migrazione tra cluster (15) dal manager, manager multiutente e macchina dedicata (20). Il bilanciamento, il consiglio del nodo, i gruppi dai tag, il disco aggiuntivo e il rollout sul calcolo sono **fatti** (vedi registro).
 
 
 ## Sincronizzazione di script e snippet (strumenti fatti e provati, integrazione del manager da fare, ROADMAP 13)
@@ -979,4 +993,5 @@ Elenco unico e aggiornato in `ROADMAP.md` (tabella di priorita' e dettaglio). In
 - 2026-11-19 — **Manageriale v3 in servizio**: PR #47 integrata (squash `40f9c8c`), deploy in `proxmox-manager-use` (copie di sicurezza di `config.json` e del database nello scratchpad della sessione), servizio e tre cluster rispondono, `v3` presente nel report di servizio. Da fare dall'utente: inserire listino interno e prezzi di mercato di CALCOLO in Impostazioni (o con "Controlla i listini"); al primo salvataggio `config.json` passa a 0600 (oggi 644) — `CLAUDE.md`, `ROADMAP.md`
 - 2026-11-19 — **Impostazioni: revisione di usabilita' e rifacimento** (richiesta utente, proposte A-F approvate). Due schede "Generale" / "Report e listini" (`#/settings`, `#/settings/report`), la seconda segue il cluster della barra in alto (tolto il secondo selettore); riga di stato (parte economica, listino piu' recente, interruzioni) con prezzi mancanti a richiesta; sezioni richiudibili, soglie avanzate chiuse con il predefinito nel campo e tutte in % (conversione esatta verso le frazioni salvate; predefiniti in un oggetto JS confrontato da un test con `handlers.BuiltinReportDefaults()`); anteprima del listino interno con lo stesso calcolo del report (15 casi condivisi Go/JS); storage in tabella con classe proposta dal nome; interruzioni con `datetime-local` (le date con fuso esplicito restano in sola lettura); un solo modello di salvataggio: tema, densita' e aggiornamento subito, report con barra "Modifiche non salvate" e avviso uscendo (pagina, scheda, cluster, chiusura), aggiornamento automatico sospeso con modifiche; cluster con menu "Altro…" (Imposta predefinito, Elimina). Implementato da Codex (terra poi sol, alto, in tre parti dopo un primo tentativo interrotto); ritocchi miei: riga di stato compatta, pulsanti dei prezzi su una riga, predefiniti dei blocchi visibili, nota ridondante tolta, anteprima che dice quando una GPU non costa gettoni, `/storage` nel mock. Provato nel browser sul mock (1440 e 390 px, nessuno scorrimento orizzontale, nessun errore JS) — `cmd/server/web/templates/index.html`, `internal/handlers/reportdefaults.go`, test in `cmd/server/` e `internal/handlers/`, `devtools/mockpve/mockpve.py`, `CLAUDE.md`
 - 2026-11-19 — **Impostazioni in servizio (PR #49) e correzione** trovata con il controllo sul servizio vero: la scheda "Report e listini" si apriva gia' con "Modifiche non salvate" perche' le classi degli storage proposte dal nome (3 su CALCOLO) compilavano i campi da sole, e l'avviso sarebbe scattato uscendo senza aver toccato niente. Ora le proposte non compilano nulla: un pulsante "Applica le proposte dal nome (N storage)" le applica e conta come modifica da salvare. Test aggiornato (apertura senza modifiche, pulsante, applicazione), provato nel browser sul mock — `index.html`, `cmd/server/settings_storage_test.go`, `CLAUDE.md`
+- 2026-11-19 — **Documentazione riallineata** (richiesta utente prima della voce 20): README (funzioni nuove: report Andamento, manageriale v3, listini e controllo listini, uso GPU, Inventory Ansible, aggiornamento automatico, tema Spider-Man; Proxmox 8/9; campi `gpu_usage`/`vm_usage`/`db_path`; sezione "Stored data" con tabelle e conservazione; privilegi del token per GPU, tag, guest agent; unica uscita verso Internet), README del mock (`/storage`), CLAUDE.md ("Dove siamo" al 2026-11-19, config con `report` e campi nuovi, strutture Go, route `report-settings`/`price-check`, pagina Impostazioni; corretto "Username/password rimossi": esistono per la console seriale), ROADMAP (riga 3 con la regola dei flag CPU D63, riga 23 Impostazioni) — `README.md`, `devtools/mockpve/README.md`, `CLAUDE.md`, `ROADMAP.md`
 
