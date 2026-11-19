@@ -988,7 +988,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.196.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.197.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -6051,7 +6051,7 @@ window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>
 // pmgr:report-settings:begin
 // The metadata defines both form units and client-side bounds. The server validates independently.
 const ReportSettingsUI={
-  idx:null, generation:0, saving:false,
+  idx:null, generation:0, saving:false, proposals:[],
   internal:[
     ['token_eur','Valore gettone VM (EUR)',0,1000],['gpu_token_eur','Valore gettone GPU (EUR)',0,100000],
     ['base_tokens','VM base (gettoni/mese)',0,1000],['base_cores','Core inclusi nella base',0,4096,'int'],
@@ -6154,7 +6154,7 @@ const ReportSettingsUI={
   },
   async open(idx){
     const generation=++this.generation,editor=document.getElementById('rs-editor');
-    this.idx=null;editor.textContent='Caricamento…';
+    this.idx=null;this.proposals=[];editor.textContent='Caricamento…';
     try{
       const r=await api(`/clusters/${idx}/report-settings`,{quiet:true});
       if(generation!==this.generation)return;
@@ -6173,7 +6173,7 @@ const ReportSettingsUI={
       <h3>Listino interno</h3><div class="rs-grid" id="rs-internal">${this.internal.map(f=>this.field(f,p[f[0]]??(f[5]==='optional'?null:0))).join('')}</div>
       <p class="hint">Blocchi vuoti: dimensione predefinita. Le risorse oltre la base si arrotondano per eccesso. Fasce GPU: da X GiB, N gettoni GPU; vale la fascia più alta raggiunta. Per il supplemento da 89 GiB, aggiungi una fascia dedicata.</p>
       <div id="rs-tiers">${(p.gpu_tiers??[]).map(t=>this.tier(t)).join('')}</div><button type="button" class="btn bg2 sm" data-add="tier">Aggiungi fascia GPU</button>
-      <h3>Prezzi di mercato</h3><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider</button>
+      <h3>Prezzi di mercato</h3><p class="hint">AWS, Scaleway e Aruba non hanno un listino pubblico leggibile senza credenziali: aggiornali a mano</p><button type="button" class="btn bg2 sm" data-price-check>Controlla i listini</button><div id="rs-price-status" role="status"></div><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider</button>
       <h3>Cambio USD/EUR</h3><div id="rs-exchange">${this.field(['usd_eur','EUR per 1 USD',0,10],r.usd_eur??0)}</div>
       <h3>Classi degli storage</h3><p class="hint" id="rs-storage-hint">Lettura degli storage…</p><div id="rs-storage">${Object.entries(r.storage_classes??{}).map(([k,v])=>this.storage(k,v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage</button>
       <h3>Soglie predefinite</h3><p class="hint">Campi vuoti o zero: predefinito del report. Valori diversi da zero devono rispettare l’intervallo indicato.</p><div class="rs-grid" id="rs-defaults">${this.thresholds.map(f=>this.field(f,d[f[0]],true)).join('')}</div>
@@ -6185,6 +6185,8 @@ const ReportSettingsUI={
   },
   click(e){
     const button=e.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-price-check')){this.checkPrices(button);return;}
+    if(button.hasAttribute('data-apply-price')){this.applyPrice(Number(button.dataset.applyPrice));return;}
     if(button.hasAttribute('data-remove')){button.closest('.rs-row').remove();return;}
     let target,html,limit,selector;
     if(button.hasAttribute('data-add-market-tier')){target=button.parentElement.querySelector('[data-market-tiers]');html=this.tier({},'price');limit=8;selector='[data-tier]';}
@@ -6197,6 +6199,52 @@ const ReportSettingsUI={
     }
     if(target.querySelectorAll(selector).length>=limit){toast('Numero massimo di righe: '+limit,'err');return;}
     target.insertAdjacentHTML('beforeend',html);target.lastElementChild.querySelector('input')?.focus();
+  },
+  async checkPrices(button){
+    if(this.idx==null)return;
+    const idx=this.idx, generation=this.generation, status=document.getElementById('rs-price-status');
+    button.disabled=true;status.textContent='Controllo dei listini in corso…';
+    try{
+      const result=await api(`/clusters/${idx}/report-settings/price-check`,{method:'POST',body:JSON.stringify({sources:['azure','ovh']}),quiet:true});
+      if(generation!==this.generation)return;
+      this.proposals=result.proposals;status.textContent='Controllo completato. Le proposte non sono salvate.';this.showPrices();
+    }catch(e){if(generation===this.generation)status.textContent='Impossibile controllare i listini: '+e.message;}
+    finally{if(generation===this.generation)button.disabled=false;}
+  },
+  showPrices(){
+    const fmt=v=>Number(v).toLocaleString('it-IT',{maximumSignificantDigits:4}); // 0,01668 not 0.016679347826086956
+    document.querySelectorAll('[data-price-result]').forEach(el=>el.remove());
+    const market=document.getElementById('rs-market'),status=document.getElementById('rs-price-status');
+    this.proposals.forEach((p,i)=>{
+      const row=[...market.querySelectorAll('[data-provider]')].find(el=>el.querySelector('[data-key="level"]').value===p.level);
+      const compare=(label,value,key)=>{
+        if(value==null)return `<li>${esc(label)}: proposta non disponibile</li>`;
+        const field=row?.querySelector(`[data-key="${key}"]`),old=field?Number(field.value):null;
+        const currency=row?.querySelector('[data-key="currency"]').value;
+        const diff=old>0&&currency==='EUR'?` (${((value-old)/old*100).toFixed(1)}%)`:'';
+        return `<li>${esc(label)}: attuale ${old===null?'non presente':esc(fmt(old))+' '+esc(currency)}, proposto ${esc(fmt(value))} EUR${esc(diff)}</li>`;
+      };
+      const gpu=p.gpu_hour.map(t=>{
+        const current=[...(row?.querySelectorAll('[data-tier]')??[])].find(el=>Number(el.querySelector('[data-key="min_gib"]').value)===t.min_gib);
+        const old=current?Number(current.querySelector('[data-key="price"]').value):null;
+        const currency=row?.querySelector('[data-key="currency"]').value;
+        const diff=old>0&&currency==='EUR'?` (${((t.price-old)/old*100).toFixed(1)}%)`:'';
+        return `<li>GPU da ${esc(t.min_gib)} GiB: attuale ${old===null?'non presente':esc(fmt(old))+' '+esc(currency)}, proposto ${esc(fmt(t.price))} EUR/ora${esc(diff)}</li>`;
+      }).join('');
+      const html=`<div class="rs-row" data-price-result><strong>${esc(p.provider_name)} — livello ${p.level==='low'?'basso':'alto'}</strong><ul>${compare('vCPU/ora',p.vcpu_hour,'vcpu_hour')}${compare('RAM GB/ora',p.ram_gb_hour,'ram_gb_hour')}${gpu}</ul><p>Voci: ${p.items.length?p.items.map(v=>esc(v.sku)+': '+esc(fmt(v.price))+' EUR/ora').join(', '):'nessuna'}</p><p>${p.errors.length?'Errori: '+p.errors.map(esc).join('; '):'Nessun errore.'}</p><button type="button" class="btn bg2 sm" data-apply-price="${i}" ${!p.items.length?'disabled':''}>Applica alla riga ${p.level==='low'?'bassa':'alta'}</button></div>`;
+      (row??status).insertAdjacentHTML('afterend',html);
+    });
+  },
+  applyPrice(i){
+    const p=this.proposals[i], market=document.getElementById('rs-market');if(!p)return;
+    let row=[...market.querySelectorAll('[data-provider]')].find(el=>el.querySelector('[data-key="level"]').value===p.level);
+    if(!row){if(market.querySelectorAll('[data-provider]').length>=6){toast('Massimo 6 listini di mercato','err');return;}market.insertAdjacentHTML('beforeend',this.provider({name:p.provider_name,level:p.level,currency:'EUR',date:p.date}));row=market.lastElementChild;}
+    if(row.querySelector('[data-key="currency"]').value!=='EUR'){toast('La riga è in USD: converti prima i valori in EUR, incluso lo storage','err');return;}
+    const set=(key,value)=>{row.querySelector(`[data-key="${key}"]`).value=value;};
+    set('name',p.provider_name);set('currency','EUR');set('source',p.source_text);set('date',p.date);
+    if(p.vcpu_hour!=null)set('vcpu_hour',p.vcpu_hour);if(p.ram_gb_hour!=null)set('ram_gb_hour',p.ram_gb_hour);
+    if(p.gpu_hour.length)row.querySelector('[data-market-tiers]').innerHTML=p.gpu_hour.map(t=>this.tier(t,'price')).join('');
+    this.showPrices();toast('Proposta applicata al modulo: salva per confermare','ok');
   },
   read(){
     const get=(el,key)=>el.querySelector(`[data-key="${key}"]`).value;
