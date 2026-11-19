@@ -31,7 +31,7 @@ Legenda stato: `da fare` · `in discussione` · `in corso` · `fatto`. Dimension
 | 18 | Installare il nuovo tooling dei template sul cluster HOSTING (oggi i vecchi script in `/root/cloud-images`) e ricreare i template | le VM nuove di HOSTING nascono gia' conformi (firewall 22/80/443, SSH a sola chiave, hardening) | M | `pmgr-calcolo-install.sh` (profilo hosting con `PROFILE=hosting`), password dei template | da fare |
 | 19 | `disk.sh`: controllare i comandi necessari e dire quale manca (oggi `parted` assente = exit 127) e aggiornare gli helper dei template Rocky | "Aggiungi disco" robusto sulle VM Debian esistenti (senza `parted`) | S | helper nei template | da fare |
 | 20 | **Deploy non locale e manager multiutente con livelli** (macchina dedicata con IP proprio, login, ruoli diversi; richiesta ribadita dall'utente il 2026-11-19) | login e ruoli al posto della VPN come unico controllo; il manager non gira piu' sulla postazione; sblocca D95/D96 | L | decisione sull'architettura (Opus) | **prossimo**, da discutere |
-| 21 | **Report: uso medio per VM su 1-12 mesi a scelta** (richiesta utente 2026-11-19) | capire se una VM e' sovradimensionata o abbandonata guardando l'andamento mese per mese | M | Report v2 (RRD a 6 ore fino a ~90 giorni, poi settimanale), D32 | **decisioni prese** (D115-D120; D121 aperta), prossimo: misure in sola lettura |
+| 21 | **Report: uso medio per VM su 1-12 mesi a scelta** (richiesta utente 2026-11-19) | capire se una VM e' sovradimensionata o abbandonata guardando l'andamento mese per mese | M | Report v2, storico giornaliero | **fatto e in servizio** (2026-11-19, PR #44 e #45): storico giornaliero per VM e istanza, report "Andamento delle VM", D115-D122 |
 
 ## Dettaglio
 
