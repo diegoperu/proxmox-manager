@@ -56,6 +56,8 @@ type reportParams struct {
 	Query    string
 	TH       VMThresholds
 	GPUIdle  gpuIdleThresholds
+	Months   int
+	Trend    trendThresholds
 }
 
 func (p reportParams) days() float64 { return p.To.Sub(p.From).Hours() / 24 }
@@ -66,7 +68,7 @@ func (p reportParams) key() string {
 		nodes = append(nodes, n)
 	}
 	sort.Strings(nodes)
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%+v|%+v", p.From.Format("2006-01-02"), p.To.Format("2006-01-02"), strings.Join(nodes, ","), p.Kind, p.Group, p.Query, p.TH, p.GPUIdle)
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%+v|%+v|%d|%+v", p.From.Format("2006-01-02"), p.To.Format("2006-01-02"), strings.Join(nodes, ","), p.Kind, p.Group, p.Query, p.TH, p.GPUIdle, p.Months, p.Trend)
 }
 
 func floatParam(v string, def, lo, hi float64) (float64, error) {
@@ -82,7 +84,7 @@ func floatParam(v string, def, lo, hi float64) (float64, error) {
 
 // parseReportParams validates every query parameter against a whitelist.
 func parseReportParams(q func(string) string, now time.Time) (reportParams, error) {
-	p := reportParams{Kind: "all", TH: defaultVMThresholds(), GPUIdle: defaultGPUIdleThresholds()}
+	p := defaultReportParams()
 	loc := now.Location()
 	to := now
 	if s := q("to"); s != "" {
@@ -114,6 +116,14 @@ func parseReportParams(q func(string) string, now time.Time) (reportParams, erro
 		return p, err
 	}
 	p.From, p.To, p.TF, p.Step = from, to, tf, step
+	return parseReportFilters(q, p)
+}
+
+func defaultReportParams() reportParams {
+	return reportParams{Kind: "all", TH: defaultVMThresholds(), GPUIdle: defaultGPUIdleThresholds(), Months: 6, Trend: defaultTrendThresholds()}
+}
+
+func parseReportFilters(q func(string) string, p reportParams) (reportParams, error) {
 	if s := q("nodes"); s != "" {
 		p.Nodes = map[string]bool{}
 		for _, n := range strings.Split(s, ",") {
@@ -171,6 +181,9 @@ func parseReportParams(q func(string) string, now time.Time) (reportParams, erro
 			return p, errors.New("idle_days: soglia non valida (7-60 giorni interi)")
 		}
 		p.GPUIdle.Days = n
+	}
+	if err := parseTrendThresholds(q, &p); err != nil {
+		return p, err
 	}
 	return p, nil
 }
@@ -515,7 +528,7 @@ func guestRRD(c reportAPI, g resGuest, tf, cf string, from, to int64) (rrdSeries
 	if err != nil {
 		return rrdSeries{}, false
 	}
-	s, err := parseRRD(raw, "cpu", "mem", "maxmem", "netin", "netout")
+	s, err := parseRRD(raw, "cpu", "mem", "maxmem", "netin", "netout", "diskread", "diskwrite")
 	if err != nil {
 		return rrdSeries{}, false
 	}
