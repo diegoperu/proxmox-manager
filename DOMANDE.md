@@ -1243,11 +1243,11 @@ Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi
 **Risposta utente**: (2026-11-19) "Tutto come suggerisci": opzione suggerita.
 
 ### D121 — Identita' di una VM nel tempo (conseguenza della nota su D119)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (proposta da verificare con le misure dello step 1)
 **Domanda**: Poiche' VMID e IP si riusano, ogni riga salvata porta anche un **identificativo di istanza**: per le VM QEMU il `ctime` di `meta: creation-qemu=...,ctime=<epoch>` nella configurazione (scritto da Proxmox alla creazione e al clone) e, se manca, l'`uuid` di `smbios1`; per gli LXC (che non hanno ne' l'uno ne' l'altro) il primo giorno in cui il VMID compare con quel nome, con una nuova istanza quando il VMID ricompare dopo essere sparito o cambia nome mentre c'e' un buco. L'IP non si salva e non si usa mai per collegare dati. La stessa correzione va applicata alla tabella `gpu_use_day` (oggi chiave giorno+cluster+VMID). Va bene?
 **Perche' conta**: senza, una VM nuova che riceve il VMID di una cancellata erediterebbe la sua storia ("ultimo mese attivo", "abbandonata", uso delle GPU).
 **Opzioni**: A) come proposto; B) solo VMID + nome (una VM rinominata diventa un'altra); C) solo VMID (storia mescolata).
 **Suggerimento**: A.
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) "Ottima proposta": A. **Corretta dalle misure dello step 1 (2026-11-19):** il `ctime` di `meta` NON e' utilizzabile (i cloni copiano quello del template: ripetuto 16 volte su CALCOLO e 3 su HOSTING; assente su 7 VM di CALCOLO e 12 di HOSTING); l'`uuid` di `smbios1` e' presente su tutte le VM QEMU (107 CALCOLO, 28 HOSTING) e mai ripetuto, template compresi: e' l'identificativo di istanza. LXC (uno per cluster) con la regola del buco/cambio di nome. In piu': nei report si salvano comunque **nome della VM e VMID**, e l'identificativo di istanza serve a distinguere le VM che li condividono.
 
