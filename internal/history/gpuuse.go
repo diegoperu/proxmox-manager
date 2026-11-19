@@ -27,6 +27,7 @@ type GPUUseDay struct {
 	Day         string
 	Cluster     string
 	VMID        int
+	Inst        string // instance id (D121: "u:<smbios1 uuid>"); "" = row written before instances existed
 	Node        string
 	Group       string // first group of the VM (D36), "altro" when none
 	Model       string // card model as Proxmox names it (not the guest's text)
@@ -48,23 +49,60 @@ type GPUUseDay struct {
 	PowerAvg    float64 // -1 = unknown
 }
 
-func (s *Store) migrateGPUUse() error {
-	_, err := s.db.Exec(`
-	CREATE TABLE IF NOT EXISTS gpu_use_day (
-		day TEXT NOT NULL, cluster TEXT NOT NULL, vmid INTEGER NOT NULL,
+const gpuUseColumns = `day, cluster, vmid, inst, node, grp, model, cards, expected, valid, off,
+	no_driver, driver_error, no_data, reserved, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg`
+
+func gpuUseSchema(table string) string {
+	return `CREATE TABLE IF NOT EXISTS ` + table + ` (
+		day TEXT NOT NULL, cluster TEXT NOT NULL, vmid INTEGER NOT NULL, inst TEXT NOT NULL,
 		node TEXT NOT NULL, grp TEXT NOT NULL, model TEXT NOT NULL, cards INTEGER NOT NULL,
 		expected INTEGER NOT NULL, valid INTEGER NOT NULL, off INTEGER NOT NULL,
-		no_driver INTEGER NOT NULL, driver_error INTEGER NOT NULL, no_data INTEGER NOT NULL,
+		no_driver INTEGER NOT NULL, driver_error INTEGER NOT NULL, no_data INTEGER NOT NULL, reserved INTEGER NOT NULL,
 		busy_minutes INTEGER NOT NULL,
 		util_avg REAL NOT NULL, util_p95 REAL NOT NULL, util_max REAL NOT NULL,
 		mem_avg_pct REAL NOT NULL, mem_max_pct REAL NOT NULL,
 		temp_max REAL NOT NULL, power_avg REAL NOT NULL,
-		PRIMARY KEY (day, cluster, vmid));
-	`)
+		PRIMARY KEY (day, cluster, vmid, inst));`
+}
+
+// migrateGPUUse creates the table, or brings an older one to the current schema: `reserved` (D114) is added,
+// and the instance id (D121) enters the primary key, which SQLite can only do by rebuilding the table.
+// Old rows are kept with inst "" (the reports merge them with the VM's only instance).
+func (s *Store) migrateGPUUse() error {
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='gpu_use_day'`).Scan(&n); err != nil {
+		return err
+	}
+	if n == 0 {
+		_, err := s.db.Exec(gpuUseSchema("gpu_use_day"))
+		return err
+	}
+	if err := s.addColumn("gpu_use_day", "reserved", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	has, err := s.hasColumn("gpu_use_day", "inst")
+	if err != nil || has {
+		return err
+	}
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
-	return s.addColumn("gpu_use_day", "reserved", "INTEGER NOT NULL DEFAULT 0")
+	defer tx.Rollback() //nolint:errcheck // no-op after Commit
+	for _, q := range []string{
+		`DROP TABLE IF EXISTS gpu_use_day_v2`,
+		gpuUseSchema("gpu_use_day_v2"),
+		`INSERT INTO gpu_use_day_v2 (` + gpuUseColumns + `) SELECT day, cluster, vmid, '', node, grp, model, cards, expected, valid, off,
+			no_driver, driver_error, no_data, reserved, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg
+			FROM gpu_use_day`,
+		`DROP TABLE gpu_use_day`,
+		`ALTER TABLE gpu_use_day_v2 RENAME TO gpu_use_day`,
+	} {
+		if _, err := tx.Exec(q); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func finitePct(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 && v <= 100 }
@@ -78,6 +116,8 @@ func ValidGPUUse(r GPUUseDay) error {
 		return errors.New("history: invalid cluster label")
 	case r.VMID <= 0 || r.VMID > 999999999:
 		return errors.New("history: invalid vmid")
+	case r.Inst != "" && !InstPattern.MatchString(r.Inst):
+		return errors.New("history: invalid instance")
 	case !gpuNodePattern.MatchString(r.Node):
 		return errors.New("history: invalid node")
 	case !gpuGroupPattern.MatchString(r.Group):
@@ -109,10 +149,9 @@ func (s *Store) UpsertGPUUse(rows []GPUUseDay) error {
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op after Commit
-	st, err := tx.Prepare(`INSERT INTO gpu_use_day (day, cluster, vmid, node, grp, model, cards, expected, valid, off,
-		no_driver, driver_error, no_data, reserved, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-		ON CONFLICT(day, cluster, vmid) DO UPDATE SET node=excluded.node, grp=excluded.grp, model=excluded.model,
+	st, err := tx.Prepare(`INSERT INTO gpu_use_day (` + gpuUseColumns + `)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		ON CONFLICT(day, cluster, vmid, inst) DO UPDATE SET node=excluded.node, grp=excluded.grp, model=excluded.model,
 		cards=excluded.cards, expected=excluded.expected, valid=excluded.valid, off=excluded.off, no_driver=excluded.no_driver,
 		driver_error=excluded.driver_error, no_data=excluded.no_data, reserved=excluded.reserved, busy_minutes=excluded.busy_minutes,
 		util_avg=excluded.util_avg, util_p95=excluded.util_p95, util_max=excluded.util_max,
@@ -122,7 +161,7 @@ func (s *Store) UpsertGPUUse(rows []GPUUseDay) error {
 	}
 	defer st.Close()
 	for _, r := range rows {
-		if _, err := st.Exec(r.Day, r.Cluster, r.VMID, r.Node, r.Group, r.Model, r.Cards, r.Expected, r.Valid, r.Off,
+		if _, err := st.Exec(r.Day, r.Cluster, r.VMID, r.Inst, r.Node, r.Group, r.Model, r.Cards, r.Expected, r.Valid, r.Off,
 			r.NoDriver, r.DriverError, r.NoData, r.Reserved, r.BusyMinutes, r.UtilAvg, r.UtilP95, r.UtilMax, r.MemAvgPct, r.MemMaxPct,
 			r.TempMax, r.PowerAvg); err != nil {
 			return err
@@ -136,9 +175,8 @@ func (s *Store) GPUUseDays(cluster, from, to string) ([]GPUUseDay, error) {
 	if !dayPattern.MatchString(from) || !dayPattern.MatchString(to) || !labelPattern.MatchString(cluster) {
 		return nil, errors.New("history: invalid query")
 	}
-	rows, err := s.db.Query(`SELECT day, cluster, vmid, node, grp, model, cards, expected, valid, off, no_driver, driver_error,
-		no_data, reserved, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg
-		FROM gpu_use_day WHERE cluster=? AND day>=? AND day<=? ORDER BY day, vmid`, cluster, from, to)
+	rows, err := s.db.Query(`SELECT `+gpuUseColumns+`
+		FROM gpu_use_day WHERE cluster=? AND day>=? AND day<=? ORDER BY day, vmid, inst`, cluster, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +184,7 @@ func (s *Store) GPUUseDays(cluster, from, to string) ([]GPUUseDay, error) {
 	out := []GPUUseDay{}
 	for rows.Next() {
 		var r GPUUseDay
-		if err := rows.Scan(&r.Day, &r.Cluster, &r.VMID, &r.Node, &r.Group, &r.Model, &r.Cards, &r.Expected, &r.Valid, &r.Off,
+		if err := rows.Scan(&r.Day, &r.Cluster, &r.VMID, &r.Inst, &r.Node, &r.Group, &r.Model, &r.Cards, &r.Expected, &r.Valid, &r.Off,
 			&r.NoDriver, &r.DriverError, &r.NoData, &r.Reserved, &r.BusyMinutes, &r.UtilAvg, &r.UtilP95, &r.UtilMax, &r.MemAvgPct,
 			&r.MemMaxPct, &r.TempMax, &r.PowerAvg); err != nil {
 			return nil, err

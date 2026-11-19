@@ -327,3 +327,28 @@ func TestGPUUsageGroupWeightsAndTail(t *testing.T) {
 		t.Fatalf("zero weight and real others group: %+v", groups)
 	}
 }
+
+// D121: rows of one VMID with two instances stay apart; rows written before instances existed (inst "")
+// join the VMID's only instance and stay apart when there are two.
+func TestGPUUsageInstances(t *testing.T) {
+	p := gpuReportParams()
+	row := func(day string, vmid int, inst string) history.GPUUseDay {
+		return history.GPUUseDay{Day: day, Cluster: "C", VMID: vmid, Inst: inst, Node: "n", Group: "g", Model: "m", Cards: 1,
+			Expected: 10, Valid: 10, UtilAvg: 50, UtilMax: 50, TempMax: -1, PowerAvg: -1}
+	}
+	a, b := "u:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "u:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	u := aggregateGPUUsage([]history.GPUUseDay{
+		row("2026-10-30", 101, ""), row("2026-10-31", 101, a), // legacy merges into the only instance
+		row("2026-10-20", 102, a), row("2026-10-30", 102, b), row("2026-10-29", 102, ""), // two instances: legacy apart
+	}, p)
+	count := map[int]int{}
+	for _, r := range u.Rows {
+		count[r.VMID]++
+		if r.VMID == 101 && (r.Inst != a || r.Days != 2) {
+			t.Errorf("legacy row not merged: %+v", r)
+		}
+	}
+	if count[101] != 1 || count[102] != 3 {
+		t.Fatalf("rows per VMID: %v", count)
+	}
+}

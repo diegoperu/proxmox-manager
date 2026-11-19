@@ -44,6 +44,8 @@ func main() {
 	handlers.StartSnapshots(context.Background(), hist)
 	// GPU usage sampling (ROADMAP 4): runs only when config gpu_usage is true.
 	handlers.StartGPUUse(context.Background(), hist)
+	// Daily VM usage history from the RRD (ROADMAP 21): on unless config vm_usage is false.
+	handlers.StartVMUse(context.Background(), hist)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

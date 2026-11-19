@@ -17,6 +17,7 @@ func defaultGPUIdleThresholds() gpuIdleThresholds {
 
 type gpuUsageRow struct {
 	VMID        int      `json:"vmid"`
+	Inst        string   `json:"-"` // D121, server side only
 	Name        string   `json:"name"`
 	Node        string   `json:"node"`
 	Group       string   `json:"group"`
@@ -79,7 +80,7 @@ func (a *gpuUseAccumulator) add(r history.GPUUseDay) {
 		a.days = make(map[string]bool)
 	}
 	a.days[r.Day] = true
-	a.row.VMID = r.VMID
+	a.row.VMID, a.row.Inst = r.VMID, r.Inst
 	a.row.Expected += r.Expected
 	a.row.Valid += r.Valid
 	a.row.Off += r.Off
@@ -126,17 +127,38 @@ func (a *gpuUseAccumulator) result() gpuUsageRow {
 // final idle_days calendar days, including to. Missing days cannot produce an idle classification.
 func aggregateGPUUsage(rows []history.GPUUseDay, p reportParams) gpuUsageReport {
 	type acc struct{ period, window gpuUseAccumulator }
-	byVM := make(map[int]*acc)
+	type key struct {
+		vmid int
+		inst string
+	}
+	byVM := make(map[key]*acc)
 	from, to := p.From.Format("2006-01-02"), p.To.Format("2006-01-02")
 	start := p.To.AddDate(0, 0, 1-p.GPUIdle.Days).Format("2006-01-02")
+	// Rows written before instance ids existed (inst "") belong to the VM's only known instance; with
+	// two or more instances of that VMID they cannot be attributed and stay apart.
+	insts := map[int]map[string]bool{}
+	for _, row := range rows {
+		if row.Inst != "" {
+			if insts[row.VMID] == nil {
+				insts[row.VMID] = map[string]bool{}
+			}
+			insts[row.VMID][row.Inst] = true
+		}
+	}
 	for _, row := range rows {
 		if row.Day < from || row.Day > to {
 			continue
 		}
-		a := byVM[row.VMID]
+		if row.Inst == "" && len(insts[row.VMID]) == 1 {
+			for only := range insts[row.VMID] {
+				row.Inst = only
+			}
+		}
+		k := key{row.VMID, row.Inst}
+		a := byVM[k]
 		if a == nil {
 			a = &acc{}
-			byVM[row.VMID] = a
+			byVM[k] = a
 		}
 		a.period.add(row)
 		if row.Day >= start {

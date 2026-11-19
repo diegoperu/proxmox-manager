@@ -411,7 +411,7 @@ func TestGPUUseReservedAccumulator(t *testing.T) {
 	g.record("C", "2026-11-19", target, sampleState(cards), cards)
 	cards[0].Util = &ten
 	g.record("C", "2026-11-19", target, sampleState(cards), cards)
-	k := gpuUseAccKey{"C", "2026-11-19", 101}
+	k := gpuUseAccKey{"C", "2026-11-19", 101, target.inst}
 	row := g.acc[k].row(k)
 	if row.Valid != 2 || row.Reserved != 1 || row.BusyMinutes != 5 {
 		t.Fatalf("%+v", row)
