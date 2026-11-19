@@ -1267,37 +1267,55 @@ Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi
 Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, neppure nei grafici: informazioni interessanti sull'uso e sull'andamento del servizio); parte di valutazione e parte di finanziamento come proposto; **grafici anche a torta, di andamento, di disponibilita'**; una sezione su **come gli utenti dimensionano le VM** (% sovradimensionate ecc.); **GPU raggruppate per taglia di memoria**, senza dettaglio per modello; **niente VM abbandonate**; contenuti nuovi: **valore economico**, **crescita nel tempo**, **sicurezza e affidabilita'**; formato **1 pagina esecutiva per lingua + allegati**.
 
 ### D123 — Valore economico: con quali prezzi
-**Stato**: APERTA
+**Stato**: IN CORSO
 **Bloccante**: si (per la sezione valore economico)
 **Domanda**: "Quanto costerebbero le stesse risorse altrove" richiede prezzi di riferimento. Quali?
 **Perche' conta**: e' il numero che un consiglio di dipartimento ricorda; deve essere difendibile (fonte e data dichiarate).
 **Opzioni**: A) listino pubblico di un cloud commerciale (es. on-demand nella regione di Milano) per vCPU-ora, GB di RAM-ora, GPU-ora per taglia, storage GB-mese, inseriti a mano in `config.json` con fonte e data; B) costo interno (ammortamento dell'hardware + energia + personale) da dati che fornisci tu; C) entrambi, affiancati.
 **Suggerimento**: A per partire (si calcola dalle risorse assegnate e usate gia' raccolte, con fonte e data in nota); C quando ci saranno i costi interni.
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) cercare prezzi di riferimento tra AWS, Azure, Aruba Cloud o altri, **solo nel mercato europeo**. Proposta sotto (D123-bis), in attesa di conferma.
 
 ### D124 — Sicurezza e affidabilita': da quali dati
-**Stato**: APERTA
+**Stato**: IN PAUSA (sicurezza); affidabilita' RISPOSTA
 **Bloccante**: no
 **Domanda**: L'affidabilita' si puo' mostrare subito con dati gia' disponibili (disponibilita' dei nodi dai campioni RRD, backup riusciti, operazioni fallite). La **sicurezza delle VM** (fail2ban attivo, aggiornamenti automatici, SSH solo chiave) oggi non e' raccolta dal manager: si leggerebbe con un controllo periodico in sola lettura via guest agent su tutte le VM (come l'uso delle GPU, ma su ~120 VM), oppure si rinvia.
 **Perche' conta**: la postura di sicurezza e' un argomento forte, ma leggere dentro tutte le VM e' un'esecuzione periodica in piu' su macchine di produzione.
 **Opzioni**: A) solo affidabilita' ora (disponibilita' mensile, backup, operazioni), sicurezza come voce di roadmap; B) A + controllo settimanale in sola lettura della postura di sicurezza in tutte le VM; C) A + una percentuale fissa dichiarata a mano dal rollout (aggiornata quando si rifa' il rollout).
 **Suggerimento**: A ora, B come lavoro a parte (stesso schema sicuro del monitoraggio GPU).
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) "metti in pausa la sicurezza, la affrontiamo dopo se richiesto dal management": nel v3 solo affidabilita' (disponibilita', backup, operazioni).
 
 ### D125 — Concentrazione dell'uso senza nomi
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: Senza citare gruppi si possono mostrare: numero di gruppi serviti e loro crescita, e la **concentrazione** (es. "il 20% dei gruppi usa il 70% della RAM" con una torta per fasce: primi 5 gruppi / successivi 15 / tutti gli altri, senza nomi). Va bene?
 **Perche' conta**: mostra se il servizio e' usato da tanti o da pochi, senza esporre nessuno.
 **Opzioni**: A) si', fasce anonime; B) solo il numero di gruppi; C) nulla sui gruppi.
 **Suggerimento**: A.
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) "ok": fasce anonime.
 
 ### D126 — Contenuto della pagina esecutiva
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (si vede meglio su uno schizzo)
 **Domanda**: Proposta per la pagina esecutiva (una per lingua): condizione del servizio in una frase; 4 numeri grandi (VM attive, crescita annua delle risorse assegnate, disponibilita', valore economico); 2 grafici piccoli (andamento delle risorse assegnate rispetto alla capacita'; torta del dimensionamento delle VM); 3 messaggi chiave; "cosa serve" in una riga (risorsa che si esaurisce prima e data stimata). Allegati: A1 uso e crescita, A2 come vengono dimensionate le VM, A3 GPU per taglia di memoria, A4 affidabilita' (e sicurezza secondo D124), A5 fabbisogno e finanziamento (esaurimenti, cosa comprare e quando, valore economico), A6 metodo. Va bene come impianto?
 **Opzioni**: A) si', poi lo vedi su uno schizzo con dati veri; B) da cambiare (dimmi cosa).
 **Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "ok": impianto approvato, da vedere su uno schizzo con dati veri.
+
+### D123-bis — Prezzi di riferimento proposti (ricerca del 2026-11-19, mercato europeo)
+**Stato**: APERTA
+**Bloccante**: si (per la sezione valore economico)
+**Ricerca:** listini pubblici on-demand senza IVA. Fonti ufficiali dove leggibili, altrimenti aggregatori con la data; **da verificare sui calcolatori ufficiali prima della pubblicazione** (la pagina prezzi ufficiale di OVHcloud non e' leggibile per intero in automatico; AWS e Azure pubblicano in USD).
+| Voce | Provider europeo (basso) | Hyperscaler, regione Milano/Europa (alto) |
+|---|---|---|
+| Istanza generica 4 vCPU / 16 GB | OVHcloud b3-16 **0,093 EUR/h** (blog prezzi OVH, Holori) | AWS m7i.xlarge Milano **0,235 USD/h**; Azure D4s v5 Italy North **0,224 USD/h** |
+| -> vCPU-ora / GB RAM-ora (ripartiti con il rapporto 7,5:1 dei listini a risorse di Google) | **0,0151 EUR / 0,0020 EUR** | ~0,038 / ~0,0051 USD |
+| GPU 16 GB (A2/T4) | nessuna offerta europea trovata | AWS g4dn.xlarge (T4) Milano **0,616 USD/h** (con 4 vCPU/16 GB) |
+| GPU 24 GB (L4/A10/RTX 3090) | OVH L4 **0,72-0,75 EUR/h**, OVH A10 **0,76 EUR/h**, Scaleway L4 **0,79 EUR/h** | AWS g6.xlarge (L4) Francoforte **1,006 USD/h** |
+| GPU 40-48 GB (A100 40 GB) | nessuna A100 da 40 GB singola in Europa; OVH/Scaleway L40S 48 GB **1,40-1,47 EUR/h** | (A100 40 GB solo in istanze da 8 schede) |
+| GPU 80 GB (A100/H100 80 GB) | OVH A100 80 GB **2,75 EUR/h**, OVH H100 **2,80 EUR/h**, Scaleway H100 **2,73-2,86 EUR/h** | Azure NC24ads A100 v4 West Europe **4,78-5,88 USD/h** |
+| Storage a blocchi GB-mese | Aruba **0,000028 EUR/h/GB = ~0,020 EUR** | AWS gp3 Milano **~0,094 EUR** (stima) |
+**Proposta di metodo:** valore = risorse **assegnate** x tempo: vCPU e RAM per le ore in cui la VM e' accesa (dallo storico giornaliero), GPU per le ore di VM accesa, storage per i GB assegnati x mesi; mostrato come **intervallo** "tra X (provider europeo) e Y (hyperscaler)" con fonte e data in nota; prezzi in `config.json` (EUR, fonte, data) cosi' si aggiornano senza codice; per la classe 40 GB il prezzo della L40S 48 GB (prudente, dichiarato); per gli USD un cambio fisso dichiarato in config.
+**Opzioni**: A) intervallo basso-alto come sopra; B) solo il provider europeo (cifra prudente, piu' difendibile); C) solo hyperscaler (cifra piu' alta).
+**Suggerimento**: A, con la cifra bassa in evidenza nella pagina esecutiva (prudente) e l'intervallo negli allegati.
 **Risposta utente**: (vuoto)
 
