@@ -1027,7 +1027,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.188.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.189.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -6353,6 +6353,29 @@ const ReportSettingsUI={
   storage(name='',value='',detected=false,proposed=false){
     return `<tr data-storage ${detected?'data-detected':''} ${proposed?'data-proposed':''}><td>${detected?`<span class="tm">${esc(name)}</span><input type="hidden" data-key="name" value="${esc(name)}">`:this.text('name','Nome storage manuale',name,64)}<span class="hint" data-storage-note>${proposed?'proposta dal nome':detected?'rilevato nel cluster':'non rilevato · manuale'}</span></td><td>${this.select('class','Classe storage',value,[['','non classificato'],['ssd','SSD'],['hdd','HDD'],['other','Altro']])}${detected?'':this.remove('Rimuovi')}</td></tr>`;
   },
+  // Name-based proposals never fill the form by themselves (the page would open with unsaved changes):
+  // the administrator applies them with one click, and they are saved with the normal Salva.
+  // Detected rows whose class is still empty, not saved, and that the name suggests (ssd/hdd).
+  proposable(){
+    return [...document.querySelectorAll('#rs-storage tr[data-storage]')].filter(row=>{
+      const name=row.querySelector('[data-key="name"]')?.value??'',cls=row.querySelector('[data-key="class"]');
+      return row.hasAttribute('data-detected')&&cls&&!cls.value&&!Object.hasOwn(this.savedStorage,name)&&!!this.storageProposal(name);
+    });
+  },
+  proposalButton(){
+    const box=document.getElementById('rs-storage-propose');if(!box)return;
+    const n=this.proposable().length;
+    box.innerHTML=n?`<button type="button" class="btn bg2 sm" data-storage-propose>${esc(n===1?'Applica la proposta dal nome (1 storage)':'Applica le proposte dal nome ('+n+' storage)')}</button>`:'';
+  },
+  // Name-based proposals never fill the form by themselves (the page would open with unsaved changes):
+  // the administrator applies them with one click, and they are saved with the normal Salva.
+  applyStorageProposals(){
+    for(const row of this.proposable()){
+      row.setAttribute('data-proposed','');
+      row.querySelector('[data-key="class"]').value=this.storageProposal(row.querySelector('[data-key="name"]').value);
+    }
+    this.updateStorageNotes();this.updateDirty();this.proposalButton();
+  },
   storageTable(classes,propose=true){
     const detected=new Set(this.detectedStorage);
     return [...new Set([...this.detectedStorage,...Object.keys(classes)])].sort().map(name=>{
@@ -6369,11 +6392,12 @@ const ReportSettingsUI={
         existing.setAttribute('data-detected','');existing.querySelector('[data-key="name"]').readOnly=true;
         existing.querySelector('[data-remove]')?.remove();
       }else{
-        const saved=Object.hasOwn(this.savedStorage,name),value=saved?this.savedStorage[name]:this.storageProposal(name);
-        root.insertAdjacentHTML('beforeend',this.storage(name,value,true,!saved&&!!value));
+        const saved=Object.hasOwn(this.savedStorage,name);
+        root.insertAdjacentHTML('beforeend',this.storage(name,saved?this.savedStorage[name]:'',true,false));
       }
     }
-    document.getElementById('rs-storage-hint').textContent=this.detectedStorage.length?'Una riga per storage rilevato. Le proposte dal nome richiedono il salvataggio.':'Nessuno storage rilevato nel cluster. Puoi aggiungere righe manuali.';
+    document.getElementById('rs-storage-hint').textContent=this.detectedStorage.length?'Una riga per storage rilevato. Le classi non assegnate non vengono salvate.':'Nessuno storage rilevato nel cluster. Puoi aggiungere righe manuali.';
+    this.proposalButton();
     this.updateStorageNotes();this.updateDirty();
   },
   updateStorageNotes(){
@@ -6472,7 +6496,7 @@ const ReportSettingsUI={
     const base={cores:p?.base_cores??0,mem_gib:p?.base_mem_gib??0,ssd_gb:p?.base_ssd_gb??0,hdd_gb:0,gpu_memory_gib:[]};
     preview.innerHTML='<strong>anteprima, stesso calcolo del report</strong>'+line(`VM base (${format(base.cores)} core, ${format(base.mem_gib)} GiB RAM, ${format(base.ssd_gb)} GB SSD)`,base)+line('VM con 32 core, 128 GiB, 500 GB SSD e una GPU da 80 GB',{cores:32,mem_gib:128,ssd_gb:500,hdd_gb:0,gpu_memory_gib:[80]});
   },
-  render(r,proposeStorage=true){
+  render(r,proposeStorage=false){
     const p=r.internal_prices??{}, d=r.defaults??{};
     this.savedStorage={...r.storage_classes??{}};
     document.getElementById('rs-editor').innerHTML=`<form id="rs-form" novalidate>
@@ -6485,7 +6509,7 @@ const ReportSettingsUI={
       <details class="rs-section" open><summary>Prezzi di mercato</summary><p class="hint">Livello basso: provider europeo economico, per esempio OVHcloud; è la cifra in evidenza nel report. Livello alto: hyperscaler, per esempio Azure; completa l’intervallo di confronto.</p><p class="hint">AWS, Scaleway e Aruba non hanno un listino pubblico leggibile senza credenziali: aggiornali a mano</p><div class="rs-actions"><button type="button" class="btn ba sm" data-price-check>Controlla i listini</button><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider a mano</button></div><div id="rs-price-status" role="status"></div><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div>
       <h3>Cambio USD/EUR</h3><div id="rs-exchange">${this.field(['usd_eur','EUR per 1 USD',0,10],r.usd_eur??0)}</div>
       </details>
-      <details class="rs-section"><summary>Classi degli storage</summary><p class="hint" id="rs-storage-hint">Le classi non assegnate non vengono salvate. Le proposte dal nome richiedono il salvataggio.</p><table class="rs-storage-table"><caption class="sr">Classi degli storage del cluster</caption><thead><tr><th scope="col">Storage</th><th scope="col">Classe</th></tr></thead><tbody id="rs-storage">${this.storageTable(r.storage_classes??{},proposeStorage)}</tbody></table><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage manuale</button></details>
+      <details class="rs-section"><summary>Classi degli storage</summary><p class="hint" id="rs-storage-hint">Le classi non assegnate non vengono salvate.</p><div class="rs-actions" id="rs-storage-propose"></div><table class="rs-storage-table"><caption class="sr">Classi degli storage del cluster</caption><thead><tr><th scope="col">Storage</th><th scope="col">Classe</th></tr></thead><tbody id="rs-storage">${this.storageTable(r.storage_classes??{},proposeStorage)}</tbody></table><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage manuale</button></details>
       <details class="rs-section"><summary>Registro delle interruzioni</summary><p class="hint" id="rs-offset-note">Le date locali usano il fuso del server. Le date con fuso esplicito sono in sola lettura per conservarne il valore. Durata massima: 31 giorni per riga.</p><div id="rs-interruptions">${(r.interruptions??[]).map(v=>this.interruption(v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="interruption">Aggiungi interruzione</button></details>
       <details class="rs-section"><summary>Soglie avanzate</summary><p class="hint">Campi vuoti o zero: predefinito del report. Le percentuali si inseriscono in %, anche quando il valore salvato è una frazione.</p><div class="rs-grid" id="rs-defaults">${this.thresholds.map(f=>this.field(f,d[f[0]],true)).join('')}</div></details>
       <div class="rs-savebar" id="rs-savebar" role="region" aria-label="Salvataggio dei parametri dei report" hidden>
@@ -6504,6 +6528,7 @@ const ReportSettingsUI={
     const button=e.target.closest('button');if(!button)return;
     if(button.hasAttribute('data-cancel')){this.cancel();return;}
     if(button.hasAttribute('data-price-check')){this.checkPrices(button);return;}
+    if(button.hasAttribute('data-storage-propose')){this.applyStorageProposals();return;}
     if(button.hasAttribute('data-apply-price')){this.applyPrice(Number(button.dataset.applyPrice));return;}
     if(button.hasAttribute('data-remove')){button.closest('[data-storage],.rs-row').remove();this.updateStatus();return;}
     let target,html,limit,selector;
