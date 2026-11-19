@@ -1262,3 +1262,42 @@ Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi
 **Suggerimento**: A.
 **Risposta utente**: (2026-11-19) "Ok su entrambe": A. Applicata: abbandonata solo con picco di CPU < `abandon_peak` (10%) in ogni mese della finestra; VM con un dispositivo in passthrough (`hostpciN`) mai giudicate sovradimensionate per la CPU (la RAM si'). Su CALCOLO (6 mesi): abbandonate 14 -> 5, nessuna VM con GPU proposta a meno core, recuperabili 894 GiB/488 core -> 796 GiB/356 core.
 
+## Report manageriale v3 (2026-11-19)
+
+Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, neppure nei grafici: informazioni interessanti sull'uso e sull'andamento del servizio); parte di valutazione e parte di finanziamento come proposto; **grafici anche a torta, di andamento, di disponibilita'**; una sezione su **come gli utenti dimensionano le VM** (% sovradimensionate ecc.); **GPU raggruppate per taglia di memoria**, senza dettaglio per modello; **niente VM abbandonate**; contenuti nuovi: **valore economico**, **crescita nel tempo**, **sicurezza e affidabilita'**; formato **1 pagina esecutiva per lingua + allegati**.
+
+### D123 — Valore economico: con quali prezzi
+**Stato**: APERTA
+**Bloccante**: si (per la sezione valore economico)
+**Domanda**: "Quanto costerebbero le stesse risorse altrove" richiede prezzi di riferimento. Quali?
+**Perche' conta**: e' il numero che un consiglio di dipartimento ricorda; deve essere difendibile (fonte e data dichiarate).
+**Opzioni**: A) listino pubblico di un cloud commerciale (es. on-demand nella regione di Milano) per vCPU-ora, GB di RAM-ora, GPU-ora per taglia, storage GB-mese, inseriti a mano in `config.json` con fonte e data; B) costo interno (ammortamento dell'hardware + energia + personale) da dati che fornisci tu; C) entrambi, affiancati.
+**Suggerimento**: A per partire (si calcola dalle risorse assegnate e usate gia' raccolte, con fonte e data in nota); C quando ci saranno i costi interni.
+**Risposta utente**: (vuoto)
+
+### D124 — Sicurezza e affidabilita': da quali dati
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: L'affidabilita' si puo' mostrare subito con dati gia' disponibili (disponibilita' dei nodi dai campioni RRD, backup riusciti, operazioni fallite). La **sicurezza delle VM** (fail2ban attivo, aggiornamenti automatici, SSH solo chiave) oggi non e' raccolta dal manager: si leggerebbe con un controllo periodico in sola lettura via guest agent su tutte le VM (come l'uso delle GPU, ma su ~120 VM), oppure si rinvia.
+**Perche' conta**: la postura di sicurezza e' un argomento forte, ma leggere dentro tutte le VM e' un'esecuzione periodica in piu' su macchine di produzione.
+**Opzioni**: A) solo affidabilita' ora (disponibilita' mensile, backup, operazioni), sicurezza come voce di roadmap; B) A + controllo settimanale in sola lettura della postura di sicurezza in tutte le VM; C) A + una percentuale fissa dichiarata a mano dal rollout (aggiornata quando si rifa' il rollout).
+**Suggerimento**: A ora, B come lavoro a parte (stesso schema sicuro del monitoraggio GPU).
+**Risposta utente**: (vuoto)
+
+### D125 — Concentrazione dell'uso senza nomi
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: Senza citare gruppi si possono mostrare: numero di gruppi serviti e loro crescita, e la **concentrazione** (es. "il 20% dei gruppi usa il 70% della RAM" con una torta per fasce: primi 5 gruppi / successivi 15 / tutti gli altri, senza nomi). Va bene?
+**Perche' conta**: mostra se il servizio e' usato da tanti o da pochi, senza esporre nessuno.
+**Opzioni**: A) si', fasce anonime; B) solo il numero di gruppi; C) nulla sui gruppi.
+**Suggerimento**: A.
+**Risposta utente**: (vuoto)
+
+### D126 — Contenuto della pagina esecutiva
+**Stato**: APERTA
+**Bloccante**: no (si vede meglio su uno schizzo)
+**Domanda**: Proposta per la pagina esecutiva (una per lingua): condizione del servizio in una frase; 4 numeri grandi (VM attive, crescita annua delle risorse assegnate, disponibilita', valore economico); 2 grafici piccoli (andamento delle risorse assegnate rispetto alla capacita'; torta del dimensionamento delle VM); 3 messaggi chiave; "cosa serve" in una riga (risorsa che si esaurisce prima e data stimata). Allegati: A1 uso e crescita, A2 come vengono dimensionate le VM, A3 GPU per taglia di memoria, A4 affidabilita' (e sicurezza secondo D124), A5 fabbisogno e finanziamento (esaurimenti, cosa comprare e quando, valore economico), A6 metodo. Va bene come impianto?
+**Opzioni**: A) si', poi lo vedi su uno schizzo con dati veri; B) da cambiare (dimmi cosa).
+**Suggerimento**: A.
+**Risposta utente**: (vuoto)
+
