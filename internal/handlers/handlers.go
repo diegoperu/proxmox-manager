@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -1331,9 +1332,31 @@ func (h *Handler) GetClusters(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, result)
 }
 
+// Cluster edits cannot write report settings through the legacy endpoint. Keeping a
+// separate request type prevents new persisted fields from becoming writable by accident.
+func decodeClusterRequest(w http.ResponseWriter, r *http.Request) (config.ClusterConfig, error) {
+	var body struct {
+		Label    string `json:"label"`
+		URL      string `json:"url"`
+		APIToken string `json:"api_token"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Default  bool   `json:"default"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		return config.ClusterConfig{}, errors.New("configurazione cluster non valida")
+	}
+	if err := dec.Decode(new(any)); err != io.EOF {
+		return config.ClusterConfig{}, errors.New("configurazione cluster non valida")
+	}
+	return config.ClusterConfig{Label: body.Label, URL: body.URL, APIToken: body.APIToken, Username: body.Username, Password: body.Password, Default: body.Default}, nil
+}
+
 func (h *Handler) AddCluster(w http.ResponseWriter, r *http.Request) {
-	var body config.ClusterConfig
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	body, err := decodeClusterRequest(w, r)
+	if err != nil {
 		writeError(w, err, 400)
 		return
 	}
@@ -1362,8 +1385,8 @@ func (h *Handler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 400)
 		return
 	}
-	var body config.ClusterConfig
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	body, err := decodeClusterRequest(w, r)
+	if err != nil {
 		writeError(w, err, 400)
 		return
 	}

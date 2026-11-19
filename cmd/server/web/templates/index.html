@@ -611,6 +611,15 @@ td.spk{width:130px}
 .tile b{display:block;font-weight:600;font-size:13px}
 .tile span{font-size:12px;color:var(--text3)}
 .set{max-width:780px}
+.rs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;align-items:end}
+.rs-field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text2);min-width:0}
+.rs-field .inp{width:100%;min-width:0}
+.rs-row{padding:12px;margin:10px 0;border:1px solid var(--border);border-radius:8px}
+/* Short rows (GPU tiers, storage classes): one line each, like a table, instead of a card per row */
+.rs-row.rs-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;padding:6px 0;margin:0;border:0;border-bottom:1px solid var(--border);border-radius:0}
+.rs-row.rs-line .rs-field{flex-direction:row;align-items:center;gap:8px}.rs-row.rs-line .rs-field .inp{max-width:160px}
+#rs-form h3{margin:24px 0 12px;font-size:14px}
+#rs-form .hint{margin:12px 0}
 .sel-sum{font-size:12px;color:var(--text2);margin:10px 0 14px}
 .sel-sum b{color:var(--text);font-variant-numeric:tabular-nums}
 @media(max-width:650px){.ngrid{grid-template-columns:minmax(0,1fr)}.nc-m{grid-template-columns:1fr;gap:12px}.toolbar .sp{display:none}}
@@ -879,7 +888,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.192.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.193.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1404,6 +1413,13 @@ html.spiderman{
             <div id="ctres" style="margin-top:8px;font-size:12px"></div>
           </div>
         </div>
+        <div class="panel" id="report-settings-panel">
+          <div class="panel-h"><h2>Listini e parametri dei report</h2></div>
+          <div class="panel-b">
+            <label class="rs-field"><span>Cluster dei parametri</span><select class="inp" id="rs-cluster" onchange="ReportSettingsUI.open(Number(this.value))"></select></label>
+            <div id="rs-editor"></div>
+          </div>
+        </div>
         <div class="panel">
           <div class="panel-h"><h2>Aspetto</h2></div>
           <div class="panel-b">
@@ -1624,7 +1640,7 @@ async function api(path, opts={}) {
   const NO_CLUSTER_ROUTES=['/clusters','/config'];
   const needsCluster=!NO_CLUSTER_ROUTES.some(p=>path.startsWith(p));
   let fullPath='/api'+path;
-  if(needsCluster){
+  if(needsCluster&&!new URLSearchParams(path.split('?')[1]||'').has('cluster')){
     const sep=path.includes('?')?'&':'?';
     const cidx=(typeof ClusterMgr!=='undefined')?(ClusterMgr.current??0):0;
     fullPath+=sep+'cluster='+cidx;
@@ -2101,6 +2117,7 @@ const ClusterMgr={
       }
       this.hideForm();
       await this.renderList();
+        await ReportSettingsUI.load(ClusterMgr.current);
     }catch(e){toast(`Errore: ${e.message}`,'err');}
   },
   async deleteCluster(idx){
@@ -2114,6 +2131,7 @@ const ClusterMgr={
       try{
         await fetch(`/api/clusters/${idx}`,{method:'DELETE',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
         await this.renderList();
+        await ReportSettingsUI.load(ClusterMgr.current);
         toast('Cluster eliminato','ok');
       }catch(e){toast(`Errore: ${e.message}`,'err');}
     });
@@ -2122,6 +2140,7 @@ const ClusterMgr={
     try{
       await fetch(`/api/clusters/${idx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
       await this.renderList();
+        await ReportSettingsUI.load(ClusterMgr.current);
       toast('Default aggiornato','ok');
     }catch(e){toast(`Errore: ${e.message}`,'err');}
   },
@@ -5808,9 +5827,188 @@ window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>
   if(!sel||!sel.value) applyTheme('');
 });
 
+// pmgr:report-settings:begin
+// The metadata defines both form units and client-side bounds. The server validates independently.
+const ReportSettingsUI={
+  idx:null, generation:0, saving:false,
+  internal:[
+    ['token_eur','Valore gettone VM (EUR)',0,1000],['gpu_token_eur','Valore gettone GPU (EUR)',0,100000],
+    ['base_tokens','VM base (gettoni/mese)',0,1000],['base_cores','Core inclusi nella base',0,4096,'int'],
+    ['base_mem_gib','RAM inclusa nella base (GiB)',0,65536],['base_ssd_gb','SSD incluso nella base (GB)',0,1e7],
+    ['cores_block','Blocco core (core)',1,4096,'int','optional'],['cores_block_tokens','Prezzo blocco core (gettoni/mese)',0,1000],
+    ['mem_block_gib','Blocco RAM (GiB)',1,65536,'','optional'],['mem_block_tokens','Prezzo blocco RAM (gettoni/mese)',0,1000],
+    ['ssd_block_gb','Blocco SSD (GB)',1,1e7,'','optional'],['ssd_block_tokens','Prezzo blocco SSD (gettoni/mese)',0,1000],
+    ['hdd_block_gb','Blocco HDD (GB)',1,1e8,'','optional'],['hdd_block_tokens','Prezzo blocco HDD (gettoni/mese)',0,1000]
+  ],
+  thresholds:[
+    ['inactive_cpu','VM inattive: CPU (frazione, 0–0,5)',0,.5],['inactive_net','VM inattive: rete (byte/s)',0,1e9],
+    ['inactive_days','VM inattive: giorni osservati',1,488],['oversized_mem','VM sovradimensionate: RAM (frazione)',0,1],
+    ['oversized_cpu','VM sovradimensionate: CPU (frazione)',0,1],['oversized_days','VM sovradimensionate: giorni osservati',1,488],
+    ['idle_util','GPU inattive: utilizzo (%)',0,50],['idle_mem','GPU inattive: memoria (%)',0,50],['idle_days','GPU inattive: giorni',7,60,'int'],
+    ['abandon_months','Andamento: mesi di inattività',1,12,'int'],['abandon_peak','Andamento: picco massimo (%)',1,90],
+    ['abandon_cpu','Andamento: CPU media (%)',0,50],['abandon_net','Andamento: rete (byte/s)',0,1048576],
+    ['over_mem','Andamento: RAM sovradimensionata (%)',1,90],['over_cpu','Andamento: CPU sovradimensionata (%)',1,90],
+    ['margin','Andamento: margine (%)',0,200]
+  ],
+  market:[['vcpu_hour','vCPU-ora',0,1000],['ram_gb_hour','RAM GB-ora',0,1000],['storage_gb_month','Storage GB-mese',0,1000]],
+  number(value,f,defaultable=false){
+    if(value===''||value==null){if(f[5]==='optional')return undefined;return 0;}
+    if(typeof value==='string'&&!/^-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value))throw new Error(f[1]+': numero non valido');
+    const n=Number(value);
+    if(!Number.isFinite(n)||(!defaultable||n!==0)&&(n<f[2]||n>f[3])||f[4]==='int'&&!Number.isInteger(n))throw new Error(f[1]+': valore non valido (da '+f[2]+' a '+f[3]+')');
+    return n;
+  },
+  printable(s,max){return typeof s==='string'&&[...s].length<=max&&!/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}]/u.test(s);},
+  date(s){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
+    const d=new Date(s+'T00:00:00Z');return Number.isFinite(+d)&&d.toISOString().slice(0,10)===s;
+  },
+  time(s){
+    const local=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s);
+    if(!local&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(s))return NaN;
+    if(!this.date(s.slice(0,10))||Number(s.slice(11,13))>23||Number(s.slice(14,16))>59||!local&&Number(s.slice(17,19))>59)return NaN;
+    const d=new Date(s);
+    if(local&&(d.getFullYear()!==Number(s.slice(0,4))||d.getMonth()+1!==Number(s.slice(5,7))||d.getDate()!==Number(s.slice(8,10))||d.getHours()!==Number(s.slice(11,13))||d.getMinutes()!==Number(s.slice(14,16))))return NaN;
+    return +d;
+  },
+  validate(r){
+    for(const f of this.internal)this.number(r.internal_prices[f[0]],f);
+    this.number(r.usd_eur,['usd_eur','Cambio USD/EUR',0,10]);
+    for(const f of this.thresholds)this.number(r.defaults[f[0]],f,true);
+    const tiers=(rows,key)=>{
+      if(rows.length>8)throw new Error('GPU: massimo 8 fasce');
+      let last=-1;
+      for(const t of rows){const n=this.number(t.min_gib,['min_gib','GPU: memoria minima (GiB)',0,1024]);this.number(t[key],[key,'GPU: prezzo o gettoni',0,1000]);if(n<=last)throw new Error('GPU: memoria minima strettamente crescente');last=n;}
+    };
+    tiers(r.internal_prices.gpu_tiers,'tokens');
+    if(r.market_prices.length>6)throw new Error('Massimo 6 listini di mercato');
+    for(const p of r.market_prices){
+      if(!p.name.trim()||!this.printable(p.name,64))throw new Error('Nome provider: testo semplice, massimo 64 caratteri');
+      if(!['low','high'].includes(p.level)||!['EUR','USD'].includes(p.currency))throw new Error('Livello o valuta non validi');
+      if(!this.printable(p.source,300))throw new Error('Fonte: testo semplice, massimo 300 caratteri');
+      if(!this.date(p.date))throw new Error('Data del listino non valida (AAAA-MM-GG)');
+      for(const f of this.market)this.number(p[f[0]],f);
+      tiers(p.gpu_hour,'price');
+    }
+    if(Object.keys(r.storage_classes).length>64)throw new Error('Massimo 64 storage');
+    for(const [k,v] of Object.entries(r.storage_classes))if(!/^[A-Za-z0-9._-]{1,64}$/.test(k)||!['ssd','hdd','other'].includes(v))throw new Error('Storage: nome o classe non validi');
+    if(r.interruptions.length>500)throw new Error('Massimo 500 interruzioni');
+    for(const row of r.interruptions){
+      const from=this.time(row.from),to=this.time(row.to);
+      if(!Number.isFinite(from)||!Number.isFinite(to)||to<=from||to-from>31*86400000)throw new Error('Interruzione: date non valide, fine successiva all’inizio, durata massima 31 giorni');
+      if(!['external','maintenance','fault'].includes(row.cause))throw new Error('Causa dell’interruzione non valida');
+      if(!this.printable(row.note,200))throw new Error('Nota: testo semplice, massimo 200 caratteri');
+    }
+    return r;
+  },
+  field(f,value,defaults=false){
+    const empty=defaults&&(!value)||value==null;
+    return `<label class="rs-field"><span>${esc(f[1])}</span><input class="inp" data-key="${esc(f[0])}" type="number" min="${defaults?0:f[2]}" max="${f[3]}" step="${f[4]==='int'?1:'any'}" value="${empty?'':esc(value)}" ${defaults||f[5]==='optional'?'placeholder="Predefinito"':''}></label>`;
+  },
+  text(key,label,value,max,placeholder=''){
+    return `<label class="rs-field"><span>${esc(label)}</span><input class="inp" data-key="${esc(key)}" maxlength="${max*2}" value="${esc(value)}" placeholder="${esc(placeholder)}"></label>`;
+  },
+  select(key,label,value,options){
+    return `<label class="rs-field"><span>${esc(label)}</span><select class="inp" data-key="${esc(key)}">${options.map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+  },
+  remove(label='Rimuovi riga'){return `<button type="button" class="btn bg2 sm" data-remove>${esc(label)}</button>`;},
+  tier(t={},key='tokens'){
+    return `<div class="rs-row rs-grid rs-line" data-tier>${this.field(['min_gib','Da (GiB)',0,1024],t.min_gib??0)}${this.field([key,key==='tokens'?'Gettoni GPU/mese':'GPU-ora (valuta del provider)',0,1000],t[key]??0)}${this.remove()}</div>`;
+  },
+  provider(p={}){
+    return `<div class="rs-row" data-provider><div class="rs-grid">${this.text('name','Nome provider',p.name??'',64)}${this.select('level','Livello',p.level??'low',[['low','Basso'],['high','Alto']])}${this.select('currency','Valuta',p.currency??'EUR',[['EUR','EUR'],['USD','USD']])}${this.market.map(f=>this.field(f,p[f[0]]??0)).join('')}${this.text('source','Fonte (solo testo)',p.source??'',300)}${this.text('date','Data del listino',p.date??'',10,'AAAA-MM-GG')}</div><p class="hint">Prezzi nella valuta selezionata. Fasce GPU per memoria minima, in ordine crescente.</p><div data-market-tiers>${(p.gpu_hour??[]).map(t=>this.tier(t,'price')).join('')}</div><button type="button" class="btn bg2 sm" data-add-market-tier>Aggiungi fascia GPU</button> ${this.remove('Rimuovi provider')}</div>`;
+  },
+  storage(name='',value='ssd'){
+    return `<div class="rs-row rs-grid rs-line" data-storage>${this.text('name','Storage',name,64)}${this.select('class','Classe',value,[['ssd','SSD'],['hdd','HDD'],['other','Altro']])}${this.remove()}</div>`;
+  },
+  interruption(r={}){
+    return `<div class="rs-row rs-grid" data-interruption>${this.text('from','Dal',r.from??'',35,'AAAA-MM-GGTHH:MM')}${this.text('to','Al',r.to??'',35,'AAAA-MM-GGTHH:MM')}${this.select('cause','Causa',r.cause??'external',[['external','esterna (es. corrente)'],['maintenance','manutenzione programmata'],['fault','guasto del servizio']])}${this.text('note','Nota',r.note??'',200)}${this.remove()}</div>`;
+  },
+  async load(selected=ClusterMgr.current){
+    const sel=document.getElementById('rs-cluster');
+    sel.innerHTML=ClusterMgr.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
+    const idx=ClusterMgr.clusters.some(c=>c.idx===Number(selected))?Number(selected):ClusterMgr.clusters[0]?.idx;
+    if(idx==null){document.getElementById('rs-editor').textContent='Nessun cluster configurato';this.idx=null;return;}
+    sel.value=String(idx);await this.open(idx);
+  },
+  async open(idx){
+    const generation=++this.generation,editor=document.getElementById('rs-editor');
+    this.idx=null;editor.textContent='Caricamento…';
+    try{
+      const r=await api(`/clusters/${idx}/report-settings`,{quiet:true});
+      if(generation!==this.generation)return;
+      this.idx=Number(idx);this.render(r);
+      // Explicit cluster parameter: this selector may differ from the top bar's cluster.
+      api(`/storage?cluster=${idx}`,{quiet:true}).then(data=>{
+        if(generation!==this.generation)return;
+        const names=[...new Set((Array.isArray(data)?data:[]).map(s=>s.storage).filter(s=>typeof s==='string'))].sort();
+        document.getElementById('rs-storage-hint').textContent=names.length?'Storage rilevati nel cluster: '+names.join(', '):'Nessuno storage rilevato nel cluster.';
+      }).catch(()=>{if(generation===this.generation)document.getElementById('rs-storage-hint').textContent='Impossibile leggere gli storage del cluster; puoi inserire i nomi manualmente.';});
+    }catch(e){if(generation===this.generation){editor.textContent=e.message;toast(e.message,'err');}}
+  },
+  render(r){
+    const p=r.internal_prices??{}, d=r.defaults??{};
+    document.getElementById('rs-editor').innerHTML=`<form id="rs-form" novalidate>
+      <h3>Listino interno</h3><div class="rs-grid" id="rs-internal">${this.internal.map(f=>this.field(f,p[f[0]]??(f[5]==='optional'?null:0))).join('')}</div>
+      <p class="hint">Blocchi vuoti: dimensione predefinita. Le risorse oltre la base si arrotondano per eccesso. Fasce GPU: da X GiB, N gettoni GPU; vale la fascia più alta raggiunta. Per il supplemento da 89 GiB, aggiungi una fascia dedicata.</p>
+      <div id="rs-tiers">${(p.gpu_tiers??[]).map(t=>this.tier(t)).join('')}</div><button type="button" class="btn bg2 sm" data-add="tier">Aggiungi fascia GPU</button>
+      <h3>Prezzi di mercato</h3><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider</button>
+      <h3>Cambio USD/EUR</h3><div id="rs-exchange">${this.field(['usd_eur','EUR per 1 USD',0,10],r.usd_eur??0)}</div>
+      <h3>Classi degli storage</h3><p class="hint" id="rs-storage-hint">Lettura degli storage…</p><div id="rs-storage">${Object.entries(r.storage_classes??{}).map(([k,v])=>this.storage(k,v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage</button>
+      <h3>Soglie predefinite</h3><p class="hint">Campi vuoti o zero: predefinito del report. Valori diversi da zero devono rispettare l’intervallo indicato.</p><div class="rs-grid" id="rs-defaults">${this.thresholds.map(f=>this.field(f,d[f[0]],true)).join('')}</div>
+      <h3>Registro delle interruzioni</h3><p class="hint">Date locali nel formato AAAA-MM-GGTHH:MM (fuso del server), oppure RFC3339 con fuso esplicito. Durata massima: 31 giorni per riga.</p><div id="rs-interruptions">${(r.interruptions??[]).map(v=>this.interruption(v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="interruption">Aggiungi interruzione</button>
+      <p class="hint">Se tutti i prezzi sono a zero, i report di questo cluster non mostrano la parte economica.</p><button type="submit" class="btn ba" id="rs-save" ${this.saving?'disabled':''}>Salva parametri dei report</button>
+    </form>`;
+    const form=document.getElementById('rs-form');
+    form.addEventListener('click',e=>this.click(e));form.addEventListener('submit',e=>{e.preventDefault();this.save();});
+  },
+  click(e){
+    const button=e.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-remove')){button.closest('.rs-row').remove();return;}
+    let target,html,limit,selector;
+    if(button.hasAttribute('data-add-market-tier')){target=button.parentElement.querySelector('[data-market-tiers]');html=this.tier({},'price');limit=8;selector='[data-tier]';}
+    else switch(button.dataset.add){
+      case 'tier':target=document.getElementById('rs-tiers');html=this.tier();limit=8;selector='[data-tier]';break;
+      case 'provider':target=document.getElementById('rs-market');html=this.provider();limit=6;selector='[data-provider]';break;
+      case 'storage':target=document.getElementById('rs-storage');html=this.storage();limit=64;selector='[data-storage]';break;
+      case 'interruption':target=document.getElementById('rs-interruptions');html=this.interruption();limit=500;selector='[data-interruption]';break;
+      default:return;
+    }
+    if(target.querySelectorAll(selector).length>=limit){toast('Numero massimo di righe: '+limit,'err');return;}
+    target.insertAdjacentHTML('beforeend',html);target.lastElementChild.querySelector('input')?.focus();
+  },
+  read(){
+    const get=(el,key)=>el.querySelector(`[data-key="${key}"]`).value;
+    const fields=(el,defs,defaults=false)=>Object.fromEntries(defs.map(f=>[f[0],this.number(get(el,f[0]),f,defaults)]).filter(([,v])=>v!==undefined));
+    const tiers=(el,key)=>[...el.querySelectorAll('[data-tier]')].map(row=>fields(row,[['min_gib','GPU: memoria minima',0,1024],[key,'GPU: prezzo o gettoni',0,1000]]));
+    const p=fields(document.getElementById('rs-internal'),this.internal);p.gpu_tiers=tiers(document.getElementById('rs-tiers'),'tokens');
+    const market=[...document.querySelectorAll('#rs-market [data-provider]')].map(el=>({...fields(el,this.market),name:get(el,'name'),level:get(el,'level'),currency:get(el,'currency'),source:get(el,'source'),date:get(el,'date'),gpu_hour:tiers(el,'price')}));
+    const storage=Object.create(null),rows=document.querySelectorAll('#rs-storage [data-storage]');
+    if(rows.length>64)throw new Error('Massimo 64 storage');
+    for(const el of rows){const name=get(el,'name');if(Object.hasOwn(storage,name))throw new Error('Nome storage duplicato');storage[name]=get(el,'class');}
+    return this.validate({internal_prices:p,market_prices:market,usd_eur:this.number(document.querySelector('#rs-exchange input').value,['usd_eur','Cambio USD/EUR',0,10]),storage_classes:storage,defaults:fields(document.getElementById('rs-defaults'),this.thresholds,true),interruptions:[...document.querySelectorAll('#rs-interruptions [data-interruption]')].map(el=>Object.fromEntries(['from','to','cause','note'].map(k=>[k,get(el,k)])))});
+  },
+  async save(){
+    if(this.saving||this.idx==null)return;
+    const idx=this.idx;
+    try{
+      const body=JSON.stringify(this.read());if(new TextEncoder().encode(body).length>65536)throw new Error('Impostazioni troppo grandi: massimo 64 KB');
+      this.saving=true;document.getElementById('rs-save').disabled=true;
+      await api(`/clusters/${idx}/report-settings`,{method:'PUT',body,quiet:true});toast('Parametri dei report salvati','ok');
+    }catch(e){toast(e.message,'err');}
+    finally{this.saving=false;const button=document.getElementById('rs-save');if(button)button.disabled=false;}
+  }
+};
+// pmgr:report-settings:end
+
 const Settings={
   async load(){
+    const selected=ClusterMgr.current;
     await ClusterMgr.renderList();
+    if(ClusterMgr.clusters.some(c=>c.idx===selected)){
+      ClusterMgr.current=selected;document.getElementById('cluster-select').value=String(selected);
+    }
+    ReportSettingsUI.load(ClusterMgr.current);
     const cfg=await api('/config',{quiet:true}).catch(()=>null); if(!cfg)return;
     const t=cfg.theme||'', d=cfg.density||'';
     document.getElementById('ctheme').value=t;
