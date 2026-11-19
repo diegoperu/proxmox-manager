@@ -354,7 +354,7 @@ func TestAgentErrorMessages(t *testing.T) {
 // verificato su Ubuntu 26.04 (1 byte extra passa, 2 o più no). Gli script embedded e
 // ogni argomento verso il guest devono quindi essere ASCII.
 func TestGuestScriptsAreASCII(t *testing.T) {
-	for name, src := range map[string]string{"adduser.sh": addUserScriptSrc, "disk.sh": diskScriptSrc} {
+	for name, src := range map[string]string{"adduser.sh": addUserScriptSrc, "disk.sh": diskScriptSrc, "dmesg.sh": dmesgScriptSrc, "gpuuse.sh": gpuUseScriptSrc} {
 		if !isASCII(src) {
 			t.Errorf("%s contiene caratteri non ASCII o di controllo: l'esecuzione inline blocca il guest agent", name)
 		}
