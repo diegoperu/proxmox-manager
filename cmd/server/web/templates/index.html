@@ -117,6 +117,9 @@ tr:last-child td{border-bottom:none}tr:hover td{background:var(--hover)}
 .gacts{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:6px}
 #page-gpu table{table-layout:fixed}
 #page-gpu th:nth-child(1){width:22%}#page-gpu th:nth-child(2){width:12%}#page-gpu th:nth-child(3){width:12%}#page-gpu th:nth-child(4){width:30%}#page-gpu th:nth-child(5){width:12%}#page-gpu td{overflow-wrap:anywhere}
+#page-gpu table.use th:nth-child(1){width:19%}#page-gpu table.use th:nth-child(2){width:9%}#page-gpu table.use th:nth-child(3){width:10%}#page-gpu table.use th:nth-child(4){width:21%}#page-gpu table.use th:nth-child(5){width:10%}#page-gpu table.use th:nth-child(6){width:19%}#page-gpu table.use th:nth-child(7){width:12%}
+.gpu-use{font-size:12px;font-variant-numeric:tabular-nums}.gpu-use+.gpu-use{margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}.gpu-use .bw{margin:3px 0 5px}.gpu-use .td{display:block}.gpu-use-note{margin-top:8px}
+@media(max-width:650px){#page-gpu table{table-layout:auto}.gpu-use{min-width:120px}}
 .badge.gpu{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green);border:1px solid color-mix(in srgb,var(--green) 32%,transparent);margin-left:6px;vertical-align:middle}
 .bq{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 32%,transparent)}
 .bl{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple);border:1px solid color-mix(in srgb,var(--purple) 32%,transparent)}
@@ -868,7 +871,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.181.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.182.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2873,6 +2876,7 @@ const Ceph={
 const Gpu={
   by:{},          // inventario per indice cluster
   availBy:{},     // true se il cluster ha almeno una scheda Nvidia
+  useBy:{},       // ultimo uso per indice cluster
   seq:0, busy:false, ctx:null,
   short(n){return String(n||'Scheda video').replace(/^NVIDIA Corporation\s+/i,'');},
   summary(d){
@@ -2898,6 +2902,28 @@ const Gpu={
     }
     return d;
   },
+  normUsage(d){
+    if(!d||typeof d!=='object'||Array.isArray(d)||typeof d.enabled!=='boolean')return null;
+    const object=x=>x&&typeof x==='object'&&!Array.isArray(x);
+    return {...d,vms:(Array.isArray(d.vms)?d.vms:[]).filter(v=>object(v)&&Number.isInteger(v.vmid)).map(v=>({...v,cards:(Array.isArray(v.cards)?v.cards:[]).filter(object)}))};
+  },
+  number(v){return typeof v==='number'&&Number.isFinite(v)?v:null;},
+  state(v){return ({busy:'Al lavoro',quiet:'Ferma',vm_off:'VM spenta',no_driver:'Driver NVIDIA assente',driver_error:'Driver in errore',no_data:'Nessun dato',paused:"In pausa: l'agent non risponde"})[v]||'Nessun dato';},
+  best(v){return v.cards.reduce((best,c)=>(Gpu.number(c.util)??-1)>(Gpu.number(best?.util)??-1)?c:best,null)||v.cards[0]||{};},
+  gb(v){v=Gpu.number(v);return v===null?'—':(v/1024).toFixed(1).replace('.',',');},
+  metrics(c){const u=Gpu.number(c.util);return `Utilizzo ${u===null?'—':u+'%'} · Memoria ${Gpu.gb(c.mem_used_mib)} / ${Gpu.gb(c.mem_total_mib)} GB`;},
+  usageLine(v){return `${Gpu.state(v.state)}${v.state==='busy'||v.state==='quiet'?' · '+Gpu.metrics(Gpu.best(v)):''}`;},
+  usage(v){
+    if(!v)return '<span class="td">—</span>';
+    const c=Gpu.best(v), u=Gpu.number(c.util), used=Gpu.number(c.mem_used_mib), total=Gpu.number(c.mem_total_mib);
+    const meter=(label,value,width)=>`<div>${esc(label)} ${esc(value)}</div>${width===null?'':`<div class="bw" aria-hidden="true"><div class="bf2" style="width:${Math.max(0,Math.min(100,width))}%"></div></div>`}`;
+    const multi=v.cards.length>1?` <span title="${esc(v.cards.map(x=>`${x.bus_id||'—'} · ${x.name||'Scheda video'} · ${Gpu.metrics(x)} · ${Gpu.number(x.temp_c)===null?'—':x.temp_c} °C · ${Gpu.number(x.power_w)===null?'—':x.power_w} W`).join('\n'))}">${v.cards.length} schede</span>`:'';
+    const extra=[Gpu.number(c.temp_c)===null?'':`${c.temp_c} °C`,Gpu.number(c.power_w)===null?'':`${c.power_w} W`].filter(Boolean).join(' · ');
+    const at=Gpu.number(v.at), age=at!==null&&at>0?Math.max(0,Math.floor((Date.now()/1000-at)/60)):null;
+    const time=age===null?'':`aggiornato ${age} min fa${v.stale?' · dato vecchio delle '+new Date(at*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):''}`;
+    const glyph=({busy:'●',quiet:'○',vm_off:'■',no_driver:'◇',driver_error:'!',no_data:'?',paused:'Ⅱ'})[v.state]||'?';
+    return `<div class="gpu-use"><div><span aria-hidden="true">${glyph}</span> ${esc(Gpu.state(v.state))}${multi}</div>${v.state==='busy'||v.state==='quiet'?meter('Utilizzo',u===null?'—':u+'%',u)+meter('Memoria',`${Gpu.gb(used)} / ${Gpu.gb(total)} GB`,used!==null&&total!==null&&total>0?used/total*100:null)+(extra?`<span class="td">${esc(extra)}</span>`:''):''}${time?`<span class="td">${esc(time)}</span>`:''}</div>`;
+  },
   note(d,idx){d=Gpu.norm(d);Gpu.by[idx]=d;Gpu.availBy[idx]=!!(d&&d.nodes.some(n=>n.cards.length));Gpu.syncNav();},
   isAvail(){return Gpu.availBy[ClusterMgr.current]===true;},
   syncNav(){const b=document.querySelector('.ni[data-page="gpu"]');if(b)b.hidden=!Gpu.isAvail()&&App.cur!=='gpu';},
@@ -2912,11 +2938,11 @@ const Gpu={
     const generation=AutoRefreshUI.generation, cluster=ClusterMgr.current;
     const seq=++Gpu.seq, body=document.getElementById('gpu-body');
     if(!silent&&!Gpu.by[ClusterMgr.current]){document.getElementById('gpu-cond').innerHTML='';body.innerHTML='<div class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div> Lettura delle schede (la prima volta richiede qualche secondo)…</div>';}
-    let d;
-    try{d=await api('/gpus',{quiet:true,timeoutMs:30000});}
+    let d,usage;
+    try{[d,usage]=await Promise.all([api('/gpus',{quiet:true,timeoutMs:30000}),api('/gpu-usage',{quiet:true,timeoutMs:30000}).catch(()=>null)]);}
     catch(e){if(!silent&&seq===Gpu.seq&&!Gpu.by[ClusterMgr.current])body.innerHTML=errBox(e.message,'Gpu.load()');return;}
-    if(seq!==Gpu.seq||(silent&&!AutoRefreshUI.canApply('gpu',generation,cluster)))return;
-    Gpu.note(d,ClusterMgr.current); Gpu.paint();
+    if(seq!==Gpu.seq||cluster!==ClusterMgr.current||(silent&&!AutoRefreshUI.canApply('gpu',generation,cluster)))return;
+    Gpu.useBy[cluster]=Gpu.normUsage(usage); Gpu.note(d,cluster); Gpu.paint();
   },
 
   vmBtn(node,u){
@@ -2932,9 +2958,12 @@ const Gpu={
     }
     const level=sm.problems?'warn':'ok';
     const title=sm.problems?`Quasi sereno · ${sm.problems} ${Dashboard.plural(sm.problems,'GPU da correggere','GPU da correggere')}`:`Sereno · ${sm.cards} schede, ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')}`;
-    const sub=sm.problems?`${sm.cards} schede · ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')} · ${sm.direct} assegnazioni dirette, ${sm.mapped} tramite mapping`:`${sm.direct} assegnazioni dirette · ${sm.mapped} tramite mapping · nessun conflitto`;
+    let sub=sm.problems?`${sm.cards} schede · ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')} · ${sm.direct} assegnazioni dirette, ${sm.mapped} tramite mapping`:`${sm.direct} assegnazioni dirette · ${sm.mapped} tramite mapping · nessun conflitto`;
+    const usage=Gpu.useBy[ClusterMgr.current];
+    if(usage?.enabled){const quiet=usage.vms.filter(v=>v.state==='quiet').length, off=usage.vms.filter(v=>v.state==='vm_off').length;sub+=` · ${quiet} ${Dashboard.plural(quiet,'scheda ferma','schede ferme')} · ${off} ${Dashboard.plural(off,'assegnata','assegnate')} a VM spente`;}
     cond.innerHTML=`<svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg><div><h2>${esc(title)}</h2><p>${esc(sub)}${d.partial&&d.partial.length?` · <span class="wrn">dati incompleti: ${esc(d.partial.slice(0,4).join(', '))}</span>`:''}</p></div>`;
-    body.innerHTML=Gpu.problems(d)+d.nodes.filter(n=>n.cards.length).map(n=>Gpu.nodePanel(n)).join('')+
+    const note=usage&&!usage.enabled?'Monitoraggio dell’uso spento: si attiva con gpu_usage in config.json.':usage?.enabled&&!usage.vms.length?'In attesa del primo campione (ogni 5 minuti)':'';
+    body.innerHTML=(note?`<p class="cnote gpu-use-note">${esc(note)}</p>`:'')+Gpu.problems(d)+d.nodes.filter(n=>n.cards.length).map(n=>Gpu.nodePanel(n)).join('')+
       (!d.mappings.length?'<p class="cnote" style="margin-top:12px">Non ci sono mapping PCI: per assegnare una scheda dall\'app serve un mapping per ogni scheda (Datacenter › Resource Mappings › PCI in Proxmox).</p>':'');
   },
 
@@ -2960,6 +2989,7 @@ const Gpu={
   },
   nodePanel(n){
     const free=n.cards.filter(c=>c.status==='free').length;
+    const usage=Gpu.useBy[ClusterMgr.current], showUse=!!usage?.enabled;
     const rows=n.cards.map(c=>{
       const st=c.status==='free'?'<span class="st ok">Libera</span>':c.status==='conflict'?'<span class="st warn">In conflitto</span>':'<span class="st">Assegnata</span>';
       const uses=c.uses.map(u=>`<div>${Gpu.vmBtn(n.node,u)} ${Gpu.useBadge(u)}${u.status==='running'?' <span class="td">· accesa</span>':''}</div>`).join('')||'<span class="td">—</span>';
@@ -2967,11 +2997,11 @@ const Gpu={
         ||(c.status==='free'?(c.mappings.length?`<button type="button" class="btn ba sm" onclick="Gpu.assign(${js(n.node)},${js(c.addr)})">Assegna…</button>`:'<span class="td" title="In Proxmox: Datacenter › Resource Mappings › PCI">serve un mapping</span>'):'');
       const mem=c.memory_gb?`${c.memory_gb} GB${c.memory_custom?' (corretta)':''}`:'memoria non nota';
       const model=`<b>${esc(c.display_name||Gpu.short(c.name))}</b><div class="td">${esc(mem)} <button type="button" class="btn bg2 sm" style="margin-left:4px" aria-label="${esc('Modifica nome e memoria del modello '+(c.display_name||Gpu.short(c.name)))}" onclick="Gpu.modelEdit(${js(n.node)},${js(c.addr)})">Modifica</button></div>`;
-      return`<tr><td>${model}</td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td><td>${acts}</td></tr>`;
+      return`<tr><td>${model}</td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td>${showUse?`<td>${c.uses.length?c.uses.map(u=>Gpu.usage(usage.vms.find(v=>v.vmid===Number(u.vmid)))).join(''):'<span class="td">—</span>'}</td>`:''}<td>${acts}</td></tr>`;
     }).join('');
     const groups=n.groups.length?`<p class="cnote" style="padding:0 var(--card-pad) 12px">Mapping a gruppo (sola lettura): ${n.groups.map(g=>esc(`${g.id} · ${g.cards} schede · ${new Set(g.uses.map(u=>u.vmid)).size} VM`)).join(' · ')}</p>`:'';
     return`<div class="panel"><div class="panel-h"><h2>${esc(n.node)}</h2><small>${n.cards.length} ${Dashboard.plural(n.cards.length,'scheda','schede')} · ${free} ${Dashboard.plural(free,'libera','libere')}</small></div>
-      <div class="tw"><table><thead><tr><th>Scheda</th><th>Indirizzo</th><th>Stato</th><th>VM</th><th>Mapping</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${groups}</div>`;
+      <div class="tw"><table${showUse?' class="use"':''}><thead><tr><th>Scheda</th><th>Indirizzo</th><th>Stato</th><th>VM</th><th>Mapping</th>${showUse?'<th>Uso</th>':''}<th></th></tr></thead><tbody>${rows}</tbody></table></div>${groups}</div>`;
   },
 
   // ── nome e memoria di un modello (D62): vale per tutte le schede di quel modello e per tutti i cluster ──
@@ -4364,7 +4394,9 @@ const VMs=(()=>{
     },
     async detail(node,vmid,type){
       const kind=type==='lxc'?'lxc':'qemu';
+      const gpuCluster=ClusterMgr.current;
       const v0=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
+      const gpuUsage=!v0?.gpus?.length?Promise.resolve(null):Gpu.useBy[gpuCluster]?Promise.resolve(Gpu.useBy[gpuCluster]):apiCached('/gpu-usage',30000).then(d=>{const u=Gpu.normUsage(d);if(u)Gpu.useBy[gpuCluster]=u;return u;}).catch(()=>null);
       document.getElementById('movT').textContent=v0?.name||`VM ${vmid}`;
       document.getElementById('movS').textContent=`${kind==='lxc'?'LXC':'QEMU'} · ${vmid} · ${node}`;
       document.getElementById('movA').replaceChildren();
@@ -4434,7 +4466,7 @@ const VMs=(()=>{
             <h3>Configurazione</h3>
             <dl class="dl">
               <dt>Risorse</dt><dd>${resTxt}</dd>
-              ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button></dd>`:''}
+              ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button><div class="td" data-gpu-usage></div></dd>`:''}
               ${grow?`<dt>Gruppo</dt><dd><div id="grp-inl"></div></dd>`:''}
               ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
             </dl>
@@ -4452,6 +4484,8 @@ const VMs=(()=>{
             <p>Lo stop forzato interrompe subito la VM senza spegnere il sistema operativo: i dati non salvati si perdono.</p>
             <button class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
           </div>`:''}`;
+        const usageEl=document.querySelector('#movB [data-gpu-usage]');
+        if(usageEl)gpuUsage.then(u=>{if(!usageEl.isConnected||ClusterMgr.current!==gpuCluster||!u?.enabled)return;const v=u.vms.find(x=>x.vmid===Number(vmid));if(v)usageEl.textContent=Gpu.usageLine(v);});
         Dmesg.setup({node,vmid:String(vmid),name:s.name||v0?.name||`VM ${vmid}`,
           why:kind==='lxc'?'Non disponibile per i container LXC: Proxmox non offre un modo per leggere il log del kernel di un container.'
             :st!=='running'?'La VM è ferma: avviala per leggere il suo dmesg.'

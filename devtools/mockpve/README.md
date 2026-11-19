@@ -4,6 +4,7 @@ Server HTTP di **sola lettura** con dati sintetici (4 nodi, ~50 VM, un nodo offl
 
 - Ascolta **solo su 127.0.0.1** (porta 18006 di default, o il primo argomento).
 - Risponde 405 a ogni scrittura (POST/PUT/DELETE) tranne `agent/exec` (finto: restituisce un dmesg e un sistema operativo inventati e non esegue nulla), la modifica della configurazione QEMU/LXC (`PUT .../{qemu|lxc}/{id}/config`, anche del campo `tags`, con controllo del `digest` come Proxmox) lo spegnimento (`status/shutdown|stop`) e la migrazione (`POST .../migrate`, sposta la VM solo in memoria; il task risulta "running" per due letture e poi OK): servono a provare l'assegnazione delle GPU, vivono solo in memoria e si perdono al riavvio del mock.
+- Il mock simula anche l’uso GPU; `"gpu_usage": true` nel `config.json` di anteprima abilita il collector (primo campione dopo 90 s).
 - I dati non rappresentano nessun cluster reale.
 
 ## Uso

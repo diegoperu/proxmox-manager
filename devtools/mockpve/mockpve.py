@@ -337,6 +337,32 @@ NOBLANK = set(x for x in os.environ.get("NOBLANK_VMIDS", "").split(",") if x.str
 NOSHUTDOWN = set(x for x in os.environ.get("NOSHUTDOWN_VMIDS", "").split(",") if x.strip().isdigit())
 
 
+def fake_gpu_usage(vm_id):
+    # Ordine stabile delle VM con schede effettivamente presenti nei nodi online.
+    eligible = []
+    for vm in VMS:
+        if vm["type"] != "qemu" or vm["status"] != "running" or NODES[vm["node"]]["status"] != "online":
+            continue
+        cfg = route("/nodes/%s/qemu/%s/config" % (vm["node"], vm["vmid"]))
+        if any(k.startswith("hostpci") and any(x in str(val) for x in ("01:00", "02:00", "gpu-a100")) for k, val in cfg.items()):
+            eligible.append(vm["vmid"])
+    eligible.sort()
+    if vm_id not in eligible:
+        return (0, "")
+    scenario = eligible.index(vm_id) % 6
+    if scenario == 2:
+        return (3, "")
+    if scenario == 3:
+        return (4, "Failed to initialize NVML: Driver/library version mismatch\n")
+    util = 0 if scenario == 1 else 40 + (vm_id + int(time.time() // 300)) % 56
+    used = 8 if scenario == 1 else 30000
+    power = "[N/A]" if scenario == 5 else ("35" if scenario == 1 else "210")
+    line = "00000000:01:00.0, NVIDIA A100, %d, %d, 40960, 65, %s\n" % (util, used, power)
+    if scenario == 4:
+        line += "00000000:02:00.0, NVIDIA A100, 25, 8000, 40960, 48, 120\n"
+    return (0, line)
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
@@ -372,8 +398,11 @@ class H(BaseHTTPRequestHandler):
             if "pmgr" in cmd and cmd[cmd.index("pmgr") + 1:] == ["find-blank"]:  # script del disco: un solo disco vuoto
                 vm_id = path.split("/")[-3] if path.count("/") >= 3 else ""
                 EXEC[pid] = (0, "" if (vm_id in NOBLANK and vm_id not in RESTARTED) else "vdb\n")
-            elif any("-x" in c and "HELPER" in c for c in cmd):
+            elif any('[ -x "$1" ]' in c for c in cmd):
                 EXEC[pid] = (0, "INLINE\n")
+            elif any("nvidia-smi --query-gpu=" in c for c in cmd) or (cmd and cmd[0].endswith("/gpuuse.sh")):
+                vm_id = path.split("/")[-3]
+                EXEC[pid] = fake_gpu_usage(int(vm_id)) if vm_id.isdigit() else (0, "")
             elif "pmgr" in cmd and len(cmd) >= 6 and cmd[-2].isdigit():  # solo dmesg (righe, livello)
                 a_lines, a_level = int(cmd[-2]), cmd[-1]
                 EXEC[pid] = (0, fake_dmesg(a_lines, a_level))
