@@ -136,3 +136,40 @@ func TestGetReturnsACopyOfGPUModels(t *testing.T) {
 		t.Fatal("Get() shares the map with the live config")
 	}
 }
+
+func TestRefreshSeconds(t *testing.T) {
+	withTempConfig(t)
+	for _, v := range []int{0, 15, 30, 60, 120, 300} {
+		if !ValidRefresh(v) {
+			t.Errorf("rejected %d", v)
+		}
+	}
+	for _, v := range []int{-1, 1, 16, 61, 301} {
+		if ValidRefresh(v) {
+			t.Errorf("accepted %d", v)
+		}
+	}
+	for _, tc := range []struct {
+		input string
+		want  int
+	}{{`{}`, 60}, {`{"refresh_seconds":0}`, 0}, {`{"refresh_seconds":120}`, 120}, {`{"proxmox_url":"https://x","api_token":"t"}`, 60}, {`{"proxmox_url":"https://x","refresh_seconds":0}`, 0}} {
+		if err := os.WriteFile(cfgPath, []byte(tc.input), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := Load(); err != nil {
+			t.Fatal(err)
+		}
+		if got := Get().RefreshSeconds; got != tc.want {
+			t.Fatalf("%s: got %d", tc.input, got)
+		}
+		if err := Update(Get()); err != nil {
+			t.Fatal(err)
+		}
+		if err := Load(); err != nil {
+			t.Fatal(err)
+		}
+		if got := Get().RefreshSeconds; got != tc.want {
+			t.Fatalf("round trip: got %d", got)
+		}
+	}
+}
