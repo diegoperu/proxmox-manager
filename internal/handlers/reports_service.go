@@ -43,6 +43,7 @@ type invDay struct {
 }
 
 type serviceReport struct {
+	V3        serviceV3  `json:"v3"`
 	Meta      reportMeta `json:"meta"`
 	Condition struct {
 		Level   string       `json:"level"` // ok | warn | bad
@@ -139,7 +140,7 @@ func sumSeries(parts []rrdSeries, num, den string) ([]int64, []float64) {
 	return ts, v
 }
 
-func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p reportParams, now time.Time) (serviceReport, error) {
+func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p reportParams, now time.Time, settings ...serviceV3Settings) (serviceReport, error) {
 	var rep serviceReport
 	rep.Meta = metaFor(cluster, p, now)
 	rep.Condition.Reasons = []condReason{}
@@ -380,6 +381,14 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 		raise("warn")
 		add("task_failures", &rep.Tasks.FailPct)
 	}
+	var options serviceV3Settings
+	if len(settings) > 0 {
+		options = settings[0]
+	}
+	rep.V3, err = buildServiceV3(c, hist, cluster, p, now, options)
+	if err != nil {
+		return rep, err
+	}
 	return rep, nil
 }
 
@@ -423,6 +432,10 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := "rpt|" + model + "|" + strconv.Itoa(idx) + "|" + p.key()
+	options := serviceV3Settings{Report: cl.Report, Models: config.GPUModels()}
+	if model == "service" {
+		key += "|" + serviceV3SettingsKey(options)
+	}
 	v, err := cephCached(key, reportCacheTTL, func() (interface{}, error) {
 		g := reportGate(idx)
 		if !g.TryLock() {
@@ -431,7 +444,7 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		defer g.Unlock()
 		switch model {
 		case "service":
-			return buildServiceReport(client, h.hist, cl.Label, p, now)
+			return buildServiceReport(client, h.hist, cl.Label, p, now, options)
 		case "nodes":
 			return buildNodesReport(client, cl.Label, p, now)
 		case "vms":
