@@ -99,6 +99,7 @@ type serviceReport struct {
 	GPUVMOff        int             `json:"gpu_vm_off"`
 	GPUInsufficient int             `json:"gpu_insufficient"`
 	GPUUseByGroup   []gpuGroupUsage `json:"gpu_use_by_group"`
+	VMTrend         vmTrendSummary  `json:"vm_trend"`
 	Tasks           struct {
 		Total         int     `json:"total"`
 		Failed        int     `json:"failed"`
@@ -158,6 +159,11 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 	rep.GPUUseKnown = usage.Known
 	rep.GPUIdle, rep.GPUReserved, rep.GPUVMOff, rep.GPUInsufficient = usage.IdleCount, usage.ReservedCount, usage.VMOffCount, usage.InsufficientCount
 	rep.GPUUseByGroup = gpuUsageGroups(usage.Rows)
+	trend, err := buildTrendReport(c, hist, cluster, serviceTrendParams(pp), now)
+	if err != nil {
+		return rep, err
+	}
+	rep.VMTrend = trend.Totals.vmTrendSummary
 	rep.KPI.Nodes = len(res.Nodes)
 
 	// capacity: node RRD aggregated over the online nodes
@@ -386,7 +392,7 @@ func reportGate(idx int) *sync.Mutex {
 	return m.(*sync.Mutex)
 }
 
-var reportModels = map[string]bool{"service": true, "nodes": true, "vms": true, "storage": true, "reliability": true, "gpu": true}
+var reportModels = map[string]bool{"service": true, "nodes": true, "vms": true, "storage": true, "reliability": true, "gpu": true, "trend": true}
 
 // GetReport: GET /api/reports/{model}?from=YYYY-MM-DD&to=YYYY-MM-DD&nodes=a,b&type=qemu|lxc&group=x&q=text&...
 func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
@@ -396,7 +402,11 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	p, err := parseReportParams(r.URL.Query().Get, now)
+	parse := parseReportParams
+	if model == "trend" {
+		parse = parseTrendParams
+	}
+	p, err := parse(r.URL.Query().Get, now)
 	if err != nil {
 		writeError(w, err, http.StatusBadRequest)
 		return
@@ -426,6 +436,8 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 			return buildNodesReport(client, cl.Label, p, now)
 		case "vms":
 			return buildVMsReport(client, cl.Label, p, now)
+		case "trend":
+			return buildTrendReport(client, h.hist, cl.Label, p, now)
 		case "storage":
 			return buildStorageReport(client, cl.Label, p, now)
 		case "reliability":

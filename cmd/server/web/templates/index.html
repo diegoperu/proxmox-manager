@@ -286,6 +286,7 @@ button.nd-name{background:none;border:0;color:inherit;padding:0;cursor:pointer;t
 .rp-model b{display:block;font-size:13px;font-weight:600}.rp-model span{color:var(--text3);font-size:12px}
 .rp-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .rp-grp{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap}.rp-grp[hidden]{display:none}
+#rp-tbl .rp-muted{color:var(--text3)}
 .rp-thr{margin:-4px 0 14px;font-size:12px;color:var(--text2)}.rp-thr summary{cursor:pointer;color:var(--text3)}
 .rp-thr-g{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:10px}.rp-thr-g label{display:grid;gap:4px;color:var(--text3)}
 .thb{background:none;border:0;color:inherit;font:inherit;font-weight:500;cursor:pointer;padding:0}.thb:hover{color:var(--text)}
@@ -878,7 +879,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.185.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.186.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1334,9 +1335,10 @@ html.spiderman{
     <div class="page" id="page-reports">
       <div class="rp-models" id="rp-models" role="group" aria-label="Modello di report"></div>
       <div class="rp-bar">
-        <div class="seg" id="rp-presets" role="group" aria-label="Periodo"></div>
+        <div id="rp-period" class="rp-grp"><div class="seg" id="rp-presets" role="group" aria-label="Periodo"></div>
         <label class="sr" for="rp-from">Dal</label><input class="inp" type="date" id="rp-from" aria-label="Data iniziale">
-        <label class="sr" for="rp-to">Al</label><input class="inp" type="date" id="rp-to" aria-label="Data finale">
+        <label class="sr" for="rp-to">Al</label><input class="inp" type="date" id="rp-to" aria-label="Data finale"></div>
+        <label id="rp-months-wrap" hidden>Mesi <select class="inp" id="rp-months"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6" selected>6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option></select></label>
         <span id="rp-filters" class="rp-grp">
           <label class="sr" for="rp-node">Nodo</label><select class="inp" id="rp-node"><option value="">Tutti i nodi</option></select>
           <label class="sr" for="rp-group">Gruppo</label><input class="inp" id="rp-group" type="text" maxlength="32" placeholder="Gruppo (es. rossi)" autocomplete="off" style="width:150px">
@@ -1364,6 +1366,17 @@ html.spiderman{
           <label>RAM p95 sovradim.<input class="inp" id="th-omem" inputmode="decimal" placeholder="0.25"></label>
           <label>CPU p95 sovradim.<input class="inp" id="th-ocpu" inputmode="decimal" placeholder="0.10"></label>
           <label>Giorni minimi (sovradim.)<input class="inp" id="th-odays" inputmode="decimal" placeholder="14"></label>
+        </div>
+      </details>
+      <details class="rp-thr" id="rp-trend-thr" hidden>
+        <summary>Soglie andamento VM (valide solo per questo report; vuoto = predefinita)</summary>
+        <div class="rp-thr-g">
+          <label>CPU media inattiva (%)<input class="inp" id="th-tcpu" inputmode="decimal" placeholder="2"></label>
+          <label>Rete inattiva (KB/s)<input class="inp" id="th-tnet" inputmode="decimal" placeholder="1"></label>
+          <label>Mesi consecutivi<input class="inp" id="th-tmonths" inputmode="numeric" placeholder="3"></label><label>Picco CPU sotto (%)<input class="inp" id="th-tpeak" inputmode="decimal" placeholder="10" title="Una VM abbandonata non supera mai questo picco di CPU in nessun mese (D122)"></label>
+          <label>RAM picco sotto (%)<input class="inp" id="th-tmem" inputmode="decimal" placeholder="25"></label>
+          <label>CPU picco sotto (%)<input class="inp" id="th-tovercpu" inputmode="decimal" placeholder="10"></label>
+          <label>Margine proposta (%)<input class="inp" id="th-tmargin" inputmode="decimal" placeholder="25"></label>
         </div>
       </details>
       <details class="rp-thr" id="rp-gpu-thr" hidden>
@@ -5320,6 +5333,7 @@ const RPT_MODELS=[
   {id:'service',kind:'manager',label:'Stato del servizio',sub:'PDF per direttore e consiglio (IT + EN)'},
   {id:'nodes',kind:'tech',label:'Nodi e capacità',sub:'media, p95, picchi, PSI, previsione'},
   {id:'vms',kind:'tech',label:'VM e container',sub:'consumi, inattive, sovradimensionate'},
+  {id:'trend',kind:'tech',label:'Andamento delle VM',sub:'uso mensile e proposte di ridimensionamento'},
   {id:'gpu',kind:'tech',label:'GPU',sub:'schede, gruppi, storico'},
   {id:'storage',kind:'tech',label:'Storage e Ceph',sub:'andamento e previsione'},
   {id:'reliability',kind:'tech',label:'Affidabilità',sub:'task falliti e backup'},
@@ -5343,6 +5357,7 @@ const RPT_TXT={
     avgSub:'media sul cluster',noTrend:'nessuna tendenza di esaurimento',exh:(m)=>`esaurimento stimato tra circa ${m} mesi`,exh0:'soglia già raggiunta',gpuSub:(t)=>`${t} schede in totale`,
     s3:'Chi usa il servizio',s3p:(n)=>`Memoria assegnata per gruppo di ricerca (primi 10 su ${n}). Il gruppo è ricavato dal nome della macchina virtuale.`,
     s4:'Fabbisogno e uso delle risorse',needs:'Stato delle risorse',eff:'Efficienza',
+    trendLine:(e)=>`Macchine virtuali: ${e.abandoned} abbandonate, ${e.off_long} spente da almeno 3 mesi e ${e.oversized} sovradimensionate; recuperabili circa ${e.mem} di RAM e ${e.cores} core.`,
     effLine:(e)=>`${e.inactive} macchine virtuali risultano inattive e ${e.oversized} sovradimensionate: liberarle recupererebbe fino a ${e.mem} di memoria e ${e.cores} processori.`,
     effRule:'Inattiva: accesa ma con CPU media sotto il 2% e rete sotto 1 KB/s per almeno 7 giorni. Sovradimensionata: memoria usata (95° percentile) sotto il 25% di quella assegnata, oppure CPU (95° percentile) sotto il 10%, per almeno 14 giorni.',
     effNone:'Il dato di efficienza non è disponibile per questo periodo.',
@@ -5368,6 +5383,7 @@ const RPT_TXT={
     avgSub:'cluster average',noTrend:'no exhaustion trend',exh:(m)=>`estimated exhaustion in about ${m} months`,exh0:'threshold already reached',gpuSub:(t)=>`${t} cards in total`,
     s3:'Who uses the service',s3p:(n)=>`Memory allocated per research group (top 10 of ${n}). The group is derived from the virtual machine name.`,
     s4:'Requirements and resource use',needs:'Resource status',eff:'Efficiency',
+    trendLine:(e)=>`Virtual machines: ${e.abandoned} abandoned, ${e.off_long} powered off for at least 3 months and ${e.oversized} oversized; approximately ${e.mem} of RAM and ${e.cores} cores recoverable.`,
     effLine:(e)=>`${e.inactive} virtual machines are idle and ${e.oversized} are oversized: releasing them would recover up to ${e.mem} of memory and ${e.cores} processors.`,
     effRule:'Idle: running with average CPU below 2% and network below 1 KB/s for at least 7 days. Oversized: memory used (95th percentile) below 25% of the assigned amount, or CPU (95th percentile) below 10%, for at least 14 days.',
     effNone:'Efficiency data is not available for this period.',
@@ -5425,6 +5441,13 @@ function rptChart(points,opt){
       out+=`<polyline class="fc" points="${X(n-1)},${Y(y0)} ${X(n-1+ext)},${Y(y1)}"/>`;}}
   return out+'</svg>';
 }
+function rptTrendMonth(s,short=false){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(s)))return '—';
+  const [y,m]=s.split('-').map(Number);
+  return new Date(y,m-1,1,12).toLocaleDateString('it-IT',{month:short?'short':'long',year:short?'2-digit':'numeric'}).replace('.', '');
+}
+function rptTrendBytes(v,loc){return v==null||v<0?'—':(v/1073741824>=1024?Number(v/1099511627776).toLocaleString(loc||'it-IT',{maximumFractionDigits:1})+' TB':Number(v/1073741824).toLocaleString(loc||'it-IT',{maximumFractionDigits:1})+' GB');}
+function rptTrendState(r){return ({in_use:'In uso',abandoned:'Abbandonata',off_long:'Spenta da tempo',deleted:'Cancellata',insufficient:'Dati insufficienti',oversized:'Sovradimensionata'+(r.oversized_mem||r.oversized_cpu?' ('+[r.oversized_mem?'RAM':'',r.oversized_cpu?'CPU':''].filter(Boolean).join(', ')+')':'')})[r.state]||'Dati insufficienti';}
 function rptBytes(v,loc){
   if(v==null)return'—'; const u=['B','KB','MB','GB','TB','PB']; let i=0; v=Number(v);
   while(v>=1024&&i<u.length-1){v/=1024;i++;}
@@ -5458,9 +5481,11 @@ const Reports={
     Reports.buildModels(); Reports.syncControls(); Reports.clear();
   },
   syncControls(){
-    const mgr=Reports.isManager(), vms=Reports.model==='vms';
+    const mgr=Reports.isManager(), vms=Reports.model==='vms', trend=Reports.model==='trend';
+    document.getElementById('rp-period').hidden=trend; document.getElementById('rp-months-wrap').hidden=!trend;
+    document.getElementById('rp-trend-thr').hidden=!trend;
     document.getElementById('rp-filters').hidden=mgr;
-    document.getElementById('rp-vmfilters').hidden=!vms;
+    document.getElementById('rp-vmfilters').hidden=!(vms||trend);
     document.getElementById('rp-thr').hidden=!vms;
     document.getElementById('rp-gpu-thr').hidden=Reports.model!=='gpu';
     document.getElementById('rp-orient').hidden=!mgr;
@@ -5476,16 +5501,21 @@ const Reports={
   query(){
     const val=id=>document.getElementById(id).value.trim(), q=new URLSearchParams();
     const from=val('rp-from'), to=val('rp-to');
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)){toast('Date non valide','err');return null;}
-    if(from>=to){toast('La data iniziale deve precedere quella finale','err');return null;}
-    q.set('from',from);q.set('to',to);
+    if(Reports.model!=='trend'&&(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to))){toast('Date non valide','err');return null;}
+    if(Reports.model!=='trend'&&from>=to){toast('La data iniziale deve precedere quella finale','err');return null;}
+    if(Reports.model==='trend'){const months=val('rp-months');if(!/^(?:[1-9]|1[0-2])$/.test(months)){toast('Mesi non validi','err');return null;}q.set('months',months);}else{q.set('from',from);q.set('to',to);}
     if(!Reports.isManager()){
       const node=val('rp-node'),type=val('rp-type'),grp=val('rp-group').toLowerCase(),txt=val('rp-q');
       if(node)q.set('nodes',node);
-      if(Reports.model==='vms'&&type&&type!=='all')q.set('type',type);
+      if((Reports.model==='vms'||Reports.model==='trend')&&type&&type!=='all')q.set('type',type);
       if(grp){if(!/^[a-z0-9]{1,32}$/.test(grp)){toast('Il gruppo è formato da lettere minuscole e cifre','err');return null;}q.set('group',grp);}
       if(txt)q.set('q',txt);
       if(Reports.model==='vms')for(const [id,k] of [['th-icpu','inactive_cpu'],['th-inet','inactive_net'],['th-idays','inactive_days'],['th-omem','oversized_mem'],['th-ocpu','oversized_cpu'],['th-odays','oversized_days']]){const v=val(id);if(v!==''){if(!/^\d+(\.\d+)?$/.test(v)){toast('Soglia non valida','err');return null;}q.set(k,v);}}
+      if(Reports.model==='trend')for(const [id,key,min,max,integer,mult] of [['th-tcpu','abandon_cpu',0,50,false,1],['th-tnet','abandon_net',0,1024,false,1024],['th-tmonths','abandon_months',1,12,true,1],['th-tpeak','abandon_peak',1,90,false,1],['th-tmem','over_mem',1,90,false,1],['th-tovercpu','over_cpu',1,90,false,1],['th-tmargin','margin',0,200,false,1]]){
+        const v=val(id);if(v==='')continue;
+        if(!/^\d+(\.\d+)?$/.test(v)||!Number.isFinite(Number(v))||Number(v)<min||Number(v)>max||(integer&&!/^\d+$/.test(v))){toast('Soglia andamento non valida: '+key+' ('+min+'–'+max+')','err');return null;}
+        q.set(key,String(Number(v)*mult));
+      }
       if(Reports.model==='gpu')for(const [id,k,min,max] of [['th-gutil','idle_util',0,50],['th-gmem','idle_mem',0,50],['th-gdays','idle_days',7,60]]){
         const v=val(id);if(v==='')continue;
         if(!/^\d+(\.\d+)?$/.test(v)||Number(v)<min||Number(v)>max||(k==='idle_days'&&!/^\d+$/.test(v))){toast(k==='idle_days'?'Giorni GPU: intero da 7 a 60':'Soglia GPU: percentuale da 0 a 50','err');return null;}
@@ -5566,6 +5596,7 @@ const Reports={
     let rows=Reports.model==='gpu'?d.models:Reports.model==='reliability'?d.by_type:d.rows;
     rows=rows||[];
     if(Reports.model==='vms'&&Reports.flag)rows=rows.filter(r=>r.flag===Reports.flag);
+    if(Reports.model==='trend'&&Reports.flag)rows=rows.filter(r=>r.state===Reports.flag);
     return rows;
   },
   val(col,r){return col.get?col.get(r):r[col.k];},
@@ -5574,6 +5605,7 @@ const Reports={
   paintTech(){
     const d=Reports.data, m=Reports.model, K=Reports.kpi;
     let k='';
+    if(m==='trend'){const t=d.totals;k=K('In uso',t.vms-t.abandoned-t.off_long-t.oversized-t.deleted-t.insufficient,'')+K('Abbandonate',t.abandoned,'')+K('Spente da tempo',t.off_long,'')+K('Sovradimensionate',t.oversized,'')+K('Cancellate',t.deleted,'')+K('Dati insufficienti',t.insufficient,'')+K('Recuperabili',esc(rptTrendBytes(t.reclaimable_mem_bytes)),t.reclaimable_cores<0?'core: —':esc(Reports.fmtNum(t.reclaimable_cores))+' core');}
     if(m==='nodes')k=K('Nodi',d.totals.nodes,'')+K('Nodi saturi',d.totals.saturated,'p95 CPU o RAM ≥ 85%',d.totals.saturated?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to))+K('Risoluzione dei dati',d.meta.timeframe==='year'?'6 h / 1 sett.':d.meta.timeframe==='day'?'1 min':'30 min',d.meta.timeframe==='year'?'6 ore negli ultimi ~90 giorni, poi settimanale':'passo di campionamento di Proxmox');
     if(m==='vms')k=K('VM nel report',d.totals.vms,d.totals.running+' accese')+K('Inattive',d.totals.inactive,'libererebbero '+rptBytes(d.totals.reclaimable_mem_bytes)+' · '+d.totals.reclaimable_cores+' core',d.totals.inactive?'w':'')+K('Sovradimensionate',d.totals.oversized,'RAM p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedMem*100)+'% o CPU p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedCPU*100)+'%',d.totals.oversized?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     if(m==='storage'){const ceph=(d.rows||[]).filter(r=>r.type==='rbd');k=K('Storage',d.rows.length,ceph.length+' Ceph')+K('Più pieno',Reports.pct(Math.max(0,...d.rows.map(r=>r.used_pct))),'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));}
@@ -5582,15 +5614,17 @@ const Reports={
     if(m==='reliability')k=K('Operazioni',Reports.fmtNum(d.totals.tasks),'copertura '+Reports.fmtNum(d.coverage_days,0)+' giorni')+K('Fallite',Reports.fmtNum(d.totals.failed),Reports.fmtNum(d.totals.fail_pct,1)+'%',d.totals.fail_pct>=5?'w':'')+K('Backup',Reports.fmtNum(d.totals.backups),Reports.fmtNum(d.totals.backups_failed)+' falliti',d.totals.backups_failed?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     document.getElementById('rp-kpis').innerHTML=k;
     let extra='';
+    if(m==='trend')extra=`<div class="seg" role="group" aria-label="Filtra per stato" style="margin-bottom:10px">${[['','Tutte'],['abandoned','Abbandonate'],['off_long','Spente da tempo'],['oversized','Sovradimensionate'],['deleted','Cancellate']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${esc(l)}</button>`).join('')}</div>`;
     if(m==='vms')extra=`<div class="seg" role="group" aria-label="Filtra per segnalazione" style="margin-bottom:10px">${[['','Tutte'],['inactive','Inattive'],['oversized','Sovradimensionate']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${l}</button>`).join('')}</div>`;
     if(m==='gpu'&&d.by_group&&Object.keys(d.by_group).length)extra=`<p class="cnote" style="margin-bottom:10px">Per gruppo: ${Object.entries(d.by_group).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
     if(m==='reliability'&&d.failed_by_node&&Object.keys(d.failed_by_node).length)extra=`<p class="cnote" style="margin-bottom:10px">Fallite per nodo: ${Object.entries(d.failed_by_node).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
     const gpuUsage=m!=='gpu'?'':d.usage&&d.usage.known?`<section style="margin-top:20px"><h3>Uso delle schede</h3><div class="seg" role="group" aria-label="Filtra per uso delle GPU" style="margin:10px 0">${[['','Tutte'],['idle','Inutilizzate'],['reserved','Riservate'],['vm_off','VM spente']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${esc(l)}</button>`).join('')}</div><div class="panel"><div class="tw" id="rp-gpu-use-tbl"></div></div></section>`:`<p class="cnote" style="margin-top:12px">Nessun dato sull'uso delle GPU nel periodo: il monitoraggio raccoglie un campione ogni 5 minuti da quando e' attivo (gpu_usage in config.json).</p>`;
-    document.getElementById('rp-body').innerHTML=`${extra}<div class="panel"><div class="tw" id="rp-tbl"></div></div>${gpuUsage}<p class="cnote" style="margin-top:8px">Report tecnico — uso interno.</p>${Reports.notes(d)}`;
+    document.getElementById('rp-body').innerHTML=`${extra}<div class="panel"><div class="tw" id="rp-tbl"></div></div>${gpuUsage}<p class="cnote" style="margin-top:8px">Report tecnico — uso interno.</p>${m==='trend'?`<p class="cnote">Fonti: storico giornaliero e ≈ dati Proxmox a 6 ore o settimanali (prima dello storico). Il mese in corso è parziale. Storico giornaliero dal ${esc(d.meta.stored_from?rptDate(d.meta.stored_from,'it-IT'):'—')}. Proposta = picco del periodo + margine, arrotondata; mai applicata dall'app.</p>`:Reports.notes(d)}`;
     Reports.paintTable();
     if(m==='gpu'&&d.usage&&d.usage.known)Reports.paintTable(true);
   },
   paintTable(usage=false){
+    if(Reports.model==='trend'&&!usage){Reports.paintTrendTable();return;}
     const cols=Reports.cols(usage); if(!cols)return;
     let rows=[...Reports.rows(usage)];
     const s=usage?Reports.usageSort:Reports.sort, sc=cols.find(c=>c.k===s.k);
@@ -5604,7 +5638,35 @@ const Reports={
       return`<td${c.num?' class="n"':''}>${esc(t)}</td>`;}).join('')}</tr>`).join('');
     document.getElementById(usage?'rp-gpu-use-tbl':'rp-tbl').innerHTML=`<table><thead><tr>${head}</tr></thead><tbody>${body||`<tr><td colspan="${cols.length}" class="empty">Nessun dato con questi filtri</td></tr>`}</tbody></table>`;
   },
+  trendProposal(r){
+    if(!r.proposal)return '—';
+    const parts=[];if(r.mem_bytes>0&&r.proposal.mem_bytes>=0&&r.proposal.mem_bytes<r.mem_bytes)parts.push('RAM '+rptTrendBytes(r.mem_bytes)+' → '+rptTrendBytes(r.proposal.mem_bytes));
+    if(r.cores>0&&r.proposal.cores>=0&&r.proposal.cores<r.cores)parts.push('core '+Reports.fmtNum(r.cores)+' → '+Reports.fmtNum(r.proposal.cores));
+    return parts.join(' · ')||'—';
+  },
+  trendReclaim(r){if(r.state==='abandoned'||r.state==='off_long')return r.mem_bytes<0?null:r.mem_bytes;if(r.proposal&&r.mem_bytes>=0&&r.proposal.mem_bytes>=0)return Math.max(0,r.mem_bytes-r.proposal.mem_bytes);return 0;},
+  paintTrendTable(){
+    const d=Reports.data,s=Reports.sort, months=d.meta.months||[];
+    const fields=[['vm','VM',r=>`${r.vmid} · ${r.name}`],['group','Gruppo',r=>r.group==='altro'?'senza gruppo':r.group],['state','Stato',r=>rptTrendState(r)],['active','Ultimo mese attivo',r=>r.last_active_month],['reclaim','Recuperabile',r=>Reports.trendReclaim(r)]];
+    const sorted=[...Reports.rows()], field=fields.find(f=>f[0]===s.k);
+    if(field)sorted.sort((a,b)=>{const x=field[2](a),y=field[2](b);if(x==null&&y==null)return 0;if(x==null)return 1;if(y==null)return -1;return (typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'it',{numeric:true}))*s.dir;});
+    const th=([key,label])=>`<th aria-sort="${s.k===key?(s.dir>0?'ascending':'descending'):'none'}"><button type="button" class="thb${s.k===key?' on '+(s.dir>0?'asc':'desc'):''}" onclick="Reports.sortBy(${js(key)})">${esc(label)}</button></th>`;
+    const head=fields.slice(0,4).map(th).join('')+months.map((m,i)=>`<th>${esc(rptTrendMonth(m,true))}${d.meta.current_partial&&i===months.length-1?' (in corso)':''}</th>`).join('')+th(fields[4])+'<th>Proposta</th>';
+    const body=sorted.map(r=>{const state=rptTrendState(r),problem=['abandoned','off_long','oversized'].includes(r.state);
+      const cells=months.map(month=>{const m=(r.months||[]).find(x=>x.month===month);if(!m||!m.source)return '<td class="rp-muted">spenta</td>';
+        const approx=m.source==='rrd'||m.source==='mixed'?'<span title="dati Proxmox a 6 ore o settimanali (prima dello storico)"> ≈</span>':'';
+        return `<td>CPU ${esc(Reports.pct(m.cpu_avg))} · picco ${esc(Reports.pct(m.cpu_max))}${approx}<br>RAM picco ${esc(Reports.pct(m.mem_max))}</td>`;}).join('');
+      return `<tr><td>${esc(r.vmid)} · ${esc(r.name)}${r.status==='deleted'?'<br><span class="rp-muted">cancellata</span>':''}</td><td>${esc(r.group==='altro'?'senza gruppo':r.group||'—')}</td><td>${problem?`<span class="chip">${esc(state)}</span>`:esc(state)}</td><td>${esc(rptTrendMonth(r.last_active_month))}</td>${cells}<td>${esc(rptTrendBytes(Reports.trendReclaim(r)))}</td><td>${esc(Reports.trendProposal(r))}</td></tr>`;}).join('');
+    document.getElementById('rp-tbl').innerHTML=`<table><thead><tr>${head}</tr></thead><tbody>${body||`<tr><td colspan="${months.length+6}" class="empty">Nessun dato con questi filtri</td></tr>`}</tbody></table>`;
+  },
+  trendExport(){
+    const months=Reports.data.meta.months||[], keys=['cpu_avg','cpu_max','mem_avg','mem_max','source'];
+    const header=['VMID','Nome','Tipo','Nodo','Gruppo','Stato','Ultimo mese attivo','Core assegnati','RAM assegnata (byte)','Core proposti','RAM proposta (byte)','Recuperabile RAM (byte)',...months.flatMap(m=>keys.map(k=>m+' '+k))];
+    const rows=Reports.rows().map(r=>[r.vmid,r.name,r.kind,r.node,r.group,rptTrendState(r),r.last_active_month||'',r.cores,r.mem_bytes,r.proposal?r.proposal.cores:'',r.proposal?r.proposal.mem_bytes:'',Reports.trendReclaim(r)??'',...months.flatMap(month=>{const m=(r.months||[]).find(x=>x.month===month)||{};return keys.map(k=>m[k]??'');})]);
+    return {header,rows};
+  },
   exportData(usage=false){
+    if(Reports.model==='trend'&&!usage)return Reports.trendExport();
     const cols=(Reports.cols(usage)||[]).filter(c=>!c.noexp&&!c.spark);
     const rows=Reports.rows(usage).map(r=>cols.map(c=>{const v=Reports.val(c,r);return v==null?'':v;}));
     return{header:cols.map(c=>c.l),rows};
@@ -5698,6 +5760,7 @@ const Reports={
       need(T.c.gpu,k.gpu_total?`${N(k.gpu_assigned)} / ${N(k.gpu_total)}`+(d.gpu_full_since?` — ${T.gpuFull(dateFmt(d.gpu_full_since))}`:''):'—',k.gpu_total&&k.gpu_assigned>=k.gpu_total),
       need(T.c.cpu,`${N(d.stats.cpu.avg,0)}% ${T.avgSub}`)].join('');
     const e=eff&&eff.totals?{inactive:eff.totals.inactive,oversized:eff.totals.oversized,mem:B(eff.totals.reclaimable_mem_bytes),cores:N(eff.totals.reclaimable_cores)}:null;
+    const trend=d.vm_trend, trendHTML=trend?`<p class="rp-rule">${esc(T.trendLine({...trend,abandoned:N(trend.abandoned),off_long:N(trend.off_long),oversized:N(trend.oversized),mem:rptTrendBytes(trend.reclaimable_mem_bytes,loc),cores:trend.reclaimable_cores<0?'—':N(trend.reclaimable_cores)}))}</p>`:'';
     const effHTML=e?`<p class="rp-eff">${esc(T.effLine(e))}</p><p class="rp-rule">${esc(T.effRule)}</p>`:`<p class="rp-rule">${esc(T.effNone)}</p>`;
     const gpuUseHTML=d.gpu_use_known?`<p class="rp-rule">${esc(T.gpuUse(d,RPT_GPU_DEFAULTS))}</p><h3 class="rp-h3">${esc(T.gpuUseTitle)}</h3><table class="rp-gpu-use"><thead><tr>${T.gpuUseCols.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>${(d.gpu_use_by_group||[]).map(g=>`<tr><td>${esc(g.others?T.gpuOthers:g.group==='altro'?T.gpuNoGroup:g.group)}</td><td class="n">${esc(N(g.cards))}</td><td class="n">${esc(N(g.util_avg,1))}%</td><td class="n">${esc(N(g.busy_hours,1))}</td></tr>`).join('')}</tbody></table>`:`<p class="rp-rule">${esc(T.gpuUseNone)}</p>`;
     const notes=[d.meta.notes.includes('inventory_since')&&inv.first_day?T.inv(dateFmt(inv.first_day)):'',d.meta.notes.includes('group_rule_changed')&&inv.group_rule_change?T.rule(dateFmt(inv.group_rule_change)):'',T.method].filter(Boolean).join(' ');
@@ -5705,7 +5768,7 @@ const Reports={
 <section class="rp-page rp-cover"><span class="rp-lang">${esc(T.lang)}</span><img src="${esc(RPT_ID.logo)}" class="rp-logo" alt="${esc(RPT_ID.name)}"><div class="rp-ct"><h1>${esc(T.title)}</h1><p class="rp-per">${esc(per.from)} – ${esc(per.to)}</p><p>${esc(T.sub)}<br>${esc(RPT_ID.org)}</p></div><div class="rp-cf">${esc(T.gen)} ${esc(new Date().toLocaleDateString(loc,{day:'numeric',month:'long',year:'numeric'}))} · ${esc(RPT_ID.mail)}</div></section>
 <section class="rp-page"><h2>${esc(T.s1)}</h2><div class="rp-sum"><div><div class="rp-cond"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${d.condition.level}">${Dashboard.ICONS[d.condition.level==='ok'?'ok':d.condition.level==='bad'?'bad':'warn']}</svg><div><h3>${esc(T.lvl[d.condition.level])}</h3><p>${esc(T.intro(per,k))} ${esc(condP)}</p></div></div></div><div class="rp-kg">${tiles}</div></div>${foot(2)}</section>
 <section class="rp-page"><h2>${esc(T.s2)}</h2><p class="rp-lead">${esc(T.s2p)}</p><div class="rp-cg">${cards}</div>${foot(3)}</section>
-<section class="rp-page rp-resource-page"><div class="rp-two"><div><h2>${esc(T.s3)}</h2><p class="rp-lead">${esc(T.s3p(d.group_count))}</p><div class="rp-bars">${bars}</div></div><div><h2>${esc(T.s4)}</h2><table class="rp-need">${needs}</table><h3 class="rp-h3">${esc(T.eff)}</h3>${effHTML}${gpuUseHTML}</div></div><p class="rp-meth">${esc(notes)}</p>${foot(4)}</section>`;
+<section class="rp-page rp-resource-page"><div class="rp-two"><div><h2>${esc(T.s3)}</h2><p class="rp-lead">${esc(T.s3p(d.group_count))}</p><div class="rp-bars">${bars}</div></div><div><h2>${esc(T.s4)}</h2><table class="rp-need">${needs}</table><h3 class="rp-h3">${esc(T.eff)}</h3>${effHTML}${trendHTML}${gpuUseHTML}</div></div><p class="rp-meth">${esc(notes)}</p>${foot(4)}</section>`;
   },
 };
 
