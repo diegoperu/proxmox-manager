@@ -27,6 +27,9 @@ type Config struct {
 	RefreshSeconds int             `json:"refresh_seconds"`
 	DBPath         string          `json:"db_path"`
 	ListenAddr     string          `json:"listen_addr"`
+	// GPUUsage turns on the periodic nvidia-smi sampling inside the VMs that have a GPU (ROADMAP 4).
+	// Off by default: it runs a command in production guests every 5 minutes.
+	GPUUsage bool `json:"gpu_usage"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
 	AllowedHosts []string `json:"allowed_hosts"`
 	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
