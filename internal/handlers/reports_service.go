@@ -43,6 +43,7 @@ type invDay struct {
 }
 
 type serviceReport struct {
+	V3        serviceV3  `json:"v3"`
 	Meta      reportMeta `json:"meta"`
 	Condition struct {
 		Level   string       `json:"level"` // ok | warn | bad
@@ -139,7 +140,7 @@ func sumSeries(parts []rrdSeries, num, den string) ([]int64, []float64) {
 	return ts, v
 }
 
-func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p reportParams, now time.Time) (serviceReport, error) {
+func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p reportParams, now time.Time, settings ...serviceV3Settings) (serviceReport, error) {
 	var rep serviceReport
 	rep.Meta = metaFor(cluster, p, now)
 	rep.Condition.Reasons = []condReason{}
@@ -380,6 +381,14 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 		raise("warn")
 		add("task_failures", &rep.Tasks.FailPct)
 	}
+	var options serviceV3Settings
+	if len(settings) > 0 {
+		options = settings[0]
+	}
+	rep.V3, err = buildServiceV3(c, hist, cluster, p, now, options)
+	if err != nil {
+		return rep, err
+	}
 	return rep, nil
 }
 
@@ -402,18 +411,24 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
+	idx := clusterIdx(r)
+	cl, clErr := config.GetCluster(idx)
+	var saved *config.ReportSettings
+	if clErr == nil {
+		saved = cl.Report
+	}
 	parse := parseReportParams
 	if model == "trend" {
 		parse = parseTrendParams
 	}
-	p, err := parse(r.URL.Query().Get, now)
+	// A threshold the request does not set takes the cluster's default from Settings (D130), and goes
+	// through the same validation as a request value. Parameter errors are reported first, as before.
+	p, err := parse(withReportDefaults(r.URL.Query().Get, saved), now)
 	if err != nil {
 		writeError(w, err, http.StatusBadRequest)
 		return
 	}
-	idx := clusterIdx(r)
-	cl, err := config.GetCluster(idx)
-	if err != nil || cl.URL == "" {
+	if clErr != nil || cl.URL == "" {
 		writeError(w, errors.New("cluster non configurato"), http.StatusBadRequest)
 		return
 	}
@@ -423,6 +438,10 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := "rpt|" + model + "|" + strconv.Itoa(idx) + "|" + p.key()
+	options := serviceV3Settings{Report: cl.Report, Models: config.GPUModels()}
+	if model == "service" {
+		key += "|" + serviceV3SettingsKey(options)
+	}
 	v, err := cephCached(key, reportCacheTTL, func() (interface{}, error) {
 		g := reportGate(idx)
 		if !g.TryLock() {
@@ -431,7 +450,7 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		defer g.Unlock()
 		switch model {
 		case "service":
-			return buildServiceReport(client, h.hist, cl.Label, p, now)
+			return buildServiceReport(client, h.hist, cl.Label, p, now, options)
 		case "nodes":
 			return buildNodesReport(client, cl.Label, p, now)
 		case "vms":
@@ -464,3 +483,28 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 }
 
 var errReportBusy = errors.New("report busy")
+
+// withReportDefaults returns a query getter that falls back to the cluster's saved default thresholds
+// (0 = not set: the report's built-in default applies).
+func withReportDefaults(q func(string) string, rs *config.ReportSettings) func(string) string {
+	if rs == nil {
+		return q
+	}
+	d := rs.Defaults
+	defaults := map[string]float64{
+		"inactive_cpu": d.InactiveCPU, "inactive_net": d.InactiveNet, "inactive_days": d.InactiveDays,
+		"oversized_mem": d.OversizedMem, "oversized_cpu": d.OversizedCPU, "oversized_days": d.OversizedDays,
+		"idle_util": d.IdleUtil, "idle_mem": d.IdleMem, "idle_days": float64(d.IdleDays),
+		"abandon_months": float64(d.AbandonMonths), "abandon_peak": d.AbandonPeak, "abandon_cpu": d.AbandonCPU,
+		"abandon_net": d.AbandonNet, "over_mem": d.OverMem, "over_cpu": d.OverCPU, "margin": d.Margin,
+	}
+	return func(name string) string {
+		if v := q(name); v != "" {
+			return v
+		}
+		if v, ok := defaults[name]; ok && v > 0 {
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		}
+		return ""
+	}
+}

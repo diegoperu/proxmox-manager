@@ -1262,3 +1262,108 @@ Contesto: il report tecnico "VM e container" esiste gia' (periodi fino a 12 mesi
 **Suggerimento**: A.
 **Risposta utente**: (2026-11-19) "Ok su entrambe": A. Applicata: abbandonata solo con picco di CPU < `abandon_peak` (10%) in ogni mese della finestra; VM con un dispositivo in passthrough (`hostpciN`) mai giudicate sovradimensionate per la CPU (la RAM si'). Su CALCOLO (6 mesi): abbandonate 14 -> 5, nessuna VM con GPU proposta a meno core, recuperabili 894 GiB/488 core -> 796 GiB/356 core.
 
+## Report manageriale v3 (2026-11-19)
+
+Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, neppure nei grafici: informazioni interessanti sull'uso e sull'andamento del servizio); parte di valutazione e parte di finanziamento come proposto; **grafici anche a torta, di andamento, di disponibilita'**; una sezione su **come gli utenti dimensionano le VM** (% sovradimensionate ecc.); **GPU raggruppate per taglia di memoria**, senza dettaglio per modello; **niente VM abbandonate**; contenuti nuovi: **valore economico**, **crescita nel tempo**, **sicurezza e affidabilita'**; formato **1 pagina esecutiva per lingua + allegati**.
+
+### D123 — Valore economico: con quali prezzi
+**Stato**: IN CORSO
+**Bloccante**: si (per la sezione valore economico)
+**Domanda**: "Quanto costerebbero le stesse risorse altrove" richiede prezzi di riferimento. Quali?
+**Perche' conta**: e' il numero che un consiglio di dipartimento ricorda; deve essere difendibile (fonte e data dichiarate).
+**Opzioni**: A) listino pubblico di un cloud commerciale (es. on-demand nella regione di Milano) per vCPU-ora, GB di RAM-ora, GPU-ora per taglia, storage GB-mese, inseriti a mano in `config.json` con fonte e data; B) costo interno (ammortamento dell'hardware + energia + personale) da dati che fornisci tu; C) entrambi, affiancati.
+**Suggerimento**: A per partire (si calcola dalle risorse assegnate e usate gia' raccolte, con fonte e data in nota); C quando ci saranno i costi interni.
+**Risposta utente**: (2026-11-19) cercare prezzi di riferimento tra AWS, Azure, Aruba Cloud o altri, **solo nel mercato europeo**. Proposta sotto (D123-bis), in attesa di conferma.
+
+### D124 — Sicurezza e affidabilita': da quali dati
+**Stato**: IN PAUSA (sicurezza); affidabilita' RISPOSTA
+**Bloccante**: no
+**Domanda**: L'affidabilita' si puo' mostrare subito con dati gia' disponibili (disponibilita' dei nodi dai campioni RRD, backup riusciti, operazioni fallite). La **sicurezza delle VM** (fail2ban attivo, aggiornamenti automatici, SSH solo chiave) oggi non e' raccolta dal manager: si leggerebbe con un controllo periodico in sola lettura via guest agent su tutte le VM (come l'uso delle GPU, ma su ~120 VM), oppure si rinvia.
+**Perche' conta**: la postura di sicurezza e' un argomento forte, ma leggere dentro tutte le VM e' un'esecuzione periodica in piu' su macchine di produzione.
+**Opzioni**: A) solo affidabilita' ora (disponibilita' mensile, backup, operazioni), sicurezza come voce di roadmap; B) A + controllo settimanale in sola lettura della postura di sicurezza in tutte le VM; C) A + una percentuale fissa dichiarata a mano dal rollout (aggiornata quando si rifa' il rollout).
+**Suggerimento**: A ora, B come lavoro a parte (stesso schema sicuro del monitoraggio GPU).
+**Risposta utente**: (2026-11-19) "metti in pausa la sicurezza, la affrontiamo dopo se richiesto dal management": nel v3 solo affidabilita' (disponibilita', backup, operazioni).
+
+### D125 — Concentrazione dell'uso senza nomi
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Senza citare gruppi si possono mostrare: numero di gruppi serviti e loro crescita, e la **concentrazione** (es. "il 20% dei gruppi usa il 70% della RAM" con una torta per fasce: primi 5 gruppi / successivi 15 / tutti gli altri, senza nomi). Va bene?
+**Perche' conta**: mostra se il servizio e' usato da tanti o da pochi, senza esporre nessuno.
+**Opzioni**: A) si', fasce anonime; B) solo il numero di gruppi; C) nulla sui gruppi.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "ok": fasce anonime.
+
+### D126 — Contenuto della pagina esecutiva
+**Stato**: RISPOSTA
+**Bloccante**: no (si vede meglio su uno schizzo)
+**Domanda**: Proposta per la pagina esecutiva (una per lingua): condizione del servizio in una frase; 4 numeri grandi (VM attive, crescita annua delle risorse assegnate, disponibilita', valore economico); 2 grafici piccoli (andamento delle risorse assegnate rispetto alla capacita'; torta del dimensionamento delle VM); 3 messaggi chiave; "cosa serve" in una riga (risorsa che si esaurisce prima e data stimata). Allegati: A1 uso e crescita, A2 come vengono dimensionate le VM, A3 GPU per taglia di memoria, A4 affidabilita' (e sicurezza secondo D124), A5 fabbisogno e finanziamento (esaurimenti, cosa comprare e quando, valore economico), A6 metodo. Va bene come impianto?
+**Opzioni**: A) si', poi lo vedi su uno schizzo con dati veri; B) da cambiare (dimmi cosa).
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "ok": impianto approvato, da vedere su uno schizzo con dati veri.
+
+### D123-bis — Prezzi di riferimento proposti (ricerca del 2026-11-19, mercato europeo)
+**Stato**: RISPOSTA
+**Bloccante**: si (per la sezione valore economico)
+**Ricerca:** listini pubblici on-demand senza IVA. Fonti ufficiali dove leggibili, altrimenti aggregatori con la data; **da verificare sui calcolatori ufficiali prima della pubblicazione** (la pagina prezzi ufficiale di OVHcloud non e' leggibile per intero in automatico; AWS e Azure pubblicano in USD).
+| Voce | Provider europeo (basso) | Hyperscaler, regione Milano/Europa (alto) |
+|---|---|---|
+| Istanza generica 4 vCPU / 16 GB | OVHcloud b3-16 **0,093 EUR/h** (blog prezzi OVH, Holori) | AWS m7i.xlarge Milano **0,235 USD/h**; Azure D4s v5 Italy North **0,224 USD/h** |
+| -> vCPU-ora / GB RAM-ora (ripartiti con il rapporto 7,5:1 dei listini a risorse di Google) | **0,0151 EUR / 0,0020 EUR** | ~0,038 / ~0,0051 USD |
+| GPU 16 GB (A2/T4) | nessuna offerta europea trovata | AWS g4dn.xlarge (T4) Milano **0,616 USD/h** (con 4 vCPU/16 GB) |
+| GPU 24 GB (L4/A10/RTX 3090) | OVH L4 **0,72-0,75 EUR/h**, OVH A10 **0,76 EUR/h**, Scaleway L4 **0,79 EUR/h** | AWS g6.xlarge (L4) Francoforte **1,006 USD/h** |
+| GPU 40-48 GB (A100 40 GB) | nessuna A100 da 40 GB singola in Europa; OVH/Scaleway L40S 48 GB **1,40-1,47 EUR/h** | (A100 40 GB solo in istanze da 8 schede) |
+| GPU 80 GB (A100/H100 80 GB) | OVH A100 80 GB **2,75 EUR/h**, OVH H100 **2,80 EUR/h**, Scaleway H100 **2,73-2,86 EUR/h** | Azure NC24ads A100 v4 West Europe **4,78-5,88 USD/h** |
+| Storage a blocchi GB-mese | Aruba **0,000028 EUR/h/GB = ~0,020 EUR** | AWS gp3 Milano **~0,094 EUR** (stima) |
+**Proposta di metodo:** valore = risorse **assegnate** x tempo: vCPU e RAM per le ore in cui la VM e' accesa (dallo storico giornaliero), GPU per le ore di VM accesa, storage per i GB assegnati x mesi; mostrato come **intervallo** "tra X (provider europeo) e Y (hyperscaler)" con fonte e data in nota; prezzi in `config.json` (EUR, fonte, data) cosi' si aggiornano senza codice; per la classe 40 GB il prezzo della L40S 48 GB (prudente, dichiarato); per gli USD un cambio fisso dichiarato in config.
+**Opzioni**: A) intervallo basso-alto come sopra; B) solo il provider europeo (cifra prudente, piu' difendibile); C) solo hyperscaler (cifra piu' alta).
+**Suggerimento**: A, con la cifra bassa in evidenza nella pagina esecutiva (prudente) e l'intervallo negli allegati.
+**Risposta utente**: (2026-11-19) "il tuo metodo va bene": A (intervallo, cifra bassa in evidenza), piu' il **listino interno DataCloud** da affiancare (vedi D127).
+
+### D127 — Listino interno DataCloud (costo per i gruppi)
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Listino fornito dall'utente (2026-11-19), costo mensile:** VM Calcolo Base **8 gettoni** (comprende **16 core, 32 GiB di RAM, 100 GB su SSD**); +16 core **1 gettone**; +32 GiB RAM **4 gettoni**; +100 GB SSD **3 gettoni**; +1 TB HDD **2 gettoni**; GPU low end **1 gettone GPU**, mid range **3**, high end **10**; **GPU da 89 GiB e oltre: 1 gettone GPU in piu'** (11; nota utente 2026-11-19). 1 gettone VM = 1 EUR, 1 gettone GPU = 35 EUR.
+**Regole (risposte dell'utente):** blocchi oltre la base **arrotondati per eccesso** (es. 20 core = base + 1 blocco); fasce GPU **per memoria**: low end = 16 GB (A2), mid range = 24 GB (L4, RTX 3090), high end = 40 GB e oltre (A100 40/80); il listino vale **solo per CALCOLO** (HOSTING: solo valore di mercato); SSD o HDD **dal nome dello storage** del disco nella configurazione della VM (`datacloud-ssd`, `datacloud-hdd`; altri storage da associare a una classe in `config.json`).
+**Uso nel report:** "quanto paga la ricerca" (listino interno) accanto a "quanto costerebbe sul mercato" (intervallo D123-bis).
+
+### D128 — Backup: cosa misurare e come spiegarlo
+**Stato**: RISPOSTA
+**Bloccante**: no (per la pagina A4)
+**Fatti (lettura in sola lettura dei task di tutti i nodi di CALCOLO, 2026-11-19):** il report contava i **job notturni di nodo** (`vzdump` senza VMID: 546 su 548), non le VM; i fallimenti sono 70: **59 "could not activate storage 'datacloud-backup-calcolo'"** (archivio di backup non raggiungibile, nessuna VM salvata quella notte su quel nodo), 8 "job errors" (errore su una o piu' VM del job), 2 interruzioni, 1 stato inatteso; concentrati in pochi mesi (ago 2026 20/41, giu 2026 15/33, dic 2025-gen 2026 7/31 e 7/32), il resto dei mesi a zero.
+**Domanda**: Proposta per il manageriale: (1) **copertura**: % delle VM con almeno un backup riuscito negli ultimi 7 giorni (dal contenuto dello storage di backup, in sola lettura; fattibilita' da verificare); (2) **notti con backup riuscito** per mese (job riusciti/totali, grafico); (3) **cause dei fallimenti in parole**, raggruppate: "archivio di backup non raggiungibile", "errore su singole macchine", "interrotto", "altro", con il numero. Nel tecnico il dettaglio per nodo e per notte. Va bene?
+**Perche' conta**: "85,5% riusciti" senza spiegazione suona come un servizio inaffidabile, mentre quasi tutti i fallimenti sono notti in cui l'archivio non era raggiungibile.
+**Opzioni**: A) le tre misure proposte; B) solo (2) e (3); C) altro.
+**Suggerimento**: A (se la copertura non si puo' leggere in modo affidabile, B e lo si dichiara).
+**Risposta utente**: (2026-11-19) "come suggerisci": A (copertura, notti riuscite per mese, cause in parole; se la copertura non e' leggibile in modo affidabile, B dichiarato).
+
+### D129 — Disponibilita': interruzioni esterne
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Nota dell'utente (2026-11-19):** le interruzioni sono di norma **mancanze di corrente non dipendenti da noi**, e il sistema non puo' saperlo perche' non e' collegato ai sistemi di monitoraggio dell'ateneo.
+**Domanda**: (A) solo una **nota fissa** nel documento ("le interruzioni sono dovute di norma a cause esterne, ad es. mancanze di corrente, che il sistema non distingue"); (B) A + un **registro delle interruzioni** in Impostazioni (periodo, causa: esterna/elettrica, manutenzione programmata, guasto del servizio) compilato dagli amministratori: il report mostra la disponibilita' totale e quella **al netto delle cause esterne e delle manutenzioni**, con i periodi annotati nel grafico; (C) collegamento ai sistemi di monitoraggio dell'ateneo (fuori portata oggi).
+**Suggerimento**: A subito, B nello stesso lavoro (piccolo e utile anche per spiegare i backup falliti delle stesse notti).
+**Risposta utente**: (2026-11-19) "come suggerisci": nota fissa subito + registro delle interruzioni in Impostazioni.
+
+### D130 — Parametri economici e dei report in Impostazioni
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Richiesta dell'utente (2026-11-19):** listino e parametri in una sezione dedicata delle Impostazioni, aggiornabili facilmente.
+**Proposta**: sezione "Listini e parametri dei report": listino interno (valore dei gettoni, contenuto della VM base, prezzo dei blocchi, fasce GPU per memoria con i gettoni, soglia 89 GiB = +1), prezzi di mercato per provider (vCPU-ora, GB RAM-ora, GPU-ora per taglia, storage GB-mese) **con fonte e data**, cambio USD/EUR, associazione storage -> SSD/HDD, soglie dei report (D32, D111, D117). Salvati in `config.json` con validazione a whitelist e intervalli; ogni modifica registrata (chi/quando non c'e' ancora: senza login si registra solo quando e cosa); il report riporta la data dei prezzi usati.
+**Opzioni**: A) come proposto; B) solo i prezzi, soglie dove sono oggi; C) solo da `config.json` a mano.
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "come suggerisci", **distinto per cluster**; se i prezzi di un cluster sono **tutti a 0**, la parte economica e' **esclusa dai report** di quel cluster.
+
+### D131 — Scaricare i listini aggiornati dei servizi esterni
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Fattibilita' (da verificare in implementazione): **Azure** ha un'API pubblica dei prezzi senza chiave (Retail Prices API, filtrabile per regione e taglia); **OVHcloud** ha un catalogo pubblico via API; **AWS** pubblica i listini in file pubblici per servizio e regione (molto grandi: serve leggere solo la parte necessaria); **Scaleway** ha un catalogo prodotti via API (da verificare se serve una chiave); **Aruba** non ha un'API (resta manuale). Proposta: pulsante "Controlla i listini" in Impostazioni che interroga **solo indirizzi fissi** di questi provider, mostra i valori nuovi accanto a quelli attuali con la differenza, e **salva solo dopo la conferma** dell'amministratore.
+**Perche' conta (sicurezza)**: sarebbe la prima chiamata del manager verso Internet: indirizzi fissi in whitelist (nessun indirizzo dalla richiesta, niente SSRF), TLS verificato, timeout, limite di dimensione, nessun dato inviato; il manager deve poter uscire su Internet (oggi sta in una rete interna).
+**Opzioni**: A) semi-automatico con conferma per Azure e OVHcloud, poi AWS se la lettura parziale regge, manuale per gli altri; B) solo manuale con link alle pagine ufficiali; C) aggiornamento automatico periodico senza conferma (sconsigliato).
+**Suggerimento**: A.
+**Risposta utente**: (2026-11-19) "come suggerisci": semi-automatico con conferma (Azure, OVHcloud, poi AWS se regge), manuale per gli altri.
+
+### D132 — Una GPU rimossa (guasta, obsoleta) non deve cancellare la storia
+**Stato**: APERTA (verifica tecnica, nessuna scelta richiesta)
+**Analisi**: le righe giornaliere (`gpu_use_day`, `inv_gpu`) restano dopo la rimozione e portano il modello come lo nominava Proxmox: la taglia si ricava ancora (tabella interna o correzioni di `gpu_models`, che restano valide per i modelli gia' corretti); il report usa le righe salvate, non l'inventario attuale; il totale delle schede scende dal giorno della rimozione nella fotografia. Da **provare con un test** (scheda che sparisce dall'inventario: storico intatto, report invariato per i giorni passati, conteggi giusti dopo) nello step del backend.
+**Risposta utente**: (2026-11-19) ok: test nello step del backend.
+

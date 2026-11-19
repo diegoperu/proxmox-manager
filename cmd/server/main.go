@@ -72,6 +72,9 @@ func main() {
 		r.Post("/config/test", h.TestConnection)
 
 		r.Get("/clusters", h.GetClusters)
+		r.Get("/clusters/{idx}/report-settings", h.GetReportSettings)
+		r.Put("/clusters/{idx}/report-settings", h.PutReportSettings)
+		r.Post("/clusters/{idx}/report-settings/price-check", h.PriceCheck)
 		r.Post("/clusters", h.AddCluster)
 		r.Put("/clusters/{idx}", h.UpdateCluster)
 		r.Delete("/clusters/{idx}", h.DeleteCluster)

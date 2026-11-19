@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"unicode"
@@ -12,12 +13,13 @@ import (
 )
 
 type ClusterConfig struct {
-	Label    string `json:"label"`
-	URL      string `json:"url"`
-	APIToken string `json:"api_token"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Default  bool   `json:"default"`
+	Report   *ReportSettings `json:"report,omitempty"`
+	Label    string          `json:"label"`
+	URL      string          `json:"url"`
+	APIToken string          `json:"api_token"`
+	Username string          `json:"username"`
+	Password string          `json:"password"`
+	Default  bool            `json:"default"`
 }
 
 type Config struct {
@@ -137,18 +139,39 @@ func Load() error {
 		return save()
 	}
 
-	return json.Unmarshal(data, &current)
+	if err := json.Unmarshal(data, &current); err != nil {
+		return err
+	}
+	for _, c := range current.Clusters {
+		if err := ValidReportSettings(c.Report); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
+// save requires mu to be held. Rename keeps readers from observing a partial file.
 func save() error {
-	f, err := os.Create(cfgPath)
+	f, err := os.CreateTemp(filepath.Dir(cfgPath), ".config-*.tmp")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	name := f.Name()
+	defer os.Remove(name)
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	return enc.Encode(current)
+	if err := enc.Encode(current); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(name, cfgPath)
 }
 
 func Get() Config {
@@ -157,15 +180,38 @@ func Get() Config {
 	c := current
 	c.Clusters = make([]ClusterConfig, len(current.Clusters))
 	copy(c.Clusters, current.Clusters)
+	for i := range c.Clusters {
+		c.Clusters[i].Report = copyReport(current.Clusters[i].Report)
+	}
+	c.AllowedHosts = append([]string(nil), current.AllowedHosts...)
+	if current.VMUsage != nil {
+		v := *current.VMUsage
+		c.VMUsage = &v
+	}
 	c.GPUModels = copyGPUModels(current.GPUModels)
 	return c
 }
 
 func Update(c Config) error {
+	for _, cl := range c.Clusters {
+		if err := ValidReportSettings(cl.Report); err != nil {
+			return err
+		}
+	}
+	// Keep caller-owned report pointers out of the live configuration.
+	c.Clusters = append([]ClusterConfig(nil), c.Clusters...)
+	for i := range c.Clusters {
+		c.Clusters[i].Report = copyReport(c.Clusters[i].Report)
+	}
 	mu.Lock()
+	defer mu.Unlock()
+	old := current
 	current = c
-	mu.Unlock()
-	return save()
+	if err := save(); err != nil {
+		current = old
+		return err
+	}
+	return nil
 }
 
 // GetCluster ritorna il cluster all'indice idx.
@@ -178,15 +224,20 @@ func GetCluster(idx int) (ClusterConfig, error) {
 		return ClusterConfig{}, nil
 	}
 	if idx >= 0 && idx < len(current.Clusters) {
-		return current.Clusters[idx], nil
+		c := current.Clusters[idx]
+		c.Report = copyReport(c.Report)
+		return c, nil
 	}
 	// idx fuori range: fallback al default
 	for _, c := range current.Clusters {
 		if c.Default {
+			c.Report = copyReport(c.Report)
 			return c, nil
 		}
 	}
-	return current.Clusters[0], nil
+	c := current.Clusters[0]
+	c.Report = copyReport(c.Report)
+	return c, nil
 }
 
 // GetDefaultCluster ritorna il primo cluster con Default==true.
@@ -199,11 +250,14 @@ func GetDefaultCluster() (ClusterConfig, error) {
 	}
 	for _, c := range current.Clusters {
 		if c.Default {
+			c.Report = copyReport(c.Report)
 			return c, nil
 		}
 	}
 	log.Printf("warning: nessun cluster con default=true, usando Clusters[0]")
-	return current.Clusters[0], nil
+	c := current.Clusters[0]
+	c.Report = copyReport(c.Report)
+	return c, nil
 }
 
 // AllowedHosts returns a copy of the configured Host allowlist (empty = no restriction).
