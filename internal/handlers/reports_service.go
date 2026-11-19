@@ -411,18 +411,24 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
+	idx := clusterIdx(r)
+	cl, clErr := config.GetCluster(idx)
+	var saved *config.ReportSettings
+	if clErr == nil {
+		saved = cl.Report
+	}
 	parse := parseReportParams
 	if model == "trend" {
 		parse = parseTrendParams
 	}
-	p, err := parse(r.URL.Query().Get, now)
+	// A threshold the request does not set takes the cluster's default from Settings (D130), and goes
+	// through the same validation as a request value. Parameter errors are reported first, as before.
+	p, err := parse(withReportDefaults(r.URL.Query().Get, saved), now)
 	if err != nil {
 		writeError(w, err, http.StatusBadRequest)
 		return
 	}
-	idx := clusterIdx(r)
-	cl, err := config.GetCluster(idx)
-	if err != nil || cl.URL == "" {
+	if clErr != nil || cl.URL == "" {
 		writeError(w, errors.New("cluster non configurato"), http.StatusBadRequest)
 		return
 	}
@@ -477,3 +483,28 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 }
 
 var errReportBusy = errors.New("report busy")
+
+// withReportDefaults returns a query getter that falls back to the cluster's saved default thresholds
+// (0 = not set: the report's built-in default applies).
+func withReportDefaults(q func(string) string, rs *config.ReportSettings) func(string) string {
+	if rs == nil {
+		return q
+	}
+	d := rs.Defaults
+	defaults := map[string]float64{
+		"inactive_cpu": d.InactiveCPU, "inactive_net": d.InactiveNet, "inactive_days": d.InactiveDays,
+		"oversized_mem": d.OversizedMem, "oversized_cpu": d.OversizedCPU, "oversized_days": d.OversizedDays,
+		"idle_util": d.IdleUtil, "idle_mem": d.IdleMem, "idle_days": float64(d.IdleDays),
+		"abandon_months": float64(d.AbandonMonths), "abandon_peak": d.AbandonPeak, "abandon_cpu": d.AbandonCPU,
+		"abandon_net": d.AbandonNet, "over_mem": d.OverMem, "over_cpu": d.OverCPU, "margin": d.Margin,
+	}
+	return func(name string) string {
+		if v := q(name); v != "" {
+			return v
+		}
+		if v, ok := defaults[name]; ok && v > 0 {
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		}
+		return ""
+	}
+}

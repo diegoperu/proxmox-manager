@@ -265,3 +265,28 @@ func TestV3UsesBoundedTrendWorkers(t *testing.T) {
 		t.Fatalf("peak Proxmox concurrency %d", f.peak)
 	}
 }
+
+// D130: thresholds saved in Settings apply when the request does not set them; a request value wins.
+func TestReportDefaultsFromSettings(t *testing.T) {
+	rs := &config.ReportSettings{Defaults: config.ReportDefaults{IdleUtil: 7, IdleDays: 21, AbandonPeak: 15, InactiveCPU: 0.03}}
+	base := map[string]string{"idle_util": "", "from": "2026-10-01", "to": "2026-10-31"}
+	q := withReportDefaults(func(k string) string { return base[k] }, rs)
+	if q("idle_util") != "7" || q("idle_days") != "21" || q("abandon_peak") != "15" || q("inactive_cpu") != "0.03" || q("over_mem") != "" || q("from") != "2026-10-01" {
+		t.Fatalf("defaults not applied: %q %q %q %q %q", q("idle_util"), q("idle_days"), q("abandon_peak"), q("inactive_cpu"), q("over_mem"))
+	}
+	base["idle_util"] = "3"
+	if q("idle_util") != "3" {
+		t.Fatal("request value must win over the saved default")
+	}
+	p, err := parseReportParams(q, time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC))
+	if err != nil || p.GPUIdle.Util != 3 || p.GPUIdle.Days != 21 || p.TH.InactiveCPU != 0.03 {
+		t.Fatalf("parsed with defaults: %+v %v", p.GPUIdle, err)
+	}
+	tp, err := parseTrendParams(q, time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC))
+	if err != nil || tp.Trend.AbandonPeak != 15 {
+		t.Fatalf("trend with defaults: %+v %v", tp.Trend, err)
+	}
+	if withReportDefaults(func(string) string { return "" }, nil)("idle_util") != "" {
+		t.Fatal("nil settings must not invent values")
+	}
+}
