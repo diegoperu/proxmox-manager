@@ -379,3 +379,41 @@ func TestGPUTargetsDedupAndTemplates(t *testing.T) {
 		t.Fatalf("targets: %+v", ts)
 	}
 }
+
+func TestSampleStateReserved(t *testing.T) {
+	zero, nine, ten, used, total := 0.0, 9.0, 10.0, 10.0, 100.0
+	for _, tc := range []struct {
+		name  string
+		cards []gpuCardUse
+		want  string
+	}{
+		{"busy utilization", []gpuCardUse{{Util: &ten}}, gpuStBusy},
+		{"reserved", []gpuCardUse{{Util: &nine, MemUsedMiB: &used, MemTotalMiB: &total}}, gpuStReserved},
+		{"busy takes priority", []gpuCardUse{{Util: &zero, MemUsedMiB: &used, MemTotalMiB: &total}, {Util: &ten}}, gpuStBusy},
+		{"quiet", []gpuCardUse{{Util: &zero}}, gpuStQuiet},
+		{"unknown utilization memory fallback", []gpuCardUse{{MemUsedMiB: &used, MemTotalMiB: &total}}, gpuStBusy},
+		{"other card utilization known", []gpuCardUse{{MemUsedMiB: &used, MemTotalMiB: &total}, {Util: &zero}}, gpuStReserved},
+		{"nothing known", []gpuCardUse{{}}, gpuStNoData},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := sampleState(tc.cards); got != tc.want {
+				t.Fatalf("got %s want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGPUUseReservedAccumulator(t *testing.T) {
+	g := newGPUUseCollector()
+	target := gpuUseTarget{vmid: 101, node: "n1", group: "altro", cards: 1}
+	zero, ten, total := 0.0, 10.0, 100.0
+	cards := []gpuCardUse{{Util: &zero, MemUsedMiB: &ten, MemTotalMiB: &total}}
+	g.record("C", "2026-11-19", target, sampleState(cards), cards)
+	cards[0].Util = &ten
+	g.record("C", "2026-11-19", target, sampleState(cards), cards)
+	k := gpuUseAccKey{"C", "2026-11-19", 101}
+	row := g.acc[k].row(k)
+	if row.Valid != 2 || row.Reserved != 1 || row.BusyMinutes != 5 {
+		t.Fatalf("%+v", row)
+	}
+}

@@ -354,8 +354,8 @@ def fake_gpu_usage(vm_id):
         return (3, "")
     if scenario == 3:
         return (4, "Failed to initialize NVML: Driver/library version mismatch\n")
-    util = 0 if scenario == 1 else 40 + (vm_id + int(time.time() // 300)) % 56
-    used = 8 if scenario == 1 else 30000
+    util = 0 if scenario in (1, 5) else 40 + (vm_id + int(time.time() // 300)) % 56
+    used = 8 if scenario == 1 else (16384 if scenario == 5 else 30000)
     power = "[N/A]" if scenario == 5 else ("35" if scenario == 1 else "210")
     line = "00000000:01:00.0, NVIDIA A100, %d, %d, 40960, 65, %s\n" % (util, used, power)
     if scenario == 4:

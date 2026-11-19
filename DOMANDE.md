@@ -1172,14 +1172,14 @@ Contesto: le schede sono in passthrough (vfio), quindi l'host Proxmox non vede n
 **Perche' conta**: e' il numero che distingue un uso a raffiche da una scheda ferma; il 5% di D111 e' una media su 14 giorni, questa e' la soglia del singolo campione.
 **Opzioni**: A) 10% utilizzo o memoria; B) solo utilizzo >= 10%; C) un'altra soglia.
 **Suggerimento**: A (un modello caricato e fermo occupa memoria: e' "riservata", non "ferma").
-**Risposta utente**: (vuoto) — assunzione provvisoria: A, modificabile come le soglie D32.
+**Risposta utente**: (vuoto) — assunzione provvisoria: A, modificabile come le soglie D32. **Superata in parte da D114 (2026-11-19):** la memoria non rende piu' un campione "al lavoro".
 
 ### D114 — La memoria occupata conta come "al lavoro"?
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (decide cosa si accende)
 **Domanda**: Nella prova reale (VM 202) ollama tiene il modello in memoria dopo la generazione: utilizzo 0%, memoria al 38%. Con D113 quel campione e' "al lavoro" e con D111 la scheda non sara' mai "inutilizzata" finche' un servizio tiene un modello caricato, anche se nessuno lo usa da settimane (caso tipico dei server di inferenza dimenticati). Si cambia?
 **Perche' conta**: decide se il report trova davvero le schede abbandonate o solo quelle con il driver scarico.
 **Opzioni**: A) "al lavoro" e "inutilizzata" guardano solo l'utilizzo; la memoria resta mostrata e, se occupata con utilizzo basso, la scheda e' segnalata "riservata" (modello caricato, nessun calcolo); B) lasciare D111/D113 come sono (memoria = in uso); C) soglie diverse.
 **Suggerimento**: A: e' l'utilizzo che dice se qualcuno lavora; la memoria occupata senza calcolo e' proprio il segnale di una scheda tenuta ferma.
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) "sono d'accordo con te": opzione A. Sostituisce la parte "memoria" di D113: un campione e' "al lavoro" solo con utilizzo >= 10%; memoria >= 10% con utilizzo sotto = "riservata".
 

@@ -30,6 +30,7 @@ type gpuUsageRow struct {
 	NoDriver    int      `json:"no_driver"`
 	DriverError int      `json:"driver_error"`
 	NoData      int      `json:"no_data"`
+	Reserved    int      `json:"reserved"`
 	Coverage    float64  `json:"coverage"` // fraction, not percent
 	UtilAvg     float64  `json:"util_avg"`
 	UtilP95Day  float64  `json:"util_p95_day"` // highest daily p95, never a period percentile
@@ -45,6 +46,7 @@ type gpuUsageReport struct {
 	Known             bool          `json:"known"`
 	Rows              []gpuUsageRow `json:"rows"`
 	IdleCount         int           `json:"idle_count"` // cards, not VMs
+	ReservedCount     int           `json:"reserved_count"`
 	VMOffCount        int           `json:"vm_off_count"`
 	InsufficientCount int           `json:"insufficient_count"`
 }
@@ -54,6 +56,8 @@ func (u *gpuUsageReport) add(row gpuUsageRow) {
 	switch row.State {
 	case "idle":
 		u.IdleCount += row.Cards
+	case "reserved":
+		u.ReservedCount += row.Cards
 	case "vm_off":
 		u.VMOffCount += row.Cards
 	case "insufficient":
@@ -82,6 +86,7 @@ func (a *gpuUseAccumulator) add(r history.GPUUseDay) {
 	a.row.NoDriver += r.NoDriver
 	a.row.DriverError += r.DriverError
 	a.row.NoData += r.NoData
+	a.row.Reserved += r.Reserved
 	a.row.BusyHours += float64(r.BusyMinutes) / 60
 	a.util += r.UtilAvg * float64(r.Valid)
 	a.mem += r.MemAvgPct * float64(r.Valid)
@@ -153,8 +158,12 @@ func aggregateGPUUsage(rows []history.GPUUseDay, p reportParams) gpuUsageReport 
 			r.State = "driver_error"
 		case w.Coverage < 0.5 || len(a.window.days) < p.GPUIdle.Days:
 			r.State = "insufficient"
-		case w.UtilAvg < p.GPUIdle.Util && w.MemAvg < p.GPUIdle.Mem:
-			r.State = "idle"
+		case w.UtilAvg < p.GPUIdle.Util:
+			if w.MemAvg >= p.GPUIdle.Mem {
+				r.State = "reserved"
+			} else {
+				r.State = "idle"
+			}
 		default:
 			r.State = "in_use"
 		}

@@ -878,7 +878,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.184.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.185.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -2923,11 +2923,11 @@ const Gpu={
     return {...d,vms:(Array.isArray(d.vms)?d.vms:[]).filter(v=>object(v)&&Number.isInteger(v.vmid)).map(v=>({...v,cards:(Array.isArray(v.cards)?v.cards:[]).filter(object)}))};
   },
   number(v){return typeof v==='number'&&Number.isFinite(v)?v:null;},
-  state(v){return ({busy:'Al lavoro',quiet:'Ferma',vm_off:'VM spenta',no_driver:'Driver NVIDIA assente',driver_error:'Driver in errore',no_data:'Nessun dato',paused:"In pausa: l'agent non risponde"})[v]||'Nessun dato';},
+  state(v){return ({busy:'Al lavoro',reserved:'Riservata: modello caricato, nessun calcolo',quiet:'Ferma',vm_off:'VM spenta',no_driver:'Driver NVIDIA assente',driver_error:'Driver in errore',no_data:'Nessun dato',paused:"In pausa: l'agent non risponde"})[v]||'Nessun dato';},
   best(v){return v.cards.reduce((best,c)=>(Gpu.number(c.util)??-1)>(Gpu.number(best?.util)??-1)?c:best,null)||v.cards[0]||{};},
   gb(v){v=Gpu.number(v);return v===null?'—':(v/1024).toFixed(1).replace('.',',');},
   metrics(c){const u=Gpu.number(c.util);return `Utilizzo ${u===null?'—':u+'%'} · Memoria ${Gpu.gb(c.mem_used_mib)} / ${Gpu.gb(c.mem_total_mib)} GB`;},
-  usageLine(v){return `${Gpu.state(v.state)}${v.state==='busy'||v.state==='quiet'?' · '+Gpu.metrics(Gpu.best(v)):''}`;},
+  usageLine(v){return `${Gpu.state(v.state)}${v.state==='busy'||v.state==='reserved'||v.state==='quiet'?' · '+Gpu.metrics(Gpu.best(v)):''}`;},
   usage(v){
     if(!v)return '<span class="td">—</span>';
     const c=Gpu.best(v), u=Gpu.number(c.util), used=Gpu.number(c.mem_used_mib), total=Gpu.number(c.mem_total_mib);
@@ -2936,8 +2936,8 @@ const Gpu={
     const extra=[Gpu.number(c.temp_c)===null?'':`${c.temp_c} °C`,Gpu.number(c.power_w)===null?'':`${c.power_w} W`].filter(Boolean).join(' · ');
     const at=Gpu.number(v.at), age=at!==null&&at>0?Math.max(0,Math.floor((Date.now()/1000-at)/60)):null;
     const time=age===null?'':`aggiornato ${age} min fa${v.stale?' · dato vecchio delle '+new Date(at*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):''}`;
-    const glyph=({busy:'●',quiet:'○',vm_off:'■',no_driver:'◇',driver_error:'!',no_data:'?',paused:'Ⅱ'})[v.state]||'?';
-    return `<div class="gpu-use"><div><span aria-hidden="true">${glyph}</span> ${esc(Gpu.state(v.state))}${multi}</div>${v.state==='busy'||v.state==='quiet'?meter('Utilizzo',u===null?'—':u+'%',u)+meter('Memoria',`${Gpu.gb(used)} / ${Gpu.gb(total)} GB`,used!==null&&total!==null&&total>0?used/total*100:null)+(extra?`<span class="td">${esc(extra)}</span>`:''):''}${time?`<span class="td">${esc(time)}</span>`:''}</div>`;
+    const glyph=({busy:'●',reserved:'◆',quiet:'○',vm_off:'■',no_driver:'◇',driver_error:'!',no_data:'?',paused:'Ⅱ'})[v.state]||'?';
+    return `<div class="gpu-use"><div><span aria-hidden="true">${glyph}</span> ${esc(Gpu.state(v.state))}${multi}</div>${v.state==='busy'||v.state==='reserved'||v.state==='quiet'?meter('Utilizzo',u===null?'—':u+'%',u)+meter('Memoria',`${Gpu.gb(used)} / ${Gpu.gb(total)} GB`,used!==null&&total!==null&&total>0?used/total*100:null)+(extra?`<span class="td">${esc(extra)}</span>`:''):''}${time?`<span class="td">${esc(time)}</span>`:''}</div>`;
   },
   note(d,idx){d=Gpu.norm(d);Gpu.by[idx]=d;Gpu.availBy[idx]=!!(d&&d.nodes.some(n=>n.cards.length));Gpu.syncNav();},
   isAvail(){return Gpu.availBy[ClusterMgr.current]===true;},
@@ -2975,7 +2975,7 @@ const Gpu={
     const title=sm.problems?`Quasi sereno · ${sm.problems} ${Dashboard.plural(sm.problems,'GPU da correggere','GPU da correggere')}`:`Sereno · ${sm.cards} schede, ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')}`;
     let sub=sm.problems?`${sm.cards} schede · ${sm.free} ${Dashboard.plural(sm.free,'libera','libere')} · ${sm.direct} assegnazioni dirette, ${sm.mapped} tramite mapping`:`${sm.direct} assegnazioni dirette · ${sm.mapped} tramite mapping · nessun conflitto`;
     const usage=Gpu.useBy[ClusterMgr.current];
-    if(usage?.enabled){const quiet=usage.vms.filter(v=>v.state==='quiet').length, off=usage.vms.filter(v=>v.state==='vm_off').length;sub+=` · ${quiet} ${Dashboard.plural(quiet,'scheda ferma','schede ferme')} · ${off} ${Dashboard.plural(off,'assegnata','assegnate')} a VM spente`;}
+    if(usage?.enabled){const quiet=usage.vms.filter(v=>v.state==='quiet').length, off=usage.vms.filter(v=>v.state==='vm_off').length, reserved=usage.vms.filter(v=>v.state==='reserved').length;sub+=` · ${quiet} ${Dashboard.plural(quiet,'scheda ferma','schede ferme')} · ${off} ${Dashboard.plural(off,'assegnata','assegnate')} a VM spente`;if(reserved)sub+=` · ${reserved} riservate`;}
     cond.innerHTML=`<svg class="cond-ico ${level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[level]}</svg><div><h2>${esc(title)}</h2><p>${esc(sub)}${d.partial&&d.partial.length?` · <span class="wrn">dati incompleti: ${esc(d.partial.slice(0,4).join(', '))}</span>`:''}</p></div>`;
     const note=usage&&!usage.enabled?'Monitoraggio dell’uso spento: si attiva con gpu_usage in config.json.':usage?.enabled&&!usage.vms.length?'In attesa del primo campione (ogni 5 minuti)':'';
     body.innerHTML=(note?`<p class="cnote gpu-use-note">${esc(note)}</p>`:'')+Gpu.problems(d)+d.nodes.filter(n=>n.cards.length).map(n=>Gpu.nodePanel(n)).join('')+
@@ -5326,7 +5326,7 @@ const RPT_MODELS=[
 ];
 const RPT_PRESETS=[{id:'30',label:'30 giorni',days:30},{id:'91',label:'Trimestre',days:91},{id:'182',label:'Semestre',days:182},{id:'365',label:'12 mesi',days:365},{id:'custom',label:'Personalizzato',days:0}];
 const RPT_GPU_DEFAULTS={idle_util:5,idle_mem:5,idle_days:14};
-const RPT_GPU_STATES={in_use:'Al lavoro',idle:'Inutilizzata',vm_off:'VM spenta',no_driver:'Driver assente',driver_error:'Driver in errore',insufficient:'Dati insufficienti'};
+const RPT_GPU_STATES={in_use:'Al lavoro',idle:'Inutilizzata',reserved:'Riservata',vm_off:'VM spenta',no_driver:'Driver assente',driver_error:'Driver in errore',insufficient:'Dati insufficienti'};
 const RPT_TXT={
   it:{loc:'it-IT',title:'Rapporto sul servizio',sub:'Infrastruttura cloud IaaS per la ricerca',gen:'Generato il',s1:'In sintesi',
     lvl:{ok:'Servizio in buona salute',warn:'Servizio stabile, alcuni indicatori da tenere sotto controllo',bad:'Servizio in difficoltà: servono interventi'},
@@ -5346,7 +5346,7 @@ const RPT_TXT={
     effLine:(e)=>`${e.inactive} macchine virtuali risultano inattive e ${e.oversized} sovradimensionate: liberarle recupererebbe fino a ${e.mem} di memoria e ${e.cores} processori.`,
     effRule:'Inattiva: accesa ma con CPU media sotto il 2% e rete sotto 1 KB/s per almeno 7 giorni. Sovradimensionata: memoria usata (95° percentile) sotto il 25% di quella assegnata, oppure CPU (95° percentile) sotto il 10%, per almeno 14 giorni.',
     effNone:'Il dato di efficienza non è disponibile per questo periodo.',
-    gpuUse:(d,t)=>`Schede GPU: ${d.gpu_idle} inutilizzate e ${d.gpu_vm_off} assegnate a VM spente negli ultimi ${t.idle_days} giorni (utilizzo medio < ${t.idle_util}% e memoria < ${t.idle_mem}%). Dati insufficienti: ${d.gpu_insufficient}.`,
+    gpuUse:(d,t)=>`Schede GPU: ${d.gpu_idle} inutilizzate, ${d.gpu_reserved} occupate da un modello senza calcolo e ${d.gpu_vm_off} assegnate a VM spente negli ultimi ${t.idle_days} giorni (utilizzo medio < ${t.idle_util}%; memoria < ${t.idle_mem}% per le inutilizzate, ≥ ${t.idle_mem}% per le riservate). Dati insufficienti: ${d.gpu_insufficient}.`,
     gpuUseNone:'Dati sull’uso delle GPU non ancora disponibili',gpuUseTitle:'Uso delle GPU per gruppo',
     gpuUseCols:['Gruppo','Schede','Utilizzo medio','Ore al lavoro'],gpuNoGroup:'senza gruppo',gpuOthers:'Altri gruppi',
     inv:(d)=>`Lo storico dell'inventario (numero di VM, gruppi, GPU) è disponibile dal ${d}: le variazioni nel tempo si completeranno col passare dei mesi.`,
@@ -5371,7 +5371,7 @@ const RPT_TXT={
     effLine:(e)=>`${e.inactive} virtual machines are idle and ${e.oversized} are oversized: releasing them would recover up to ${e.mem} of memory and ${e.cores} processors.`,
     effRule:'Idle: running with average CPU below 2% and network below 1 KB/s for at least 7 days. Oversized: memory used (95th percentile) below 25% of the assigned amount, or CPU (95th percentile) below 10%, for at least 14 days.',
     effNone:'Efficiency data is not available for this period.',
-    gpuUse:(d,t)=>`GPU cards: ${d.gpu_idle} idle and ${d.gpu_vm_off} assigned to powered-off VMs over the last ${t.idle_days} days (average utilisation < ${t.idle_util}% and memory < ${t.idle_mem}%). Insufficient data: ${d.gpu_insufficient}.`,
+    gpuUse:(d,t)=>`GPU cards: ${d.gpu_idle} idle, ${d.gpu_reserved} reserved by a model without compute and ${d.gpu_vm_off} assigned to powered-off VMs over the last ${t.idle_days} days (average utilisation < ${t.idle_util}%; memory < ${t.idle_mem}% for idle cards, ≥ ${t.idle_mem}% for reserved cards). Insufficient data: ${d.gpu_insufficient}.`,
     gpuUseNone:'GPU usage data not yet available',gpuUseTitle:'GPU usage by group',
     gpuUseCols:['Group','Cards','Average utilisation','Hours at work'],gpuNoGroup:'without group',gpuOthers:'Other groups',
     inv:(d)=>`Inventory history (number of VMs, groups, GPUs) is available since ${d}: changes over time will fill in as months go by.`,
@@ -5527,7 +5527,7 @@ const Reports={
     if(usage)return[
       {k:'vm',l:'VM',get:r=>r.name?`${r.vmid} · ${r.name}`:String(r.vmid)},
       {k:'group',l:'Gruppo',get:r=>r.group==='altro'?'senza gruppo':r.group},{k:'model',l:'Modello'},
-      {k:'state',l:'Stato d’uso',get:r=>RPT_GPU_STATES[r.state]||'Dati insufficienti',chip:r=>r.state==='idle'},
+      {k:'state',l:'Stato d’uso',get:r=>RPT_GPU_STATES[r.state]||'Dati insufficienti',chip:r=>r.state==='idle'||r.state==='reserved'},
       // Senza campioni validi (VM spenta, driver assente) i numeri non esistono: "—", mai 0%.
       {k:'util_avg',l:'Utilizzo medio %',num:1,get:r=>r.valid?r.util_avg:null,fmt:p},{k:'util_p95_day',l:'p95 del giorno peggiore %',num:1,get:r=>r.valid?r.util_p95_day:null,fmt:p},
       {k:'util_max',l:'Picco %',num:1,get:r=>r.valid?r.util_max:null,fmt:p},{k:'mem_avg',l:'Memoria media %',num:1,get:r=>r.valid?r.mem_avg:null,fmt:p},{k:'mem_max',l:'Memoria massima %',num:1,get:r=>r.valid?r.mem_max:null,fmt:p},
@@ -5576,14 +5576,14 @@ const Reports={
     if(m==='vms')k=K('VM nel report',d.totals.vms,d.totals.running+' accese')+K('Inattive',d.totals.inactive,'libererebbero '+rptBytes(d.totals.reclaimable_mem_bytes)+' · '+d.totals.reclaimable_cores+' core',d.totals.inactive?'w':'')+K('Sovradimensionate',d.totals.oversized,'RAM p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedMem*100)+'% o CPU p95 &lt; '+Reports.fmtNum(d.thresholds.OversizedCPU*100)+'%',d.totals.oversized?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     if(m==='storage'){const ceph=(d.rows||[]).filter(r=>r.type==='rbd');k=K('Storage',d.rows.length,ceph.length+' Ceph')+K('Più pieno',Reports.pct(Math.max(0,...d.rows.map(r=>r.used_pct))),'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));}
     if(m==='gpu')k=K('Schede',d.total,'')+K('Assegnate',d.assigned,d.total-d.assigned+' libere',d.total&&d.assigned>=d.total?'w':'')+K('Da correggere',d.problems,'conflitti e incoerenze',d.problems?'w':'')+K('Tutte assegnate dal',d.full_since?esc(d.full_since):'—','storico dal '+esc(d.snapshot_from||'—'));
-    if(m==='gpu'&&d.usage){const u=d.usage, known=u.known;k+=K('Inutilizzate',known?Reports.fmtNum(u.idle_count):'—','schede',known&&u.idle_count?'w':'')+K('Assegnate a VM spente',known?Reports.fmtNum(u.vm_off_count):'—','schede',known&&u.vm_off_count?'w':'')+K('Dati insufficienti',known?Reports.fmtNum(u.insufficient_count):'—','schede',known&&u.insufficient_count?'w':'');}
+    if(m==='gpu'&&d.usage){const u=d.usage, known=u.known;k+=K('Inutilizzate',known?Reports.fmtNum(u.idle_count):'—','schede',known&&u.idle_count?'w':'')+K('Riservate',known?Reports.fmtNum(u.reserved_count):'—','schede',known&&u.reserved_count?'w':'')+K('Assegnate a VM spente',known?Reports.fmtNum(u.vm_off_count):'—','schede',known&&u.vm_off_count?'w':'')+K('Dati insufficienti',known?Reports.fmtNum(u.insufficient_count):'—','schede',known&&u.insufficient_count?'w':'');}
     if(m==='reliability')k=K('Operazioni',Reports.fmtNum(d.totals.tasks),'copertura '+Reports.fmtNum(d.coverage_days,0)+' giorni')+K('Fallite',Reports.fmtNum(d.totals.failed),Reports.fmtNum(d.totals.fail_pct,1)+'%',d.totals.fail_pct>=5?'w':'')+K('Backup',Reports.fmtNum(d.totals.backups),Reports.fmtNum(d.totals.backups_failed)+' falliti',d.totals.backups_failed?'w':'')+K('Periodo',d.meta.days+' g',esc(d.meta.from)+' → '+esc(d.meta.to));
     document.getElementById('rp-kpis').innerHTML=k;
     let extra='';
     if(m==='vms')extra=`<div class="seg" role="group" aria-label="Filtra per segnalazione" style="margin-bottom:10px">${[['','Tutte'],['inactive','Inattive'],['oversized','Sovradimensionate']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${l}</button>`).join('')}</div>`;
     if(m==='gpu'&&d.by_group&&Object.keys(d.by_group).length)extra=`<p class="cnote" style="margin-bottom:10px">Per gruppo: ${Object.entries(d.by_group).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
     if(m==='reliability'&&d.failed_by_node&&Object.keys(d.failed_by_node).length)extra=`<p class="cnote" style="margin-bottom:10px">Fallite per nodo: ${Object.entries(d.failed_by_node).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`${esc(g)} ${c}`).join(' · ')}</p>`;
-    const gpuUsage=m!=='gpu'?'':d.usage&&d.usage.known?`<section style="margin-top:20px"><h3>Uso delle schede</h3><div class="seg" role="group" aria-label="Filtra per uso delle GPU" style="margin:10px 0">${[['','Tutte'],['idle','Inutilizzate'],['vm_off','VM spente']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${esc(l)}</button>`).join('')}</div><div class="panel"><div class="tw" id="rp-gpu-use-tbl"></div></div></section>`:`<p class="cnote" style="margin-top:12px">Nessun dato sull'uso delle GPU nel periodo: il monitoraggio raccoglie un campione ogni 5 minuti da quando e' attivo (gpu_usage in config.json).</p>`;
+    const gpuUsage=m!=='gpu'?'':d.usage&&d.usage.known?`<section style="margin-top:20px"><h3>Uso delle schede</h3><div class="seg" role="group" aria-label="Filtra per uso delle GPU" style="margin:10px 0">${[['','Tutte'],['idle','Inutilizzate'],['reserved','Riservate'],['vm_off','VM spente']].map(([v,l])=>`<button type="button" class="${Reports.flag===v?'on':''}" aria-pressed="${Reports.flag===v}" onclick="Reports.setFlag(${js(v)})">${esc(l)}</button>`).join('')}</div><div class="panel"><div class="tw" id="rp-gpu-use-tbl"></div></div></section>`:`<p class="cnote" style="margin-top:12px">Nessun dato sull'uso delle GPU nel periodo: il monitoraggio raccoglie un campione ogni 5 minuti da quando e' attivo (gpu_usage in config.json).</p>`;
     document.getElementById('rp-body').innerHTML=`${extra}<div class="panel"><div class="tw" id="rp-tbl"></div></div>${gpuUsage}<p class="cnote" style="margin-top:8px">Report tecnico — uso interno.</p>${Reports.notes(d)}`;
     Reports.paintTable();
     if(m==='gpu'&&d.usage&&d.usage.known)Reports.paintTable(true);

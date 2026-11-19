@@ -95,6 +95,7 @@ type serviceReport struct {
 	GPUFullSince    string          `json:"gpu_full_since"`
 	GPUUseKnown     bool            `json:"gpu_use_known"`
 	GPUIdle         int             `json:"gpu_idle"`
+	GPUReserved     int             `json:"gpu_reserved"`
 	GPUVMOff        int             `json:"gpu_vm_off"`
 	GPUInsufficient int             `json:"gpu_insufficient"`
 	GPUUseByGroup   []gpuGroupUsage `json:"gpu_use_by_group"`
@@ -155,7 +156,7 @@ func buildServiceReport(c reportAPI, hist *history.Store, cluster string, p repo
 		return rep, err
 	}
 	rep.GPUUseKnown = usage.Known
-	rep.GPUIdle, rep.GPUVMOff, rep.GPUInsufficient = usage.IdleCount, usage.VMOffCount, usage.InsufficientCount
+	rep.GPUIdle, rep.GPUReserved, rep.GPUVMOff, rep.GPUInsufficient = usage.IdleCount, usage.ReservedCount, usage.VMOffCount, usage.InsufficientCount
 	rep.GPUUseByGroup = gpuUsageGroups(usage.Rows)
 	rep.KPI.Nodes = len(res.Nodes)
 

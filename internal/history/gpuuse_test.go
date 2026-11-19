@@ -1,6 +1,7 @@
 package history
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestGPUUseUpsertQueryPrune(t *testing.T) {
 		t.Fatal(err)
 	}
 	upd := gpuRow("2026-11-19", 101)
-	upd.Expected, upd.Valid, upd.UtilMax, upd.TempMax, upd.PowerAvg = 20, 19, 100, -1, -1
+	upd.Expected, upd.Valid, upd.UtilMax, upd.TempMax, upd.PowerAvg, upd.Reserved = 20, 19, 100, -1, -1, 4
 	if err := s.UpsertGPUUse([]GPUUseDay{upd}); err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +31,7 @@ func TestGPUUseUpsertQueryPrune(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[0].VMID != 101 || rows[0].Expected != 20 || rows[0].Valid != 19 || rows[0].UtilMax != 100 || rows[0].TempMax != -1 {
+	if len(rows) != 2 || rows[0].VMID != 101 || rows[0].Expected != 20 || rows[0].Valid != 19 || rows[0].UtilMax != 100 || rows[0].TempMax != -1 || rows[0].Reserved != 4 {
 		t.Fatalf("upsert not applied: %+v", rows)
 	}
 	if other, _ := s.GPUUseDays("HOSTING", "2026-01-01", "2026-12-31"); len(other) != 0 {
@@ -64,6 +65,8 @@ func TestGPUUseValidation(t *testing.T) {
 		func(r *GPUUseDay) { r.Group = "Rossi" },
 		func(r *GPUUseDay) { r.Model = "A100 è" },
 		func(r *GPUUseDay) { r.Valid = r.Expected + 1 },
+		func(r *GPUUseDay) { r.Reserved = -1 },
+		func(r *GPUUseDay) { r.Reserved = r.Valid + 1 },
 		func(r *GPUUseDay) { r.UtilAvg = 101 },
 		func(r *GPUUseDay) { r.MemMaxPct = -1 },
 		func(r *GPUUseDay) { r.TempMax = 500 },
@@ -82,5 +85,35 @@ func TestGPUUseValidation(t *testing.T) {
 	}
 	if _, err := s.GPUUseDays("CALCOLO", "x", "2026-12-31"); err == nil {
 		t.Error("bad query accepted")
+	}
+}
+
+func TestGPUUseMigrationReserved(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE gpu_use_day (day TEXT NOT NULL, cluster TEXT NOT NULL, vmid INTEGER NOT NULL,
+ node TEXT NOT NULL, grp TEXT NOT NULL, model TEXT NOT NULL, cards INTEGER NOT NULL, expected INTEGER NOT NULL,
+ valid INTEGER NOT NULL, off INTEGER NOT NULL, no_driver INTEGER NOT NULL, driver_error INTEGER NOT NULL,
+ no_data INTEGER NOT NULL, busy_minutes INTEGER NOT NULL, util_avg REAL NOT NULL, util_p95 REAL NOT NULL,
+ util_max REAL NOT NULL, mem_avg_pct REAL NOT NULL, mem_max_pct REAL NOT NULL, temp_max REAL NOT NULL,
+ power_avg REAL NOT NULL, PRIMARY KEY(day, cluster, vmid));
+ INSERT INTO gpu_use_day VALUES ('2026-11-19','CALCOLO',101,'node-1','rossi','A100',1,1,1,0,0,0,0,0,0,0,0,0,0,-1,-1)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	rows, err := s.GPUUseDays("CALCOLO", "2026-11-19", "2026-11-19")
+	if err != nil || len(rows) != 1 || rows[0].Reserved != 0 {
+		t.Fatalf("migration: %+v %v", rows, err)
 	}
 }

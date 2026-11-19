@@ -37,6 +37,7 @@ type GPUUseDay struct {
 	NoDriver    int
 	DriverError int
 	NoData      int     // agent missing, timeout, unparsable output
+	Reserved    int     // valid samples with memory reserved and no compute
 	BusyMinutes int     // valid samples at work (D113) x sample interval
 	UtilAvg     float64 // over valid samples
 	UtilP95     float64
@@ -60,7 +61,10 @@ func (s *Store) migrateGPUUse() error {
 		temp_max REAL NOT NULL, power_avg REAL NOT NULL,
 		PRIMARY KEY (day, cluster, vmid));
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.addColumn("gpu_use_day", "reserved", "INTEGER NOT NULL DEFAULT 0")
 }
 
 func finitePct(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 && v <= 100 }
@@ -81,7 +85,7 @@ func ValidGPUUse(r GPUUseDay) error {
 	case !gpuModelPattern.MatchString(r.Model):
 		return errors.New("history: invalid model")
 	case r.Cards < 0 || r.Cards > 64 || r.Expected < 0 || r.Valid < 0 || r.Valid > r.Expected || r.Off < 0 ||
-		r.NoDriver < 0 || r.DriverError < 0 || r.NoData < 0 || r.BusyMinutes < 0 || r.BusyMinutes > 24*60:
+		r.Reserved < 0 || r.Reserved > r.Valid || r.NoDriver < 0 || r.DriverError < 0 || r.NoData < 0 || r.BusyMinutes < 0 || r.BusyMinutes > 24*60:
 		return errors.New("history: invalid counts")
 	case !finitePct(r.UtilAvg) || !finitePct(r.UtilP95) || !finitePct(r.UtilMax) || !finitePct(r.MemAvgPct) || !finitePct(r.MemMaxPct):
 		return errors.New("history: invalid percentage")
@@ -106,11 +110,11 @@ func (s *Store) UpsertGPUUse(rows []GPUUseDay) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op after Commit
 	st, err := tx.Prepare(`INSERT INTO gpu_use_day (day, cluster, vmid, node, grp, model, cards, expected, valid, off,
-		no_driver, driver_error, no_data, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		no_driver, driver_error, no_data, reserved, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(day, cluster, vmid) DO UPDATE SET node=excluded.node, grp=excluded.grp, model=excluded.model,
 		cards=excluded.cards, expected=excluded.expected, valid=excluded.valid, off=excluded.off, no_driver=excluded.no_driver,
-		driver_error=excluded.driver_error, no_data=excluded.no_data, busy_minutes=excluded.busy_minutes,
+		driver_error=excluded.driver_error, no_data=excluded.no_data, reserved=excluded.reserved, busy_minutes=excluded.busy_minutes,
 		util_avg=excluded.util_avg, util_p95=excluded.util_p95, util_max=excluded.util_max,
 		mem_avg_pct=excluded.mem_avg_pct, mem_max_pct=excluded.mem_max_pct, temp_max=excluded.temp_max, power_avg=excluded.power_avg`)
 	if err != nil {
@@ -119,7 +123,7 @@ func (s *Store) UpsertGPUUse(rows []GPUUseDay) error {
 	defer st.Close()
 	for _, r := range rows {
 		if _, err := st.Exec(r.Day, r.Cluster, r.VMID, r.Node, r.Group, r.Model, r.Cards, r.Expected, r.Valid, r.Off,
-			r.NoDriver, r.DriverError, r.NoData, r.BusyMinutes, r.UtilAvg, r.UtilP95, r.UtilMax, r.MemAvgPct, r.MemMaxPct,
+			r.NoDriver, r.DriverError, r.NoData, r.Reserved, r.BusyMinutes, r.UtilAvg, r.UtilP95, r.UtilMax, r.MemAvgPct, r.MemMaxPct,
 			r.TempMax, r.PowerAvg); err != nil {
 			return err
 		}
@@ -133,7 +137,7 @@ func (s *Store) GPUUseDays(cluster, from, to string) ([]GPUUseDay, error) {
 		return nil, errors.New("history: invalid query")
 	}
 	rows, err := s.db.Query(`SELECT day, cluster, vmid, node, grp, model, cards, expected, valid, off, no_driver, driver_error,
-		no_data, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg
+		no_data, reserved, busy_minutes, util_avg, util_p95, util_max, mem_avg_pct, mem_max_pct, temp_max, power_avg
 		FROM gpu_use_day WHERE cluster=? AND day>=? AND day<=? ORDER BY day, vmid`, cluster, from, to)
 	if err != nil {
 		return nil, err
@@ -143,7 +147,7 @@ func (s *Store) GPUUseDays(cluster, from, to string) ([]GPUUseDay, error) {
 	for rows.Next() {
 		var r GPUUseDay
 		if err := rows.Scan(&r.Day, &r.Cluster, &r.VMID, &r.Node, &r.Group, &r.Model, &r.Cards, &r.Expected, &r.Valid, &r.Off,
-			&r.NoDriver, &r.DriverError, &r.NoData, &r.BusyMinutes, &r.UtilAvg, &r.UtilP95, &r.UtilMax, &r.MemAvgPct,
+			&r.NoDriver, &r.DriverError, &r.NoData, &r.Reserved, &r.BusyMinutes, &r.UtilAvg, &r.UtilP95, &r.UtilMax, &r.MemAvgPct,
 			&r.MemMaxPct, &r.TempMax, &r.PowerAvg); err != nil {
 			return nil, err
 		}

@@ -34,7 +34,7 @@ const (
 	gpuUseProbeTTL   = time.Hour // whether the labelled helper exists: asked once per hour per VM
 	gpuUseFlushEvery = time.Hour
 	gpuUseStaleAfter = 15 * time.Minute
-	gpuUseBusyPct    = 10.0 // D113: a sample "at work" has utilization or memory at or above this
+	gpuUseBusyPct    = 10.0 // D114: utilization threshold for a sample at work
 	gpuUseMaxSamples = 400  // per VM and day (288 expected at 5 minutes): bounds memory
 )
 
@@ -42,6 +42,7 @@ const (
 const (
 	gpuStBusy        = "busy"
 	gpuStQuiet       = "quiet"
+	gpuStReserved    = "reserved"
 	gpuStVMOff       = "vm_off"
 	gpuStNoDriver    = "no_driver"
 	gpuStDriverError = "driver_error"
@@ -74,7 +75,7 @@ type gpuUseAcc struct {
 	cards                         int
 	expected, valid, off          int
 	noDriver, driverError, noData int
-	busy                          int
+	busy, reserved                int
 	utils                         []float64 // per valid sample with a known utilization: highest card
 	utilSum, memSum, memMax       float64
 	memN                          int
@@ -230,24 +231,31 @@ func gpuTargets(inv GPUInventory, resources json.RawMessage) ([]gpuUseTarget, er
 	return out, nil
 }
 
-// sampleState decides busy/quiet from the parsed cards; no card with a number = no_data.
+// sampleState classifies all cards together, giving compute priority over reserved memory.
 func sampleState(cards []gpuCardUse) string {
-	known := false
+	utilKnown, memoryKnown, reserved := false, false, false
 	for _, c := range cards {
 		if c.Util != nil {
-			known = true
+			utilKnown = true
 			if *c.Util >= gpuUseBusyPct {
 				return gpuStBusy
 			}
 		}
-		if p, ok := memPct(c); ok {
-			known = true
-			if p >= gpuUseBusyPct {
-				return gpuStBusy
-			}
+		if c.MemUsedMiB != nil || c.MemTotalMiB != nil {
+			memoryKnown = true
+		}
+		if p, ok := memPct(c); ok && p >= gpuUseBusyPct {
+			reserved = true
 		}
 	}
-	if !known {
+	if reserved {
+		// MIG may report no utilization at all; retain the memory fallback in that case.
+		if !utilKnown {
+			return gpuStBusy
+		}
+		return gpuStReserved
+	}
+	if !utilKnown && !memoryKnown {
 		return gpuStNoData
 	}
 	return gpuStQuiet
@@ -310,10 +318,12 @@ func (g *gpuUseCollector) record(cluster, day string, t gpuUseTarget, state stri
 		a.driverError++
 	case gpuStNoData, gpuStPaused:
 		a.noData++
-	case gpuStBusy, gpuStQuiet:
+	case gpuStBusy, gpuStQuiet, gpuStReserved:
 		a.valid++
 		if state == gpuStBusy {
 			a.busy++
+		} else if state == gpuStReserved {
+			a.reserved++
 		}
 		util, utilKnown, mem, memKnown := -1.0, false, -1.0, false
 		for _, c := range cards {
@@ -349,7 +359,7 @@ func (g *gpuUseCollector) record(cluster, day string, t gpuUseTarget, state stri
 func (a *gpuUseAcc) row(k gpuUseAccKey) history.GPUUseDay {
 	r := history.GPUUseDay{Day: k.day, Cluster: k.cluster, VMID: k.vmid, Node: a.node, Group: a.group, Model: a.model,
 		Cards: a.cards, Expected: a.expected, Valid: a.valid, Off: a.off, NoDriver: a.noDriver, DriverError: a.driverError,
-		NoData: a.noData, BusyMinutes: min(a.busy*int(gpuUseEvery/time.Minute), 24*60), TempMax: -1, PowerAvg: -1}
+		NoData: a.noData, Reserved: a.reserved, BusyMinutes: min(a.busy*int(gpuUseEvery/time.Minute), 24*60), TempMax: -1, PowerAvg: -1}
 	if n := len(a.utils); n > 0 {
 		s := append([]float64(nil), a.utils...)
 		sort.Float64s(s)

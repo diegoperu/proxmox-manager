@@ -92,7 +92,7 @@ func TestGPUUsageClassification(t *testing.T) {
 	}{
 		{"idle", "idle", func(r *history.GPUUseDay) { r.UtilAvg, r.MemAvgPct = 4.9, 4.9 }, false},
 		{"util at threshold", "in_use", func(r *history.GPUUseDay) { r.UtilAvg = 5 }, false},
-		{"mem at threshold", "in_use", func(r *history.GPUUseDay) { r.MemAvgPct = 5 }, false},
+		{"mem at threshold", "reserved", func(r *history.GPUUseDay) { r.MemAvgPct = 5 }, false},
 		{"off before driver and insufficient", "vm_off", func(r *history.GPUUseDay) { r.Valid, r.Off, r.NoDriver, r.DriverError = 0, 11, 6, 6 }, true},
 		{"off when expected zero", "vm_off", func(r *history.GPUUseDay) { r.Expected, r.Valid, r.Off = 0, 0, 10 }, true},
 		{"driver before error and insufficient", "no_driver", func(r *history.GPUUseDay) { r.Valid, r.NoDriver, r.DriverError = 0, 6, 6 }, true},
@@ -113,7 +113,7 @@ func TestGPUUsageClassification(t *testing.T) {
 			if u.Rows[0].State != tc.state {
 				t.Fatalf("%+v", u.Rows[0])
 			}
-			if tc.state == "idle" && u.IdleCount != 2 || tc.state == "vm_off" && u.VMOffCount != 2 || tc.state == "insufficient" && u.InsufficientCount != 2 {
+			if tc.state == "idle" && u.IdleCount != 2 || tc.state == "reserved" && u.ReservedCount != 2 || tc.state == "vm_off" && u.VMOffCount != 2 || tc.state == "insufficient" && u.InsufficientCount != 2 {
 				t.Fatalf("counts must count cards: %+v", u)
 			}
 		})
@@ -169,7 +169,7 @@ func TestGPUUsageWindow(t *testing.T) {
 		t.Fatalf("custom idle_util ignored: %+v", r)
 	}
 	p.GPUIdle.Util, p.GPUIdle.Mem = 50, 0
-	if r := aggregateGPUUsage(rows, p).Rows[0]; r.State != "in_use" {
+	if r := aggregateGPUUsage(rows, p).Rows[0]; r.State != "reserved" {
 		t.Fatalf("custom idle_mem ignored: %+v", r)
 	}
 }
@@ -236,7 +236,11 @@ func TestGPUUsageReports(t *testing.T) {
 		}
 	}
 	rows := gpuDays(p, 101)
-	rows = append(rows, gpuDays(p, 999)...)
+	reserved := gpuDays(p, 999)
+	for i := range reserved {
+		reserved[i].MemAvgPct, reserved[i].Reserved = 40, 3
+	}
+	rows = append(rows, reserved...)
 	off := gpuDays(p, 102)
 	for i := range off {
 		off[i].Expected, off[i].Valid, off[i].Off, off[i].Cards = 0, 0, 10, 3
@@ -253,7 +257,7 @@ func TestGPUUsageReports(t *testing.T) {
 	if err != nil || !rep.Usage.Known || len(rep.Usage.Rows) != 4 {
 		t.Fatalf("usage: %+v %v", rep.Usage, err)
 	}
-	if rep.Usage.Rows[0].Name != "rossi-idle" || rep.Usage.Rows[3].VMID != 999 || rep.Usage.Rows[3].Name != "" || rep.Usage.IdleCount != 4 || rep.Usage.VMOffCount != 3 || rep.Usage.InsufficientCount != 1 {
+	if rep.Usage.Rows[0].Name != "rossi-idle" || rep.Usage.Rows[3].VMID != 999 || rep.Usage.Rows[3].Name != "" || rep.Usage.Rows[3].Reserved != 42 || rep.Usage.IdleCount != 2 || rep.Usage.ReservedCount != 2 || rep.Usage.VMOffCount != 3 || rep.Usage.InsufficientCount != 1 {
 		t.Fatalf("names/counts: %+v", rep.Usage)
 	}
 	b, err := json.Marshal(rep)
@@ -275,12 +279,15 @@ func TestGPUUsageReports(t *testing.T) {
 		}
 	}
 	svc, err := buildServiceReport(newRpt(), hist, "C", p, p.To)
-	if err != nil || !svc.GPUUseKnown || svc.GPUIdle != 4 || svc.GPUVMOff != 3 || svc.GPUInsufficient != 1 || len(svc.GPUUseByGroup) != 2 {
+	if err != nil || !svc.GPUUseKnown || svc.GPUIdle != 2 || svc.GPUReserved != 2 || svc.GPUVMOff != 3 || svc.GPUInsufficient != 1 || len(svc.GPUUseByGroup) != 2 {
 		t.Fatalf("manager usage: %+v %v", svc, err)
 	}
 	b, err = json.Marshal(svc)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"gpu_reserved":2`) {
+		t.Fatalf("missing reserved aggregate: %s", b)
 	}
 	for _, leak := range []string{`"vmid"`, `"name"`, `"node"`, `"n1"`, "rossi-idle", "bianchi-busy", "A100"} {
 		if strings.Contains(string(b), leak) {
