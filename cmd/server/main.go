@@ -10,7 +10,6 @@ import (
 	"path"
 	"strings"
 
-	"proxmox-manager/internal/cache"
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/handlers"
 	"proxmox-manager/internal/history"
@@ -33,13 +32,7 @@ func main() {
 	}
 	cfg := config.Get()
 
-	store, err := cache.New(cfg.DBPath)
-	if err != nil {
-		log.Fatalf("db: %v", err)
-	}
-	defer store.Close()
-
-	h := handlers.New(store)
+	h := handlers.New()
 
 	// Daily inventory snapshot for the reports (D28): counts and assignments only.
 	hist, err := history.New(cfg.DBPath)

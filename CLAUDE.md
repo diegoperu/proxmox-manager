@@ -22,7 +22,7 @@ Browser → Go proxy (localhost:8080) → Proxmox API. Nessun CORS.
 | Backend | Go 1.21, modulo `proxmox-manager` |
 | Router | `github.com/go-chi/chi/v5` |
 | CORS | `github.com/go-chi/cors` |
-| DB | SQLite via `github.com/mattn/go-sqlite3` (CGO_ENABLED=1) — solo cache API |
+| DB | SQLite via `github.com/mattn/go-sqlite3` (CGO_ENABLED=1) — solo la fotografia giornaliera dell'inventario (`internal/history`) |
 | Frontend | Vanilla JS + Chart.js 4.4 + SheetJS (xlsx 0.20.3) + xterm.js 5.3 — **nessun framework**. Librerie e font **incorporati nel binario** (`web/static/`), nessun CDN |
 | Config | `config.json` nella working dir del binario |
 | Storico | Proxmox RRD nativo (no collector locale) |
@@ -43,8 +43,6 @@ proxmox-manager/
 └── internal/
     ├── api/
     │   └── client.go               # client HTTP verso Proxmox (TLS skip verify)
-    ├── cache/
-    │   └── store.go                # SQLite: solo api_cache (TTL)
     ├── config/
     │   └── config.go               # config.json, singleton con RWMutex
     ├── history/
@@ -354,11 +352,9 @@ Nessuna cancellazione automatica: un fallimento lascia la VM com'e' con la fase 
 
 `internal/history` + `internal/handlers/snapshot.go`. Il server, 30 s dopo l'avvio e poi ogni ora, controlla per ogni cluster configurato se esiste la fotografia di oggi (data locale del server); se manca la legge e la salva (`INSERT` in una transazione, una per cluster e giorno; se la lettura fallisce riprova all'ora dopo e non salva niente). Contenuto: `inv_node` (nodo, online, core, RAM), `inv_group` (nodo, **gruppo**, tipo qemu/lxc: n. VM, in esecuzione, core, RAM e disco assegnati; template esclusi), `inv_gpu` (nodo, modello, gruppo, n. schede; gruppo vuoto = libere), `inv_meta` (`gpu_known`: se l'inventario GPU non e' leggibile o e' parziale non si salvano righe GPU, cosi' l'assenza non diventa "zero GPU"). **Niente IP, nomi di VM, dati dei guest, metriche.** Gruppo = prefisso del nome VM prima del primo `-` (D27), `altro` se non e' `[a-z0-9]{1,32}`. Il cluster e' identificato dalla **label**: rinominarla in `config.json` interrompe la serie storica. Retention 5 anni (`history.Retention`, pulizia a ogni giro). Stessa base dati del file `db_path` (WAL, una connessione per ciascun `Store`). Verificato sul cluster reale il 2026-11-03: CALCOLO 11 nodi / 107 VM / 27 schede, HOSTING 2 nodi / 28 VM.
 
-## SQLite schema (solo cache)
+## SQLite schema
 
-```sql
-api_cache(key TEXT PK, value TEXT, expires_at INTEGER)
-```
+Solo le tabelle `inv_*` della fotografia giornaliera (vedi sopra). La vecchia tabella `api_cache` e il pacchetto `internal/cache`, mai usati, sono stati rimossi il 2026-11-19; in un `proxmox.db` esistente la tabella `api_cache` resta, vuota e ignorata.
 
 Nessuna tabella metrics — storico dei consumi delegato a Proxmox RRD. Report v2 (D28) aggiungera' una tabella di fotografie giornaliere dell'inventario (vedi "Report v2").
 
@@ -849,4 +845,5 @@ Elenco unico e aggiornato in `ROADMAP.md` (tabella di priorita' e dettaglio). In
 - 2026-11-19 — **Aggiornamento automatico dei dati regolabile** (richiesta utente: verifica che ci sia e che sia regolabile con un default sensato; non c'era, solo il pulsante e il pallino di connessione a 30 s): default 60 s, scelte spento/15 s/30 s/1 min/2 min/5 min, selettore nella barra e in Impostazioni, salvato in `config.json`; pagine di lettura; D106. Codex (terra, alto) aveva escluso panoramica, VM e gruppi perche' un ricaricamento avrebbe perso stato: li ho resi silenziosi io (ordinamento delle VM che prima si perdeva anche cambiando filtro, informazioni lette a parte conservate, nessun lampeggio della panoramica) e provati nel browser sul mock: giro eseguito su 6 pagine, ordinamento, selezione e gruppi conservati, nessun giro con un dialogo aperto, intervallo salvato e selettori allineati. `go vet` e `go test -race ./...` verdi — `cmd/server/web/templates/index.html`, `internal/config/config.go`, `internal/handlers/handlers.go`, test, `DOMANDE.md`, `CLAUDE.md`
 - 2026-11-19 — **Stile del selettore dell'aggiornamento automatico** (segnalazione utente: stonava): era un `<select>` senza classe, ora `inp sm` come il selettore del cluster; in Impostazioni la riga con etichetta doppia e select nativo e' diventata un controllo segmentato come la densita'; sotto 650px il selettore della barra sparisce (usciva dalla barra a 390px) e i pulsanti segmentati si stringono. Controllato con screenshot su 3 temi, Impostazioni e telefono (390px) — `cmd/server/web/templates/index.html`, `CLAUDE.md`
 - 2026-11-19 — **Rimosso `cache_seconds`** (campo di `config.json` letto ma mai usato: doveva essere il TTL di una cache SQLite delle risposte di Proxmox che nessun handler chiama; le cache vere hanno TTL propri nel codice e nel browser): tolto da `Config`, dal default, dal caricamento e dai README; un valore gia' presente nel file viene ignorato e sparisce al prossimo salvataggio. `internal/cache` (tabella `api_cache`) resta, da valutare a parte. README: documentato `refresh_seconds` — `internal/config/config.go`, `README.md`, `devtools/mockpve/README.md`, `DOMANDE.md`, `CLAUDE.md`
+- 2026-11-19 — **Rimossi `internal/cache` e la tabella `api_cache`** (codice morto: `CacheSet`/`CacheGet` non erano chiamati da nessun handler; restava solo l'apertura del database e la creazione di una tabella vuota): tolti il pacchetto, il campo `store` di `Handler`, il parametro di `handlers.New()` e l'apertura in `main.go`; ora `db_path` e' aperto una sola volta (da `history`) invece di due connessioni sullo stesso file. La tabella `api_cache` gia' presente nei database esistenti non viene toccata (vuota, ignorata). `go-sqlite3` resta per `history` — `internal/cache/`, `internal/handlers/handlers.go`, `cmd/server/main.go`, `CLAUDE.md`
 
