@@ -1089,3 +1089,12 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Domanda**: Si completano SSH a sola chiave, aggiornamenti automatici e riavvio sulla 108? Prima va chiarito come si autenticano i tunnel di `ollama-tunnel` (porte 18000/18001, utente senza chiavi).
 **Risposta utente**: (2026-11-12) "non toccarla per ora": fatti solo firewall e fail2ban.
 
+### D105 — Inventory Ansible: assunzioni provvisorie
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: Cosa va nell'inventory esportato dalla pagina VM & Container?
+**Perche' conta**: il file guida Ansible su VM di produzione; un nome o un valore non ripulito potrebbe iniettare righe o variabili nel file.
+**Opzioni**: A) tutte le VM accese del cluster, filtri ignorati, solo IPv4, nessun `ansible_user`; B) rispettare i filtri della pagina; C) aggiungere `ansible_user: tecnico`.
+**Suggerimento**: A, perche' l'utente ha chiesto "esporta quelle accese" e l'utente SSH e' una scelta sua.
+**Risposta utente**: (2026-11-19) "Va bene cosi', procedi" sulla proposta A. Riaprire se serve `ansible_user`, IPv6 o i filtri.
+
