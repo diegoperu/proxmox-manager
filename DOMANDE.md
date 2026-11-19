@@ -1105,5 +1105,5 @@ Verificato e corretto (vedi `CLAUDE.md` e `SUPPORT-FILES/pmgr-scripts/README.md`
 **Perche' conta**: la pagina VM costa oltre 100 chiamate a Proxmox (6 s a freddo su CALCOLO); un intervallo troppo corto carica il cluster, uno troppo lungo mostra dati vecchi. Le pagine con moduli o piani da confermare non vanno ricaricate mentre si lavora.
 **Opzioni**: default 60 s / 30 s / 5 min / spento; selettore in barra + Impostazioni / solo uno dei due; pagine di sola lettura / tutte / solo panoramica e VM.
 **Suggerimento**: 60 s, entrambi i controlli, solo pagine di lettura.
-**Risposta utente**: (2026-11-19) 60 secondi; Impostazioni piu' scelta rapida nella barra; solo pagine di lettura. Resta aperto: `cache_seconds` in `config.json` e' letto ma non usato (da togliere o collegare).
+**Risposta utente**: (2026-11-19) 60 secondi; Impostazioni piu' scelta rapida nella barra; solo pagine di lettura. `cache_seconds`, letto ma mai usato, e' stato tolto (2026-11-19).
 

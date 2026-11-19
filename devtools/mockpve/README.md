@@ -17,7 +17,7 @@ cat > config.json <<'JSON'
 {
   "clusters": [{"label": "Anteprima (dati finti)", "url": "http://127.0.0.1:18006",
                 "api_token": "mock@pve!preview=00000000-0000-0000-0000-000000000000", "default": true}],
-  "theme": "", "density": "", "cache_seconds": 30,
+  "theme": "", "density": "",
   "db_path": "preview.db", "listen_addr": "127.0.0.1:8090"
 }
 JSON

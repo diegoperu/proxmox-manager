@@ -136,7 +136,7 @@ Settings are stored in `config.json` in the binary's working directory. The file
   ],
   "theme": "",
   "density": "",
-  "cache_seconds": 30,
+  "refresh_seconds": 60,
   "db_path": "proxmox.db",
   "listen_addr": ":8080"
 }
@@ -152,8 +152,8 @@ Settings are stored in `config.json` in the binary's working directory. The file
 | `clusters[].default` | — | `true` = loaded on startup |
 | `theme` | `""` | `""` follow OS, `"dark"`, `"light"`, `"eva01"`, `"catppuccino"` (unknown values are rejected) |
 | `density` | `""` | `""` comfortable, `"compact"` (tighter tables and rows) |
+| `refresh_seconds` | `60` | Automatic data refresh interval in seconds: `0` (off), `15`, `30`, `60`, `120` or `300`. Also adjustable from the top bar and Settings |
 | `allowed_hosts` | `[]` | Optional list of host names accepted in the `Host` header (anti DNS-rebinding), e.g. `["localhost","pmgr.example.org"]`; empty = no restriction |
-| `cache_seconds` | `30` | SQLite API cache TTL |
 | `listen_addr` | `:8080` | HTTP listen address |
 
 Configuration can also be edited from the **Settings** page in the web UI.
