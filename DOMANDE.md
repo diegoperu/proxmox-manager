@@ -1302,7 +1302,7 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: (2026-11-19) "ok": impianto approvato, da vedere su uno schizzo con dati veri.
 
 ### D123-bis — Prezzi di riferimento proposti (ricerca del 2026-11-19, mercato europeo)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si (per la sezione valore economico)
 **Ricerca:** listini pubblici on-demand senza IVA. Fonti ufficiali dove leggibili, altrimenti aggregatori con la data; **da verificare sui calcolatori ufficiali prima della pubblicazione** (la pagina prezzi ufficiale di OVHcloud non e' leggibile per intero in automatico; AWS e Azure pubblicano in USD).
 | Voce | Provider europeo (basso) | Hyperscaler, regione Milano/Europa (alto) |
@@ -1317,5 +1317,12 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Proposta di metodo:** valore = risorse **assegnate** x tempo: vCPU e RAM per le ore in cui la VM e' accesa (dallo storico giornaliero), GPU per le ore di VM accesa, storage per i GB assegnati x mesi; mostrato come **intervallo** "tra X (provider europeo) e Y (hyperscaler)" con fonte e data in nota; prezzi in `config.json` (EUR, fonte, data) cosi' si aggiornano senza codice; per la classe 40 GB il prezzo della L40S 48 GB (prudente, dichiarato); per gli USD un cambio fisso dichiarato in config.
 **Opzioni**: A) intervallo basso-alto come sopra; B) solo il provider europeo (cifra prudente, piu' difendibile); C) solo hyperscaler (cifra piu' alta).
 **Suggerimento**: A, con la cifra bassa in evidenza nella pagina esecutiva (prudente) e l'intervallo negli allegati.
-**Risposta utente**: (vuoto)
+**Risposta utente**: (2026-11-19) "il tuo metodo va bene": A (intervallo, cifra bassa in evidenza), piu' il **listino interno DataCloud** da affiancare (vedi D127).
+
+### D127 — Listino interno DataCloud (costo per i gruppi)
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Listino fornito dall'utente (2026-11-19), costo mensile:** VM Calcolo Base **8 gettoni** (comprende **16 core, 32 GiB di RAM, 100 GB su SSD**); +16 core **1 gettone**; +32 GiB RAM **4 gettoni**; +100 GB SSD **3 gettoni**; +1 TB HDD **2 gettoni**; GPU low end **1 gettone GPU**, mid range **3**, high end **10**. 1 gettone VM = 1 EUR, 1 gettone GPU = 35 EUR.
+**Regole (risposte dell'utente):** blocchi oltre la base **arrotondati per eccesso** (es. 20 core = base + 1 blocco); fasce GPU **per memoria**: low end = 16 GB (A2), mid range = 24 GB (L4, RTX 3090), high end = 40 GB e oltre (A100 40/80); il listino vale **solo per CALCOLO** (HOSTING: solo valore di mercato); SSD o HDD **dal nome dello storage** del disco nella configurazione della VM (`datacloud-ssd`, `datacloud-hdd`; altri storage da associare a una classe in `config.json`).
+**Uso nel report:** "quanto paga la ricerca" (listino interno) accanto a "quanto costerebbe sul mercato" (intervallo D123-bis).
 
