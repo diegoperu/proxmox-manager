@@ -134,6 +134,8 @@ def resources():
             res.append(dict(id=f"storage/{n}/ceph-vm", type="storage", node=n, storage="ceph-vm", status="available", shared=1, content="images,rootdir", maxdisk=5000 * GB, disk=int(1000 * GB)))
             res.append(dict(id=f"storage/{n}/local", type="storage", node=n, storage="local", status="available", shared=0, content="snippets,iso,backup", maxdisk=100 * GB, disk=10 * GB))
             res.append(dict(id=f"storage/{n}/local-lvm", type="storage", node=n, storage="local-lvm", status="available", shared=0, content="images,rootdir", maxdisk=900 * GB, disk=int(900 * GB * b["disk"])))
+            for storage in ("datacloud-ssd", "datacloud-hdd"):
+                res.append(dict(id=f"storage/{n}/{storage}", type="storage", node=n, storage=storage, status="available", shared=1, content="images,rootdir", maxdisk=1000 * GB, disk=200 * GB))
     return res
 
 
@@ -228,6 +230,8 @@ def route(path):
     p = path.rstrip("/")
     segs = p.split("/")
     if p == "/cluster/resources": return resources()
+    if p == "/storage":  # cluster storage configuration (Settings: storage classes)
+        return [dict(storage=n, type=t, content=c, shared=sh) for n, t, c, sh in (("ceph-vm", "rbd", "images,rootdir", 1), ("datacloud-ssd", "rbd", "images,rootdir", 1), ("datacloud-hdd", "rbd", "images,rootdir", 1), ("local", "dir", "snippets,iso,backup", 0), ("local-lvm", "lvmthin", "images,rootdir", 0))]
     if p == "/cluster/status":
         return [dict(type="cluster", name="polimi-deib", nodes=4, quorate=1, version=7)] + \
                [dict(type="node", name=n, online=1 if b["status"] == "online" else 0, id=f"node/{n}") for n, b in NODES.items()]

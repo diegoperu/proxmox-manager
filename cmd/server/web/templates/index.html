@@ -697,11 +697,19 @@ td.spk{width:130px}
 .nc .rb{min-width:0}
 .rb .track .range{left:0}
 .ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--gap);margin-bottom:20px}
-.cl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--border)}
+.cl-row{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;padding:12px 0;border-top:1px solid var(--border)}
 .cl-row:first-child{border-top:0}
 .cl-row strong{font-size:14px;font-weight:600}
-.cl-row .cl-u{color:var(--text3);font-size:12px;overflow-wrap:anywhere}
-.cl-row .cl-a{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.cl-label{display:flex;align-items:center;gap:8px;min-width:0}.cl-label strong{overflow-wrap:anywhere;min-width:0}.cl-label .badge{flex-shrink:0}
+.cl-row .cl-u{color:var(--text3);font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+.cl-row .cl-a{display:flex;gap:8px;flex-wrap:nowrap}
+.cl-more{position:relative}
+#settings-clusters-panel{overflow:visible}
+.cl-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:10;width:max-content;max-width:240px;padding:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;box-shadow:var(--shadow-pop)}
+.cl-menu[hidden]{display:none}
+.cl-menu [role=menuitem]{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);font:inherit;font-size:12px;padding:8px;border-radius:6px;cursor:pointer}
+.cl-menu [role=menuitem]:hover,.cl-menu [role=menuitem]:focus-visible{background:var(--hover)}
+.cl-menu .cl-delete{color:var(--red)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px}
 .tile{display:block;text-align:left;font:inherit;color:var(--text);background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;cursor:pointer}
 .tile:hover{border-color:var(--border2)}
@@ -711,15 +719,43 @@ td.spk{width:130px}
 .tile b{display:block;font-weight:600;font-size:13px}
 .tile span{font-size:12px;color:var(--text3)}
 .set{max-width:780px}
+.set-tabs{margin-bottom:16px;max-width:100%}
+.rs-heading{overflow-wrap:anywhere;min-width:0}
+.rs-status{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:12px;overflow-wrap:anywhere}
+.rs-status strong,.rs-status span{display:block}
+.rs-status span{color:var(--text2);margin-top:4px}
+.rs-section{border-top:1px solid var(--border);padding:12px 0}
+.rs-section>summary{cursor:pointer;font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.rs-section>summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.rs-section[open]>summary{margin-bottom:16px}
 .rs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px;align-items:end}
 .rs-field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text2);min-width:0}
 .rs-field .inp{width:100%;min-width:0}
+.rs-preview{margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;overflow-wrap:anywhere}
+.rs-preview p{margin:8px 0 0}
+.rs-storage-table{width:100%;table-layout:fixed;border-collapse:collapse}
+.rs-storage-table th,.rs-storage-table td{white-space:normal;padding:8px 4px;vertical-align:top;overflow-wrap:anywhere}
+.rs-storage-table th:first-child{width:46%}.rs-storage-table th:last-child{width:54%}
+.rs-storage-table .inp{width:100%;min-width:0}
+.rs-storage-table .hint{display:block;font-size:11px}
+.rs-storage-table [data-remove]{margin-top:6px}
 .rs-row{padding:12px;margin:10px 0;border:1px solid var(--border);border-radius:8px}
 /* Short rows (GPU tiers, storage classes): one line each, like a table, instead of a card per row */
 .rs-row.rs-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;padding:6px 0;margin:0;border:0;border-bottom:1px solid var(--border);border-radius:0}
 .rs-row.rs-line .rs-field{flex-direction:row;align-items:center;gap:8px}.rs-row.rs-line .rs-field .inp{max-width:160px}
 #rs-form h3{margin:24px 0 12px;font-size:14px}
 #rs-form .hint{margin:12px 0}
+/* The save bar must stick to #content, not the panel's non-scrolling overflow box. */
+#report-settings-panel{overflow:visible}
+#rs-form{padding-bottom:16px}
+#rs-form.has-unsaved{padding-bottom:32px}
+.rs-savebar{position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;margin-top:16px}
+.rs-savebar[hidden]{display:none}
+.rs-savebar-status{flex:1 1 160px;font-size:13px;overflow-wrap:anywhere}
+.rs-savebar-actions{display:flex;flex-wrap:wrap;gap:8px}
+.rs-savebar-error{flex-basis:100%;min-width:0;color:var(--red);font-size:12px;overflow-wrap:anywhere}
+#rs-form :is(input,select,button,summary){scroll-margin-block:16px 180px}
+@media(max-width:650px){.rs-row.rs-line{grid-template-columns:minmax(0,1fr)}.rs-row.rs-line .rs-field{flex-direction:column;align-items:stretch}.rs-row.rs-line .rs-field .inp{max-width:none}.rs-row.rs-line [data-remove]{justify-self:start}.set-tabs .tab{white-space:normal}}
 .sel-sum{font-size:12px;color:var(--text2);margin:10px 0 14px}
 .sel-sum b{color:var(--text);font-variant-numeric:tabular-nums}
 @media(max-width:650px){.ngrid{grid-template-columns:minmax(0,1fr)}.nc-m{grid-template-columns:1fr;gap:12px}.toolbar .sp{display:none}}
@@ -924,6 +960,9 @@ html.spiderman{
 .node-chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-family:var(--sans);font-size:12px;cursor:pointer;transition:all .12s;white-space:nowrap}
 .node-chip:hover{border-color:var(--accent);color:var(--accent)}
 .node-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
+.rs-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.rs-missing summary{cursor:pointer;color:var(--text2)}
+.rs-missing ul{margin:4px 0 0;padding-left:18px;color:var(--text2)}
 </style>
 </head>
 <body>
@@ -988,7 +1027,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.187.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.188.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1505,19 +1544,17 @@ html.spiderman{
     <!-- ██ SETTINGS ██ -->
     <div class="page" id="page-settings">
       <div class="set">
-        <div class="panel">
+        <div class="seg set-tabs" role="tablist" aria-label="Impostazioni">
+          <button type="button" class="tab active" role="tab" id="settings-tab-general" aria-controls="settings-general" aria-selected="true" onclick="Settings.selectTab('general')">Generale</button>
+          <button type="button" class="tab" role="tab" id="settings-tab-report" aria-controls="settings-report" aria-selected="false" tabindex="-1" onclick="Settings.selectTab('report')">Report e listini</button>
+        </div>
+      <div id="settings-general" role="tabpanel" aria-labelledby="settings-tab-general">
+        <div class="panel" id="settings-clusters-panel">
           <div class="panel-h"><h2>Cluster Proxmox</h2><span class="sp" style="flex:1"></span><button class="btn ba sm" onclick="ClusterMgr.showAdd()">Aggiungi cluster</button></div>
           <div class="panel-b">
             <div id="cluster-form" style="display:none"></div>
             <div id="cluster-list"></div>
             <div id="ctres" style="margin-top:8px;font-size:12px"></div>
-          </div>
-        </div>
-        <div class="panel" id="report-settings-panel">
-          <div class="panel-h"><h2>Listini e parametri dei report</h2></div>
-          <div class="panel-b">
-            <label class="rs-field"><span>Cluster dei parametri</span><select class="inp" id="rs-cluster" onchange="ReportSettingsUI.open(Number(this.value))"></select></label>
-            <div id="rs-editor"></div>
           </div>
         </div>
         <div class="panel">
@@ -1538,8 +1575,7 @@ html.spiderman{
               <button type="button" data-v="" onclick="Settings.pickDensity('')">Comoda</button>
               <button type="button" data-v="compact" onclick="Settings.pickDensity('compact')">Compatta</button>
             </div>
-            <div class="hint">La compatta riduce spaziature e altezza delle righe: più VM visibili nelle tabelle. Le scelte si vedono subito; premi Salva per tenerle.</div>
-            <div style="margin-top:16px"><button class="btn ba" onclick="Settings.saveAppearance()">Salva aspetto</button></div>
+            <div class="hint">La compatta riduce spaziature e altezza delle righe: più VM visibili nelle tabelle. La scelta si salva subito.</div>
           </div>
         </div>
         <div class="panel">
@@ -1568,6 +1604,13 @@ html.spiderman{
             </dl>
           </div>
         </div>
+      </div>
+      <div id="settings-report" role="tabpanel" aria-labelledby="settings-tab-report" hidden>
+        <div class="panel" id="report-settings-panel">
+          <div class="panel-h"><h2 class="rs-heading" id="rs-heading">Report e listini</h2></div>
+          <div class="panel-b"><div id="rs-editor"></div></div>
+        </div>
+      </div>
       </div>
     </div>
 
@@ -2130,20 +2173,26 @@ const ClusterMgr={
     const c = this.clusters.find(x => x.idx === this.current);
     return c ? (c.has_console_credentials === true) : false;
   },
-  async load(){
+  async load(preserveCurrent=false){
     try{
       const data=await fetch('/api/clusters',{headers:{'Content-Type':'application/json'}}).then(r=>r.json());
       this.clusters=Array.isArray(data)?data:[];
       const sel=document.getElementById('cluster-select');
       sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
       const def=this.clusters.find(c=>c.default);
-      this.current=def?def.idx:0;
+      this.current=preserveCurrent&&this.clusters.some(c=>c.idx===this.current)?this.current:(def?def.idx:0);
       sel.value=this.current;
       sel.style.display=this.clusters.length>1?'':'none';
     }catch(e){}
   },
   switchTo(idx){
-    this.current=parseInt(idx);
+    const selected=Number(idx);
+    const select=document.getElementById('cluster-select');
+    select.value=this.current;
+    if(!Number.isInteger(selected)||!this.clusters.some(c=>c.idx===selected)||selected===this.current)return;
+    if(ReportSettingsUI.guardLeave(()=>this.switchTo(selected)))return;
+    this.current=selected;
+    select.value=selected;
     VMs.clearCache&&VMs.clearCache();
     Nodes.clearCache&&Nodes.clearCache();
     Batch.clearCache&&Batch.clearCache();
@@ -2151,21 +2200,60 @@ const ClusterMgr={
     AutoRefreshUI.reset();
   },
   async renderList(){
-    await this.load();
+    await this.load(true);
     const list=document.getElementById('cluster-list');
     if(!list)return;
+    this.closeMenu(false);
     if(!this.clusters.length){list.innerHTML='<div class="td" style="font-size:12px;padding:8px 0">Nessun cluster configurato</div>';return;}
     list.innerHTML=this.clusters.map((c,i)=>`
       <div class="cl-row">
-        <strong>${esc(c.label)}</strong>${c.default?'<span class="badge bn">Predefinito</span>':''}
+        <div class="cl-label"><strong>${esc(c.label)}</strong>${c.default?'<span class="badge bn">Predefinito</span>':''}</div>
         <span class="cl-u">${esc(c.url)}</span><span class="cl-u tm">${esc(c.api_token_hint)}</span>
         <div class="cl-a">
           <button class="btn bg2 sm" onclick="ClusterMgr.testCluster(${i})">Test</button>
           <button class="btn bg2 sm" onclick="ClusterMgr.showEdit(${i})">Modifica</button>
-          ${!c.default?`<button class="btn bg2 sm" onclick="ClusterMgr.setDefault(${i})">Imposta predefinito</button>`:''}
-          ${this.clusters.length>1?`<button class="btn bd sm" onclick="ClusterMgr.deleteCluster(${i})">Elimina</button>`:''}
+          ${!c.default||this.clusters.length>1?`<div class="cl-more">
+            <button type="button" class="btn bg2 sm" id="cl-more-${i}" aria-haspopup="menu" aria-expanded="false" aria-controls="cl-menu-${i}" onclick="ClusterMgr.toggleMenu(this)" onkeydown="ClusterMgr.menuKey(event)">Altro…<span class="sr"> ${esc(c.label)}</span></button>
+            <div class="cl-menu" id="cl-menu-${i}" role="menu" aria-labelledby="cl-more-${i}" hidden onkeydown="ClusterMgr.menuKey(event)">
+              ${!c.default?`<button type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();ClusterMgr.setDefault(${i})">Imposta predefinito</button>`:''}
+              ${this.clusters.length>1?`<button type="button" role="menuitem" tabindex="-1" class="cl-delete" onclick="ClusterMgr.closeMenu();ClusterMgr.deleteCluster(${i})">Elimina</button>`:''}
+            </div>
+          </div>`:''}
         </div>
       </div>`).join('');
+  },
+  closeMenu(returnFocus=true){
+    if(!this.menu)return;
+    const {button,popup,outside,keyboard}=this.menu;
+    popup.hidden=true;button.setAttribute('aria-expanded','false');this.menu=null;
+    document.removeEventListener('click',outside,true);document.removeEventListener('keydown',keyboard);
+    if(returnFocus)button.focus();
+  },
+  toggleMenu(button,last=false){
+    if(this.menu?.button===button){this.closeMenu();return;}
+    this.closeMenu(false);
+    const popup=document.getElementById(button.getAttribute('aria-controls'));
+    if(!popup)return;
+    const outside=e=>{if(!button.parentElement.contains(e.target))this.closeMenu();};
+    const keyboard=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();this.closeMenu();}};
+    this.menu={button,popup,outside,keyboard};popup.hidden=false;button.setAttribute('aria-expanded','true');
+    document.addEventListener('click',outside,true);document.addEventListener('keydown',keyboard);
+    const items=popup.querySelectorAll('[role="menuitem"]');items[last?items.length-1:0]?.focus();
+  },
+  menuKey(e){
+    if(e.key==='Escape'&&this.menu){e.preventDefault();e.stopPropagation();this.closeMenu();return;}
+    if(e.key==='Tab'){this.closeMenu();return;}
+    if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key))return;
+    e.preventDefault();e.stopPropagation();
+    if(e.currentTarget.getAttribute('aria-haspopup')==='menu'){
+      if(!this.menu||this.menu.button!==e.currentTarget)this.toggleMenu(e.currentTarget,e.key==='ArrowUp'||e.key==='End');
+      else{const items=this.menu.popup.querySelectorAll('[role="menuitem"]');items[e.key==='ArrowUp'||e.key==='End'?items.length-1:0]?.focus();}
+      return;
+    }
+    if(!this.menu)return;
+    const items=[...this.menu.popup.querySelectorAll('[role="menuitem"]')],index=items.indexOf(document.activeElement);
+    const next=e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowUp'?-1:1)+items.length)%items.length;
+    items[next]?.focus();
   },
   _form(idx){
     const c=idx>=0?this.clusters[idx]:null;
@@ -2217,7 +2305,7 @@ const ClusterMgr={
       }
       this.hideForm();
       await this.renderList();
-        await ReportSettingsUI.load(ClusterMgr.current);
+      await ReportSettingsUI.load();
     }catch(e){toast(`Errore: ${e.message}`,'err');}
   },
   async deleteCluster(idx){
@@ -2226,12 +2314,12 @@ const ClusterMgr={
       title:'Elimina cluster',
       lines:[`Cluster: ${c?.label??'?'}`,`URL: ${c?.url??'?'}`],
       consequence:'La configurazione e il token di questo cluster vengono rimossi da config.json. Il cluster Proxmox non viene toccato.',
-      level:'danger', okLabel:'Elimina cluster'
+      level:'danger', typed:c?.label, okLabel:'Elimina cluster'
     },async()=>{
       try{
         await fetch(`/api/clusters/${idx}`,{method:'DELETE',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
         await this.renderList();
-        await ReportSettingsUI.load(ClusterMgr.current);
+        await ReportSettingsUI.load();
         toast('Cluster eliminato','ok');
       }catch(e){toast(`Errore: ${e.message}`,'err');}
     });
@@ -2240,7 +2328,7 @@ const ClusterMgr={
     try{
       await fetch(`/api/clusters/${idx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
       await this.renderList();
-        await ReportSettingsUI.load(ClusterMgr.current);
+      await ReportSettingsUI.load();
       toast('Default aggiornato','ok');
     }catch(e){toast(`Errore: ${e.message}`,'err');}
   },
@@ -2266,6 +2354,7 @@ const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
   parse(h){
+    if(h==='#/settings/report')return{page:'settings',tab:'report'};
     const m=/^#\/([a-z]+)$/.exec(h||'');
     if(m&&Object.prototype.hasOwnProperty.call(PMETA,m[1]))return{page:m[1]};
     const v=/^#\/vm\/([A-Za-z0-9._-]{1,64})\/(\d{1,9})\/(qemu|lxc)$/.exec(h||'');
@@ -2275,18 +2364,25 @@ const Route={
   replace(h){if(location.hash!==h)history.replaceState(null,'',h);},
   apply(){
     const r=Route.parse(location.hash)||{page:'dashboard'};
+    if(ReportSettingsUI.isDirty()){
+      const target=location.hash;
+      Route.replace('#/settings/report');
+      if(r.page==='settings'&&r.tab==='report')return;
+      if(ReportSettingsUI.guardLeave(()=>{Route.push(target);Route.apply();}))return;
+    }
     if(r.vm){App.nav('vms',{silent:true});VMs.detail(r.vm.node,r.vm.vmid,r.vm.type);return;}
     if(document.getElementById('mov').classList.contains('open'))closeModal('mov');
-    App.nav(r.page,{silent:true}); Route.replace('#/'+r.page);
+    App.nav(r.page,{silent:true,settingsTab:r.tab??'general'}); Route.replace(r.tab==='report'?'#/settings/report':'#/'+r.page);
   }
 };
 window.addEventListener('popstate',()=>Route.apply());
+window.addEventListener('hashchange',()=>{const r=Route.parse(location.hash);if(r?.page!==App.cur||r?.page==='settings'&&(r.tab??'general')!==Settings.tab||!r)Route.apply();});
 // pmgr:autorefresh:begin
 const AutoRefresh={
   PAGES:['dashboard','nodes','vms','cluster','gpu','groups'],
   CHOICES:[0,15,30,60,120,300],
-  shouldRun({page,hidden,modalOpen,busy,typing,blocked,now,busySince}){
-    return this.PAGES.includes(page)&&!hidden&&!modalOpen&&!typing&&!blocked&&(!busy||now-busySince>=120000);
+  shouldRun({page,hidden,modalOpen,busy,typing,blocked,unsaved,now,busySince}){
+    return this.PAGES.includes(page)&&!hidden&&!modalOpen&&!typing&&!blocked&&!unsaved&&(!busy||now-busySince>=120000);
   }
 };
 // pmgr:autorefresh:end
@@ -2310,7 +2406,7 @@ const AutoRefreshUI={
   init(){this.started=true;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});this.reset();},
   mark(){this.last=Date.now();const b=document.getElementById('refresh-btn');const t='Ultimo aggiornamento '+new Date(this.last).toLocaleTimeString('it-IT');b.title=t;},
   reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
-  state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
+  state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,unsaved:ReportSettingsUI.isDirty(),typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
   canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
   async tick(){
     clearTimeout(this.timer);this.timer=null;
@@ -2332,6 +2428,11 @@ const App={
     ClusterMgr.load().then(async()=>{await Settings.load();Route.apply();AutoRefreshUI.init();App.checkConn();setInterval(App.checkConn,30000);});
   },
   nav(p,opts={}){
+    if(ReportSettingsUI.isDirty()){
+      if(p==='settings'&&opts.settingsTab==='report')return;
+      if(ReportSettingsUI.guardLeave(()=>App.nav(p,opts)))return;
+    }
+    if(p==='settings')Settings.showTab(opts.settingsTab??'general');
     document.querySelectorAll('.ni').forEach(el=>{const on=el.dataset.page===p;el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+p));
     document.getElementById('ptitle').textContent=PMETA[p]||p;
@@ -6049,27 +6150,123 @@ window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>
 });
 
 // pmgr:report-settings:begin
+// pmgr:report-defaults:begin
+const REPORT_DEFAULTS = {
+  "inactive_cpu": 0.02,
+  "inactive_net": 1024,
+  "inactive_days": 7,
+  "oversized_mem": 0.25,
+  "oversized_cpu": 0.1,
+  "oversized_days": 14,
+  "idle_util": 5,
+  "idle_mem": 5,
+  "idle_days": 14,
+  "abandon_months": 3,
+  "abandon_peak": 10,
+  "abandon_cpu": 2,
+  "abandon_net": 1024,
+  "over_mem": 25,
+  "over_cpu": 10,
+  "margin": 25
+};
+// pmgr:report-defaults:end
 // The metadata defines both form units and client-side bounds. The server validates independently.
+// pmgr:internal-price:begin
+// Quantities and defaults mirror v3InternalEconomic; VM and GPU tokens have separate EUR values.
+function internalPrice(p,g){
+  const valid=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
+  const amount=()=>({value:0,unknown:false});
+  const add=(a,value,price)=>{
+    if(price===0)return;
+    if(!valid(value)||!valid(price)||!valid(value*price)){a.unknown=true;return;}
+    a.value+=value*price;if(!valid(a.value))a.unknown=true;
+  };
+  const number=a=>a.unknown||!valid(a.value)||a.value>Number.MAX_VALUE/100?null:a.value;
+  const block=(value,base,size)=>valid(value)&&valid(base)&&valid(size)&&size>0?Math.ceil(Math.max(0,value-base)/size):-1;
+  const money=v=>v===null?null:Math.round(v*100)/100;
+  const vm=amount(),compute=amount(),gpu=amount(),gpuTokens=amount();
+  const tokenEUR=p.token_eur??0,gpuTokenEUR=p.gpu_token_eur??0,tiers=p.gpu_tiers??[];
+  let reason='';
+  add(vm,p.base_tokens??0,1);
+  add(vm,block(g.cores,p.base_cores??0,p.cores_block??16),p.cores_block_tokens??0);
+  add(vm,block(g.mem_gib,p.base_mem_gib??0,p.mem_block_gib??32),p.mem_block_tokens??0);
+  add(vm,block(g.ssd_gb,p.base_ssd_gb??0,p.ssd_block_gb??100),p.ssd_block_tokens??0);
+  add(vm,block(g.hdd_gb??0,0,p.hdd_block_gb??1000),p.hdd_block_tokens??0);
+  if(tokenEUR===0){compute.unknown=true;reason='Valore del gettone VM assente o pari a zero';}
+  if(vm.unknown&&tokenEUR!==0)compute.unknown=true;else add(compute,vm.value,tokenEUR);
+  for(const memory of g.gpu_memory_gib??[]){
+    if(gpuTokenEUR===0||tiers.length===0){gpu.unknown=true;gpuTokens.unknown=true;reason='Valore del gettone GPU o fasce GPU mancanti';continue;}
+    if(!tiers.some(t=>t.tokens!==0))continue;
+    let best=-1,tokens=-1;
+    if(valid(memory))for(const tier of tiers)if(memory>=tier.min_gib&&tier.min_gib>best){best=tier.min_gib;tokens=tier.tokens;}
+    add(gpuTokens,tokens,1);add(gpu,tokens,gpuTokenEUR);
+    if(tokens<0)reason='Nessuna fascia GPU applicabile alla memoria';
+  }
+  const total=(a,b)=>a===null||b===null?null:number({value:a+b,unknown:false});
+  const vmCount=number(vm),gpuCount=number(gpuTokens),eur=money(total(number(compute),number(gpu)));
+  return {vmTokens:vmCount,gpuTokens:gpuCount,tokens:total(vmCount,gpuCount),eur,gpuEUR:money(number(gpu)),reason:eur===null?(reason||'Quantità o prezzi incompleti o non validi'):''};
+}
+// pmgr:internal-price:end
+
 const ReportSettingsUI={
-  idx:null, generation:0, saving:false, proposals:[],
+  idx:null, generation:0, saving:false, reloading:false, proposals:[], baseline:null, label:'', detectedStorage:[], savedStorage:{},
+  serialize(value){
+    // Sort object keys so storage row order cannot create a false change.
+    return JSON.stringify(value,(_,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+  },
+  isDirty(){return this.baseline!==null&&this.baseline!==this.serialize(this.read(false));},
+  updateDirty(){
+    const dirty=this.isDirty(),bar=document.getElementById('rs-savebar');
+    bar.hidden=!dirty;document.getElementById('rs-form').classList.toggle('has-unsaved',dirty);
+    if(!dirty)this.saveError('');
+  },
+  saveError(message){document.getElementById('rs-save-error').textContent=message;},
+  syncActions(){
+    for(const id of ['rs-save','rs-cancel']){const button=document.getElementById(id);if(button)button.disabled=this.saving||this.reloading;}
+  },
+  guardLeave(proceed){
+    if(!this.isDirty())return false;
+    askConfirm({title:`Hai modifiche non salvate ai parametri dei report di ${this.label}. Uscire senza salvare?`,level:'warn',okLabel:'Esci senza salvare'},()=>{this.clear();proceed();});
+    return true;
+  },
+  async cancel(){
+    if(this.saving||this.reloading||this.idx==null)return;
+    const idx=this.idx,generation=this.generation;
+    this.reloading=true;this.syncActions();this.saveError('');
+    try{
+      const saved=await api(`/clusters/${idx}/report-settings`,{quiet:true});
+      if(generation!==this.generation)return;
+      this.render(saved,false);
+      document.querySelector('#rs-internal input')?.focus();
+    }catch(e){if(generation===this.generation)this.saveError(e.message);}
+    finally{this.reloading=false;this.syncActions();}
+  },
   internal:[
     ['token_eur','Valore gettone VM (EUR)',0,1000],['gpu_token_eur','Valore gettone GPU (EUR)',0,100000],
     ['base_tokens','VM base (gettoni/mese)',0,1000],['base_cores','Core inclusi nella base',0,4096,'int'],
     ['base_mem_gib','RAM inclusa nella base (GiB)',0,65536],['base_ssd_gb','SSD incluso nella base (GB)',0,1e7],
-    ['cores_block','Blocco core (core)',1,4096,'int','optional'],['cores_block_tokens','Prezzo blocco core (gettoni/mese)',0,1000],
-    ['mem_block_gib','Blocco RAM (GiB)',1,65536,'','optional'],['mem_block_tokens','Prezzo blocco RAM (gettoni/mese)',0,1000],
-    ['ssd_block_gb','Blocco SSD (GB)',1,1e7,'','optional'],['ssd_block_tokens','Prezzo blocco SSD (gettoni/mese)',0,1000],
-    ['hdd_block_gb','Blocco HDD (GB)',1,1e8,'','optional'],['hdd_block_tokens','Prezzo blocco HDD (gettoni/mese)',0,1000]
+    ['cores_block','Blocco core (core)',1,4096,'int','optional',16],['cores_block_tokens','Prezzo blocco core (gettoni/mese)',0,1000],
+    ['mem_block_gib','Blocco RAM (GiB)',1,65536,'','optional',32],['mem_block_tokens','Prezzo blocco RAM (gettoni/mese)',0,1000],
+    ['ssd_block_gb','Blocco SSD (GB)',1,1e7,'','optional',100],['ssd_block_tokens','Prezzo blocco SSD (gettoni/mese)',0,1000],
+    ['hdd_block_gb','Blocco HDD (GB)',1,1e8,'','optional',1000],['hdd_block_tokens','Prezzo blocco HDD (gettoni/mese)',0,1000]
   ],
   thresholds:[
-    ['inactive_cpu','VM inattive: CPU (frazione, 0–0,5)',0,.5],['inactive_net','VM inattive: rete (byte/s)',0,1e9],
-    ['inactive_days','VM inattive: giorni osservati',1,488],['oversized_mem','VM sovradimensionate: RAM (frazione)',0,1],
-    ['oversized_cpu','VM sovradimensionate: CPU (frazione)',0,1],['oversized_days','VM sovradimensionate: giorni osservati',1,488],
-    ['idle_util','GPU inattive: utilizzo (%)',0,50],['idle_mem','GPU inattive: memoria (%)',0,50],['idle_days','GPU inattive: giorni',7,60,'int'],
-    ['abandon_months','Andamento: mesi di inattività',1,12,'int'],['abandon_peak','Andamento: picco massimo (%)',1,90],
-    ['abandon_cpu','Andamento: CPU media (%)',0,50],['abandon_net','Andamento: rete (byte/s)',0,1048576],
-    ['over_mem','Andamento: RAM sovradimensionata (%)',1,90],['over_cpu','Andamento: CPU sovradimensionata (%)',1,90],
-    ['margin','Andamento: margine (%)',0,200]
+    ['inactive_cpu','VM inattive: CPU (%)',0,.5,'',100,'CPU media sotto questa quota dei core assegnati.'],
+    ['inactive_net','VM inattive: rete (byte/s)',0,1e9,'',1,'Traffico medio in ingresso e uscita sotto questa soglia.'],
+    ['inactive_days','VM inattive: giorni osservati',1,488,'',1,'Durata minima dei dati per valutare l’inattività.'],
+    ['oversized_mem','VM sovradimensionate: RAM (%)',0,1,'',100,'RAM al 95° percentile sotto questa quota della RAM assegnata.'],
+    ['oversized_cpu','VM sovradimensionate: CPU (%)',0,1,'',100,'CPU al 95° percentile sotto questa quota dei core assegnati.'],
+    ['oversized_days','VM sovradimensionate: giorni osservati',1,488,'',1,'Durata minima dei dati per valutare il dimensionamento.'],
+    ['idle_util','GPU inattive: utilizzo (%)',0,50,'',1,'Utilizzo medio della GPU sotto questa soglia.'],
+    ['idle_mem','GPU inattive: memoria (%)',0,50,'',1,'Memoria media occupata della GPU sotto questa soglia.'],
+    ['idle_days','GPU inattive: giorni',7,60,'int',1,'Giorni consecutivi richiesti per considerare una GPU inattiva.'],
+    ['abandon_months','Andamento: mesi di inattività',1,12,'int',1,'Mesi consecutivi con CPU e rete sotto le soglie di inattività.'],
+    ['abandon_peak','Andamento: picco massimo (%)',1,90,'',1,'Un picco di CPU pari o superiore esclude l’inattività.'],
+    ['abandon_cpu','Andamento: CPU media (%)',0,50,'',1,'CPU media mensile sotto questa soglia per l’inattività.'],
+    ['abandon_net','Andamento: rete (byte/s)',0,1048576,'',1,'Traffico medio mensile sotto questa soglia per l’inattività.'],
+    ['over_mem','Andamento: RAM sovradimensionata (%)',1,90,'',1,'Picco mensile di RAM sotto questa quota della RAM assegnata.'],
+    ['over_cpu','Andamento: CPU sovradimensionata (%)',1,90,'',1,'Picco mensile di CPU sotto questa quota dei core assegnati.'],
+    ['margin','Andamento: margine (%)',0,200,'',1,'Margine da aggiungere al picco nella proposta di ridimensionamento.']
   ],
   market:[['vcpu_hour','vCPU-ora',0,1000],['ram_gb_hour','RAM GB-ora',0,1000],['storage_gb_month','Storage GB-mese',0,1000]],
   number(value,f,defaultable=false){
@@ -6122,9 +6319,22 @@ const ReportSettingsUI={
     }
     return r;
   },
+  decimalShift(value,places){
+    const [coefficient,exponent='0']=String(value).toLowerCase().split('e');
+    return Number(coefficient+'e'+(Number(exponent)+places));
+  },
+  thresholdField(f){return f[5]===100?[...f.slice(0,2),this.decimalShift(f[2],2),this.decimalShift(f[3],2),...f.slice(4)]:f;},
+  thresholdNumber(value,f){
+    const n=this.number(value,this.thresholdField(f),true);
+    return f[5]===100?this.decimalShift(n,-2):n;
+  },
   field(f,value,defaults=false){
-    const empty=defaults&&(!value)||value==null;
-    return `<label class="rs-field"><span>${esc(f[1])}</span><input class="inp" data-key="${esc(f[0])}" type="number" min="${defaults?0:f[2]}" max="${f[3]}" step="${f[4]==='int'?1:'any'}" value="${empty?'':esc(value)}" ${defaults||f[5]==='optional'?'placeholder="Predefinito"':''}></label>`;
+    const empty=defaults&&(!value)||value==null, display=defaults?this.thresholdField(f):f;
+    const shown=defaults&&f[5]===100?this.decimalShift(value??0,2):value;
+    const builtin=defaults?(f[5]===100?this.decimalShift(REPORT_DEFAULTS[f[0]],2):REPORT_DEFAULTS[f[0]]):null;
+    const placeholder=defaults?'Predefinito: '+builtin+(f[1].includes('(%)')?' %':''):(f[5]==='optional'?(f[6]!=null?'Predefinito: '+f[6]:'Predefinito'):'');
+    const hint=defaults?`${f[6]} Intervallo: ${display[2]}–${display[3]}${f[1].includes('(%)')?' %':''}; vuoto o 0 = predefinito.`:'';
+    return `<label class="rs-field"><span>${esc(f[1])}</span><input class="inp" data-key="${esc(f[0])}" type="number" min="${esc(defaults?0:display[2])}" max="${esc(display[3])}" step="${f[4]==='int'?1:'any'}" value="${empty?'':esc(shown)}" placeholder="${esc(placeholder)}" ${defaults?`aria-describedby="rs-hint-${esc(f[0])}"`:''}>${defaults?`<span class="hint" id="rs-hint-${esc(f[0])}">${esc(hint)}</span>`:''}</label>`;
   },
   text(key,label,value,max,placeholder=''){
     return `<label class="rs-field"><span>${esc(label)}</span><input class="inp" data-key="${esc(key)}" maxlength="${max*2}" value="${esc(value)}" placeholder="${esc(placeholder)}"></label>`;
@@ -6139,55 +6349,163 @@ const ReportSettingsUI={
   provider(p={}){
     return `<div class="rs-row" data-provider><div class="rs-grid">${this.text('name','Nome provider',p.name??'',64)}${this.select('level','Livello',p.level??'low',[['low','Basso'],['high','Alto']])}${this.select('currency','Valuta',p.currency??'EUR',[['EUR','EUR'],['USD','USD']])}${this.market.map(f=>this.field(f,p[f[0]]??0)).join('')}${this.text('source','Fonte (solo testo)',p.source??'',300)}${this.text('date','Data del listino',p.date??'',10,'AAAA-MM-GG')}</div><p class="hint">Prezzi nella valuta selezionata. Fasce GPU per memoria minima, in ordine crescente.</p><div data-market-tiers>${(p.gpu_hour??[]).map(t=>this.tier(t,'price')).join('')}</div><button type="button" class="btn bg2 sm" data-add-market-tier>Aggiungi fascia GPU</button> ${this.remove('Rimuovi provider')}</div>`;
   },
-  storage(name='',value='ssd'){
-    return `<div class="rs-row rs-grid rs-line" data-storage>${this.text('name','Storage',name,64)}${this.select('class','Classe',value,[['ssd','SSD'],['hdd','HDD'],['other','Altro']])}${this.remove()}</div>`;
+  storageProposal(name){return /ssd/i.test(name)?'ssd':/hdd/i.test(name)?'hdd':'';},
+  storage(name='',value='',detected=false,proposed=false){
+    return `<tr data-storage ${detected?'data-detected':''} ${proposed?'data-proposed':''}><td>${detected?`<span class="tm">${esc(name)}</span><input type="hidden" data-key="name" value="${esc(name)}">`:this.text('name','Nome storage manuale',name,64)}<span class="hint" data-storage-note>${proposed?'proposta dal nome':detected?'rilevato nel cluster':'non rilevato · manuale'}</span></td><td>${this.select('class','Classe storage',value,[['','non classificato'],['ssd','SSD'],['hdd','HDD'],['other','Altro']])}${detected?'':this.remove('Rimuovi')}</td></tr>`;
+  },
+  storageTable(classes,propose=true){
+    const detected=new Set(this.detectedStorage);
+    return [...new Set([...this.detectedStorage,...Object.keys(classes)])].sort().map(name=>{
+      const saved=Object.hasOwn(classes,name),value=saved?classes[name]:propose?this.storageProposal(name):'';
+      return this.storage(name,value,detected.has(name),!saved&&detected.has(name)&&!!value);
+    }).join('');
+  },
+  detectStorage(data){
+    this.detectedStorage=[...new Set((Array.isArray(data)?data:[]).map(s=>s.storage).filter(s=>typeof s==='string'&&/^[A-Za-z0-9._-]{1,64}$/.test(s)))].sort();
+    const root=document.getElementById('rs-storage');
+    for(const name of this.detectedStorage){
+      const existing=[...root.querySelectorAll('[data-storage]')].find(row=>row.querySelector('[data-key="name"]').value===name);
+      if(existing){
+        existing.setAttribute('data-detected','');existing.querySelector('[data-key="name"]').readOnly=true;
+        existing.querySelector('[data-remove]')?.remove();
+      }else{
+        const saved=Object.hasOwn(this.savedStorage,name),value=saved?this.savedStorage[name]:this.storageProposal(name);
+        root.insertAdjacentHTML('beforeend',this.storage(name,value,true,!saved&&!!value));
+      }
+    }
+    document.getElementById('rs-storage-hint').textContent=this.detectedStorage.length?'Una riga per storage rilevato. Le proposte dal nome richiedono il salvataggio.':'Nessuno storage rilevato nel cluster. Puoi aggiungere righe manuali.';
+    this.updateStorageNotes();this.updateDirty();
+  },
+  updateStorageNotes(){
+    for(const row of document.querySelectorAll('#rs-storage [data-storage]')){
+      const name=row.querySelector('[data-key="name"]').value,value=row.querySelector('[data-key="class"]').value;
+      const note=row.querySelector('[data-storage-note]');if(!note)continue;
+      const proposed=row.hasAttribute('data-proposed')&&value===this.storageProposal(name)&&this.savedStorage[name]!==value;
+      note.textContent=proposed?'proposta dal nome':row.hasAttribute('data-detected')?'rilevato nel cluster':'non rilevato · manuale';
+    }
   },
   interruption(r={}){
-    return `<div class="rs-row rs-grid" data-interruption>${this.text('from','Dal',r.from??'',35,'AAAA-MM-GGTHH:MM')}${this.text('to','Al',r.to??'',35,'AAAA-MM-GGTHH:MM')}${this.select('cause','Causa',r.cause??'external',[['external','esterna (es. corrente)'],['maintenance','manutenzione programmata'],['fault','guasto del servizio']])}${this.text('note','Nota',r.note??'',200)}${this.remove()}</div>`;
+    const timeField=(key,label,value)=>{
+      const explicit=value&&!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+      return `<label class="rs-field"><span>${esc(label)}</span><input class="inp" data-key="${esc(key)}" type="${explicit?'text':'datetime-local'}" value="${esc(value)}" ${explicit?'readonly aria-describedby="rs-offset-note"':''}></label>`;
+    };
+    return `<div class="rs-row rs-grid" data-interruption>${timeField('from','Dal',r.from??'')}${timeField('to','Al',r.to??'')}${this.select('cause','Causa',r.cause??'external',[['external','esterna (es. corrente)'],['maintenance','manutenzione programmata'],['fault','guasto del servizio']])}${this.text('note','Nota',r.note??'',200)}${this.remove()}</div>`;
   },
-  async load(selected=ClusterMgr.current){
-    const sel=document.getElementById('rs-cluster');
-    sel.innerHTML=ClusterMgr.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
-    const idx=ClusterMgr.clusters.some(c=>c.idx===Number(selected))?Number(selected):ClusterMgr.clusters[0]?.idx;
-    if(idx==null){document.getElementById('rs-editor').textContent='Nessun cluster configurato';this.idx=null;return;}
-    sel.value=String(idx);await this.open(idx);
+  heading(){document.getElementById('rs-heading').innerHTML='Report e listini · '+esc(ClusterMgr.currentLabel()??'Nessun cluster');},
+  clear(){
+    this.generation++;this.idx=null;this.baseline=null;this.proposals=[];this.detectedStorage=[];this.savedStorage={};this.heading();
+    document.getElementById('rs-editor').textContent='Caricamento…';
+  },
+  async load(){
+    this.clear();
+    const idx=ClusterMgr.current;
+    if(!ClusterMgr.clusters.some(c=>c.idx===idx)){document.getElementById('rs-editor').textContent='Nessun cluster configurato';return;}
+    await this.open(idx);
   },
   async open(idx){
     const generation=++this.generation,editor=document.getElementById('rs-editor');
-    this.idx=null;this.proposals=[];editor.textContent='Caricamento…';
+    this.idx=null;this.baseline=null;this.proposals=[];editor.textContent='Caricamento…';
     try{
       const r=await api(`/clusters/${idx}/report-settings`,{quiet:true});
-      if(generation!==this.generation)return;
-      this.idx=Number(idx);this.render(r);
-      // Explicit cluster parameter: this selector may differ from the top bar's cluster.
+      if(generation!==this.generation||idx!==ClusterMgr.current)return;
+      this.idx=Number(idx);this.label=ClusterMgr.currentLabel()??String(idx);this.render(r);
+      // Pin the asynchronous storage read to the same topbar cluster as the settings.
       api(`/storage?cluster=${idx}`,{quiet:true}).then(data=>{
-        if(generation!==this.generation)return;
-        const names=[...new Set((Array.isArray(data)?data:[]).map(s=>s.storage).filter(s=>typeof s==='string'))].sort();
-        document.getElementById('rs-storage-hint').textContent=names.length?'Storage rilevati nel cluster: '+names.join(', '):'Nessuno storage rilevato nel cluster.';
-      }).catch(()=>{if(generation===this.generation)document.getElementById('rs-storage-hint').textContent='Impossibile leggere gli storage del cluster; puoi inserire i nomi manualmente.';});
-    }catch(e){if(generation===this.generation){editor.textContent=e.message;toast(e.message,'err');}}
+        if(generation!==this.generation||idx!==ClusterMgr.current)return;
+        this.detectStorage(data);
+      }).catch(()=>{if(generation===this.generation&&idx===ClusterMgr.current)document.getElementById('rs-storage-hint').textContent='Impossibile leggere gli storage del cluster; puoi inserire i nomi manualmente.';});
+    }catch(e){if(generation===this.generation&&idx===ClusterMgr.current){editor.textContent=e.message;toast(e.message,'err');}}
   },
-  render(r){
+  status(r){
+    const p=r.internal_prices??{},market=r.market_prices??[],positive=v=>Number.isFinite(Number(v))&&Number(v)>0;
+    const internalFields=['token_eur','gpu_token_eur','base_tokens','cores_block_tokens','mem_block_tokens','ssd_block_tokens','hdd_block_tokens'];
+    const internalActive=internalFields.some(k=>positive(p[k]))||(p.gpu_tiers??[]).some(t=>positive(t.tokens));
+    const marketActive=market.some(v=>this.market.some(f=>positive(v[f[0]]))||(v.gpu_hour??[]).some(t=>positive(t.price)));
+    const missing=[];
+    const labels=['gettone VM','gettone GPU','VM base','blocco core','blocco RAM','blocco SSD','blocco HDD'];
+    const internalMissing=internalFields.flatMap((key,i)=>positive(p[key])?[]:[labels[i]]);
+    if(!(p.gpu_tiers??[]).some(t=>positive(t.tokens)))internalMissing.push('fasce GPU');
+    if(internalMissing.length)missing.push('listino interno: '+internalMissing.join(', '));
+    for(const [level,label] of [['low','mercato basso'],['high','mercato alto']]){
+      const rows=market.filter(v=>v.level===level);
+      const items=[...this.market.map(f=>[f[0],f[1]]),['gpu_hour','GPU-ora']].filter(([key])=>!rows.some(v=>key==='gpu_hour'?(v.gpu_hour??[]).some(t=>positive(t.price)):positive(v[key]))).map(([,name])=>name);
+      if(items.length)missing.push(label+': '+items.join(', '));
+    }
+    const dates=market.map(v=>v.date).filter(v=>this.date(v)).sort();
+    const latest=dates.length?dates[dates.length-1]:'Nessun listino datato';
+    return `<div><strong>Parte economica: ${internalActive||marketActive?'attiva':'disabilitata'}</strong>${missing.length?`<details class="rs-missing"><summary>${esc(missing.length===1?'Una parte con prezzi mancanti':missing.length+' parti con prezzi mancanti')}</summary><ul>${missing.map(m=>`<li>${esc(m)}</li>`).join('')}</ul></details>`:'<span>Prezzi interni e di mercato presenti.</span>'}</div><div><strong>Listino di mercato più recente</strong><span>${esc(latest)}</span></div><div><strong>Interruzioni registrate</strong><span>${esc((r.interruptions??[]).length)}</span></div>`;
+  },
+  updateStatus(){
+    const numeric=el=>Number(el?.value)||0;
+    const readPrices=(root,defs)=>Object.fromEntries(defs.map(f=>[f[0],numeric(root.querySelector(`[data-key="${f[0]}"]`))]));
+    const p=readPrices(document.getElementById('rs-internal'),this.internal);
+    p.gpu_tiers=[...document.querySelectorAll('#rs-tiers [data-key="tokens"]')].map(el=>({tokens:numeric(el)}));
+    const market=[...document.querySelectorAll('#rs-market [data-provider]')].map(el=>({...readPrices(el,this.market),level:el.querySelector('[data-key="level"]').value,date:el.querySelector('[data-key="date"]').value,gpu_hour:[...el.querySelectorAll('[data-key="price"]')].map(v=>({price:numeric(v)}))}));
+    document.getElementById('rs-status').innerHTML=this.status({internal_prices:p,market_prices:market,interruptions:[...document.querySelectorAll('#rs-interruptions [data-interruption]')]});
+    this.updatePreview();this.updateStorageNotes();this.updateDirty();
+  },
+  updatePreview(){
+    const preview=document.getElementById('rs-internal-preview');if(!preview)return;
+    let p,error='';
+    try{
+      p=Object.fromEntries(this.internal.map(f=>{
+        const el=document.getElementById('rs-internal').querySelector(`[data-key="${f[0]}"]`);
+        if(el.validity?.badInput)throw new Error(f[1]+': numero incompleto');
+        return [f[0],this.number(el.value,f)];
+      }));
+      let last=-1;
+      p.gpu_tiers=[...document.querySelectorAll('#rs-tiers [data-tier]')].map(row=>{
+        const read=(key)=>{const el=row.querySelector(`[data-key="${key}"]`);if(el.validity?.badInput)throw new Error('Fascia GPU incompleta');return this.number(el.value,[key,'Fascia GPU',0,key==='min_gib'?1024:1000]);};
+        const min=read('min_gib'),tokens=read('tokens');
+        if(min<=last)throw new Error('Fasce GPU: memoria minima strettamente crescente');last=min;
+        return {min_gib:min,tokens};
+      });
+    }catch(e){error=e.message;}
+    const format=(v,money=false)=>v.toLocaleString('it-IT',{minimumFractionDigits:money?2:0,maximumFractionDigits:money?2:6});
+    const line=(label,g)=>{
+      const result=error?null:internalPrice(p,g);
+      if(!result||result.eur===null)return `<p>${esc(label)} = — · ${esc(error||result.reason)}</p>`;
+      const noTier=g.gpu_memory_gib.length&&!(p.gpu_tiers??[]).some(t=>Number(t.tokens)>0);
+      const detail=g.gpu_memory_gib.length?` (${format(result.vmTokens)} VM + ${format(result.gpuTokens)} GPU${noTier?': nessuna fascia GPU con gettoni, la scheda non costa nulla':''})`:'';
+      return `<p>${esc(label)} = ${esc(format(result.tokens))} gettoni${esc(detail)} = ${esc(format(result.eur,true))} €/mese</p>`;
+    };
+    const base={cores:p?.base_cores??0,mem_gib:p?.base_mem_gib??0,ssd_gb:p?.base_ssd_gb??0,hdd_gb:0,gpu_memory_gib:[]};
+    preview.innerHTML='<strong>anteprima, stesso calcolo del report</strong>'+line(`VM base (${format(base.cores)} core, ${format(base.mem_gib)} GiB RAM, ${format(base.ssd_gb)} GB SSD)`,base)+line('VM con 32 core, 128 GiB, 500 GB SSD e una GPU da 80 GB',{cores:32,mem_gib:128,ssd_gb:500,hdd_gb:0,gpu_memory_gib:[80]});
+  },
+  render(r,proposeStorage=true){
     const p=r.internal_prices??{}, d=r.defaults??{};
+    this.savedStorage={...r.storage_classes??{}};
     document.getElementById('rs-editor').innerHTML=`<form id="rs-form" novalidate>
-      <h3>Listino interno</h3><div class="rs-grid" id="rs-internal">${this.internal.map(f=>this.field(f,p[f[0]]??(f[5]==='optional'?null:0))).join('')}</div>
+      <div class="rs-status" id="rs-status" role="status" aria-label="Stato dei parametri dei report">${this.status(r)}</div>
+      <details class="rs-section" open><summary>Listino interno</summary><div class="rs-grid" id="rs-internal">${this.internal.map(f=>this.field(f,p[f[0]]??(f[5]==='optional'?null:0))).join('')}</div>
       <p class="hint">Blocchi vuoti: dimensione predefinita. Le risorse oltre la base si arrotondano per eccesso. Fasce GPU: da X GiB, N gettoni GPU; vale la fascia più alta raggiunta. Per il supplemento da 89 GiB, aggiungi una fascia dedicata.</p>
       <div id="rs-tiers">${(p.gpu_tiers??[]).map(t=>this.tier(t)).join('')}</div><button type="button" class="btn bg2 sm" data-add="tier">Aggiungi fascia GPU</button>
-      <h3>Prezzi di mercato</h3><p class="hint">AWS, Scaleway e Aruba non hanno un listino pubblico leggibile senza credenziali: aggiornali a mano</p><button type="button" class="btn bg2 sm" data-price-check>Controlla i listini</button><div id="rs-price-status" role="status"></div><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider</button>
+      <div class="rs-preview" id="rs-internal-preview" role="status" aria-live="polite"></div>
+      </details>
+      <details class="rs-section" open><summary>Prezzi di mercato</summary><p class="hint">Livello basso: provider europeo economico, per esempio OVHcloud; è la cifra in evidenza nel report. Livello alto: hyperscaler, per esempio Azure; completa l’intervallo di confronto.</p><p class="hint">AWS, Scaleway e Aruba non hanno un listino pubblico leggibile senza credenziali: aggiornali a mano</p><div class="rs-actions"><button type="button" class="btn ba sm" data-price-check>Controlla i listini</button><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider a mano</button></div><div id="rs-price-status" role="status"></div><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div>
       <h3>Cambio USD/EUR</h3><div id="rs-exchange">${this.field(['usd_eur','EUR per 1 USD',0,10],r.usd_eur??0)}</div>
-      <h3>Classi degli storage</h3><p class="hint" id="rs-storage-hint">Lettura degli storage…</p><div id="rs-storage">${Object.entries(r.storage_classes??{}).map(([k,v])=>this.storage(k,v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage</button>
-      <h3>Soglie predefinite</h3><p class="hint">Campi vuoti o zero: predefinito del report. Valori diversi da zero devono rispettare l’intervallo indicato.</p><div class="rs-grid" id="rs-defaults">${this.thresholds.map(f=>this.field(f,d[f[0]],true)).join('')}</div>
-      <h3>Registro delle interruzioni</h3><p class="hint">Date locali nel formato AAAA-MM-GGTHH:MM (fuso del server), oppure RFC3339 con fuso esplicito. Durata massima: 31 giorni per riga.</p><div id="rs-interruptions">${(r.interruptions??[]).map(v=>this.interruption(v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="interruption">Aggiungi interruzione</button>
-      <p class="hint">Se tutti i prezzi sono a zero, i report di questo cluster non mostrano la parte economica.</p><button type="submit" class="btn ba" id="rs-save" ${this.saving?'disabled':''}>Salva parametri dei report</button>
+      </details>
+      <details class="rs-section"><summary>Classi degli storage</summary><p class="hint" id="rs-storage-hint">Le classi non assegnate non vengono salvate. Le proposte dal nome richiedono il salvataggio.</p><table class="rs-storage-table"><caption class="sr">Classi degli storage del cluster</caption><thead><tr><th scope="col">Storage</th><th scope="col">Classe</th></tr></thead><tbody id="rs-storage">${this.storageTable(r.storage_classes??{},proposeStorage)}</tbody></table><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage manuale</button></details>
+      <details class="rs-section"><summary>Registro delle interruzioni</summary><p class="hint" id="rs-offset-note">Le date locali usano il fuso del server. Le date con fuso esplicito sono in sola lettura per conservarne il valore. Durata massima: 31 giorni per riga.</p><div id="rs-interruptions">${(r.interruptions??[]).map(v=>this.interruption(v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="interruption">Aggiungi interruzione</button></details>
+      <details class="rs-section"><summary>Soglie avanzate</summary><p class="hint">Campi vuoti o zero: predefinito del report. Le percentuali si inseriscono in %, anche quando il valore salvato è una frazione.</p><div class="rs-grid" id="rs-defaults">${this.thresholds.map(f=>this.field(f,d[f[0]],true)).join('')}</div></details>
+      <div class="rs-savebar" id="rs-savebar" role="region" aria-label="Salvataggio dei parametri dei report" hidden>
+        <span class="rs-savebar-status" role="status">Modifiche non salvate</span>
+        <div class="rs-savebar-actions"><button type="button" class="btn bg2" id="rs-cancel" data-cancel ${this.saving?'disabled':''}>Annulla</button><button type="submit" class="btn ba" id="rs-save" ${this.saving?'disabled':''}>Salva</button></div>
+        <span class="rs-savebar-error" id="rs-save-error" role="alert"></span>
+      </div>
     </form>`;
     const form=document.getElementById('rs-form');
     form.addEventListener('click',e=>this.click(e));form.addEventListener('submit',e=>{e.preventDefault();this.save();});
+    form.addEventListener('input',()=>this.updateStatus());form.addEventListener('change',()=>this.updateStatus());
+    this.baseline=this.serialize({...this.read(false),storage_classes:this.savedStorage});
+    this.updatePreview();this.updateDirty();this.syncActions();
   },
   click(e){
     const button=e.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-cancel')){this.cancel();return;}
     if(button.hasAttribute('data-price-check')){this.checkPrices(button);return;}
     if(button.hasAttribute('data-apply-price')){this.applyPrice(Number(button.dataset.applyPrice));return;}
-    if(button.hasAttribute('data-remove')){button.closest('.rs-row').remove();return;}
+    if(button.hasAttribute('data-remove')){button.closest('[data-storage],.rs-row').remove();this.updateStatus();return;}
     let target,html,limit,selector;
     if(button.hasAttribute('data-add-market-tier')){target=button.parentElement.querySelector('[data-market-tiers]');html=this.tier({},'price');limit=8;selector='[data-tier]';}
     else switch(button.dataset.add){
@@ -6198,7 +6516,7 @@ const ReportSettingsUI={
       default:return;
     }
     if(target.querySelectorAll(selector).length>=limit){toast('Numero massimo di righe: '+limit,'err');return;}
-    target.insertAdjacentHTML('beforeend',html);target.lastElementChild.querySelector('input')?.focus();
+    target.insertAdjacentHTML('beforeend',html);this.updateStatus();target.lastElementChild.querySelector('input')?.focus();
   },
   async checkPrices(button){
     if(this.idx==null)return;
@@ -6244,41 +6562,72 @@ const ReportSettingsUI={
     set('name',p.provider_name);set('currency','EUR');set('source',p.source_text);set('date',p.date);
     if(p.vcpu_hour!=null)set('vcpu_hour',p.vcpu_hour);if(p.ram_gb_hour!=null)set('ram_gb_hour',p.ram_gb_hour);
     if(p.gpu_hour.length)row.querySelector('[data-market-tiers]').innerHTML=p.gpu_hour.map(t=>this.tier(t,'price')).join('');
-    this.showPrices();toast('Proposta applicata al modulo: salva per confermare','ok');
+    this.updateStatus();this.showPrices();toast('Proposta applicata al modulo: salva per confermare','ok');
   },
-  read(){
+  read(validate=true){
     const get=(el,key)=>el.querySelector(`[data-key="${key}"]`).value;
-    const fields=(el,defs,defaults=false)=>Object.fromEntries(defs.map(f=>[f[0],this.number(get(el,f[0]),f,defaults)]).filter(([,v])=>v!==undefined));
+    const numeric=(control,f,defaults=false)=>{
+      // Invalid edits still participate in the serialized draft; Save validates them.
+      if(control.validity?.badInput){if(validate)throw new Error(f[1]+': numero non valido');return {invalid:true};}
+      try{return defaults?this.thresholdNumber(control.value,f):this.number(control.value,f);}
+      catch(e){if(validate)throw e;return {invalid:control.value};}
+    };
+    const fields=(el,defs,defaults=false)=>Object.fromEntries(defs.map(f=>[f[0],numeric(el.querySelector(`[data-key="${f[0]}"]`),f,defaults)]).filter(([,v])=>v!==undefined));
     const tiers=(el,key)=>[...el.querySelectorAll('[data-tier]')].map(row=>fields(row,[['min_gib','GPU: memoria minima',0,1024],[key,'GPU: prezzo o gettoni',0,1000]]));
     const p=fields(document.getElementById('rs-internal'),this.internal);p.gpu_tiers=tiers(document.getElementById('rs-tiers'),'tokens');
     const market=[...document.querySelectorAll('#rs-market [data-provider]')].map(el=>({...fields(el,this.market),name:get(el,'name'),level:get(el,'level'),currency:get(el,'currency'),source:get(el,'source'),date:get(el,'date'),gpu_hour:tiers(el,'price')}));
     const storage=Object.create(null),rows=document.querySelectorAll('#rs-storage [data-storage]');
-    if(rows.length>64)throw new Error('Massimo 64 storage');
-    for(const el of rows){const name=get(el,'name');if(Object.hasOwn(storage,name))throw new Error('Nome storage duplicato');storage[name]=get(el,'class');}
-    return this.validate({internal_prices:p,market_prices:market,usd_eur:this.number(document.querySelector('#rs-exchange input').value,['usd_eur','Cambio USD/EUR',0,10]),storage_classes:storage,defaults:fields(document.getElementById('rs-defaults'),this.thresholds,true),interruptions:[...document.querySelectorAll('#rs-interruptions [data-interruption]')].map(el=>Object.fromEntries(['from','to','cause','note'].map(k=>[k,get(el,k)])))});
+    let duplicate=false;
+    const names=new Set();
+    for(const el of rows){const name=get(el,'name'),value=get(el,'class');if(name&&names.has(name)){if(validate)throw new Error('Nome storage duplicato');duplicate=true;}names.add(name);if(value!=='')storage[name]=value;}
+    const r={internal_prices:p,market_prices:market,usd_eur:numeric(document.querySelector('#rs-exchange input'),['usd_eur','Cambio USD/EUR',0,10]),storage_classes:duplicate?[...rows].map(el=>[get(el,'name'),get(el,'class')]):storage,defaults:fields(document.getElementById('rs-defaults'),this.thresholds,true),interruptions:[...document.querySelectorAll('#rs-interruptions [data-interruption]')].map(el=>Object.fromEntries(['from','to','cause','note'].map(k=>[k,get(el,k)])))};
+    return validate?this.validate(r):r;
   },
   async save(){
-    if(this.saving||this.idx==null)return;
-    const idx=this.idx;
+    if(this.saving||this.reloading||this.idx==null||!this.isDirty())return;
+    const idx=this.idx,generation=this.generation;
+    this.saveError('');
     try{
       const body=JSON.stringify(this.read());if(new TextEncoder().encode(body).length>65536)throw new Error('Impostazioni troppo grandi: massimo 64 KB');
-      this.saving=true;document.getElementById('rs-save').disabled=true;
-      await api(`/clusters/${idx}/report-settings`,{method:'PUT',body,quiet:true});toast('Parametri dei report salvati','ok');
-    }catch(e){toast(e.message,'err');}
-    finally{this.saving=false;const button=document.getElementById('rs-save');if(button)button.disabled=false;}
+      this.saving=true;this.syncActions();
+      await api(`/clusters/${idx}/report-settings`,{method:'PUT',body,quiet:true});
+      if(generation!==this.generation)return;
+      const saved=JSON.parse(body);this.savedStorage={...saved.storage_classes};
+      this.baseline=this.serialize(saved);this.updateStatus();toast('Parametri dei report salvati','ok');
+      if(!this.isDirty())document.querySelector('#rs-internal input')?.focus();
+    }catch(e){if(generation===this.generation)this.saveError(e.message);}
+    finally{this.saving=false;this.syncActions();}
   }
 };
 // pmgr:report-settings:end
+window.addEventListener('beforeunload',e=>{if(ReportSettingsUI.isDirty()){e.preventDefault();e.returnValue='';}});
 
 const Settings={
-  async load(){
-    const selected=ClusterMgr.current;
-    await ClusterMgr.renderList();
-    if(ClusterMgr.clusters.some(c=>c.idx===selected)){
-      ClusterMgr.current=selected;document.getElementById('cluster-select').value=String(selected);
+  tab:'general', generation:0,
+  showTab(tab){
+    if(!['general','report'].includes(tab))return;
+    this.tab=tab;
+    for(const name of ['general','report']){
+      const selected=name===tab,button=document.getElementById('settings-tab-'+name);
+      button.classList.toggle('active',selected);button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
+      document.getElementById('settings-'+name).hidden=!selected;
     }
-    ReportSettingsUI.load(ClusterMgr.current);
-    const cfg=await api('/config',{quiet:true}).catch(()=>null); if(!cfg)return;
+  },
+  selectTab(tab){
+    if(!['general','report'].includes(tab)||tab===this.tab)return;
+    if(ReportSettingsUI.guardLeave(()=>this.selectTab(tab)))return;
+    this.showTab(tab);Route.push(tab==='report'?'#/settings/report':'#/settings');
+    if(tab==='report')ReportSettingsUI.load();
+  },
+  async load(){
+    if(ReportSettingsUI.isDirty())return;
+    const generation=++this.generation;
+    ReportSettingsUI.clear();
+    await ClusterMgr.renderList();
+    if(generation!==this.generation)return;
+    ReportSettingsUI.heading();
+    if(this.tab==='report')ReportSettingsUI.load();
+    const cfg=await api('/config',{quiet:true}).catch(()=>null); if(!cfg||generation!==this.generation)return;
     const t=cfg.theme||'', d=cfg.density||'';
     document.getElementById('ctheme').value=t;
     document.getElementById('cdensity').value=d;
@@ -6287,18 +6636,24 @@ const Settings={
   },
   applyTheme(t){applyTheme(t);},
   applyDensity(d){applyDensity(d);},
-  // Tessere e controllo segmentato: lo stato sta in due campi nascosti, letti da saveAppearance().
-  pickTheme(t){document.getElementById('ctheme').value=t;applyTheme(t);Settings.syncAppearance();},
-  pickDensity(d){document.getElementById('cdensity').value=d;applyDensity(d);Settings.syncAppearance();},
+  pickTheme(t){this.saveAppearance('theme',t);},
+  pickDensity(d){this.saveAppearance('density',d);},
   syncAppearance(){
     const t=document.getElementById('ctheme').value, d=document.getElementById('cdensity').value;
     document.querySelectorAll('#theme-tiles .tile').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===t));
     document.querySelectorAll('#dens-seg button').forEach(b=>{const on=b.dataset.v===d;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
   },
-  async saveAppearance(){
-    const t=document.getElementById('ctheme').value, d=document.getElementById('cdensity').value;
-    await api('/config',{method:'POST',body:JSON.stringify({theme:t,density:d})});
-    applyTheme(t); applyDensity(d); toast('Aspetto salvato','ok');
+  async saveAppearance(key,value){
+    if(this.appearanceSaving)return;
+    const field=document.getElementById(key==='theme'?'ctheme':'cdensity'), previous=field.value;
+    this.appearanceSaving=true;
+    document.querySelectorAll('#theme-tiles button,#dens-seg button').forEach(b=>b.disabled=true);
+    field.value=value;
+    if(key==='theme')applyTheme(value);else applyDensity(value);
+    this.syncAppearance();
+    try{await api('/config',{method:'POST',body:JSON.stringify({[key]:value}),quiet:true});}
+    catch(e){field.value=previous;if(key==='theme')applyTheme(previous);else applyDensity(previous);this.syncAppearance();toast(e.message,'err');}
+    finally{this.appearanceSaving=false;document.querySelectorAll('#theme-tiles button,#dens-seg button').forEach(b=>b.disabled=false);}
   }
 };
 
