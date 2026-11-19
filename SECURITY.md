@@ -181,3 +181,16 @@ The advice for a new VM counts the RAM of the guests that use it now (running, s
 ### Template prechecks (files and space)
 
 The advice reads the template config itself (`template_vmid`) and refuses to treat anything else than a template as one. Values taken from that config are checked before they are used: file references only match `storage:snippets/<name>` or `storage:iso/<name>` with a storage name pattern and a name without control characters, `/` or `,`; storage and node names are validated before the listing call (`/nodes/{n}/storage/{s}/content?content=snippets|iso`, a fixed set of content values), and the result is cached 60 s per cluster, node, storage and kind. Sizes are parsed with a bound. A listing that cannot be read, or a storage that does not enable the content type, blocks nothing and is reported in `meta.partial` (`files`, `files_unverified`): the check is a safeguard, never a condition for creating.
+
+### Waiting for the resize task and for cloud-init (VM creation)
+
+On Proxmox 9 a disk resize answers with a task and rewrites the VM configuration when it ends; the job now waits for that task before reading the configuration (and its `digest`) for the extra disk, so the write is never based on a stale digest. After the guest agent answers, the job waits until cloud-init has finished in the current boot (read-only probe using shell builtins, same result twice on the same boot id, 15 minutes at most) before it adds the extra user or touches the disk: cloud-init restarts the agent while it runs, which used to kill `adduser` half way. On timeout nothing is run in the guest and a warning is returned. `adduser.sh` guarantees sudo (checks `sudo` and `visudo` first, writes and validates `/etc/sudoers.d/<user>`, verifies with `sudo -l -U`) and rolls the account back on any failure or on SIGTERM/SIGHUP/SIGINT.
+
+### Node access for script and snippet sync (`tools/pmgr-sync`)
+
+`tools/pmgr-sync/pmgr-sync-setup.sh` creates a non-root `pmgr-sync` user on Proxmox nodes. On destinations its key is bound by `authorized_keys` to a forced command (`pmgr-sync-gate`) that accepts only `pmgr-list` and `rsync --server` writes into `snippets/` and `pmgr-scripts/` (via `rrsync -wo -no-del`: no reads, no deletes, no other paths); no shell. Snippets are executed as root in new VMs (cloud-init vendor data), so whoever can write them controls the future VMs: the source node is the trust anchor, copies are verified by `MANIFEST.sha256`, and nothing is deleted automatically. The manager integration (forced command `status|diff|run`, `os/exec` of `ssh` with a fixed argument list) is not written yet; see ROADMAP 13.
+
+### Hardening of existing VMs (operational tooling, not part of the binary)
+
+The scripts used to bring existing VMs to the current baseline (fail2ban, automatic security updates, SSH, firewall) live outside the repository and are documented in `CLAUDE.md` and `ROADMAP.md`. Operating rules: always the `tecnico` account, snapshot before every write, one VM at a time with a verification afterwards, a safety timer that disables the firewall if the checks fail, and automatic security updates that never reboot and never touch Docker packages (or kernel/NVIDIA/Slurm on GPU VMs). Known residual exposure: ports published by Docker bypass `ufw`.
+

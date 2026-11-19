@@ -865,7 +865,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.174.0 · 2026-11-12</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.177.0 · 2026-11-19</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1026,6 +1026,7 @@ html.spiderman{
           <option value="">Con e senza GPU</option><option value="1">Solo con GPU</option><option value="0">Senza GPU</option>
         </select>
         <button class="btn bg2 sm" onclick="VMs.load()" aria-label="Aggiorna la lista"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg></button>
+        <button type="button" class="btn bg2 sm" id="vm-ansible" onclick="VMs.exportAnsible()">Inventory Ansible</button>
         <span class="sp"></span><span class="tb-sum" id="vm-sum" aria-live="polite"></span>
       </div>
       <div class="tw"><table>
@@ -3969,6 +3970,68 @@ const Nodes={
 // ════════════════════════════════════════════════════════════════════════════
 // VMs — multi-node filter
 // ════════════════════════════════════════════════════════════════════════════
+// pmgr:ansible-inventory:begin
+const AnsibleInv={
+  slug(label){return (typeof label==='string'?label:'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,'');},
+  fileName(label,idx,allLabelsWithIdx){
+    const base=(name,id)=>this.slug(name)||`cluster${id}`;
+    const entries=allLabelsWithIdx.map(c=>({idx:c.idx,base:base(c.label,c.idx)}));
+    const own=base(label,idx);
+    const used=new Set(entries.map(c=>c.base));
+    const assigned=new Set();
+    for(const c of entries.slice().sort((a,b)=>a.idx-b.idx)){
+      let name=c.base;
+      if(entries.some(other=>other.idx!==c.idx&&other.base===c.base))name+=`-${c.idx}`;
+      while(assigned.has(name)||(name!==c.base&&used.has(name)))name+=`-${c.idx}`;
+      assigned.add(name);
+      if(c.idx===idx)return `inventory-${name}.yml`;
+    }
+    return `inventory-${own}.yml`;
+  },
+  build(vms,{label,idx,slug,now}){
+    const safeSlug=/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)?slug:`cluster${Number.isSafeInteger(idx)&&idx>=0?idx:0}`;
+    const comment=(typeof label==='string'?label:'').replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g,'').slice(0,80);
+    const lines=['# Inventory Ansible generato da ProxmoxManager',`# Cluster: ${comment}`,`# Solo VM e container in esecuzione, generato il ${now.toISOString()}`,'all:','  hosts:'];
+    let skipped=0;
+    const hosts=[];
+    for(const v of vms){
+      if(!v||v.status!=='running'||v.template===1||v.template==='1'||/template/i.test(typeof v.name==='string'?v.name:''))continue;
+      const parts=typeof v.ip==='string'?v.ip.split('.'):[];
+      const validIP=parts.length===4&&parts.every(p=>/^(0|[1-9][0-9]{0,2})$/.test(p)&&Number(p)<=255);
+      if(!validIP||!Number.isSafeInteger(v.vmid)||v.vmid<=0||typeof v.node!=='string'||!/^[A-Za-z0-9._-]{1,64}$/.test(v.node)||!['qemu','lxc'].includes(v.type)){skipped++;continue;}
+      const alias=(typeof v.name==='string'?v.name:'').replace(/[^A-Za-z0-9._-]/g,'_')||`vm${v.vmid}`;
+      const groups=Array.isArray(v.grp?.groups)?v.grp.groups.filter(g=>typeof g==='string'&&/^[a-z0-9]{1,32}$/.test(g)):[];
+      hosts.push({v,alias,groups});
+    }
+    const counts=new Map();
+    for(const h of hosts)counts.set(h.alias,(counts.get(h.alias)||0)+1);
+    for(const h of hosts)if(counts.get(h.alias)>1)h.alias+=`-${h.v.vmid}`;
+    // A suffixed duplicate may collide with an existing name; keep every key unique.
+    const reserved=new Set(hosts.map(h=>h.alias));
+    const seen=new Set();
+    hosts.sort((a,b)=>a.alias<b.alias?-1:a.alias>b.alias?1:a.v.vmid-b.v.vmid);
+    for(const h of hosts){
+      let name=h.alias;
+      while(seen.has(name)){name+=`-${h.v.vmid}`;while(reserved.has(name))name+=`-${h.v.vmid}`;}
+      h.alias=name;seen.add(name);
+    }
+    hosts.sort((a,b)=>a.alias<b.alias?-1:a.alias>b.alias?1:0);
+    for(const h of hosts)lines.push(`    "${h.alias}":`,`      ansible_host: ${h.v.ip}`,`      pmgr_vmid: ${h.v.vmid}`,`      pmgr_node: "${h.v.node}"`,`      pmgr_type: ${h.v.type}`,`      pmgr_cluster: "${safeSlug}"`);
+    if(hosts.length){
+      lines.push('  children:',`    cluster_${safeSlug.replace(/-/g,'_')}:`,'      hosts:');
+      for(const h of hosts)lines.push(`        "${h.alias}": {}`);
+      const groups=new Map();
+      for(const h of hosts)for(const g of new Set(h.groups)){if(!groups.has(g))groups.set(g,[]);groups.get(g).push(h.alias);}
+      for(const g of [...groups.keys()].sort()){
+        lines.push(`    gruppo_${g}:`,'      hosts:');
+        for(const alias of groups.get(g))lines.push(`        "${alias}": {}`);
+      }
+    }
+    return {yaml:lines.join('\n')+'\n',exported:hosts.length,skipped};
+  }
+};
+// pmgr:ansible-inventory:end
+
 const VMs=(()=>{
   const S=mkSorter('vmtbody','page-vms');
   let all=[], filtered=[], currentTab='all', selectedNodes=new Set(), sortedData=[], picked=new Set();
@@ -4117,6 +4180,26 @@ const VMs=(()=>{
   }
 
   return {
+    async exportAnsible(){
+      const button=document.getElementById('vm-ansible');
+      if(button.disabled)return;
+      button.disabled=true;
+      const idx=ClusterMgr.current, list=all, label=ClusterMgr.currentLabel()||'';
+      try{
+        const running=list.filter(v=>v.status==='running'&&!isTemplate(v));
+        if(running.some(v=>v.grp===undefined))await loadGroups();
+        if(ClusterMgr.current!==idx||all!==list)throw new Error('La lista o il cluster sono cambiati');
+        if(running.some(v=>v.type==='qemu'&&!v.ip))await loadAgentIps();
+        if(ClusterMgr.current!==idx||all!==list)throw new Error('La lista o il cluster sono cambiati');
+        const name=AnsibleInv.fileName(label,idx,ClusterMgr.clusters);
+        const slug=name.slice('inventory-'.length,-'.yml'.length);
+        const result=AnsibleInv.build(list,{label,idx,slug,now:new Date()});
+        if(!result.exported){toast('Nessuna VM in esecuzione da esportare','info');return;}
+        Reports.download(new Blob([result.yaml],{type:'text/yaml;charset=utf-8'}),name);
+        toast(`Esportate ${result.exported} VM in esecuzione (${result.skipped} senza IP saltate)`,'ok');
+      }catch(e){toast('Esportazione inventario non riuscita: '+e.message,'err');}
+      finally{button.disabled=false;}
+    },
     clearCache(){all=[];filtered=[];selectedNodes=new Set();sortedData=[];picked=new Set();updateBar();},
     pick(el){el.checked?picked.add(el.value):picked.delete(el.value);updateBar();},
     pickAll(cb){sortedData.forEach(v=>cb.checked?picked.add(keyOf(v)):picked.delete(keyOf(v)));renderRows(sortedData);},
