@@ -64,7 +64,7 @@ nodes.set('rs-storage',storage);
 nodes.set('rs-internal',fields(Object.fromEntries(ui.internal.map(f=>[f[0],f[5]==='optional'?'':0]))));
 nodes.set('rs-defaults',fields(Object.fromEntries(ui.thresholds.map(f=>[f[0],'']))));
 global.document={getElementById(id){if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},
- querySelectorAll:s=>s.startsWith('#rs-storage ')?storage.rows:[],querySelector:s=>s==='#rs-exchange input'?{value:'0'}:null};
+ querySelectorAll:s=>s.startsWith('#rs-storage ')?storage.rows.filter(r=>!r.removedRow):[],querySelector:s=>s==='#rs-exchange input'?{value:'0'}:null};
 ui.idx=0;ui.savedStorage={'saved-ssd':'other'};ui.baseline=ui.serialize(ui.read(false));
 ui.detectStorage([{storage:'pool-ssd'},{storage:'pool-ssd'},{storage:'pool-hdd'},{storage:'local'},
  {storage:'saved-ssd'},{storage:'pending-manual'},{storage:'../invalid'},{storage:42}]);
@@ -73,9 +73,15 @@ assert.equal(storage.rows[0].controls.class.value,'other','saved value preserved
 assert.equal(storage.rows[1].controls.class.value,'hdd','pending manual edit preserved');
 assert(storage.rows[1].controls.name.readOnly);assert(storage.rows[1].removed);
 const ssd=storage.rows.find(r=>r.controls.name.value==='pool-ssd');
+assert.equal(ssd.controls.class.value,'','name proposals never fill the form on load');
+assert(!ui.isDirty(),'opening the tab must not create unsaved changes');
+assert.equal(ui.proposable().length,2,'pool-ssd and pool-hdd can be proposed');
+assert(document.getElementById('rs-storage-propose').innerHTML.includes('Applica le proposte dal nome (2 storage)'));
+ui.applyStorageProposals();
 assert.equal(ssd.controls.class.value,'ssd');assert.equal(ssd.note.textContent,'proposta dal nome');
 assert.equal(storage.rows.find(r=>r.controls.name.value==='local').controls.class.value,'');
-assert(ui.isDirty(),'proposals remain unsaved until PUT');
+assert.equal(document.getElementById('rs-storage-propose').innerHTML,'','button gone once applied');
+assert(ui.isDirty(),'applied proposals remain unsaved until PUT');
 let draft=ui.read();assert.deepEqual({...draft.storage_classes},{'saved-ssd':'other','pending-manual':'hdd','pool-hdd':'hdd','pool-ssd':'ssd'});
 assert(!Object.hasOwn(draft.storage_classes,'local'),'unclassified rows never reach PUT');
 storage.rows.push(row('',''));assert.doesNotThrow(()=>ui.read(),'empty unclassified manual row omitted');
