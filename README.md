@@ -36,11 +36,16 @@ ProxmoxManager is a self-hosted web interface for managing one or more Proxmox V
 - 🎮 **GPU page** — inventory of NVIDIA cards per node, assign/remove through PCI resource mappings, conflicts and problems, card model names and memory you can correct
 - ⚖ **Cluster balance** — a plan of migrations that evens out assigned RAM (live or cold), "what if I switch off node X", one step at a time with recalculation; CPU compatibility rules for live migration
 - 🗄 **Ceph page** — read-only "weather station" (capacity, I/O, recovery, OSDs per pool, health checks translated)
-- 📊 **Reports** — managerial (bilingual IT+EN, A4 portrait or landscape, printed to PDF) and technical reports (nodes, VMs, GPU, storage, reliability) from Proxmox RRD plus a daily inventory snapshot; CSV and Excel export
+- 📊 **Reports** — technical reports (nodes, VMs and containers, GPU and GPU usage, storage and Ceph, reliability) and a **VM trend** report (1–12 calendar months per VM: average and peak use, abandoned / long-off / oversized VMs, a sizing proposal); CSV and Excel export with formula neutralisation
+- 🏛 **Manager report** — an anonymous document for management (no VM, group or node names): one executive page plus annexes, Italian then English, A4 portrait or landscape, printed to PDF. Growth over time, how users size their VMs, GPUs by memory size, availability (also net of recorded external outages and maintenance), backups, economic value (internal price list vs. a low–high market range)
+- 💶 **Price lists and report parameters per cluster** — internal price list (tokens, base VM, blocks, GPU tiers by memory) with a live preview, market prices, storage classes, default report thresholds, outage log. A **"Check price lists"** button reads the public Azure and OVHcloud price lists and *proposes* values; nothing is saved without the administrator. All prices at zero = no economic section for that cluster
+- 📈 **GPU usage** — optional sampling of `nvidia-smi` inside VMs with a GPU every 5 minutes (utilisation, memory, temperature, power; never processes): working / reserved (model loaded, no compute) / idle / VM off, on the GPU page, in the VM panel and in reports
+- 🧾 **Ansible inventory** — export the running VMs of the current cluster as `inventory-<cluster>.yml` (one file per cluster, groups from tags)
+- 🔄 **Automatic refresh** — read-only pages refresh every 60 s by default (off, 15 s … 5 min), paused while a dialog is open, while typing or with unsaved changes
 - 🌐 **Multi-cluster** — manage multiple independent Proxmox clusters from a single interface, switch with a dropdown
 - 👤 **Add VM users** — create OS users inside running VMs via QEMU Guest Agent, with optional SSH public key and sudoers setup
 - 🖥 **Serial console** — xterm.js terminal for VMs with `serial0` configured via termproxy WebSocket bridge (requires dedicated credentials — see [Security — Console credentials](#security--console-credentials))
-- 🎨 **Themes and density** — auto (follows the OS), Night, Light ("Alba"), Eva-01, Catppuccin Mocha; comfortable or compact density
+- 🎨 **Themes and density** — auto (follows the OS), Night, Light ("Alba"), Eva-01, Catppuccin Mocha, Spider-Man; comfortable or compact density
 - ⌨ **Quick search** — `Ctrl`/`⌘` + `K` jumps to any VM, node, page or action; every VM has a shareable link (`#/vm/<node>/<vmid>/<qemu|lxc>`)
 - 🧾 **Kernel log (dmesg)** — read on demand from a running Linux VM through the guest agent (last 100/300/1000 lines, errors-and-warnings filter, search, copy, download); needs the labelled `dmesg.sh` helper on SELinux-enforcing guests
 - 🧩 **Operating system column** — name and version from the guest agent (e.g. Ubuntu 24.04, Rocky 8.10), with the Proxmox OS type as fallback
@@ -65,7 +70,7 @@ All API calls go through the Go proxy, which adds the `Authorization` header wit
 |----------------|-------------------------------|
 | Go             | 1.21+ with CGO enabled        |
 | C compiler     | gcc or clang (for go-sqlite3) |
-| Proxmox VE     | 7.x or 8.x                    |
+| Proxmox VE     | 8.x or 9.x (in use on 9.2)    |
 | OS             | Linux, macOS                  |
 
 **Debian/Ubuntu:** `apt install golang gcc`  
@@ -138,9 +143,12 @@ Settings are stored in `config.json` in the binary's working directory. The file
   "density": "",
   "refresh_seconds": 60,
   "db_path": "proxmox.db",
-  "listen_addr": ":8080"
+  "listen_addr": ":8080",
+  "gpu_usage": false
 }
 ```
+
+Per-cluster report settings (`clusters[].report`: price lists, storage classes, default thresholds, outage log) and the GPU model corrections (`gpu_models`) are written by the Settings and GPU pages; there is no need to edit them by hand.
 
 > `username` and `password` are optional. If left empty, all features remain available except the Serial console, whose button is automatically hidden in the UI. For secure setup of these credentials, see [Security — Console credentials](#security--console-credentials).
 
@@ -150,13 +158,32 @@ Settings are stored in `config.json` in the binary's working directory. The file
 | `clusters[].url` | — | Proxmox node URL (or cluster VIP) |
 | `clusters[].api_token` | — | Proxmox API token (`USER@REALM!TOKENID=UUID`) |
 | `clusters[].default` | — | `true` = loaded on startup |
-| `theme` | `""` | `""` follow OS, `"dark"`, `"light"`, `"eva01"`, `"catppuccino"` (unknown values are rejected) |
+| `theme` | `""` | `""` follow OS, `"dark"`, `"light"`, `"eva01"`, `"catppuccino"`, `"spiderman"` (unknown values are rejected) |
 | `density` | `""` | `""` comfortable, `"compact"` (tighter tables and rows) |
 | `refresh_seconds` | `60` | Automatic data refresh interval in seconds: `0` (off), `15`, `30`, `60`, `120` or `300`. Also adjustable from the top bar and Settings |
 | `allowed_hosts` | `[]` | Optional list of host names accepted in the `Host` header (anti DNS-rebinding), e.g. `["localhost","pmgr.example.org"]`; empty = no restriction |
 | `listen_addr` | `:8080` | HTTP listen address |
+| `db_path` | `proxmox.db` | SQLite file for the stored history (see [Stored data](#stored-data)) |
+| `gpu_usage` | `false` | `true` = sample `nvidia-smi` every 5 minutes inside running VMs that have a GPU (runs a fixed read-only script through the guest agent) |
+| `vm_usage` | on | `false` = do not keep the daily VM usage history (it only reads the Proxmox RRD) |
 
-Configuration can also be edited from the **Settings** page in the web UI.
+The server rewrites `config.json` atomically with permissions `0600` whenever something is saved from the UI.
+
+Configuration can also be edited from the **Settings** page in the web UI (tabs *General* and *Reports and price lists*).
+
+---
+
+## Stored data
+
+Live data always comes from Proxmox. The SQLite file (`db_path`) keeps only:
+
+| Table | Content | Kept |
+|---|---|---|
+| `inv_*` | daily inventory snapshot per cluster: counts and assigned resources per node and group, GPU cards | 5 years |
+| `vm_use_day` | daily usage per VM and instance (CPU/RAM average, p95 and peak, network, disk), **VM name**, VMID, group, assigned resources | 13 months |
+| `gpu_use_day` | daily GPU usage per VM and instance (when `gpu_usage` is on) | 13 months |
+
+No IP addresses, no guest content, no processes. VMIDs are reused by Proxmox, so rows carry an instance id (the SMBIOS UUID of the VM).
 
 ---
 
@@ -172,7 +199,12 @@ Configuration can also be edited from the **Settings** page in the web UI.
 **Minimum privileges** (if using privilege separation):
 - `VM.Audit`, `VM.PowerMgmt`, `VM.Snapshot`, `VM.Clone`, `VM.Config.CPU`, `VM.Config.Memory`, `VM.Config.Disk`, `VM.Config.Network`, `VM.Migrate`, `VM.Allocate`
 - `Sys.Audit`, `Sys.PowerMgmt`
-- `Datastore.Audit`
+- `Datastore.Audit`, `Datastore.AllocateSpace` (VM creation, extra disks)
+- `VM.Config.Options` (group tags), `VM.Config.Cloudinit` (VM creation)
+- `VM.Config.HWType`, `Mapping.Audit`, `Mapping.Use` (GPU assignment through PCI mappings)
+- guest agent features (add user, disks, dmesg, OS and IP info, GPU usage): `VM.Monitor` on Proxmox 8, the `VM.GuestAgent.*` privileges on Proxmox 9
+
+Missing privileges show up as an explained error (403) on the feature that needs them; the rest keeps working.
 
 ---
 
@@ -180,7 +212,8 @@ Configuration can also be edited from the **Settings** page in the web UI.
 
 - TLS certificate verification is **intentionally disabled** for Proxmox connections — Proxmox VE ships with self-signed certificates. See [`SECURITY.md`](SECURITY.md).
 - Restrict the listen address to loopback if running on a shared host: `"listen_addr": "127.0.0.1:8080"`.
-- `config.json` contains API tokens in plaintext — restrict file permissions: `chmod 600 config.json`.
+- `config.json` contains API tokens in plaintext — the server writes it with `0600`; check the permissions of a file created by hand: `chmod 600 config.json`.
+- The only outbound Internet traffic is the optional **"Check price lists"** button (fixed public Azure and OVHcloud URLs, TLS verified, nothing about your organisation sent). Everything else talks only to Proxmox.
 - For remote access, place a TLS-terminating reverse proxy (nginx, Caddy) in front, or use an SSH tunnel: `ssh -L 8080:localhost:8080 user@server`.
 - **Console credentials**: if using the serial console feature, follow the dedicated user setup in [Security — Console credentials](#security--console-credentials) instead of storing `root@pam` credentials.
 

@@ -276,6 +276,9 @@ Elenco a filetti: ogni task ha una linea di stato (verde piena = riuscito, accen
 ### Pannello laterale e ricerca rapida
 Il dettaglio VM si apre da destra (460px, scorrimento 0.24s) sopra uno scrim, con intestazione, elenco dt/dd, azioni e una "zona pericolo" separata da filetto in fondo. La ricerca (Ctrl/Cmd+K) e' un modal 640px con campo da 52px, risultati raggruppati, riga selezionata con velo accento.
 
+### Moduli lunghi (Impostazioni, 2026-11-19)
+Pagina divisa in schede (`role=tablist`, indirizzo nell'hash) quando contiene argomenti diversi; in testa una riga di stato che dice in parole cosa manca, con il dettaglio a richiesta; sezioni richiudibili (`<details>`), le avanzate chiuse; nei campi vuoti il segnaposto dice il valore predefinito ("Predefinito: 25 %"), mai solo "Predefinito"; unita' coerenti (% e non frazioni). Un solo modello di salvataggio per pagina: preferenze semplici subito, moduli con molti campi con una barra fissa in basso "Modifiche non salvate · Annulla · Salva" che compare solo con modifiche reali, avviso uscendo. Proposte automatiche (es. classe dello storage dal nome) mai precompilate: un pulsante le applica. Azioni rare o pericolose in un menu "Altro…": il rosso compare solo dentro il menu aperto.
+
 ### Toast
 Vetro, raggio 12px, ombra pop, in basso a destra; una linea a sinistra dice lo stato (accento info, verde ok, rossa da 3px errore) prima del testo.
 
