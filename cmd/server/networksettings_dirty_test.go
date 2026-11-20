@@ -30,6 +30,7 @@ global.VMs={clearCache(){},detail(){}};global.Nodes={};global.Batch={};
 global.Groups={busy:false};global._modalStack=[];
 global.ReportSettingsUI={isDirty:()=>false,clear(){},heading(){},load(){}};
 global.Provision={resetNetwork(){}};
+global.UpdateUI={load(){}};
 `+source+`
 const ui=NetworkSettingsUI;
 const empty=()=>({networks:[],dns:[],search_domain:''});

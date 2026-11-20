@@ -52,39 +52,10 @@ type priceSpec struct {
 var azureSpecs = []priceSpec{{"Standard_D4s_v5", "italynorth", -1}, {"Standard_NC4as_T4_v3", "westeurope", 0}, {"Standard_NV36ads_A10_v5", "westeurope", 17}, {"Standard_NC24ads_A100_v4", "westeurope", 49}}
 var ovhSpecs = []priceSpec{{"b3-16.consumption", "", -1}, {"l4-90.consumption", "", 17}, {"a10-45.consumption", "", 17}, {"l40s-90.consumption", "", 25}, {"a100-180.consumption", "", 49}, {"h100-380.consumption", "", 49}}
 
-func priceClient() *http.Client {
-	t := http.DefaultTransport.(*http.Transport).Clone()
-	t.TLSClientConfig = nil
-	return &http.Client{Transport: t, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 || !strings.EqualFold(req.URL.Host, via[0].URL.Host) || req.URL.Scheme != via[0].URL.Scheme {
-			return errors.New("redirect non ammesso")
-		}
-		return nil
-	}}
-}
+func priceClient() *http.Client { return externalClient() }
 func priceRead(ctx context.Context, client *http.Client, address string, count *int64) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "proxmox-manager price check")
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("risposta HTTP non valida")
-	}
-	b, err := io.ReadAll(io.LimitReader(resp.Body, priceBodyLimit+1))
-	*count += int64(len(b))
-	if err != nil {
-		return nil, err
-	}
-	if len(b) > priceBodyLimit {
-		return nil, errors.New("risposta troppo grande")
-	}
-	return b, nil
+	b, _, err := externalRead(ctx, client, address, priceBodyLimit, count)
+	return b, err
 }
 func validPrice(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v > 0 && v <= 1000 }
 func (p *priceProposal) add(spec priceSpec, value float64) {

@@ -36,6 +36,8 @@ type Config struct {
 	// VMUsage controls the daily VM usage history (ROADMAP 21): nil/absent = on (it only reads the RRD),
 	// false = off. A pointer so that existing config files without the field keep the default.
 	VMUsage *bool `json:"vm_usage,omitempty"`
+	// UpdateCheck reads public GitHub build comparisons unless explicitly false.
+	UpdateCheck *bool `json:"update_check,omitempty"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
 	AllowedHosts []string `json:"allowed_hosts"`
 	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
@@ -77,6 +79,8 @@ func ValidDensity(d string) bool { return d == "" || densities[d] }
 
 // VMUsageEnabled: the daily VM usage history runs unless vm_usage is explicitly false.
 func (c Config) VMUsageEnabled() bool { return c.VMUsage == nil || *c.VMUsage }
+
+func (c Config) UpdateCheckEnabled() bool { return c.UpdateCheck == nil || *c.UpdateCheck }
 
 // ValidRefresh reports whether the automatic refresh interval is allowed.
 func ValidRefresh(n int) bool {
@@ -192,6 +196,10 @@ func Get() Config {
 	if current.VMUsage != nil {
 		v := *current.VMUsage
 		c.VMUsage = &v
+	}
+	if current.UpdateCheck != nil {
+		v := *current.UpdateCheck
+		c.UpdateCheck = &v
 	}
 	c.GPUModels = copyGPUModels(current.GPUModels)
 	return c
