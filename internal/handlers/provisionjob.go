@@ -98,6 +98,7 @@ type provReq struct {
 	DiskDevice   string    `json:"disk_device"`
 	IP           string    `json:"ip"` // a.b.c.d[/nn]; "" = leave the template's
 	Gateway      string    `json:"gateway"`
+	SearchDomain string    `json:"search_domain"`
 	DNS          string    `json:"dns"` // up to 3 addresses, space or comma separated
 	SSHKeys      string    `json:"ssh_keys"`
 	CIUser       string    `json:"ciuser"`
@@ -201,6 +202,11 @@ func validateProvReq(r provReq) (provPlan, error) {
 		}
 		p.dns = strings.Join(out, " ")
 	}
+	domain, ok := config.ValidSearchDomain(r.SearchDomain)
+	if !ok {
+		return bad("dominio di ricerca")
+	}
+	p.SearchDomain = domain
 	if r.SSHKeys != "" {
 		var keys []string
 		keysText := strings.ReplaceAll(strings.ReplaceAll(r.SSHKeys, "\r\n", "\n"), "\r", "\n")
@@ -817,6 +823,9 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	}
 	if p.dns != "" {
 		ci.Set("nameserver", p.dns)
+	}
+	if p.SearchDomain != "" {
+		ci.Set("searchdomain", p.SearchDomain)
 	}
 	if p.sshKeys != "" {
 		ci.Set("sshkeys", strings.ReplaceAll(url.QueryEscape(p.sshKeys), "+", "%20")) // Proxmox wants RFC 3986
