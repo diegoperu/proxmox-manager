@@ -49,7 +49,7 @@ global.api=async(path,options)=>{calls.push(path);return path==='/version'?{shor
  const running=UpdateUI.check();assert(get('update-check').disabled);await UpdateUI.load();
  const previousResolve=resolve;await UpdateUI.check();assert.equal(resolve,previousResolve);
  resolve(behind);await running;assert(!get('update-check').disabled);assert.equal(get('update-state').textContent,'6 commit indietro rispetto a main');
- let help;global.askConfirm=(options)=>help=options;UpdateUI.help();assert(help.lines.join(' ').includes('quando disponibili'));assert(help.lines.join(' ').includes('sha256sum -c SHA256SUMS'));assert(help.lines.join(' ').includes('gh attestation verify'));
+ let help;global.askConfirm=(options)=>help=options;UpdateUI.help();assert(help.lines.join(' ').includes('ultima release')&&help.lines.join(' ').includes('SHA256SUMS.sig')&&help.lines.join(' ').includes('release-sign verify'));assert(help.lines.join(' ').includes('sha256sum -c SHA256SUMS'));assert(help.lines.join(' ').includes('gh attestation verify'));
 })().catch(e=>{console.error(e);process.exitCode=1;});
 `)
 }
