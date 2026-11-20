@@ -1378,7 +1378,7 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: A (2026-11-20). Osservazione dell'utente: la scheda non va chiamata "Parametri del cluster" mescolando tecnico ed economico -> **tre schede**: Generale, **Infrastruttura** (per cluster: rete delle VM nuove; in futuro sincronizzazione snippet, valori dei template), **Report e listini** (invariata: listini, soglie, interruzioni, classi degli storage). Assunzioni provvisorie (non bloccanti): dominio di ricerca presente e facoltativo; precedenza valore a mano > rete del cluster > template > nessuno.
 
 ### D134 — Controllo aggiornamenti e binari compilati su GitHub (ROADMAP 24)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (il controllo si fa con le assunzioni; i binari con la risposta a B1-B2)
 **Domanda**: (1) il controllo e' acceso di default? (2) quali binari pubblichiamo e con che nome di versione? (3) come si firmano, in vista del pulsante "Aggiorna" della voce 20?
 **Perché conta**: il controllo e' una seconda uscita verso Internet (dopo il controllo dei listini); i binari che il manager scarica ed esegue sono il punto piu' delicato di tutta la catena (chi li produce controlla il manager e, tramite lui, i cluster).
@@ -1387,5 +1387,5 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
  B1) solo **linux/amd64**, binario **statico** (musl, provato: 12 MB, parte su Rocky 8, SQLite funziona), tag `vAAAA.MM.GG[.N]` (il `v0.N.0` della pagina e' calcolato dall'hook sul branch e con i merge a squash non coincide con i commit di `main`: 194 contro 192); B2) anche arm64 (serve compilatore incrociato, nessuna richiesta oggi); macOS resta "compila dai sorgenti".
  C1) firma **ed25519 offline**: la chiave privata resta sulla postazione dell'utente, che firma `SHA256SUMS` a mano a ogni release (poche) con un piccolo strumento nel repo; la chiave pubblica e' incorporata nel binario e si verifica con la sola libreria standard (nessuna dipendenza); un repository o un workflow compromessi non possono produrre un aggiornamento valido. C2) firma nel workflow con un segreto di GitHub (automatica, ma chi compromette il repository firma anche lui). C3) solo checksum e attestazione di provenienza di GitHub (`gh attestation verify`): vanno bene per l'aggiornamento a mano, non per un pulsante che si fida da solo.
 **Suggerimento**: A1; B1; C1 (decisione che serve solo con la voce 20: per ora i binari si pubblicano con checksum e attestazione, la firma si aggiunge prima del pulsante).
-**Risposta utente**: (vuoto)
+**Risposta utente**: A1, B1, C1 come suggerito (2026-11-20). Per ora binari con checksum e attestazione; la firma ed25519 offline si aggiunge prima del pulsante "Aggiorna" (voce 20).
 

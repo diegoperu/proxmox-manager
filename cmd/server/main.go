@@ -46,6 +46,7 @@ func main() {
 	handlers.StartGPUUse(context.Background(), hist)
 	// Daily VM usage history from the RRD (ROADMAP 21): on unless config vm_usage is false.
 	handlers.StartVMUse(context.Background(), hist)
+	handlers.StartUpdateCheck(context.Background())
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -77,6 +78,9 @@ func main() {
 		r.Get("/clusters/{idx}/report-settings", h.GetReportSettings)
 		r.Put("/clusters/{idx}/report-settings", h.PutReportSettings)
 		r.Post("/clusters/{idx}/report-settings/price-check", h.PriceCheck)
+		r.Get("/version", h.Version)
+		r.Get("/update-status", h.UpdateStatus)
+		r.Post("/update-check", h.UpdateCheck)
 		r.Post("/clusters", h.AddCluster)
 		r.Put("/clusters/{idx}", h.UpdateCluster)
 		r.Delete("/clusters/{idx}", h.DeleteCluster)

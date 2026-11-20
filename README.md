@@ -38,6 +38,7 @@ ProxmoxManager is a self-hosted web interface for managing one or more Proxmox V
 - 🗄 **Ceph page** — read-only "weather station" (capacity, I/O, recovery, OSDs per pool, health checks translated)
 - 📊 **Reports** — technical reports (nodes, VMs and containers, GPU and GPU usage, storage and Ceph, reliability) and a **VM trend** report (1–12 calendar months per VM: average and peak use, abandoned / long-off / oversized VMs, a sizing proposal); CSV and Excel export with formula neutralisation
 - 🏛 **Manager report** — an anonymous document for management (no VM, group or node names): one executive page plus annexes, Italian then English, A4 portrait or landscape, printed to PDF. Growth over time, how users size their VMs, GPUs by memory size, availability (also net of recorded external outages and maintenance), backups, economic value (internal price list vs. a low–high market range)
+- 🔔 **Update check** — the manager compares the commit it was built from with `main` on GitHub (every 6 hours, or on demand) and says in Settings → General → Information whether it is up to date, how many commits behind it is and what they are, with instructions to update. It never downloads or runs anything. Can be switched off with `update_check: false`
 - 🌐 **Network of new VMs per cluster** — Settings → Infrastructure: networks (CIDR + gateway), DNS and search domain; the New VM page picks the gateway from the network that contains the IP and warns when the IP is in none of them
 - 💶 **Price lists and report parameters per cluster** — internal price list (tokens, base VM, blocks, GPU tiers by memory) with a live preview, market prices, storage classes, default report thresholds, outage log. A **"Check price lists"** button reads the public Azure and OVHcloud price lists and *proposes* values; nothing is saved without the administrator. All prices at zero = no economic section for that cluster
 - 📈 **GPU usage** — optional sampling of `nvidia-smi` inside VMs with a GPU every 5 minutes (utilisation, memory, temperature, power; never processes): working / reserved (model loaded, no compute) / idle / VM off, on the GPU page, in the VM panel and in reports
@@ -95,6 +96,7 @@ On first run, `config.json` and `proxmox.db` are created in the working director
 ```bash
 CGO_ENABLED=1 go build -ldflags="-s -w" -o proxmox-manager ./cmd/server/
 ```
+`./build.sh` additionally embeds the commit, its date and whether the tree was modified, which the update check needs to compare with `main` (a plain `go build` inside the git checkout is also recognised).
 
 **Systemd service:**
 ```ini
@@ -166,6 +168,7 @@ Per-cluster report settings (`clusters[].report`: price lists, storage classes, 
 | `listen_addr` | `:8080` | HTTP listen address |
 | `db_path` | `proxmox.db` | SQLite file for the stored history (see [Stored data](#stored-data)) |
 | `gpu_usage` | `false` | `true` = sample `nvidia-smi` every 5 minutes inside running VMs that have a GPU (runs a fixed read-only script through the guest agent) |
+| `update_check` | on | `false` = never contact GitHub to look for a newer version (see [Security](#security)) |
 | `vm_usage` | on | `false` = do not keep the daily VM usage history (it only reads the Proxmox RRD) |
 
 The server rewrites `config.json` atomically with permissions `0600` whenever something is saved from the UI.
@@ -214,7 +217,7 @@ Missing privileges show up as an explained error (403) on the feature that needs
 - TLS certificate verification is **intentionally disabled** for Proxmox connections — Proxmox VE ships with self-signed certificates. See [`SECURITY.md`](SECURITY.md).
 - Restrict the listen address to loopback if running on a shared host: `"listen_addr": "127.0.0.1:8080"`.
 - `config.json` contains API tokens in plaintext — the server writes it with `0600`; check the permissions of a file created by hand: `chmod 600 config.json`.
-- The only outbound Internet traffic is the optional **"Check price lists"** button (fixed public Azure and OVHcloud URLs, TLS verified, nothing about your organisation sent). Everything else talks only to Proxmox.
+- The only outbound Internet traffic is the optional **"Check price lists"** button (fixed public Azure and OVHcloud URLs) and the **update check** (the public GitHub API of this repository; it sends only the public commit hash it was built from). Both use TLS with verification and send nothing about your organisation. Everything else talks only to Proxmox.
 - For remote access, place a TLS-terminating reverse proxy (nginx, Caddy) in front, or use an SSH tunnel: `ssh -L 8080:localhost:8080 user@server`.
 - **Console credentials**: if using the serial console feature, follow the dedicated user setup in [Security — Console credentials](#security--console-credentials) instead of storing `root@pam` credentials.
 

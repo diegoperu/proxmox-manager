@@ -52,6 +52,7 @@ global.location={hash:'#/settings/report'};
 global.history={pushState(a,b,h){location.hash=h;},replaceState(a,b,h){location.hash=h;}};
 let confirmation,confirmations=0;
 global.askConfirm=(options,ok)=>{confirmation={options,ok};confirmations++;};
+global.UpdateUI={load(){}};
 global.toast=()=>{};global.closeModal=()=>{};
 global.Ceph={stop(){},probe(){}};global.Gpu={probe(){}};
 global.VMs={clearCache(){},detail(){}};global.Nodes={};global.Batch={};

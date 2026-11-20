@@ -1036,7 +1036,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.193.0 · 2026-11-20</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.194.0 · 2026-11-20 <span id="update-dot" role="img" hidden style="color:var(--accent);font-size:16px;line-height:1">●</span></div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1615,11 +1615,18 @@ html.spiderman{
           <div class="panel-h"><h2>Informazioni</h2></div>
           <div class="panel-b">
             <dl class="dl">
+              <dt>Versione</dt><dd id="update-version">Caricamento…</dd>
+              <dt>Aggiornamenti</dt><dd><span id="update-state" role="status">In attesa del primo controllo</span><ul id="update-titles" hidden></ul></dd>
               <dt>Percorso</dt><dd>Browser → proxy Go → API Proxmox (HTTPS)</dd>
               <dt>Accesso</dt><dd>API token, custodito solo lato server</dd>
               <dt>Storico</dt><dd>RRD nativo di Proxmox (ora, giorno, settimana, mese, anno)</dd>
               <dt>Certificati</dt><dd>self-signed accettati, vedi SECURITY.md</dd>
             </dl>
+            <div class="btns" style="margin-top:12px">
+              <button type="button" class="btn bg2 sm" id="update-check" onclick="UpdateUI.check()">Controlla ora</button>
+              <button type="button" class="btn bg2 sm" onclick="UpdateUI.help()">Come aggiornare</button>
+            </div>
+            <p class="hint" id="update-message" role="status"></p>
           </div>
         </div>
       </div>
@@ -1804,7 +1811,7 @@ const _IS_CONSOLE = window.location.pathname === '/console';
 // CORE
 // ════════════════════════════════════════════════════════════════════════════
 async function api(path, opts={}) {
-  const NO_CLUSTER_ROUTES=['/clusters','/config'];
+  const NO_CLUSTER_ROUTES=['/clusters','/config','/version','/update-status','/update-check'];
   const needsCluster=!NO_CLUSTER_ROUTES.some(p=>path.startsWith(p));
   let fullPath='/api'+path;
   if(needsCluster&&!new URLSearchParams(path.split('?')[1]||'').has('cluster')){
@@ -2451,6 +2458,7 @@ const AutoRefreshUI={
 const App={
   cur:'dashboard',
   init(){
+    UpdateUI.load();
     document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
     ClusterMgr.load().then(async()=>{await Settings.load();Route.apply();AutoRefreshUI.init();App.checkConn();setInterval(App.checkConn,30000);});
   },
@@ -6903,6 +6911,90 @@ const SettingsGuard={
 // pmgr:settings-guard:end
 window.addEventListener('beforeunload',e=>{if(SettingsGuard.isDirty()){e.preventDefault();e.returnValue='';}});
 
+// pmgr:update-status:begin
+function updateStatusText(result={}){
+  const count=Number.isSafeInteger(result.behind_by)&&result.behind_by>=0?result.behind_by:0;
+  switch(result.state){
+    case 'up_to_date':return 'Aggiornato';
+    case 'behind':return `${count} commit indietro rispetto a main`;
+    case 'ahead_of_main':return "Versione piu' recente di main";
+    case 'diverged':return 'Divergente da main';
+    case 'unknown_commit':case 'no_build_info':return 'Versione non confrontabile (compilazione locale)';
+    case 'unreachable':{
+      const date=new Date(result.checked_at);
+      return 'GitHub non raggiungibile'+(Number.isFinite(date.getTime())?' · ultimo controllo '+date.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'');
+    }
+    case 'disabled':return 'Controllo spento';
+    case 'pending':return 'In attesa del primo controllo';
+    default:return 'Stato aggiornamenti non disponibile';
+  }
+}
+// pmgr:update-status:end
+
+const UpdateUI={
+  busy:false,loading:null,sequence:0,result:null,
+  render(result){
+    this.result=result;
+    document.getElementById('update-state').textContent=updateStatusText(result);
+    const titles=document.getElementById('update-titles');titles.replaceChildren();
+    if(result.state==='behind'&&Array.isArray(result.titles)){
+      for(const title of result.titles.slice(0,20)){
+        const li=document.createElement('li');li.textContent=String(title);titles.append(li);
+      }
+    }
+    titles.hidden=!titles.childElementCount;
+    const dot=document.getElementById('update-dot');dot.hidden=result.state!=='behind';
+    if(!dot.hidden){const label=`Aggiornamento disponibile: ${result.behind_by} commit`;dot.title=label;dot.setAttribute('aria-label',label);}
+    else{dot.removeAttribute('title');dot.removeAttribute('aria-label');}
+    document.getElementById('update-check').disabled=this.busy||['disabled','no_build_info'].includes(result.state);
+  },
+  async load(){
+    if(this.busy)return;
+    if(this.loading)return this.loading;
+    const sequence=++this.sequence;
+    this.loading=(async()=>{
+      const [version,status]=await Promise.allSettled([
+        api('/version',{quiet:true,timeoutMs:5000}),api('/update-status',{quiet:true,timeoutMs:5000})
+      ]);
+      if(sequence!==this.sequence)return;
+      const el=document.getElementById('update-version');
+      if(version.status==='fulfilled'){
+        const v=version.value;
+        el.textContent=[v.short||'Commit sconosciuto',v.date||'',v.dirty?'con modifiche locali':''].filter(Boolean).join(' · ');
+      }else el.textContent='Versione non disponibile';
+      if(status.status==='fulfilled'&&status.value&&typeof status.value.state==='string'){
+        this.render(status.value);document.getElementById('update-message').textContent='';
+      }
+      else document.getElementById('update-message').textContent='Stato aggiornamenti non disponibile';
+    })().catch(()=>{document.getElementById('update-message').textContent='Stato aggiornamenti non disponibile';}).finally(()=>{this.loading=null;});
+    return this.loading;
+  },
+  async check(){
+    if(this.busy)return;
+    this.busy=true;this.sequence++;
+    const button=document.getElementById('update-check'),message=document.getElementById('update-message');
+    button.disabled=true;message.textContent='Controllo in corso…';
+    try{
+      const result=await api('/update-check',{method:'POST',quiet:true,timeoutMs:20000});
+      this.render(result);message.textContent='';
+    }catch(e){
+      const retry=Number(e.body?.retry_after);
+      message.textContent=e.status===429?`riprova tra ${Number.isFinite(retry)&&retry>0?Math.ceil(retry/60):5} minuti`:'Controllo aggiornamenti non riuscito';
+    }finally{
+      this.busy=false;button.disabled=['disabled','no_build_info'].includes(this.result?.state);
+    }
+  },
+  help(){
+    askConfirm({title:'Come aggiornare',level:'safe',okLabel:'Chiudi',lines:[
+      'Da sorgenti: nella directory del repository esegui git pull --ff-only, poi ./build.sh. Riavvia il servizio.',
+      'Da binario di release, quando disponibili: scarica il binario per la tua piattaforma e SHA256SUMS dalla stessa release GitHub.',
+      'Verifica il checksum con sha256sum -c SHA256SUMS. Procedi solo se il binario risulta OK.',
+      'Facoltativo: verifica la provenienza con gh attestation verify <binario> --repo diegoperu/proxmox-manager.',
+      'Sostituisci il binario e riavvia il servizio.'
+    ]},()=>{});
+  }
+};
+
 const Settings={
   tab:'general', generation:0,
   hash(tab){return tab==='infra'?'#/settings/infra':tab==='report'?'#/settings/report':'#/settings';},
@@ -6919,11 +7011,13 @@ const Settings={
     if(!['general','infra','report'].includes(tab)||tab===this.tab)return;
     if(SettingsGuard.guardLeave(()=>this.selectTab(tab)))return;
     this.showTab(tab);Route.push(this.hash(tab));
+    if(tab==='general')UpdateUI.load();
     if(tab==='infra')NetworkSettingsUI.load();
     if(tab==='report')ReportSettingsUI.load();
   },
   async load(){
     if(SettingsGuard.isDirty())return;
+    if(this.tab==='general')UpdateUI.load();
     const generation=++this.generation;
     ReportSettingsUI.clear();NetworkSettingsUI.clear();
     await ClusterMgr.renderList();
