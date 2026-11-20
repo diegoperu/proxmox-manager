@@ -168,3 +168,26 @@ func routeCtx(kv ...string) func(*http.Request) context.Context {
 		return context.WithValue(r.Context(), chi.RouteCtxKey, rc)
 	}
 }
+
+func TestSetupDiskMissingCommands(t *testing.T) {
+	setupFast(t)
+	for _, phase := range []string{"find", "setup"} {
+		f := newFakeProv()
+		setupVM(f)
+		f.diskErr = "MISSING parted\nsecret raw stderr\n"
+		if phase == "find" {
+			f.findExit = 4
+		} else {
+			f.setupExit = 4
+		}
+		_, e := runSetupDisk(f, "n1", 60, req("virtio1"))
+		if e == nil {
+			t.Fatal("expected error")
+		}
+		rec := httptest.NewRecorder()
+		writeSetupDiskErr(rec, e)
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "apt install parted") || strings.Contains(rec.Body.String(), "secret raw stderr") {
+			t.Fatalf("%s: %d %s", phase, rec.Code, rec.Body)
+		}
+	}
+}
