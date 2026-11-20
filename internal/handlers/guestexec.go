@@ -220,15 +220,33 @@ var (
 
 func (t guestTool) helperPath() string { return guestHelperDir + "/" + t.name }
 
+// guestProbeScript reports whether the helper ($1) is executable and, when it is not, the SELinux domain of the
+// agent. /proc/self/attr/current has no trailing newline, so read returns 1 at EOF although d is filled (the first
+// version chained with && and never printed the domain on a real guest, 2026-11-20).
+const guestProbeScript = `if [ -x "$1" ]; then echo HELPER; else echo INLINE; IFS= read -r d < /proc/self/attr/current 2>/dev/null || :; printf '%s\n' "$d"; fi`
+
+type errNoHelperSELinux struct{ tool string }
+
+func (e errNoHelperSELinux) Error() string {
+	return fmt.Sprintf("la VM usa SELinux in modalita' enforcing e l'helper %s non e' installato in /usr/local/libexec/pmgr: senza, l'esecuzione diretta e' bloccata. Installa gli helper (modulo agent-exec del rollout o snippet cloud-init aggiornati) e riprova", e.tool)
+}
+
 // probeHelper asks the guest whether the labelled helper is installed and executable.
 // `[ -x ]` is a shell builtin: it runs even in the confined agent domain, so the probe
 // itself works on any guest. An agent error is returned (the real command would fail too).
 func (t guestTool) probeHelper(c agentExecer, node string, vmid int) (bool, error) {
-	res, err := runGuestScript(c, node, vmid, `[ -x "$1" ] && echo HELPER || echo INLINE`, []string{t.helperPath()}, 15*time.Second)
+	res, err := runGuestScript(c, node, vmid, guestProbeScript, []string{t.helperPath()}, 15*time.Second)
 	if err != nil {
 		return false, err
 	}
-	return strings.TrimSpace(res.Out) == "HELPER", nil
+	lines := strings.Split(res.Out, "\n")
+	if strings.TrimSpace(lines[0]) == "HELPER" {
+		return true, nil
+	}
+	if strings.TrimSpace(lines[0]) == "INLINE" && len(lines) > 1 && strings.Contains(strings.TrimRight(lines[1], "\x00"), ":virt_qemu_ga_t:") {
+		return false, errNoHelperSELinux{tool: t.name}
+	}
+	return false, nil
 }
 
 // run executes the tool with args using the helper (useHelper) or the inline fallback.

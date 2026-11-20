@@ -191,3 +191,14 @@ func TestSetupDiskMissingCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupDiskSELinuxMissingHelper(t *testing.T) {
+	setupFast(t)
+	f := newFakeProv()
+	setupVM(f)
+	f.probeOutput = "INLINE\nsystem_u:system_r:virt_qemu_ga_t:s0\x00\n"
+	_, err := runSetupDisk(f, "n1", 60, req("virtio1"))
+	if err == nil || err.Code != http.StatusConflict || err.Err.Error() != (errNoHelperSELinux{tool: "disk.sh"}).Error() || len(f.execs) != 1 {
+		t.Fatalf("err=%+v execs=%v", err, f.execs)
+	}
+}

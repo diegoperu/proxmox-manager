@@ -84,6 +84,10 @@ func runSetupDisk(c setupDiskAPI, node string, vmid int, req setupDiskReq) (setu
 	var opLog []string
 	useHelper, err := diskTool.probeHelper(c, node, vmid)
 	if err != nil {
+		var confined errNoHelperSELinux
+		if errors.As(err, &confined) {
+			return fail(http.StatusConflict, "", err, nil)
+		}
 		return fail(http.StatusBadGateway, "", err, nil)
 	}
 	log.Printf("setup-disk %s/%d: esecuzione %s", node, vmid, guestMode(useHelper))

@@ -1263,14 +1263,23 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	addVMUserGuest(w, c, node, vmid, body.Username, sshKey)
+}
+
+func addVMUserGuest(w http.ResponseWriter, c agentExecer, node string, vmid int, username, sshKey string) {
 	// Helper etichettato se presente nel guest (SELinux enforcing), altrimenti script inline.
 	useHelper, err := addUserTool.probeHelper(c, node, vmid)
 	if err != nil {
+		var confined errNoHelperSELinux
+		if errors.As(err, &confined) {
+			writeError(w, err, http.StatusConflict)
+			return
+		}
 		writeError(w, err, 502)
 		return
 	}
 	log.Printf("adduser %s/%d: esecuzione %s", node, vmid, guestMode(useHelper))
-	res, err := addUserTool.run(c, node, vmid, useHelper, []string{body.Username, sshKey}, 30*time.Second)
+	res, err := addUserTool.run(c, node, vmid, useHelper, []string{username, sshKey}, 30*time.Second)
 	if err != nil {
 		writeError(w, err, 502)
 		return
@@ -1278,7 +1287,7 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 
 	// L'utente già esistente non è un errore del server: 409, nessuna modifica fatta.
 	if res.ExitCode == 3 {
-		writeError(w, fmt.Errorf("l'utente %s esiste già nella VM: nessuna modifica effettuata", body.Username), 409)
+		writeError(w, fmt.Errorf("l'utente %s esiste già nella VM: nessuna modifica effettuata", username), 409)
 		return
 	}
 
@@ -1292,7 +1301,7 @@ func (h *Handler) AddVMUser(w http.ResponseWriter, r *http.Request) {
 	if res.Err != "" {
 		output += res.Err
 	}
-	log.Printf("adduser %s@%s/%d exitcode=%d", body.Username, node, vmid, res.ExitCode)
+	log.Printf("adduser %s@%s/%d exitcode=%d", username, node, vmid, res.ExitCode)
 	writeJSON(w, map[string]interface{}{"output": output, "exitcode": res.ExitCode})
 }
 

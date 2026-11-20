@@ -162,6 +162,10 @@ func readDmesg(c dmesgAPI, node string, vmid, lines int, level string) (dmesgRes
 
 	useHelper, err := dmesgTool.probeHelper(c, node, vmid)
 	if err != nil {
+		var confined errNoHelperSELinux
+		if errors.As(err, &confined) {
+			return dmesgResponse{}, http.StatusConflict, err
+		}
 		return dmesgResponse{}, http.StatusBadGateway, err
 	}
 	res, err := dmesgTool.run(c, node, vmid, useHelper, []string{strconv.Itoa(lines), level}, dmesgTimeout)

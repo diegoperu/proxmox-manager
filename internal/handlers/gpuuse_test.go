@@ -26,6 +26,7 @@ type fakeGPUAPI struct {
 	mu          sync.Mutex
 	res         []map[string]interface{}
 	guests      map[int]*fakeGPUGuest
+	probeOutput string
 	helper      bool
 	pid         int
 	results     map[int]guestResult
@@ -75,6 +76,9 @@ func (f *fakeGPUAPI) AgentExec(node string, vmid int, args []string) (json.RawMe
 	if len(args) >= 3 && strings.Contains(args[2], `[ -x "$1" ]`) {
 		f.probes[vmid]++
 		out := "INLINE\n"
+		if f.probeOutput != "" {
+			out = f.probeOutput
+		}
 		if f.helper {
 			out = "HELPER\n"
 		}
@@ -415,5 +419,24 @@ func TestGPUUseReservedAccumulator(t *testing.T) {
 	row := g.acc[k].row(k)
 	if row.Valid != 2 || row.Reserved != 1 || row.BusyMinutes != 5 {
 		t.Fatalf("%+v", row)
+	}
+}
+
+func TestGPUUseSELinuxProbeCachedAndBackoff(t *testing.T) {
+	f := newFakeGPUAPI()
+	f.probeOutput = "INLINE\nsystem_u:system_r:virt_qemu_ga_t:s0\x00\n"
+	f.addVM(101, "running", "vm", "", &fakeGPUGuest{})
+	g, clk, _ := newTestCollector(t, f, gpuTestInventory(101))
+	for i := 0; i < 4; i++ {
+		g.cycle(testClusters)
+		clk.add(gpuUseEvery)
+	}
+	if f.count(f.probes, 101) != 1 || f.count(f.runs, 101) != 0 || liveState(g)[101].State != gpuStPaused {
+		t.Fatalf("probes=%d runs=%d state=%s", f.count(f.probes, 101), f.count(f.runs, 101), liveState(g)[101].State)
+	}
+	clk.add(gpuUseProbeTTL)
+	g.cycle(testClusters)
+	if f.count(f.probes, 101) != 2 {
+		t.Fatalf("probe not refreshed")
 	}
 }

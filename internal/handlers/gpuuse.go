@@ -97,6 +97,7 @@ type gpuUseFail struct {
 
 type gpuUseProbe struct {
 	helper bool
+	err    error
 	at     time.Time
 }
 
@@ -277,13 +278,17 @@ func (g *gpuUseCollector) readGuest(c gpuUseAPI, key, node string, vmid int) (st
 	g.mu.Unlock()
 	if !ok || g.now().Sub(p.at) >= gpuUseProbeTTL {
 		helper, perr := gpuUseTool.probeHelper(c, node, vmid)
-		if perr != nil {
+		var confined errNoHelperSELinux
+		if perr != nil && !errors.As(perr, &confined) {
 			return gpuStNoData, nil, 0, perr
 		}
-		p = gpuUseProbe{helper: helper, at: g.now()}
+		p = gpuUseProbe{helper: helper, err: perr, at: g.now()}
 		g.mu.Lock()
 		g.probe[key] = p
 		g.mu.Unlock()
+	}
+	if p.err != nil {
+		return gpuStNoData, nil, 0, p.err
 	}
 	res, err := gpuUseTool.run(c, node, vmid, p.helper, nil, gpuUseTimeout)
 	if err != nil {
@@ -450,11 +455,19 @@ func (g *gpuUseCollector) collectCluster(idx int, cl config.ClusterConfig) {
 			state, cards, rejected, err := g.readGuest(c, key, t.node, t.vmid)
 			g.mu.Lock()
 			if err != nil {
+				var confined errNoHelperSELinux
+				isConfined := errors.As(err, &confined)
 				f := g.fail[key]
 				f.count++
 				if f.count >= gpuUseFailLimit {
 					f.until = g.now().Add(gpuUseSkipFor)
-					log.Printf("gpu usage %q VM %d: %d letture fallite di fila, pausa di %s", cl.Label, t.vmid, f.count, gpuUseSkipFor)
+					if isConfined {
+						log.Printf("gpu usage %q VM %d: %v; %d letture fallite di fila, pausa di %s", cl.Label, t.vmid, err, f.count, gpuUseSkipFor)
+					} else {
+						log.Printf("gpu usage %q VM %d: %d letture fallite di fila, pausa di %s", cl.Label, t.vmid, f.count, gpuUseSkipFor)
+					}
+				} else if isConfined {
+					log.Printf("gpu usage %q VM %d: %v", cl.Label, t.vmid, err)
 				}
 				g.fail[key] = f
 			} else {

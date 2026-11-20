@@ -406,3 +406,12 @@ func TestNormalizeNetInfoHostileInput(t *testing.T) {
 		t.Errorf("solo interfacce virtuali: nessun primario atteso, got %q", g.PrimaryIPv4)
 	}
 }
+
+func TestDmesgSELinuxMissingHelper(t *testing.T) {
+	fastPoll(t)
+	f := newFake(guestResult{Out: "INLINE\nsystem_u:system_r:virt_qemu_ga_t:s0\x00\n"})
+	_, status, err := readDmesg(f, "n1", 150, 300, "warn")
+	if status != http.StatusConflict || err == nil || err.Error() != (errNoHelperSELinux{tool: "dmesg.sh"}).Error() || len(f.argvs) != 1 {
+		t.Fatalf("status=%d err=%v execs=%v", status, err, f.argvs)
+	}
+}
