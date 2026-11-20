@@ -6987,9 +6987,9 @@ const UpdateUI={
   help(){
     askConfirm({title:'Come aggiornare',level:'safe',okLabel:'Chiudi',lines:[
       'Da sorgenti: nella directory del repository esegui git pull --ff-only, poi ./build.sh. Riavvia il servizio.',
-      'Da binario di release, quando disponibili: scarica il binario per la tua piattaforma e SHA256SUMS dalla stessa release GitHub.',
+      'Da binario di release (Linux x86-64, statico): scarica proxmox-manager-linux-amd64, SHA256SUMS e SHA256SUMS.sig dall\'ultima release su github.com/diegoperu/proxmox-manager/releases.',
       'Verifica il checksum con sha256sum -c SHA256SUMS. Procedi solo se il binario risulta OK.',
-      'Facoltativo: verifica la provenienza con gh attestation verify <binario> --repo diegoperu/proxmox-manager.',
+      'Verifica la firma: go run ./tools/release-sign verify -pub release-signing-key.pub -in SHA256SUMS -sig SHA256SUMS.sig (la chiave pubblica e\' nel repository). Facoltativo: gh attestation verify <binario> --repo diegoperu/proxmox-manager.',
       'Sostituisci il binario e riavvia il servizio.'
     ]},()=>{});
   }
