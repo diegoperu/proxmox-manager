@@ -96,6 +96,8 @@ On first run, `config.json` and `proxmox.db` are created in the working director
 ```bash
 # download proxmox-manager-linux-amd64 and SHA256SUMS from the latest release, then:
 sha256sum -c SHA256SUMS
+# the maintainer signs SHA256SUMS offline: SHA256SUMS.sig is verified against release-signing-key.pub (in this repository)
+go run ./tools/release-sign verify -pub release-signing-key.pub -in SHA256SUMS -sig SHA256SUMS.sig
 gh attestation verify proxmox-manager-linux-amd64 --repo diegoperu/proxmox-manager   # optional: proves it was built by this repository's workflow
 chmod +x proxmox-manager-linux-amd64 && ./proxmox-manager-linux-amd64
 ```
