@@ -2,7 +2,9 @@
 # Trigger: pushing a tag vYYYY.MM.DD[.N] that points to a commit already on main.
 # The binary is built in a pinned Alpine/musl container (fully static, runs on any Linux x86-64),
 # tested, checksummed and attested (SLSA build provenance, verifiable with `gh attestation verify`).
-# No secret is used. Release signing with an offline ed25519 key is a later step (needed only for an in-app updater).
+# No secret is used. The ed25519 signature of SHA256SUMS is made offline, on the maintainer's workstation, by
+# tools/release.sh (which creates the tag, waits for this workflow, verifies, signs and uploads SHA256SUMS.sig):
+# the signing key is never available to GitHub.
 name: release
 
 on:
