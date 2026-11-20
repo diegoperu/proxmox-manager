@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -98,6 +99,9 @@ func runSetupDisk(c setupDiskAPI, node string, vmid int, req setupDiskReq) (setu
 		if err != nil {
 			return nil, err
 		}
+		if res.ExitCode == 4 {
+			return nil, diskMissingError(res.Err)
+		}
 		if res.ExitCode != 0 {
 			return nil, fmt.Errorf("ricerca dischi fallita nel guest (exit %d): %s", res.ExitCode, strings.TrimSpace(res.Err))
 		}
@@ -107,6 +111,10 @@ func runSetupDisk(c setupDiskAPI, node string, vmid int, req setupDiskReq) (setu
 	opLog = append(opLog, "Ricerca disco vuoto (senza partizioni/filesystem)...")
 	candidates, err := findBlank()
 	if err != nil {
+		var missing diskCommandsError
+		if errors.As(err, &missing) {
+			return fail(http.StatusConflict, "", err, opLog)
+		}
 		return fail(http.StatusBadGateway, "", fmt.Errorf("guest agent: %w", err), opLog)
 	}
 	if len(candidates) == 0 {
@@ -114,7 +122,11 @@ func runSetupDisk(c setupDiskAPI, node string, vmid int, req setupDiskReq) (setu
 		disk(30*time.Second, "rescan") // best effort
 		for attempt := 0; attempt < provDiskScans && len(candidates) == 0; attempt++ {
 			time.Sleep(provTiming.DiskScanWait)
-			candidates, _ = findBlank()
+			candidates, err = findBlank()
+			var missing diskCommandsError
+			if errors.As(err, &missing) {
+				return fail(http.StatusConflict, "", err, opLog)
+			}
 		}
 	}
 
@@ -156,7 +168,11 @@ func runSetupDisk(c setupDiskAPI, node string, vmid int, req setupDiskReq) (setu
 			return fail(http.StatusBadGateway, "", fmt.Errorf("la VM non ha completato il riavvio entro %d minuti — riprova più tardi", int(setupDiskTiming.AgentWait/time.Minute)), opLog)
 		}
 		opLog = append(opLog, "Guest agent di nuovo raggiungibile, nuova ricerca disco...")
-		candidates, _ = findBlank()
+		candidates, err = findBlank()
+		var missing diskCommandsError
+		if errors.As(err, &missing) {
+			return fail(http.StatusConflict, "", err, opLog)
+		}
 		if len(candidates) == 0 {
 			return fail(http.StatusBadGateway, "", fmt.Errorf("disco non rilevato nemmeno dopo il riavvio — verifica la configurazione del disco in Proxmox (bus, storage, VMID)"), opLog)
 		}
@@ -181,6 +197,9 @@ func runSetupDisk(c setupDiskAPI, node string, vmid int, req setupDiskReq) (setu
 	res, err := disk(120*time.Second, "setup", dev, req.MountPoint, perm) // mkfs on a big disk can exceed 30 s
 	if err != nil {
 		return fail(http.StatusBadGateway, "", fmt.Errorf("setup disco fallito: %w", err), opLog)
+	}
+	if res.ExitCode == 4 {
+		return fail(http.StatusConflict, "", diskMissingError(res.Err), opLog)
 	}
 	if res.ExitCode != 0 {
 		return fail(http.StatusBadGateway, "", fmt.Errorf("setup disco fallito (exit %d): %s", res.ExitCode, strings.TrimSpace(res.Err)), opLog)

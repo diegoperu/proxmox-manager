@@ -9,7 +9,19 @@
 # L'ORCHESTRAZIONE (quale disco, retry, rescan, eventuale riavvio della VM) resta nel
 # codice Go, che invoca qui una fase per volta. I valori arrivano come argomenti
 # posizionali, mai interpolati. Codici d'uscita non-standard sono documentati per fase.
+# Exit 4: manca uno o piu' comandi necessari (una riga "MISSING <comando>" su stderr per ciascuno), nessuna azione eseguita.
 set -eu
+
+need() {
+    missing=0
+    for cmd do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            printf 'MISSING %s\n' "$cmd" >&2
+            missing=1
+        fi
+    done
+    [ "$missing" -eq 0 ] || exit 4
+}
 
 CMD="${1:?subcommand mancante}"
 shift || true
@@ -24,6 +36,7 @@ case "$CMD" in
 #   collegato a caldo alla PUT /config, prima ancora di questa chiamata.
 #   lsblk che fallisce e' un ERRORE (exit 3), non "nessun disco".
 find-blank)
+    need lsblk blkid findmnt awk wc
     LIST=$(lsblk -ndo NAME,TYPE) || { echo "lsblk non riuscito" >&2; exit 3; }
     # Best effort: un device che sparisce a meta' scansione non deve abortire la ricerca.
     set +e
@@ -56,6 +69,7 @@ rescan)
 #   Idempotente: partizione/filesystem/fstab esistenti non vengono rifatti.
 #   device da find-blank, mount_point e perm (1777|0777) gia' validati dal server.
 setup)
+    need parted mkfs.ext4 blkid mountpoint mount
     DEV="${1:?device mancante}"; MNT="${2:?mount point mancante}"; PERM="${3:?permessi mancanti}"
     case "$DEV" in /dev/*) ;; *) echo "device non valido: $DEV" >&2; exit 2;; esac
 

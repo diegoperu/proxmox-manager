@@ -51,6 +51,8 @@ type fakeProv struct {
 	blankAfterStart []string            // what the guest reports once the VM has been started again (nil = unchanged)
 	started         int                 // "start" requests seen
 	setupExit       int
+	findExit        int
+	diskErr         string
 }
 
 type fvm struct {
@@ -386,6 +388,10 @@ func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, e
 	}
 	switch {
 	case sub == "find-blank":
+		if f.findExit != 0 {
+			b, _ := json.Marshal(f.diskErr)
+			return json.RawMessage(`{"exited":1,"exitcode":` + strconv.Itoa(f.findExit) + `,"err-data":` + string(b) + `}`), nil
+		}
 		devs := f.blank
 		if f.blankAfterStart != nil && f.started > 0 {
 			devs = f.blankAfterStart
@@ -398,7 +404,8 @@ func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, e
 	case sub == "rescan":
 		return json.RawMessage(`{"exited":1,"exitcode":0}`), nil
 	case strings.HasPrefix(sub, "setup "):
-		return json.RawMessage(`{"exited":1,"exitcode":` + strconv.Itoa(f.setupExit) + `}`), nil
+		b, _ := json.Marshal(f.diskErr)
+		return json.RawMessage(`{"exited":1,"exitcode":` + strconv.Itoa(f.setupExit) + `,"err-data":` + string(b) + `}`), nil
 	}
 	return json.RawMessage(`{"exited":1,"exitcode":` + strconv.Itoa(f.userExit) + `}`), nil
 }

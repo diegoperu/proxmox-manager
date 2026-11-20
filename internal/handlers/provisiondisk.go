@@ -31,6 +31,9 @@ func formatAndMountBlank(c agentExecer, node string, vmid int, mount string, sti
 		if err != nil {
 			return nil, err
 		}
+		if res.ExitCode == 4 {
+			return nil, coldMsg(diskMissingError(res.Err).Error())
+		}
 		if res.ExitCode != 0 { // a failing lsblk is an error, not "no disk"
 			return nil, coldMsg(fmt.Sprintf("ricerca dischi fallita nel guest (exit %d)", res.ExitCode))
 		}
@@ -60,6 +63,9 @@ func formatAndMountBlank(c agentExecer, node string, vmid int, mount string, sti
 	res, err := run(120*time.Second, "setup", "/dev/"+candidates[0], mount, perm) // mkfs can exceed 30 s
 	if err != nil {
 		return err
+	}
+	if res.ExitCode == 4 {
+		return coldMsg(diskMissingError(res.Err).Error())
 	}
 	if res.ExitCode != 0 {
 		return coldMsg(fmt.Sprintf("formattazione o montaggio non riusciti (exit %d)", res.ExitCode))
