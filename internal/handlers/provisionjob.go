@@ -466,9 +466,20 @@ func (j *provJob) warn(code, phase string, err error) {
 	note := ""
 	if err != nil {
 		note = proxmoxMessage(err)
+		var confined errNoHelperSELinux
+		if errors.As(err, &confined) {
+			note = confined.Error()
+		}
 		log.Printf("provision: cluster=%d vmid=%d warning %s: %v", j.Cluster, j.vmid, code, err)
 	}
-	j.step(phase, false, note)
+	var confined errNoHelperSELinux
+	if errors.As(err, &confined) {
+		j.mu.Lock()
+		j.steps = append(j.steps, provStep{Phase: phase, OK: false, Note: note})
+		j.mu.Unlock()
+	} else {
+		j.step(phase, false, note)
+	}
 	j.mu.Lock()
 	j.warnings = append(j.warnings, code)
 	j.mu.Unlock()
@@ -907,11 +918,13 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	// that updates itself can take longer than 5 minutes before the agent answers)
 	j.enter(provPhAgent)
 	useHelper, ready := false, false
+	var helperErr errNoHelperSELinux
+	var userProbeErr error
 	for attempt := 0; attempt < 2 && !ready; attempt++ {
 		end := time.Now().Add(provTiming.Agent)
 		for time.Now().Before(end) {
-			if h, err := addUserTool.probeHelper(c, node, vmid); err == nil {
-				useHelper, ready = h, true
+			if h, err := addUserTool.probeHelper(c, node, vmid); err == nil || errors.As(err, &helperErr) {
+				useHelper, ready, userProbeErr = h, true, err
 				break
 			}
 			time.Sleep(provTiming.AgentPoll)
@@ -936,7 +949,13 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	// 8b. the agent answers while cloud-init is still installing packages, restarts the agent and
 	// reboots: whatever runs in the guest in that window can be killed half way (user created
 	// without sudo). Wait until cloud-init has finished in the current boot.
-	if !waitGuestSettled(c, node, vmid, provTiming.Settle, provTiming.SettlePoll) {
+	var diskProbeErr error
+	needSettle := userProbeErr == nil
+	if userProbeErr != nil && mountWanted {
+		_, diskProbeErr = diskTool.probeHelper(c, node, vmid)
+		needSettle = diskProbeErr == nil
+	}
+	if needSettle && !waitGuestSettled(c, node, vmid, provTiming.Settle, provTiming.SettlePoll) {
 		j.warn("cloud_init_timeout", provPhAgent, coldMsg("cloud-init non e' terminato in tempo: nella VM non ho toccato niente, utente e disco si fanno dal pannello della VM"))
 		j.finish()
 		return
@@ -945,8 +964,14 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	// 9. additional user: same script and rules as the "Aggiungi utente" button
 	if p.ExtraUser != nil {
 		j.enter(provPhUser)
-		res, err := addUserTool.run(c, node, vmid, useHelper, []string{p.ExtraUser.Username, p.extraKey}, 30*time.Second)
+		var res guestResult
+		err := userProbeErr
+		if err == nil {
+			res, err = addUserTool.run(c, node, vmid, useHelper, []string{p.ExtraUser.Username, p.extraKey}, 30*time.Second)
+		}
 		switch {
+		case errors.As(err, &helperErr):
+			j.warn("user_failed", provPhUser, err)
 		case err != nil:
 			j.warn("user_failed", provPhUser, agentError(err))
 		case res.ExitCode == 3:
@@ -963,9 +988,13 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	// 10. extra disk: format and mount (D64 B). Independent of the user: one failing does not skip the other.
 	if mountWanted {
 		j.enter(provPhMount)
-		if err := formatAndMountBlank(c, node, vmid, p.disk2.MountPoint, p.disk2Sticky); err != nil {
+		err := diskProbeErr
+		if err == nil {
+			err = formatAndMountBlank(c, node, vmid, p.disk2.MountPoint, p.disk2Sticky)
+		}
+		if err != nil {
 			var ours coldMsg // our own explanation (no disk, several disks...) is shown as it is
-			if !errors.As(err, &ours) {
+			if !errors.As(err, &ours) && !errors.As(err, &helperErr) {
 				err = agentError(err)
 			}
 			j.warn("mount_failed", provPhMount, err)

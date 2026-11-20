@@ -30,6 +30,7 @@ type fakeProv struct {
 	writes          []string // "op vmid key=value..." (no secret values: they are recorded as ***)
 	cloudInit       url.Values
 	execs           [][]string
+	probeOutput     string
 	agentUp         bool
 	agentFrom       time.Time // agent answers only after this time
 	probes          int
@@ -369,7 +370,11 @@ func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, e
 	defer f.mu.Unlock()
 	args := f.execs[pid-1]
 	if strings.Contains(strings.Join(args, " "), "[ -x") {
-		return json.RawMessage(`{"exited":1,"exitcode":0,"out-data":"INLINE\n"}`), nil
+		out := f.probeOutput
+		if out == "" {
+			out = "INLINE\n"
+		}
+		return json.Marshal(map[string]interface{}{"exited": 1, "exitcode": 0, "out-data": out})
 	}
 	if strings.Contains(strings.Join(args, " "), "boot-finished") {
 		f.settleProbes++
@@ -1328,5 +1333,37 @@ func TestProvisionSearchDomain(t *testing.T) {
 	(&Handler{}).PostProvisionJob(rec, httptest.NewRequest("POST", "/api/provision/job", bytes.NewReader(body)))
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "dominio di ricerca") {
 		t.Fatalf("invalid domain: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestProvisionSELinuxMissingHelpers(t *testing.T) {
+	provFast(t)
+	f := newFakeProv()
+	f.probeOutput = "INLINE\nsystem_u:system_r:virt_qemu_ga_t:s0\x00\n"
+	r := withDisk(baseReq(), 10)
+	r.ExtraUser = &provUser{Username: "mario"}
+	j, err := startProv(f, 20, "C", mustPlanProv(t, r), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := waitProv(t, j)
+	if v.Result != provWarnings || fmt.Sprint(v.Warnings) != "[user_failed mount_failed]" {
+		t.Fatalf("%+v", v)
+	}
+	for _, phase := range []string{provPhUser, provPhMount} {
+		found := false
+		for _, step := range v.Steps {
+			if step.Phase == phase && strings.Contains(fmt.Sprint(step), "l'helper") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing helper note for %s: %+v", phase, v.Steps)
+		}
+	}
+	for _, args := range f.execs {
+		if !strings.Contains(args[2], `[ -x "$1" ]`) {
+			t.Fatalf("unexpected inline script: %v", args)
+		}
 	}
 }

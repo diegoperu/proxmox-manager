@@ -4,6 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -375,5 +380,71 @@ func TestRunGuestArgvRejectsNonASCII(t *testing.T) {
 	f := &fakeAgent{exitedAfter: 1}
 	if _, err := runGuestArgv(f, "n", 1, []string{"/bin/sh", "-c", "echo ok\n\t", "pmgr", "tosi"}, time.Second); err != nil {
 		t.Errorf("argomenti ASCII rifiutati: %v", err)
+	}
+}
+
+func TestProbeSELinuxParsing(t *testing.T) {
+	fastPoll(t)
+	for _, tc := range []struct {
+		out              string
+		helper, confined bool
+	}{
+		{"HELPER\nsystem_u:system_r:virt_qemu_ga_t:s0\n", true, false},
+		{"INLINE\n", false, false},
+		{"INLINE\nsystem_u:system_r:virt_qemu_ga_t:s0\x00\n", false, true},
+		{"INLINE\nunconfined_u:unconfined_r:unconfined_t:s0\n", false, false},
+		{"garbage\nsystem_u:system_r:virt_qemu_ga_t:s0\n", false, false},
+	} {
+		a := &scriptedAgent{replies: []guestResult{{Out: tc.out}}}
+		helper, err := addUserTool.probeHelper(a, "n", 1)
+		var confined errNoHelperSELinux
+		if helper != tc.helper || errors.As(err, &confined) != tc.confined || (err != nil && !tc.confined) {
+			t.Errorf("%q: helper=%v err=%v", tc.out, helper, err)
+		}
+		if tc.confined && confined.tool != "adduser.sh" {
+			t.Errorf("tool=%q", confined.tool)
+		}
+	}
+}
+
+func TestAddVMUserSELinuxMissingHelper(t *testing.T) {
+	fastPoll(t)
+	a := &scriptedAgent{replies: []guestResult{{Out: "INLINE\nsystem_u:system_r:virt_qemu_ga_t:s0\x00\n"}}}
+	w := httptest.NewRecorder()
+	addVMUserGuest(w, a, "n1", 150, "mario", "")
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), (errNoHelperSELinux{tool: "adduser.sh"}).Error()) || len(a.argvs) != 1 {
+		t.Fatalf("status=%d body=%s execs=%v", w.Code, w.Body.String(), a.argvs)
+	}
+}
+
+// The probe must print the SELinux domain even though /proc/self/attr/current has no trailing newline
+// (read returns 1 at EOF): the first version used && and never reported the domain on a real Rocky guest.
+func TestGuestProbeScriptReportsDomainWithoutTrailingNewline(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh not available")
+	}
+	dir := t.TempDir()
+	attr := filepath.Join(dir, "attr")
+	if err := os.WriteFile(attr, []byte("system_u:system_r:virt_qemu_ga_t:s0\x00"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	script := strings.ReplaceAll(guestProbeScript, "/proc/self/attr/current", attr)
+	out, err := exec.Command(sh, "-c", script, "probe", filepath.Join(dir, "missing-helper")).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(string(out), "\n")
+	if lines[0] != "INLINE" || !strings.Contains(strings.TrimRight(lines[1], "\x00"), ":virt_qemu_ga_t:") {
+		t.Fatalf("probe output %q", out)
+	}
+	// With the helper present only HELPER is printed.
+	helper := filepath.Join(dir, "helper")
+	if err := os.WriteFile(helper, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err = exec.Command(sh, "-c", script, "probe", helper).Output()
+	if err != nil || strings.TrimSpace(string(out)) != "HELPER" {
+		t.Fatalf("probe with helper: %q %v", out, err)
 	}
 }
