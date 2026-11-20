@@ -92,6 +92,15 @@ chmod +x build.sh && ./build.sh
 
 On first run, `config.json` and `proxmox.db` are created in the working directory.
 
+**From a release (no compiler needed):** every release carries a fully static `linux/amd64` binary (runs on any Linux x86-64, no glibc or Go needed), the `SHA256SUMS` file and a signed build-provenance attestation.
+```bash
+# download proxmox-manager-linux-amd64 and SHA256SUMS from the latest release, then:
+sha256sum -c SHA256SUMS
+gh attestation verify proxmox-manager-linux-amd64 --repo diegoperu/proxmox-manager   # optional: proves it was built by this repository's workflow
+chmod +x proxmox-manager-linux-amd64 && ./proxmox-manager-linux-amd64
+```
+Releases are tagged `vYYYY.MM.DD[.N]` and can only be created from a commit that is on `main`.
+
 **Manual build:**
 ```bash
 CGO_ENABLED=1 go build -ldflags="-s -w" -o proxmox-manager ./cmd/server/
