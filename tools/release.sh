@@ -60,13 +60,17 @@ if $dry; then
 fi
 
 step "Tag and push (the workflow starts)"
+started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 git tag -a "$tag" -m "Release $tag"
 git push --quiet origin "$tag"
 
 step "Waiting for the workflow"
 run_id=""
 for _ in $(seq 1 30); do
-  run_id="$(gh run list --repo "$REPO" --workflow release.yml --branch "$tag" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+  # Only a run created after the push and on this commit: a tag that is created again after a failed
+  # attempt must not pick up the old failed run.
+  run_id="$(gh run list --repo "$REPO" --workflow release.yml --limit 10 --json databaseId,headSha,createdAt \
+    --jq "[.[] | select(.headSha == \"$commit\" and .createdAt >= \"$started\")] | .[0].databaseId // empty")"
   [[ -n "$run_id" ]] && break
   sleep 5
 done
