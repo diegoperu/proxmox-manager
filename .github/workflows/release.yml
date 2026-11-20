@@ -55,7 +55,7 @@ jobs:
             -v "$PWD":/src -w /src \
             docker.io/library/golang@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f \
             sh -euxc '
-              apk add --no-cache gcc musl-dev nodejs >/dev/null
+              apk add --no-cache gcc musl-dev nodejs git >/dev/null
               git config --global --add safe.directory /src
               go vet ./...
               go test ./...
