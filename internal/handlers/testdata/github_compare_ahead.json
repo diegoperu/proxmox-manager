@@ -1,0 +1,53 @@
+{
+ "status": "ahead",
+ "ahead_by": 6,
+ "behind_by": 0,
+ "total_commits": 6,
+ "commits": [
+  {
+   "sha": "d7c30a3e169e792f49868c37f0d71b017bfc4217",
+   "commit": {
+    "message": "fix(settings): name-based storage proposals are opt-in (#50)\n\nProposals filled the storage class selects on load, so the report tab\nopened with unsaved changes and the leave guard fired without any edit.\nThey now appear as an \"Applica le proposte dal nome (N storage)\" button\nthat applies them as a normal unsaved change.\n\n\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+    "committer": {
+     "date": "2026-11-19T20:11:30Z"
+    }
+   }
+  },
+  {
+   "sha": "1961c44f544f01e54276ba2a80f29a5268682991",
+   "commit": {
+    "message": "docs: refresh README, CLAUDE.md, ROADMAP, SECURITY, DESIGN and mock README (#51)\n\nREADME gains the features shipped on 2026-11-19 (VM trend report, manager\nreport v3, price lists and price check, GPU usage, Ansible inventory,\nautomatic refresh), Proxmox 8/9, the new config fields, a \"Stored data\"\nsection with retention, token privileges for GPU/tags/guest agent and the\nonly outbound Internet call. CLAUDE.md status, config, structs, routes and\nSettings page are current; \"username/password removed\" corrected (they\nexist for the serial console only).\n\n\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+    "committer": {
+     "date": "2026-11-19T20:59:34Z"
+    }
+   }
+  },
+  {
+   "sha": "57b0705a1f2d58cff69dba8b41c5bce3f0785e6a",
+   "commit": {
+    "message": "docs(roadmap): update check from the repository (24) and per-cluster network values (25) (#52)\n\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+    "committer": {
+     "date": "2026-11-20T07:36:09Z"
+    }
+   }
+  },
+  {
+   "sha": "1277739484166acd5ad9c70f6472a6b7f66fd36e",
+   "commit": {
+    "message": "feat(settings): per-cluster network values for new VMs (ROADMAP 25) (#53)\n\n* docs: D133 per-cluster network values for new VMs\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\n* docs: D133 answered (A), three Settings tabs\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\n* feat(settings): per-cluster network values for new VMs (ROADMAP 25)\n\nNew Settings tab \"Infrastruttura\": networks (CIDR + gateway), DNS and\nsearch domain per cluster, GET/PUT /api/clusters/{idx}/network-settings.\nNew VM picks the gateway from the network containing the IP, DNS and\ndomain from the cluster (the hard-coded DNS is gone), warns when the IP is\noutside the known networks; precedence: typed by hand > cluster > template.\nThe provisioning job accepts an optional validated search_domain\n(cloud-init searchdomain). Unsaved-changes guard now covers both forms.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\n---------\n\nCo-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>",
+    "committer": {
+     "date": "2026-11-20T08:03:16Z"
+    }
+   }
+  },
+  {
+   "sha": "8a7a51ef57ac2edff41781d1dc1e01ed2dd0fb0e",
+   "commit": {
+    "message": "docs: design of the update check and GitHub release binaries (ROADMAP 24, D134) (#54)\n\nClaude-Session: https://claude.ai/code/session_01DF9bLXQQWMCMDFHPwRYr3s\n\nCo-authored-by: Claude Sonnet 5.5 <noreply@anthropic.com>",
+    "committer": {
+     "date": "2026-11-20T08:17:19Z"
+    }
+   }
+  }
+ ]
+}
