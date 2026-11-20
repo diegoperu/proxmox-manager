@@ -135,7 +135,7 @@ assert(strip.includes('mercato basso:'));
 }
 
 func TestReportSettingsAPIGuard(t *testing.T) {
-	for _, path := range []string{"/api/clusters/0/report-settings", "/api/clusters/1/report-settings"} {
+	for _, path := range []string{"/api/clusters/0/report-settings", "/api/clusters/1/report-settings", "/api/clusters/0/network-settings"} {
 		for _, method := range []string{"GET", "PUT"} {
 			for _, tc := range []struct {
 				origin, site, contentType string
@@ -185,7 +185,7 @@ func TestSettingsTabsAndClusterBinding(t *testing.T) {
 		}
 		return text[start : start+finish+len(end)]
 	}
-	source := section("const ClusterMgr={", "\n};") + "\n" + section("const PMETA=", "// pmgr:autorefresh:begin") + "\n" + section("const Settings={", "\n};")
+	source := section("const ClusterMgr={", "\n};") + "\n" + section("const PMETA=", "// pmgr:autorefresh:begin") + "\n" + section("const Settings={", "\n};") + "\n" + section("// pmgr:settings-guard:begin", "// pmgr:settings-guard:end")
 	driver := `
 const assert=require('node:assert/strict');
 const elements=new Map(),listeners={};
@@ -200,7 +200,9 @@ global.api=async()=>({theme:'',density:'',refresh_seconds:0});
 global.applyTheme=()=>{};global.applyDensity=()=>{};
 global.AutoRefreshUI={reset(){},configure(){}};
 global.VMs={clearCache(){},detail(){}};global.Nodes={};global.Batch={};
-let loads=[];
+let loads=[],networkLoads=[];
+global.NetworkSettingsUI={isDirty:()=>false,guardLeave:()=>false,clear(){},heading(){},load(){networkLoads.push(ClusterMgr.current);}};
+global.Provision={resetNetwork(){}};
 global.ReportSettingsUI={isDirty:()=>false,guardLeave:()=>false,clear(){},heading(){},load(){loads.push(ClusterMgr.current);}};
 global.closeModal=()=>{};
 global.App={cur:'settings',nav(page,opts){this.cur=page;if(page==='settings')Settings.showTab(opts.settingsTab??'general');},refresh(){return Settings.load();}};
@@ -209,7 +211,8 @@ global.App={cur:'settings',nav(page,opts){this.cur=page;if(page==='settings')Set
 (async()=>{
  assert.deepEqual(Route.parse('#/settings'),{page:'settings'});
  assert.deepEqual(Route.parse('#/settings/report'),{page:'settings',tab:'report'});
- for(const bad of ['#/settings/other','#/settings/report/','#/settings/report?cluster=1','#/settings/%72eport','#/settings/report<script>'])assert.equal(Route.parse(bad),null);
+ assert.deepEqual(Route.parse('#/settings/infra'),{page:'settings',tab:'infra'});
+ for(const bad of ['#/settings/infra/','#/settings/infra?cluster=1','#/settings/%69nfra','#/settings/infra<script>','#/settings/other','#/settings/report/','#/settings/report?cluster=1','#/settings/%72eport','#/settings/report<script>'])assert.equal(Route.parse(bad),null);
  Settings.selectTab('report');assert.equal(location.hash,'#/settings/report');assert.equal(Settings.tab,'report');
  assert.equal(document.getElementById('settings-tab-report')['aria-selected'],'true');
  assert.equal(document.getElementById('settings-tab-report').tabIndex,0);
@@ -222,6 +225,16 @@ global.App={cur:'settings',nav(page,opts){this.cur=page;if(page==='settings')Set
  location.hash='#/settings/report';listeners.hashchange();assert.equal(Settings.tab,'report');
  location.hash='#/settings/other';listeners.hashchange();assert.equal(App.cur,'dashboard');assert.equal(location.hash,'#/dashboard');
  Settings.selectTab('other');assert.equal(Settings.tab,'report');
+ Settings.selectTab('infra');assert.equal(location.hash,'#/settings/infra');assert.equal(Settings.tab,'infra');
+ assert.equal(document.getElementById('settings-tab-infra')['aria-selected'],'true');
+ assert.equal(document.getElementById('settings-tab-infra').tabIndex,0);
+ assert.equal(document.getElementById('settings-tab-report').tabIndex,-1);
+ assert.equal(document.getElementById('settings-infra').hidden,false);
+ assert.equal(document.getElementById('settings-report').hidden,true);
+ location.hash='#/settings/report';listeners.popstate();assert.equal(Settings.tab,'report');
+ location.hash='#/settings/infra';listeners.hashchange();assert.equal(Settings.tab,'infra');
+ ClusterMgr.current=1;await Settings.load();assert.equal(networkLoads.at(-1),1);
+ Settings.showTab('report');
  App.cur='settings';ClusterMgr.current=1;loads=[];
  await Settings.load();assert.equal(ClusterMgr.current,1);assert.deepEqual(loads,[1]);
  assert.equal(document.getElementById('cluster-select').value,1);

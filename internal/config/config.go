@@ -13,13 +13,14 @@ import (
 )
 
 type ClusterConfig struct {
-	Report   *ReportSettings `json:"report,omitempty"`
-	Label    string          `json:"label"`
-	URL      string          `json:"url"`
-	APIToken string          `json:"api_token"`
-	Username string          `json:"username"`
-	Password string          `json:"password"`
-	Default  bool            `json:"default"`
+	Report   *ReportSettings  `json:"report,omitempty"`
+	Network  *NetworkSettings `json:"network,omitempty"`
+	Label    string           `json:"label"`
+	URL      string           `json:"url"`
+	APIToken string           `json:"api_token"`
+	Username string           `json:"username"`
+	Password string           `json:"password"`
+	Default  bool             `json:"default"`
 }
 
 type Config struct {
@@ -146,6 +147,9 @@ func Load() error {
 		if err := ValidReportSettings(c.Report); err != nil {
 			return err
 		}
+		if err := ValidNetworkSettings(c.Network); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -182,6 +186,7 @@ func Get() Config {
 	copy(c.Clusters, current.Clusters)
 	for i := range c.Clusters {
 		c.Clusters[i].Report = copyReport(current.Clusters[i].Report)
+		c.Clusters[i].Network = copyNetwork(current.Clusters[i].Network)
 	}
 	c.AllowedHosts = append([]string(nil), current.AllowedHosts...)
 	if current.VMUsage != nil {
@@ -197,11 +202,18 @@ func Update(c Config) error {
 		if err := ValidReportSettings(cl.Report); err != nil {
 			return err
 		}
+		if err := ValidNetworkSettings(copyNetwork(cl.Network)); err != nil {
+			return err
+		}
 	}
 	// Keep caller-owned report pointers out of the live configuration.
 	c.Clusters = append([]ClusterConfig(nil), c.Clusters...)
 	for i := range c.Clusters {
 		c.Clusters[i].Report = copyReport(c.Clusters[i].Report)
+		c.Clusters[i].Network = copyNetwork(c.Clusters[i].Network)
+		if err := ValidNetworkSettings(c.Clusters[i].Network); err != nil {
+			return err
+		}
 	}
 	mu.Lock()
 	defer mu.Unlock()
@@ -226,17 +238,20 @@ func GetCluster(idx int) (ClusterConfig, error) {
 	if idx >= 0 && idx < len(current.Clusters) {
 		c := current.Clusters[idx]
 		c.Report = copyReport(c.Report)
+		c.Network = copyNetwork(c.Network)
 		return c, nil
 	}
 	// idx fuori range: fallback al default
 	for _, c := range current.Clusters {
 		if c.Default {
 			c.Report = copyReport(c.Report)
+			c.Network = copyNetwork(c.Network)
 			return c, nil
 		}
 	}
 	c := current.Clusters[0]
 	c.Report = copyReport(c.Report)
+	c.Network = copyNetwork(c.Network)
 	return c, nil
 }
 
@@ -251,12 +266,14 @@ func GetDefaultCluster() (ClusterConfig, error) {
 	for _, c := range current.Clusters {
 		if c.Default {
 			c.Report = copyReport(c.Report)
+			c.Network = copyNetwork(c.Network)
 			return c, nil
 		}
 	}
 	log.Printf("warning: nessun cluster con default=true, usando Clusters[0]")
 	c := current.Clusters[0]
 	c.Report = copyReport(c.Report)
+	c.Network = copyNetwork(c.Network)
 	return c, nil
 }
 

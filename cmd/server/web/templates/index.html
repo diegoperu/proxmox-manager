@@ -746,15 +746,24 @@ td.spk{width:130px}
 #rs-form h3{margin:24px 0 12px;font-size:14px}
 #rs-form .hint{margin:12px 0}
 /* The save bar must stick to #content, not the panel's non-scrolling overflow box. */
-#report-settings-panel{overflow:visible}
-#rs-form{padding-bottom:16px}
-#rs-form.has-unsaved{padding-bottom:32px}
+#report-settings-panel,#network-settings-panel{overflow:visible}
+#rs-form,#ns-form{padding-bottom:16px}
+#rs-form.has-unsaved,#ns-form.has-unsaved{padding-bottom:32px}
+#ns-form .hint{margin:12px 0;overflow-wrap:anywhere}
+.ns-network{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ns-network [data-remove]{justify-self:start}
+#ns-add{margin:12px 0}
+#pv-net-warning{color:var(--warn);overflow-wrap:anywhere}
+#pv-net-hint{overflow-wrap:anywhere}
+#pv-summary{overflow-wrap:anywhere}
+#page-provision>.g>div{min-width:0}
 .rs-savebar{position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;margin-top:16px}
 .rs-savebar[hidden]{display:none}
 .rs-savebar-status{flex:1 1 160px;font-size:13px;overflow-wrap:anywhere}
 .rs-savebar-actions{display:flex;flex-wrap:wrap;gap:8px}
 .rs-savebar-error{flex-basis:100%;min-width:0;color:var(--red);font-size:12px;overflow-wrap:anywhere}
-#rs-form :is(input,select,button,summary){scroll-margin-block:16px 180px}
+#rs-form :is(input,select,button,summary),#ns-form :is(input,button,summary){scroll-margin-block:16px 180px}
+@media(max-width:650px){.ns-network{grid-template-columns:minmax(0,1fr)}.set-tabs{display:flex}.set-tabs .tab{min-width:0;flex:1;padding-inline:8px}}
 @media(max-width:650px){.rs-row.rs-line{grid-template-columns:minmax(0,1fr)}.rs-row.rs-line .rs-field{flex-direction:column;align-items:stretch}.rs-row.rs-line .rs-field .inp{max-width:none}.rs-row.rs-line [data-remove]{justify-self:start}.set-tabs .tab{white-space:normal}}
 .sel-sum{font-size:12px;color:var(--text2);margin:10px 0 14px}
 .sel-sum b{color:var(--text);font-variant-numeric:tabular-nums}
@@ -1027,7 +1036,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
   </nav>
-  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.191.0 · 2026-11-19</div></div>
+  <div class="sb-bottom"><div id="clk"></div><div id="ver">v0.194.0 · 2026-11-20</div></div>
 </aside>
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
@@ -1299,18 +1308,26 @@ html.spiderman{
             <div class="g g2 g8 mb12">
               <div class="fr">
                 <label class="fl" for="pv-ip">IP statico (CIDR obbligatorio)</label>
-                <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24" oninput="Provision.calcGw()">
+                <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24" aria-describedby="pv-net-warning" oninput="Provision.calcGw()">
+                <div class="hint" id="pv-net-warning" role="status" hidden></div>
               </div>
               <div class="fr">
                 <label class="fl" for="pv-gw">Gateway</label>
-                <input class="inp w" id="pv-gw" type="text" placeholder="192.168.1.1" value="" oninput="Provision.onGw(this)">
+                <input class="inp w" id="pv-gw" type="text" placeholder="192.168.1.1" value="" aria-describedby="pv-net-hint" oninput="Provision.onGw(this)">
+                <div class="hint" id="pv-net-hint" hidden></div>
               </div>
             </div>
             <div class="g g2 g8 mb12">
               <div class="fr">
                 <label class="fl" for="pv-dns">DNS</label>
-                <input class="inp w" id="pv-dns" type="text" placeholder="10.248.26.30" value="10.248.26.30">
+                <input class="inp w" id="pv-dns" type="text" placeholder="Indirizzi DNS separati da spazi" value="" oninput="Provision.onDns()">
               </div>
+              <div class="fr">
+                <label class="fl" for="pv-search">Dominio di ricerca <span class="td">(opzionale)</span></label>
+                <input class="inp w" id="pv-search" type="text" maxlength="253" placeholder="es. example.org" oninput="Provision.onSearch()">
+              </div>
+            </div>
+            <div class="g g2 g8 mb12">
               <div class="fr">
                 <label class="fl" for="pv-user">CI User</label>
                 <input class="inp w" id="pv-user" type="text" placeholder="ubuntu">
@@ -1546,6 +1563,7 @@ html.spiderman{
       <div class="set">
         <div class="seg set-tabs" role="tablist" aria-label="Impostazioni">
           <button type="button" class="tab active" role="tab" id="settings-tab-general" aria-controls="settings-general" aria-selected="true" onclick="Settings.selectTab('general')">Generale</button>
+          <button type="button" class="tab" role="tab" id="settings-tab-infra" aria-controls="settings-infra" aria-selected="false" tabindex="-1" onclick="Settings.selectTab('infra')">Infrastruttura</button>
           <button type="button" class="tab" role="tab" id="settings-tab-report" aria-controls="settings-report" aria-selected="false" tabindex="-1" onclick="Settings.selectTab('report')">Report e listini</button>
         </div>
       <div id="settings-general" role="tabpanel" aria-labelledby="settings-tab-general">
@@ -1603,6 +1621,12 @@ html.spiderman{
               <dt>Certificati</dt><dd>self-signed accettati, vedi SECURITY.md</dd>
             </dl>
           </div>
+        </div>
+      </div>
+      <div id="settings-infra" role="tabpanel" aria-labelledby="settings-tab-infra" hidden>
+        <div class="panel" id="network-settings-panel">
+          <div class="panel-h"><h2 class="rs-heading" id="ns-heading">Infrastruttura</h2></div>
+          <div class="panel-b"><div id="ns-editor"></div></div>
         </div>
       </div>
       <div id="settings-report" role="tabpanel" aria-labelledby="settings-tab-report" hidden>
@@ -2190,9 +2214,10 @@ const ClusterMgr={
     const select=document.getElementById('cluster-select');
     select.value=this.current;
     if(!Number.isInteger(selected)||!this.clusters.some(c=>c.idx===selected)||selected===this.current)return;
-    if(ReportSettingsUI.guardLeave(()=>this.switchTo(selected)))return;
+    if(SettingsGuard.guardLeave(()=>this.switchTo(selected)))return;
     this.current=selected;
     select.value=selected;
+    Provision.resetNetwork();
     VMs.clearCache&&VMs.clearCache();
     Nodes.clearCache&&Nodes.clearCache();
     Batch.clearCache&&Batch.clearCache();
@@ -2354,6 +2379,7 @@ const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
   parse(h){
+    if(h==='#/settings/infra')return{page:'settings',tab:'infra'};
     if(h==='#/settings/report')return{page:'settings',tab:'report'};
     const m=/^#\/([a-z]+)$/.exec(h||'');
     if(m&&Object.prototype.hasOwnProperty.call(PMETA,m[1]))return{page:m[1]};
@@ -2364,15 +2390,16 @@ const Route={
   replace(h){if(location.hash!==h)history.replaceState(null,'',h);},
   apply(){
     const r=Route.parse(location.hash)||{page:'dashboard'};
-    if(ReportSettingsUI.isDirty()){
+    const dirty=SettingsGuard.dirtyForm();
+    if(dirty){
       const target=location.hash;
-      Route.replace('#/settings/report');
-      if(r.page==='settings'&&r.tab==='report')return;
-      if(ReportSettingsUI.guardLeave(()=>{Route.push(target);Route.apply();}))return;
+      Route.replace(Settings.hash(dirty.tab));
+      if(r.page==='settings'&&r.tab===dirty.tab)return;
+      if(SettingsGuard.guardLeave(()=>{Route.push(target);Route.apply();}))return;
     }
     if(r.vm){App.nav('vms',{silent:true});VMs.detail(r.vm.node,r.vm.vmid,r.vm.type);return;}
     if(document.getElementById('mov').classList.contains('open'))closeModal('mov');
-    App.nav(r.page,{silent:true,settingsTab:r.tab??'general'}); Route.replace(r.tab==='report'?'#/settings/report':'#/'+r.page);
+    App.nav(r.page,{silent:true,settingsTab:r.tab??'general'}); Route.replace(r.page==='settings'?Settings.hash(r.tab??'general'):'#/'+r.page);
   }
 };
 window.addEventListener('popstate',()=>Route.apply());
@@ -2406,7 +2433,7 @@ const AutoRefreshUI={
   init(){this.started=true;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});this.reset();},
   mark(){this.last=Date.now();const b=document.getElementById('refresh-btn');const t='Ultimo aggiornamento '+new Date(this.last).toLocaleTimeString('it-IT');b.title=t;},
   reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
-  state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,unsaved:ReportSettingsUI.isDirty(),typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
+  state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,unsaved:SettingsGuard.isDirty(),typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
   canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
   async tick(){
     clearTimeout(this.timer);this.timer=null;
@@ -2428,16 +2455,17 @@ const App={
     ClusterMgr.load().then(async()=>{await Settings.load();Route.apply();AutoRefreshUI.init();App.checkConn();setInterval(App.checkConn,30000);});
   },
   nav(p,opts={}){
-    if(ReportSettingsUI.isDirty()){
-      if(p==='settings'&&opts.settingsTab==='report')return;
-      if(ReportSettingsUI.guardLeave(()=>App.nav(p,opts)))return;
+    const dirty=SettingsGuard.dirtyForm();
+    if(dirty){
+      if(p==='settings'&&opts.settingsTab===dirty.tab)return;
+      if(SettingsGuard.guardLeave(()=>App.nav(p,opts)))return;
     }
     if(p==='settings')Settings.showTab(opts.settingsTab??'general');
     document.querySelectorAll('.ni').forEach(el=>{const on=el.dataset.page===p;el.classList.toggle('active',on);if(on)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+p));
     document.getElementById('ptitle').textContent=PMETA[p]||p;
     if(p!=='ceph')Ceph.stop();
-    App.cur=p; if(!opts.silent)Route.push('#/'+p);
+    App.cur=p; if(!opts.silent)Route.push(p==='settings'?Settings.hash(Settings.tab):'#/'+p);
     App.refresh();
     AutoRefreshUI.reset();
   },
@@ -4928,8 +4956,112 @@ const DiskMgr = {
 // ════════════════════════════════════════════════════════════════════════════
 // PROVISION
 // ════════════════════════════════════════════════════════════════════════════
+// pmgr:network:begin
+function parseIPv4(value){
+  if(typeof value!=='string'||value.length>15||!/^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/.test(value))return null;
+  const octets=value.split('.').map(Number);
+  return octets.some(n=>n>255)?null:octets.reduce((n,v)=>n*256+v,0);
+}
+function ipv4Text(value){return [value>>>24,(value>>>16)&255,(value>>>8)&255,value&255].join('.');}
+function parseCIDR(value){
+  if(typeof value!=='string')return null;
+  const match=/^([^/]+)\/(\d+)$/.exec(value);
+  if(!match)return null;
+  const ip=parseIPv4(match[1]),prefix=Number(match[2]);
+  if(ip===null||prefix>32)return null;
+  const size=2**(32-prefix),network=Math.floor(ip/size)*size;
+  return {ip,prefix,network,broadcast:network+size-1,cidr:ipv4Text(network)+'/'+prefix};
+}
+function normalizeNetworkIP(value){
+  const v4=parseIPv4(value);if(v4!==null)return ipv4Text(v4);
+  if(typeof value!=='string'||value.length>45||!value.includes(':'))return null;
+  let text=value.toLowerCase();
+  if(text.includes('.')){
+    const pos=text.lastIndexOf(':'),tail=parseIPv4(text.slice(pos+1));
+    if(tail===null)return null;
+    text=text.slice(0,pos+1)+(tail>>>16).toString(16)+':'+(tail&65535).toString(16);
+  }
+  const halves=text.split('::');if(halves.length>2)return null;
+  const groups=part=>part===''?[]:part.split(':');
+  const left=groups(halves[0]),right=halves.length===2?groups(halves[1]):[];
+  if([...left,...right].some(s=>!/^[0-9a-f]{1,4}$/.test(s)))return null;
+  const missing=8-left.length-right.length;
+  if(halves.length===1?missing!==0:missing<1)return null;
+  const words=[...left,...Array(missing).fill('0'),...right].map(s=>parseInt(s,16));
+  if(words.slice(0,5).every(n=>n===0)&&words[5]===65535)return ipv4Text(words[6]*65536+words[7]);
+  let best=-1,length=0;
+  for(let i=0;i<8;){if(words[i]!==0){i++;continue;}let j=i;while(j<8&&words[j]===0)j++;if(j-i>length){best=i;length=j-i;}i=j;}
+  const hex=words.map(n=>n.toString(16));
+  return length<2?hex.join(':'):hex.slice(0,best).join(':')+'::'+hex.slice(best+length).join(':');
+}
+function validSearchDomain(value){
+  if(typeof value!=='string'||value.length>253)return null;
+  if(value==='')return '';
+  return value.split('.').every(s=>/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(s))?value.toLowerCase():null;
+}
+function validateNetwork(settings){
+  const networks=settings?.networks??[],dns=settings?.dns??[],search=settings?.search_domain??'';
+  if(!Array.isArray(networks)||!Array.isArray(dns))throw new Error('impostazioni non valide: oggetto JSON con soli campi previsti richiesto');
+  if(networks.length>16)throw new Error('al massimo 16 reti');
+  if(dns.length>3)throw new Error('al massimo 3 DNS');
+  const parsed=[];
+  const normalized=networks.map((value,i)=>{
+    const row='rete '+(i+1)+': ',nw=parseCIDR(value?.cidr);
+    // Go parses IPv4-mapped IPv6 CIDRs, then rejects their 128-bit mask at the prefix check.
+    if(!nw&&typeof value?.cidr==='string'){
+      const mapped=/^([^/]*:[^/]+)\/(\d+)$/.exec(value.cidr);
+      if(mapped&&Number(mapped[2])<=128&&parseIPv4(normalizeNetworkIP(mapped[1]))!==null)throw new Error(row+'il prefisso deve essere tra 8 e 30');
+    }
+    if(!nw)throw new Error(row+'indirizzo di rete IPv4 non valido (es. 10.75.4.0/24)');
+    if(nw.prefix<8||nw.prefix>30)throw new Error(row+'il prefisso deve essere tra 8 e 30');
+    if(nw.ip!==nw.network)throw new Error(row+"scrivi l'indirizzo di rete ("+ipv4Text(nw.network)+'), non quello di un host');
+    if(parsed.some(prev=>nw.network<=prev.broadcast&&prev.network<=nw.broadcast))throw new Error(row+"si sovrappone a un'altra rete (il gateway sarebbe ambiguo)");
+    const gwText=normalizeNetworkIP(value?.gateway),gw=parseIPv4(gwText);
+    if(gw===null)throw new Error(row+'gateway IPv4 non valido');
+    if(gw<nw.network||gw>nw.broadcast)throw new Error(row+"il gateway non e' dentro la rete");
+    if(gw===nw.network)throw new Error(row+"il gateway non puo' essere l'indirizzo di rete");
+    if(gw===nw.broadcast)throw new Error(row+"il gateway non puo' essere l'indirizzo di broadcast");
+    parsed.push(nw);return {cidr:nw.cidr,gateway:gwText};
+  });
+  const seen=new Set(),addresses=dns.map((value,i)=>{
+    const ip=normalizeNetworkIP(value);
+    if(ip===null)throw new Error('DNS '+(i+1)+': indirizzo IP non valido');
+    if(seen.has(ip))throw new Error('DNS '+(i+1)+': indirizzo ripetuto');
+    seen.add(ip);return ip;
+  });
+  const domain=validSearchDomain(search);
+  if(domain===null)throw new Error('dominio di ricerca non valido (lettere, cifre e trattini separati da punti)');
+  return {networks:normalized,dns:addresses,search_domain:domain};
+}
+function findNetwork(settings,ipOrCidr){
+  const ip=typeof ipOrCidr==='string'&&ipOrCidr.includes('/')?parseCIDR(ipOrCidr)?.ip:parseIPv4(ipOrCidr);
+  if(ip==null)return null;
+  return (settings?.networks??[]).find(value=>{const nw=parseCIDR(value.cidr);return nw&&ip>=nw.network&&ip<=nw.broadcast;})??null;
+}
+// pmgr:network:end
+
+// pmgr:vmnet:begin
+function chooseNetwork({settings,ip='',typedGateway=null,typedDns=null,typedSearch=null,templateDns='',templateGw='',templateSearch='',label=''}){
+  const networks=settings?.networks??[],network=findNetwork(settings,ip);
+  const validIP=ip.includes('/')?parseCIDR(ip)!==null:parseIPv4(ip)!==null;
+  let gateway=network?.gateway??'',warning='',hint='';
+  if(networks.length){
+    if(validIP&&!network)warning='IP fuori dalle reti note di '+label+': controlla IP e gateway';
+  }else{
+    gateway=templateGw;
+    const nw=parseCIDR(ip);
+    if(!gateway&&nw&&nw.prefix>=1&&nw.prefix<=30){
+      gateway=ipv4Text(nw.broadcast-1);
+      if(typedGateway===null)hint='gateway indovinato: configura le reti in Impostazioni → Infrastruttura';
+    }
+  }
+  return {gateway:typedGateway??gateway,dns:typedDns??(settings?.dns?.length?settings.dns.join(' '):templateDns),search_domain:typedSearch??(settings?.search_domain||templateSearch),warning,hint};
+}
+// pmgr:vmnet:end
+
 const Provision=(()=>{
-  let templates=[], gwManual=false;
+  let templates=[], gwManual=false, dnsManual=false, searchManual=false, ipManual=false;
+  let networkSettings=null,networkCluster=null,networkSeq=0,loadSeq=0,networkFailed=false,templateNetwork={};
   // consiglio del nodo (GET /provision/advice): ultima risposta, scelta dell'utente, sequenza per scartare risposte superate
   let adv=null, advSeq=0, advTimer=null, manualNode='', manualCard='', job=null;
   const GB=1073741824, LABEL={clone:'Clonazione del template sul nodo scelto',config:'Core e RAM',disk:'Dimensione del disco',disk2:'Disco aggiuntivo collegato',mount:'Disco aggiuntivo formattato e montato',cloudinit:'Cloud-init',group:'Gruppo',gpu:'Scheda video',start:'Avvio',agent:'Attesa del guest agent',user:'Utente aggiuntivo'};
@@ -4957,6 +5089,11 @@ const Provision=(()=>{
 
   return{
     async load(){
+      const cluster=ClusterMgr.current;
+      if(networkCluster!==cluster)Provision.resetNetwork();
+      const seq=++loadSeq;
+      networkCluster=cluster;templateNetwork={};templates=[];
+      Provision.loadNetwork();
       Groups.fetch().catch(()=>{}); // riempie l'elenco dei gruppi esistenti (suggerimenti del campo Gruppo)
       // Load templates
       const tl=document.getElementById('tpl-loading');
@@ -4965,7 +5102,9 @@ const Provision=(()=>{
       document.getElementById('tpl-info').style.display='none';
 
       try{
-        templates=await api('/templates',{quiet:true});
+        const loaded=await api('/templates?cluster='+cluster,{quiet:true});
+        if(seq!==loadSeq||cluster!==ClusterMgr.current)return;
+        templates=loaded;
         const sel=document.getElementById('tpl-select');
         sel.innerHTML='<option value="">— Seleziona template —</option>';
         (templates||[]).forEach((t,i)=>{
@@ -4975,15 +5114,47 @@ const Provision=(()=>{
         document.getElementById('tpl-loading').style.display='none';
         sel.style.display='block';
         if(!templates||!templates.length) toast('Nessun template cloudinit trovato','info');
-      }catch(e){document.getElementById('tpl-loading').innerHTML=errBox(e.message,'Provision.load()');}
+      }catch(e){if(seq===loadSeq&&cluster===ClusterMgr.current)document.getElementById('tpl-loading').innerHTML=errBox(e.message,'Provision.load()');}
+    },
+
+    resetNetwork(){
+      networkSeq++;loadSeq++;networkCluster=null;networkSettings=null;templateNetwork={};networkFailed=false;
+      gwManual=false;dnsManual=false;searchManual=false;ipManual=false;
+      for(const id of ['pv-ip','pv-gw','pv-dns','pv-search'])document.getElementById(id).value='';
+      for(const id of ['pv-net-warning','pv-net-hint']){const el=document.getElementById(id);el.textContent='';el.hidden=true;}
+    },
+    async loadNetwork(){
+      const seq=++networkSeq,cluster=ClusterMgr.current;
+      networkSettings=null;networkFailed=false;
+      Provision.applyNetwork();
+      try{
+        const settings=await api(`/clusters/${cluster}/network-settings`,{quiet:true,timeoutMs:15000});
+        if(seq!==networkSeq||cluster!==ClusterMgr.current)return;
+        networkSettings=validateNetwork(settings);
+      }catch(e){
+        if(seq!==networkSeq||cluster!==ClusterMgr.current)return;
+        // Network defaults are optional: a failed read must leave provisioning usable and quiet.
+        networkSettings=null;networkFailed=true;
+      }
+      Provision.applyNetwork();
+    },
+    applyNetwork(){
+      const result=chooseNetwork({settings:networkSettings,ip:val('pv-ip'),typedGateway:gwManual?val('pv-gw'):null,typedDns:dnsManual?val('pv-dns'):null,typedSearch:searchManual?val('pv-search'):null,...templateNetwork,label:ClusterMgr.currentLabel()??'cluster'});
+      document.getElementById('pv-gw').value=result.gateway;
+      document.getElementById('pv-dns').value=result.dns;
+      document.getElementById('pv-search').value=result.search_domain;
+      for(const [id,text] of [['pv-net-warning',result.warning],['pv-net-hint',networkFailed?'':result.hint]]){
+        const el=document.getElementById(id);el.textContent=text;el.hidden=!text;
+      }
+      Provision.summary();
     },
 
     onSelectTemplate(){
       const idx=parseInt(document.getElementById('tpl-select').value);
       const tpl=templates[idx];
       const info=document.getElementById('tpl-info');
-      gwManual=false; // il gateway viene ricompilato dal template
-      if(!tpl){info.style.display='none';document.getElementById('pv-disk-hint').textContent='Verrà calcolato il delta rispetto al template';return;}
+      templateNetwork={};
+      if(!tpl){info.style.display='none';document.getElementById('pv-disk-hint').textContent='Verrà calcolato il delta rispetto al template';Provision.applyNetwork();return;}
 
       // Auto-detect disk device from template config (virtio/scsi/sata/ide, first with size=)
       if(tpl.config){
@@ -5022,15 +5193,16 @@ const Provision=(()=>{
       if(tpl.config){
         const cfg=tpl.config;
         if(cfg.ciuser) document.getElementById('pv-user').value=cfg.ciuser;
-        if(cfg.nameserver) document.getElementById('pv-dns').value=cfg.nameserver;
+        templateNetwork={templateDns:cfg.nameserver||'',templateSearch:cfg.searchdomain||'',templateGw:''};
         if(cfg.ipconfig0){
           const ipM=cfg.ipconfig0.match(/ip=([^,\s]+)/);
           const gwM=cfg.ipconfig0.match(/gw=([^,\s]+)/);
-          if(ipM&&ipM[1]!=='dhcp') document.getElementById('pv-ip').value=ipM[1];
-          if(gwM) document.getElementById('pv-gw').value=gwM[1];
+          if(ipM&&ipM[1]!=='dhcp'&&!ipManual) document.getElementById('pv-ip').value=ipM[1];
+          if(gwM) templateNetwork.templateGw=gwM[1];
         }
         if(cfg.sshkeys){try{document.getElementById('pv-ssh').value=decodeURIComponent(cfg.sshkeys);}catch{document.getElementById('pv-ssh').value=cfg.sshkeys;}}
       }
+      Provision.applyNetwork();
 
       info.style.display='block';
       info.innerHTML=`
@@ -5040,7 +5212,9 @@ const Provision=(()=>{
     },
 
     // Se l'utente scrive un gateway proprio, l'auto-calcolo dall'IP non lo sovrascrive più.
-    onGw(el){gwManual=el.value.trim()!=='';Provision.summary();},
+    onGw(el){gwManual=el.value.trim()!=='';Provision.applyNetwork();},
+    onDns(){dnsManual=true;Provision.summary();},
+    onSearch(){searchManual=true;Provision.summary();},
     bind(){
       const pg=document.getElementById('page-provision');
       const ADV=new Set(['pv-cpu','pv-ram','tpl-select','pv-diskdev','pv-disk','pv-group','pv-gpu','pv-d2gb']);
@@ -5060,7 +5234,9 @@ const Provision=(()=>{
       line(`Clona ${tpl.name} (${tpl.vmid}, ${tpl.node}) in ${g('pv-name')||'— nome mancante —'} sul nodo ${Provision.target()||'— da scegliere —'}`);
       if(document.getElementById('pv-gpu').checked){const c=Provision.card();line(c?`Scheda video: ${c.name} (${c.addr}, mapping ${c.mappings[0]})`:'Scheda video: — da scegliere —');}
       line(`VMID ${g('pv-vmid')&&g('pv-vmid')!=='0'?g('pv-vmid'):'automatico'} · ${g('pv-cpu')||'?'} CPU · ${g('pv-ram')||'?'} GB RAM · disco ${g('pv-disk')?g('pv-disk')+' GB':'come il template'}`);
-      line(`Rete: ${g('pv-ip')||'IP non impostato'}${g('pv-gw')?' via '+g('pv-gw'):''}`);
+      line(`Rete: ${g('pv-ip')||'IP non impostato'} · gateway: ${g('pv-gw')||'non impostato'} · DNS: ${g('pv-dns')||'non impostati'} · dominio: ${g('pv-search')||'non impostato'}`);
+      const networkWarning=document.getElementById('pv-net-warning').textContent;
+      if(networkWarning)line(networkWarning,'wn');
       if(g('pv-group'))line(`Gruppo: ${g('pv-group')}`);
       if(g('pv-xuser'))line(`Utente aggiuntivo: ${g('pv-xuser')}`);
       {const d2=Provision.disk2();if(d2)line(`Disco aggiuntivo: ${d2.size_gb} GB su ${d2.storage||'lo storage del template'}, montato in ${d2.mount_point}`);}
@@ -5087,19 +5263,7 @@ const Provision=(()=>{
     },
 
     calcGw(){
-      if(gwManual) return;
-      const cidr=document.getElementById('pv-ip').value.trim();
-      const m=cidr.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/);
-      if(!m) return;
-      const parts=m[1].split('.').map(Number);
-      if(parts.some(p=>p>255)) return;
-      const prefix=parseInt(m[2]);
-      if(prefix<1||prefix>30) return;
-      const mask=~(0xFFFFFFFF>>>prefix)>>>0;
-      const ip32=(parts[0]<<24|parts[1]<<16|parts[2]<<8|parts[3])>>>0;
-      const broadcast=(ip32|~mask)>>>0;
-      const gw=broadcast-1;
-      document.getElementById('pv-gw').value=[(gw>>>24)&255,(gw>>>16)&255,(gw>>>8)&255,gw&255].join('.');
+      ipManual=true;Provision.applyNetwork();
     },
 
     // ── consiglio del nodo e scelta della scheda ──
@@ -5210,12 +5374,14 @@ const Provision=(()=>{
         return;
       }
       const xuser=val('pv-xuser');
+      const searchDomain=validSearchDomain(val('pv-search'));
+      if(searchDomain===null){toast('dominio di ricerca non valido (lettere, cifre e trattini separati da punti)','err');document.getElementById('pv-search').focus();return;}
       const payload={
         template_node: tpl.node, template_vmid: tpl.vmid, target_node: node,
         new_vmid: parseInt(val('pv-vmid'))||0, name: vmName,
         cores: parseInt(val('pv-cpu'))||2, memory: Math.round((parseFloat(val('pv-ram'))||4)*1024),
         disk_gb: parseInt(val('pv-disk'))||0, disk_device: val('pv-diskdev')||'virtio0',
-        ip: val('pv-ip'), gateway: val('pv-ip')?val('pv-gw'):'', dns: val('pv-dns'),
+        ip: val('pv-ip'), gateway: val('pv-ip')?val('pv-gw'):'', dns: val('pv-dns'), search_domain: searchDomain,
         ciuser: val('pv-user'), cipassword: document.getElementById('pv-pass').value, ssh_keys: document.getElementById('pv-ssh').value,
         group: grp, group_new: grpNew,
         gpu_mapping: card?card.mappings[0]:'',
@@ -6149,6 +6315,107 @@ window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>
   if(!sel||!sel.value) applyTheme('');
 });
 
+// pmgr:network-settings:begin
+const NetworkSettingsUI={
+  idx:null,generation:0,baseline:null,label:'',saving:false,reloading:false,
+  serialize(value){
+    // Valid equivalent spellings are clean; invalid or incomplete rows still count as edits.
+    try{return JSON.stringify(validateNetwork(value));}catch(e){return JSON.stringify(value);}
+  },
+  read(validate=true){
+    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim()};
+    return validate?validateNetwork(value):value;
+  },
+  isDirty(){return this.baseline!==null&&this.baseline!==this.serialize(this.read(false));},
+  saveError(message){document.getElementById('ns-save-error').textContent=message;},
+  updateDirty(){
+    const dirty=this.isDirty();
+    document.getElementById('ns-savebar').hidden=!dirty;document.getElementById('ns-form').classList.toggle('has-unsaved',dirty);
+    document.getElementById('ns-add').disabled=document.querySelectorAll('#ns-networks [data-network]').length>=16;
+    if(!dirty)this.saveError('');
+  },
+  syncActions(){for(const id of ['ns-save','ns-cancel']){const button=document.getElementById(id);if(button)button.disabled=this.saving||this.reloading;}},
+  heading(){document.getElementById('ns-heading').innerHTML='Infrastruttura · '+esc(ClusterMgr.currentLabel()??'Nessun cluster');},
+  clear(){this.generation++;this.idx=null;this.baseline=null;this.heading();document.getElementById('ns-editor').textContent='Caricamento…';},
+  async load(){
+    if(this.isDirty())return;
+    this.clear();
+    const idx=ClusterMgr.current,generation=this.generation,editor=document.getElementById('ns-editor');
+    if(!ClusterMgr.clusters.some(c=>c.idx===idx)){editor.textContent='Nessun cluster configurato';return;}
+    try{
+      const settings=await api(`/clusters/${idx}/network-settings`,{quiet:true,timeoutMs:15000});
+      if(generation!==this.generation||idx!==ClusterMgr.current)return;
+      const value=validateNetwork(settings);
+      this.idx=idx;this.label=ClusterMgr.currentLabel()??String(idx);this.render(value);
+    }catch(e){if(generation===this.generation&&idx===ClusterMgr.current)editor.innerHTML=errBox(e.message,'NetworkSettingsUI.load()');}
+  },
+  row(value={}){
+    return `<div class="ns-network" data-network><label class="rs-field"><span>Rete IPv4 (CIDR)</span><input class="inp" data-key="cidr" maxlength="20" placeholder="10.75.4.0/24" value="${esc(value.cidr??'')}" spellcheck="false" autocomplete="off"></label><label class="rs-field"><span>Gateway</span><input class="inp" data-key="gateway" maxlength="45" placeholder="10.75.4.254" value="${esc(value.gateway??'')}" spellcheck="false" autocomplete="off"></label><button type="button" class="btn bg2 sm" data-remove>Rimuovi rete</button></div>`;
+  },
+  render(settings){
+    document.getElementById('ns-editor').innerHTML=`<form id="ns-form" novalidate>
+      <details class="rs-section" open><summary>Rete delle VM nuove</summary>
+        <p class="hint">Nuova VM sceglie il gateway dalla rete che contiene l'IP; il DNS e il dominio vengono da qui; il template conta solo se qui manca.</p>
+        <div id="ns-networks">${settings.networks.map(value=>this.row(value)).join('')}</div>
+        <button type="button" class="btn bg2 sm" id="ns-add" data-add>Aggiungi rete</button>
+        <div class="rs-grid"><label class="rs-field"><span>DNS (fino a 3, separati da spazi)</span><input class="inp" id="ns-dns" maxlength="137" value="${esc(settings.dns.join(' '))}" placeholder="es. 1.1.1.1 9.9.9.9" spellcheck="false" autocomplete="off"></label>
+        <label class="rs-field"><span>Dominio di ricerca (opzionale)</span><input class="inp" id="ns-search" maxlength="253" value="${esc(settings.search_domain)}" placeholder="es. example.org" spellcheck="false" autocomplete="off"></label></div>
+      </details>
+      <div class="rs-savebar" id="ns-savebar" role="region" aria-label="Salvataggio delle impostazioni di rete" hidden>
+        <span class="rs-savebar-status" role="status">Modifiche non salvate</span>
+        <div class="rs-savebar-actions"><button type="button" class="btn bg2" id="ns-cancel" data-cancel>Annulla</button><button type="submit" class="btn ba" id="ns-save">Salva</button></div>
+        <span class="rs-savebar-error" id="ns-save-error" role="alert"></span>
+      </div>
+    </form>`;
+    const form=document.getElementById('ns-form');
+    form.addEventListener('input',()=>this.updateDirty());form.addEventListener('change',()=>this.updateDirty());
+    form.addEventListener('submit',e=>{e.preventDefault();this.save();});
+    form.addEventListener('click',e=>this.click(e));
+    this.baseline=this.serialize(this.read(false));this.updateDirty();this.syncActions();
+  },
+  click(e){
+    const button=e.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-cancel')){this.cancel();return;}
+    if(button.hasAttribute('data-remove')){button.closest('[data-network]').remove();this.updateDirty();document.getElementById('ns-add').focus();return;}
+    if(button.hasAttribute('data-add')){
+      const rows=document.getElementById('ns-networks');
+      if(rows.querySelectorAll('[data-network]').length>=16)return;
+      rows.insertAdjacentHTML('beforeend',this.row());this.updateDirty();rows.lastElementChild.querySelector('input').focus();
+    }
+  },
+  guardLeave(proceed){
+    if(!this.isDirty())return false;
+    askConfirm({title:`Hai modifiche non salvate alle impostazioni di rete di ${this.label}. Uscire senza salvare?`,level:'warn',okLabel:'Esci senza salvare'},()=>{this.clear();proceed();});
+    return true;
+  },
+  async cancel(){
+    if(this.saving||this.reloading||this.idx==null)return;
+    const idx=this.idx,generation=this.generation;
+    this.reloading=true;this.syncActions();this.saveError('');
+    try{
+      const saved=await api(`/clusters/${idx}/network-settings`,{quiet:true,timeoutMs:15000});
+      if(generation!==this.generation||idx!==ClusterMgr.current)return;
+      this.render(validateNetwork(saved));document.querySelector('#ns-form input')?.focus();
+    }catch(e){if(generation===this.generation)this.saveError(e.message);}
+    finally{this.reloading=false;this.syncActions();}
+  },
+  async save(){
+    if(this.saving||this.reloading||this.idx==null||!this.isDirty())return;
+    const idx=this.idx,generation=this.generation;
+    this.saveError('');
+    try{
+      const saved=this.read(),body=JSON.stringify(saved);
+      this.saving=true;this.syncActions();
+      await api(`/clusters/${idx}/network-settings`,{method:'PUT',body,quiet:true,timeoutMs:15000});
+      if(generation!==this.generation||idx!==ClusterMgr.current)return;
+      this.baseline=this.serialize(saved);this.updateDirty();toast('Impostazioni di rete salvate','ok');
+      if(!this.isDirty())document.querySelector('#ns-form input')?.focus();
+    }catch(e){if(generation===this.generation)this.saveError(e.message);}
+    finally{this.saving=false;this.syncActions();}
+  }
+};
+// pmgr:network-settings:end
+
 // pmgr:report-settings:begin
 // pmgr:report-defaults:begin
 const REPORT_DEFAULTS = {
@@ -6208,6 +6475,8 @@ function internalPrice(p,g){
 }
 // pmgr:internal-price:end
 
+
+
 const ReportSettingsUI={
   idx:null, generation:0, saving:false, reloading:false, proposals:[], baseline:null, label:'', detectedStorage:[], savedStorage:{},
   serialize(value){
@@ -6226,7 +6495,7 @@ const ReportSettingsUI={
   },
   guardLeave(proceed){
     if(!this.isDirty())return false;
-    askConfirm({title:`Hai modifiche non salvate ai parametri dei report di ${this.label}. Uscire senza salvare?`,level:'warn',okLabel:'Esci senza salvare'},()=>{this.clear();proceed();});
+    askConfirm({title:`Hai modifiche non salvate alle impostazioni dei report di ${this.label}. Uscire senza salvare?`,level:'warn',okLabel:'Esci senza salvare'},()=>{this.clear();proceed();});
     return true;
   },
   async cancel(){
@@ -6625,32 +6894,42 @@ const ReportSettingsUI={
   }
 };
 // pmgr:report-settings:end
-window.addEventListener('beforeunload',e=>{if(ReportSettingsUI.isDirty()){e.preventDefault();e.returnValue='';}});
+// pmgr:settings-guard:begin
+const SettingsGuard={
+  dirtyForm(){return [{tab:'infra',ui:NetworkSettingsUI},{tab:'report',ui:ReportSettingsUI}].find(form=>form.ui.isDirty())??null;},
+  isDirty(){return this.dirtyForm()!==null;},
+  guardLeave(proceed){return this.dirtyForm()?.ui.guardLeave(proceed)??false;}
+};
+// pmgr:settings-guard:end
+window.addEventListener('beforeunload',e=>{if(SettingsGuard.isDirty()){e.preventDefault();e.returnValue='';}});
 
 const Settings={
   tab:'general', generation:0,
+  hash(tab){return tab==='infra'?'#/settings/infra':tab==='report'?'#/settings/report':'#/settings';},
   showTab(tab){
-    if(!['general','report'].includes(tab))return;
+    if(!['general','infra','report'].includes(tab))return;
     this.tab=tab;
-    for(const name of ['general','report']){
+    for(const name of ['general','infra','report']){
       const selected=name===tab,button=document.getElementById('settings-tab-'+name);
       button.classList.toggle('active',selected);button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
       document.getElementById('settings-'+name).hidden=!selected;
     }
   },
   selectTab(tab){
-    if(!['general','report'].includes(tab)||tab===this.tab)return;
-    if(ReportSettingsUI.guardLeave(()=>this.selectTab(tab)))return;
-    this.showTab(tab);Route.push(tab==='report'?'#/settings/report':'#/settings');
+    if(!['general','infra','report'].includes(tab)||tab===this.tab)return;
+    if(SettingsGuard.guardLeave(()=>this.selectTab(tab)))return;
+    this.showTab(tab);Route.push(this.hash(tab));
+    if(tab==='infra')NetworkSettingsUI.load();
     if(tab==='report')ReportSettingsUI.load();
   },
   async load(){
-    if(ReportSettingsUI.isDirty())return;
+    if(SettingsGuard.isDirty())return;
     const generation=++this.generation;
-    ReportSettingsUI.clear();
+    ReportSettingsUI.clear();NetworkSettingsUI.clear();
     await ClusterMgr.renderList();
-    if(generation!==this.generation)return;
-    ReportSettingsUI.heading();
+    if(generation!==this.generation||SettingsGuard.isDirty())return;
+    ReportSettingsUI.heading();NetworkSettingsUI.heading();
+    if(this.tab==='infra')NetworkSettingsUI.load();
     if(this.tab==='report')ReportSettingsUI.load();
     const cfg=await api('/config',{quiet:true}).catch(()=>null); if(!cfg||generation!==this.generation)return;
     const t=cfg.theme||'', d=cfg.density||'';

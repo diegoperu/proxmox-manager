@@ -738,6 +738,7 @@ func TestValidateProvReq(t *testing.T) {
 		"ip injection":    func(r *provReq) { r.IP = "10.0.0.1/24,gw=1.1.1.1" },
 		"bad gateway":     func(r *provReq) { r.Gateway = "x" },
 		"gateway alone":   func(r *provReq) { r.IP = "" },
+		"bad domain":      func(r *provReq) { r.SearchDomain = "bad_domain" },
 		"bad dns":         func(r *provReq) { r.DNS = "8.8.8.8 evil" },
 		"four dns":        func(r *provReq) { r.DNS = "1.1.1.1 2.2.2.2 3.3.3.3 4.4.4.4" },
 		"bad key":         func(r *provReq) { r.SSHKeys = "ssh-ed25519 AAAA'; rm -rf /" },
@@ -1289,5 +1290,36 @@ func TestProvisionWaitsForTheResizeTaskBeforeTheExtraDisk(t *testing.T) {
 	}
 	if got := f.vms[200].cfg["virtio1"]; got != "ceph:100" {
 		t.Fatalf("virtio1 = %q", got)
+	}
+}
+
+func TestProvisionSearchDomain(t *testing.T) {
+	provFast(t)
+	for _, domain := range []string{"", "Example.COM"} {
+		f := newFakeProv()
+		r := baseReq()
+		r.SearchDomain = domain
+		j, err := startProv(f, 3, "C", mustPlanProv(t, r), noOpts, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v := waitProv(t, j); v.Result != provOK {
+			t.Fatalf("%+v", v)
+		}
+		value, present := f.cloudInit["searchdomain"]
+		if domain == "" && present || domain != "" && (!present || len(value) != 1 || value[0] != "example.com") {
+			t.Fatalf("searchdomain: %v", f.cloudInit)
+		}
+	}
+	r := baseReq()
+	r.SearchDomain = "invalid_domain"
+	body, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	(&Handler{}).PostProvisionJob(rec, httptest.NewRequest("POST", "/api/provision/job", bytes.NewReader(body)))
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "dominio di ricerca") {
+		t.Fatalf("invalid domain: %d %s", rec.Code, rec.Body)
 	}
 }

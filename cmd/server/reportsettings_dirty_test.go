@@ -36,6 +36,7 @@ func TestReportSettingsUnsavedChanges(t *testing.T) {
 		section("const AutoRefreshUI={", "\n};") + "\n" +
 		section("const App={", "\n};") + "\n" +
 		section("const Settings={", "\n};") + "\n" +
+		section("// pmgr:settings-guard:begin", "// pmgr:settings-guard:end") + "\n" +
 		section("window.addEventListener('beforeunload'", "\n")
 	driver := `
 const assert=require('node:assert/strict');
@@ -55,6 +56,8 @@ global.toast=()=>{};global.closeModal=()=>{};
 global.Ceph={stop(){},probe(){}};global.Gpu={probe(){}};
 global.VMs={clearCache(){},detail(){}};global.Nodes={};global.Batch={};
 global.Groups={busy:false};global._modalStack=[];
+global.NetworkSettingsUI={isDirty:()=>false,clear(){},heading(){},load(){}};
+global.Provision={resetNetwork(){}};
 `
 	checks := `
 const ui=ReportSettingsUI;
@@ -132,10 +135,10 @@ let saved=empty();global.api=async()=>structuredClone(saved);
  // Every exit waits for confirmation; cancel leaves route, cluster and draft unchanged.
  edit('token_eur','5');
  const before=refreshes;App.nav('nodes');assert.equal(App.cur,'settings');assert.equal(refreshes,before);assert.equal(location.hash,'#/settings/report');
- assert.equal(confirmation.options.level,'warn');assert.equal(confirmation.options.title,'Hai modifiche non salvate ai parametri dei report di <CALCOLO & "test">. Uscire senza salvare?');
+ assert.equal(confirmation.options.level,'warn');assert.equal(confirmation.options.title,'Hai modifiche non salvate alle impostazioni dei report di <CALCOLO & "test">. Uscire senza salvare?');
  assert(ui.isDirty());
  Settings.selectTab('general');assert.equal(Settings.tab,'report');assert.equal(location.hash,'#/settings/report');
- for(const hash of ['#/settings','#/nodes','#/settings/invalid']){
+ for(const hash of ['#/settings','#/settings/infra','#/nodes','#/settings/invalid']){
   location.hash=hash;listeners.hashchange();assert.equal(location.hash,'#/settings/report');assert.equal(App.cur,'settings');assert(ui.isDirty());
  }
  location.hash='#/settings';listeners.popstate();const count=confirmations;listeners.hashchange();assert.equal(confirmations,count,'popstate + hashchange do not open duplicate confirmations');

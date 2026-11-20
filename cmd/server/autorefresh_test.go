@@ -39,10 +39,30 @@ for(const hidden of [false,true]) for(const modalOpen of [false,true]) for(const
  const state={...base,hidden,modalOpen,typing,blocked,unsaved,busy,busySince:expired?80000:100000};
  assert.equal(AutoRefresh.shouldRun(state),!hidden&&!modalOpen&&!typing&&!blocked&&!unsaved&&(!busy||expired));
 }
+
 assert.deepEqual(AutoRefresh.CHOICES,[0,15,30,60,120,300]);
 `
 	cmd := exec.Command(node, "-e", text[start:finish]+driver)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("autorefresh JavaScript: %v\n%s", err, out)
 	}
+}
+
+func TestAutoRefreshUnsavedSettingsForms(t *testing.T) {
+	source := settingsJS(t, "// pmgr:settings-guard:begin", "// pmgr:settings-guard:end") +
+		settingsJS(t, "// pmgr:autorefresh:begin", "// pmgr:autorefresh:end") +
+		settingsJS(t, "const AutoRefreshUI={", "\n};")
+	runSettingsJS(t, source+`
+const assert=require('node:assert/strict');
+let networkDirty=false,reportDirty=false;
+global.NetworkSettingsUI={isDirty:()=>networkDirty};global.ReportSettingsUI={isDirty:()=>reportDirty};
+global.ClusterMgr={current:0};global._modalStack=[];global.Groups={busy:false};
+global.document={hidden:false,activeElement:null,getElementById:()=>null,querySelector:()=>null};
+for(const network of [false,true])for(const report of [false,true]){
+ networkDirty=network;reportDirty=report;
+ const state=AutoRefreshUI.state('nodes');
+ assert.equal(state.unsaved,network||report);
+ assert.equal(AutoRefresh.shouldRun(state),!network&&!report);
+}
+`)
 }
