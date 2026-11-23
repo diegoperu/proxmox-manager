@@ -1,0 +1,28 @@
+# Set PMGR_HOST in the Caddy service environment, or replace {$PMGR_HOST} with its DNS name.
+# Caddy and Proxmox Manager run on the same Debian 13 machine.
+{$PMGR_HOST} {
+	# Replace both paths with the university certificate chain and matching private key.
+	# The key must be readable only by root and Caddy, never by pmgr.
+	tls /etc/caddy/certs/UNIVERSITY-fullchain.pem /etc/caddy/certs/UNIVERSITY-key.pem
+	# Alternative for a private test installation: replace the tls line with `tls internal`.
+	# Install Caddy's internal CA on clients before opening the page; never bypass TLS verification.
+
+	header Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 1MB
+	}
+
+	# Caddy sets X-Forwarded-For, X-Forwarded-Host and X-Forwarded-Proto and ignores/replaces
+	# client-supplied values by default. Do not configure external trusted proxies for this topology.
+	# Console WebSocket upgrades and streams pass through reverse_proxy unchanged.
+	reverse_proxy 127.0.0.1:8080
+
+	# Keep logs outside the manager's home; make /var/log/caddy writable by Caddy only.
+	log {
+		output file /var/log/caddy/proxmox-manager-access.json {
+			mode 0600
+			roll_size 10MiB
+			roll_keep 10
+		}
+	}
+}

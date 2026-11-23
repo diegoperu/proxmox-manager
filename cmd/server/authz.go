@@ -172,7 +172,7 @@ func authorize(root *chi.Mux, store *auth.Store, proxies []netip.Prefix) func(ht
 				jsonError(w, http.StatusForbidden, map[string]any{"error": "accesso negato"})
 				return
 			}
-			if rule.role == public {
+			if rule.role == public || (key == "GET /api/version" && localVersionProbe(r)) {
 				next.ServeHTTP(w, r)
 				return
 			}

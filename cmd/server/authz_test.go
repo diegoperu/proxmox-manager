@@ -97,7 +97,13 @@ type actor struct {
 	step   int64 // next TOTP step to use (each step is single use)
 }
 
+// code returns the next unused TOTP code that the server still accepts now: steps are single use and only
+// +-1 step around the current time is valid, so a 30-second boundary crossed during the test must not leave
+// the next code behind the window (that made the test fail now and then).
 func (a *actor) code() string {
+	if cur := time.Now().Unix() / 30; a.step < cur-1 {
+		a.step = cur - 1
+	}
 	c := totpAt(a.secret, a.step)
 	a.step++
 	return c

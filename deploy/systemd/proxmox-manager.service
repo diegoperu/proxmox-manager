@@ -1,0 +1,61 @@
+[Unit]
+Description=Proxmox Manager
+# Networking is needed for Proxmox, GitHub update checks and public price lists.
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=pmgr
+Group=pmgr
+# Relative config, database and authentication key paths resolve inside this directory.
+WorkingDirectory=/home/pmgr/proxmox-manager
+ExecStart=/home/pmgr/proxmox-manager/bin/proxmox-manager
+Restart=on-failure
+RestartSec=5
+# SQLite sidecars, authentication keys and atomically rewritten config stay private.
+UMask=0077
+
+# No executable or setuid helper may grant the service additional privileges.
+NoNewPrivileges=yes
+# Make the host filesystem read-only, then expose only the service's own writable data directory.
+ProtectSystem=strict
+# Hide all homes; bind back only this application's directory.
+ProtectHome=tmpfs
+BindPaths=/home/pmgr/proxmox-manager
+# Config saves use temporary files and rename in the parent directory, not just writes to config.json.
+ReadWritePaths=/home/pmgr/proxmox-manager
+# The service may read and execute its root-owned binaries, but cannot replace them.
+ReadOnlyPaths=/home/pmgr/proxmox-manager/bin
+# Isolate temporary files and expose only basic pseudo-devices, including the random source.
+PrivateTmp=yes
+PrivateDevices=yes
+# Deny changes to kernel settings, modules, logs and cgroup configuration.
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+# The manager must neither change time nor change the hostname.
+ProtectClock=yes
+ProtectHostname=yes
+# Namespace creation, realtime scheduling and setuid/setgid files are unnecessary.
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+# The static Go binary needs neither personality changes nor writable executable memory.
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# Permit only native service syscalls; exclude privileged and resource-control operations.
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# @resources is NOT excluded: the Go runtime raises its own RLIMIT_NOFILE soft limit at start (prlimit64);
+# excluding it killed the process with SIGSYS (found in a Debian 13 test, 2026-11-23).
+SystemCallFilter=~@privileged
+# No Linux capabilities are required to bind the loopback high port.
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Keep outbound IPv4/IPv6 and local Unix sockets available; no raw or exotic families.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
