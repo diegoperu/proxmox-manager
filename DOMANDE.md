@@ -1406,13 +1406,13 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: A, tre ruoli globali come proposto (2026-11-23).
 
 ### D137 — HTTPS: certificato e chi lo serve
-**Stato**: APERTA (in attesa)
+**Stato**: SUPERATA
 **Bloccante**: si'
 **Domanda**: da dove viene il certificato e chi termina il TLS?
 **Perché conta**: senza HTTPS password, TOTP e cookie di sessione viaggiano in chiaro sulla rete interna; un certificato non riconosciuto abitua a ignorare gli avvisi del browser.
 **Opzioni**: A) certificato rilasciato dai servizi IT di ateneo per un nome DNS interno (es. `pmgr.<dominio interno>`), TLS servito **direttamente dal binario** (libreria standard di Go, solo TLS 1.2+, HSTS), file con permessi 0600; B) come A ma dietro un reverse proxy (nginx/Caddy) sulla stessa macchina; C) CA interna del laboratorio da installare nei browser del team; D) autofirmato (sconsigliato).
 **Suggerimento**: A: un componente in meno da mantenere, il binario e' gia' statico; B solo se sulla macchina girano altri servizi web.
-**Risposta utente**: si' al certificato di ateneo, l'utente lo puo' richiedere; nome DNS ancora da decidere (2026-11-23).
+**Risposta utente**: (2026-11-23) il servizio stara' **dietro un reverse proxy** che fornisce il certificato: il binario non serve TLS in produzione. In locale niente proxy: certificato autofirmato generato dal binario, con un nome suo, che non deve collidere con quello vero. Il nome DNS serve solo all'installazione (`allowed_hosts`, inserito nella configurazione guidata).
 
 ### D138 — Sessioni e conferme forti
 **Stato**: RISPOSTA
@@ -1431,13 +1431,13 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: A (2026-11-23).
 
 ### D140 — Token di Proxmox usati dal manager
-**Stato**: APERTA (proposta rivista)
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: con quale utente/token il manager parla con i cluster?
 **Perché conta**: il token e' sul server: se il server viene compromesso, il token decide quanto danno si fa sui cluster.
 **Opzioni**: A) per ogni cluster un utente Proxmox dedicato `pmgr@pve` con un **ruolo personalizzato con solo i privilegi usati** (elenco nel README), token con separazione dei privilegi, niente `root@pam`; B) come A piu' un secondo token in sola lettura (`PVEAuditor`) usato da Lettore e raccolte periodiche; C) lasciare i token attuali.
 **Suggerimento**: A subito (con la migrazione), B in un secondo momento se serve.
-**Risposta utente**: l'utente chiede conferma che si tratta di **un solo token per cluster mediato dall'app** invece di un token per persona; in quel caso ogni azione di ogni utente va registrata, conservata e mostrata in panoramica **insieme ai log (task) di Proxmox**. Proposta rivista in D144.
+**Risposta utente**: vedi D144 (token unico per cluster).
 
 ### D141 — Primo amministratore e recupero
 **Stato**: RISPOSTA
@@ -1465,28 +1465,37 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: A: si', e' il passaggio dall'attuale manager senza login a quello multiutente, conservando configurazione e storico (2026-11-23).
 
 ### D144 — Un token per cluster, mediato dall'app, e attribuzione delle azioni
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: confermi un solo utente/token Proxmox per cluster usato dal manager, con l'attribuzione delle azioni fatta dal manager?
 **Perché conta**: in Proxmox tutte le azioni fatte dal manager risulteranno di `pmgr@pve!manager`: senza un collegamento, nei task di Proxmox non si vede quale persona le ha fatte.
 **Opzioni**: A) **token unico per cluster** (privilegi minimi, D140) e **registro delle azioni del manager** come fonte di "chi": ogni azione che scrive salva utente, ora, IP, azione, bersaglio, esito **e l'UPID del task** che Proxmox restituisce; la colonna Attivita' della panoramica e una pagina "Registro" **uniscono i task di Proxmox e il registro**: un task con UPID noto mostra "Mario Rossi tramite il manager", un task fatto fuori dal manager mostra l'utente Proxmox che l'ha fatto; conservazione 2 anni (D139); B) un token per persona, inserito da ciascuno: Proxmox registra la persona vera, ma il manager deve custodire N token, le raccolte periodiche ne vogliono comunque uno di servizio e la revoca di una persona va fatta in due posti; C) token per ruolo (tre token per cluster).
 **Suggerimento**: A: un solo segreto per cluster da proteggere e ruotare, permessi decisi in un punto solo (il manager), e l'UPID rende l'attribuzione verificabile anche dal lato Proxmox. Limite dichiarato: le operazioni che non producono un task (es. modifica dei tag di gruppo, impostazioni) sono attribuite solo dal registro del manager.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-23).
 
 ### D145 — Configurazione guidata dal web al primo avvio
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (fattibile; serve solo l'ok sul meccanismo)
 **Domanda**: va bene questo meccanismo per la configurazione da web, accanto alla riga di comando?
 **Perché conta**: un server appena avviato e senza utenti e' il momento piu' esposto: chi arriva per primo alla pagina potrebbe crearsi l'account di amministratore.
 **Opzioni**: A) **modalita' di configurazione** solo finche' non esiste alcun utente: all'avvio il server genera un **codice monouso** (128 bit) e lo scrive solo nel journal di systemd (`journalctl -u proxmox-manager`); la pagina chiede quel codice prima di tutto; HTTPS anche al primo avvio con un **certificato temporaneo autofirmato** di cui il journal stampa l'impronta (si confronta con quella mostrata dal browser); passi guidati: amministratore (password + TOTP con verifica del primo codice), primo cluster (URL e token, con prova di connessione), nome DNS ammesso, caricamento del certificato vero; il codice scade dopo 1 ora o al primo uso e la modalita' si chiude per sempre appena esiste un amministratore; la riga di comando `user add --admin` resta disponibile; B) solo riga di comando; C) configurazione web senza codice, solo da `localhost` (via tunnel SSH).
 **Suggerimento**: A: e' lo schema usato da prodotti diffusi (es. Jenkins, Grafana con codice iniziale), sicuro se il codice sta solo nel journal di una macchina a cui accedono gli amministratori.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-23); dietro il proxy la pagina arriva gia' in HTTPS con il certificato vero, il certificato autofirmato temporaneo serve solo dove non c'e' proxy (sviluppo locale).
 
 ### D146 — Sviluppo in locale dopo il passaggio
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: come si continua a sviluppare sulla postazione?
 **Opzioni**: A) si': la postazione resta l'ambiente di sviluppo con una **copia separata** (cartella, database e porta propri): cluster finto (`mockpve`) e Magi, **mai i token di produzione** (CALCOLO/HOSTING), raccolte periodiche spente (`gpu_usage`/`vm_usage` false) per non duplicare i dati della macchina vera; login sempre attivo anche in sviluppo (account locali creati con la riga di comando), HTTPS con certificato autofirmato generato da solo; **nessun interruttore che spenga il login** nel binario (un "modo sviluppo" senza login finirebbe prima o poi in produzione). In produzione si installa solo da release firmata (`tools/release.sh`), mai una build della postazione; B) sviluppo direttamente sulla macchina vera (sconsigliato).
 **Suggerimento**: A.
+**Risposta utente**: A con una modifica (2026-11-23): la copia locale **mantiene l'accesso ai cluster veri e le raccolte attive** (utile per provare i report) ed e' l'**accesso di emergenza** se la macchina salta; le operazioni reali si fanno dal sistema in servizio. Proposta conseguente: un token Proxmox **distinto** per la copia locale (`pmgr@pve!local`), revocabile da solo e riconoscibile nei task.
+
+### D147 — Reverse proxy: dove sta e come parla con il manager
+**Stato**: APERTA
+**Bloccante**: no per il codice (serve all'installazione)
+**Domanda**: il reverse proxy gira sulla stessa macchina Debian o su un'altra? Quale software (nginx, Apache, Caddy, HAProxy)?
+**Perché conta**: se e' sulla stessa macchina il manager ascolta solo su `127.0.0.1` e non serve altro; se e' su un'altra macchina il tratto proxy -> manager passa in rete e va protetto (firewall che accetta solo l'IP del proxy, ed eventualmente TLS anche su quel tratto). In tutti e due i casi il manager deve fidarsi di `X-Forwarded-For`/`X-Forwarded-Host` **solo** se arrivano dall'indirizzo del proxy (`trusted_proxies`), altrimenti chiunque potrebbe falsificare l'IP nel registro e aggirare il limite dei tentativi di login.
+**Opzioni**: A) stessa macchina, manager su `127.0.0.1:8080`, `trusted_proxies: ["127.0.0.1"]`; B) altra macchina, manager su IP di management con firewall solo dal proxy, `trusted_proxies: [<IP proxy>]`.
+**Suggerimento**: A se possibile.
 **Risposta utente**:
 
