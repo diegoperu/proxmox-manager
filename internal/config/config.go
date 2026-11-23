@@ -40,6 +40,12 @@ type Config struct {
 	UpdateCheck *bool `json:"update_check,omitempty"`
 	// AllowedHosts, if not empty, restricts the Host header accepted on /api (defence against DNS rebinding).
 	AllowedHosts []string `json:"allowed_hosts"`
+	// AuthKeyPath is the 0600 file with the key that encrypts the TOTP secrets of the accounts (voce 20).
+	// Created at the first start when missing; relative paths are relative to the working directory.
+	AuthKeyPath string `json:"auth_key_path,omitempty"`
+	// TrustedProxies: addresses or CIDR prefixes of the reverse proxy (D147). X-Forwarded-For and
+	// X-Forwarded-Host are honoured only from these; empty = none (direct access).
+	TrustedProxies []string `json:"trusted_proxies,omitempty"`
 	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
 	// model string Proxmox reports. Valid for every cluster; the built-in table is the default.
 	GPUModels map[string]GPUModel `json:"gpu_models,omitempty"`
@@ -100,6 +106,7 @@ func Load() error {
 		RefreshSeconds: 60,
 		DBPath:         "proxmox.db",
 		ListenAddr:     ":8080",
+		AuthKeyPath:    "auth.key",
 	}
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -193,6 +200,7 @@ func Get() Config {
 		c.Clusters[i].Network = copyNetwork(current.Clusters[i].Network)
 	}
 	c.AllowedHosts = append([]string(nil), current.AllowedHosts...)
+	c.TrustedProxies = append([]string(nil), current.TrustedProxies...)
 	if current.VMUsage != nil {
 		v := *current.VMUsage
 		c.VMUsage = &v
@@ -365,4 +373,12 @@ func SetGPUModel(key string, m GPUModel) error {
 		return err
 	}
 	return nil
+}
+
+// AuthKeyFile returns the path of the TOTP encryption key (default auth.key).
+func (c Config) AuthKeyFile() string {
+	if c.AuthKeyPath == "" {
+		return "auth.key"
+	}
+	return c.AuthKeyPath
 }
