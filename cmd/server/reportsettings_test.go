@@ -27,6 +27,7 @@ func TestReportSettingsClientValidation(t *testing.T) {
 	start, finish := strings.Index(text, begin)+len(begin), strings.Index(text, end)
 	driver := `
 const assert=require('node:assert/strict');
+global.RoleUI={readonly(){}};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ui=ReportSettingsUI;
 const empty=()=>({internal_prices:{gpu_tiers:[]},market_prices:[],usd_eur:0,storage_classes:{},defaults:{},interruptions:[]});

@@ -82,7 +82,7 @@ func TestAuthUIRequests(t *testing.T) {
 	runAuthUI(t, source+`
 const assert=require('node:assert/strict');
 const nodes=new Map();
-global.document={getElementById(id){if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id);}};
+global.document={documentElement:{classList:{toggle(){}}},getElementById(id){if(!nodes.has(id))nodes.set(id,{textContent:''});return nodes.get(id);}};
 const toasts=[];global.toast=(...args)=>toasts.push(args);
 global.ClusterMgr={current:2};
 const me={username:'dev',role:'admin',csrf:'csrf-in-memory',expires:1900000000};
@@ -106,7 +106,7 @@ function response(status,body,headers={}){responses.push(()=>({status,ok:status>
  assert.equal(prompts,1);assert.equal(first.url,retry.url);assert.equal(first.method,retry.method);assert.equal(first.body,retry.body);
  assert.equal(retry.headers.get('X-Other'),'keep');assert.equal(retry.headers.get('X-TOTP-Code'),'123456');assert.equal(retry.headers.get('X-CSRF-Token'),me.csrf);
  response(403,{reason:'step_up'});response(403,{reason:'step_up',error:'codice non valido'});
- const before=calls.length;await assert.rejects(api('/delete',{method:'DELETE',quiet:true}),/codice non valido/);assert.equal(calls.length-before,2);assert.equal(prompts,2);
+ const before=calls.length;await assert.rejects(api('/delete',{method:'DELETE',quiet:true}),/Codice non valido o gia' usato: attendi il codice successivo dell'app e riprova/);assert.equal(calls.length-before,2);assert.equal(prompts,2);
  Auth.promptStep=async()=>{throw new Error('Azione annullata: codice di autenticazione non fornito.');};
  response(403,{reason:'step_up'});const cancelled=calls.length;
  await assert.rejects(api('/delete',{method:'DELETE',quiet:true}),/Azione annullata/);assert.equal(calls.length-cancelled,1);
@@ -152,7 +152,7 @@ function element(id=''){
   querySelector(){return get('focus-target');},replaceChildren(){this.innerHTML='';},reset(){this.value='';}};
 }
 const get=id=>{if(!nodes.has(id))nodes.set(id,element(id));return nodes.get(id);};
-global.document={activeElement:null,body:element('body'),getElementById:get,querySelectorAll:selector=>selector==='.ov'?[get('mauth-step'),get('mauth-account')]:[],querySelector:()=>null};
+global.document={documentElement:element('html'),activeElement:null,body:element('body'),getElementById:get,querySelectorAll:selector=>selector==='.ov'?[get('mauth-step'),get('mauth-account')]:[],querySelector:()=>null};
 global.location={reload(){reloads++;}};global.toast=(...args)=>toasts.push(args);
 global.ClusterMgr={current:0,closeMenu(){},async load(){}};
 global.AutoRefreshUI={started:true,stop(){stops++;this.started=false;},init(){this.started=true;},reset(){},mark(){}};
