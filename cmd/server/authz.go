@@ -159,9 +159,29 @@ func targetOf(rctx *chi.Context, r *http.Request) string {
 func authorize(root *chi.Mux, store *auth.Store, proxies []netip.Prefix) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// The route must be looked up on exactly the path the router will use: chi routes on the still
+			// encoded RawPath when there is one. Looking up the decoded Path instead let "/api/nodes/a%2Fb/status"
+			// find no rule here (decoded it has an extra segment) while the router matched it with node="a/b":
+			// the request skipped every check (found in the step 7 review, 2026-11-23).
+			routePath := r.URL.Path
+			if r.URL.RawPath != "" {
+				routePath = r.URL.RawPath
+			}
+			// No Proxmox name contains a slash or a backslash: an encoded slash, or a backslash (Go keeps RawPath empty
+			// for "%5C" because it is the default escaping), in an API path is refused outright.
+			if strings.HasPrefix(r.URL.Path, "/api/") && (containsEncodedSeparator(r.URL.RawPath) || strings.Contains(r.URL.Path, `\`)) {
+				jsonError(w, http.StatusBadRequest, map[string]any{"error": "indirizzo non valido"})
+				return
+			}
 			rctx := chi.NewRouteContext()
-			pattern := root.Find(rctx, r.Method, r.URL.Path)
-			if pattern == "" { // unknown path or method: the router answers 404/405
+			pattern := root.Find(rctx, r.Method, routePath)
+			if pattern == "" {
+				// The router will not find a route either (same path): it answers 404/405. Nothing under /api
+				// may reach a handler without a rule, so refuse /api here instead of trusting that.
+				if strings.HasPrefix(routePath, "/api/") {
+					jsonError(w, http.StatusNotFound, map[string]any{"error": "non trovato"})
+					return
+				}
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -242,4 +262,10 @@ func routeKeys(r chi.Routes) ([]string, error) {
 	})
 	sort.Strings(keys)
 	return keys, err
+}
+
+// containsEncodedSeparator reports an encoded "/" or "\" (any case) in a raw path.
+func containsEncodedSeparator(raw string) bool {
+	l := strings.ToLower(raw)
+	return strings.Contains(l, "%2f") || strings.Contains(l, "%5c")
 }
