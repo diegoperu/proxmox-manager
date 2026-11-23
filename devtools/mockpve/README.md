@@ -24,8 +24,12 @@ cat > config.json <<'JSON'
 }
 JSON
 CGO_ENABLED=1 go build -o /tmp/pmgr-preview/proxmox-manager /path/al/repo/cmd/server/
+# nella directory di anteprima: stampa password e chiave TOTP una sola volta
+./proxmox-manager user add dev --role admin
 ./proxmox-manager        # poi apri http://127.0.0.1:8090/
 ```
+
+L’anteprima richiede sempre un account: inserisci la chiave TOTP nell’app di autenticazione e accedi con utente `dev`, password e codice a 6 cifre. In alternativa, avvia senza creare utenti e usa la configurazione web con il codice monouso stampato nel log (nel servizio: `journalctl -u proxmox-manager`). La directory di anteprima conserva account e chiave del server separati dalla produzione.
 
 Il token e' finto: non usarlo contro un Proxmox vero e non copiare qui il `config.json` di produzione.
 

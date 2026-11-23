@@ -18,6 +18,7 @@ const assert=require('node:assert/strict'),nodes=new Map(),listeners={};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
+global.Auth={locked:false,role:'admin'};global.RoleUI={readonly(){},canPage:()=>true};global._IS_CONSOLE=false;
 global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:[],querySelector:()=>null};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings/infra'};

@@ -972,13 +972,52 @@ html.spiderman{
 .rs-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .rs-missing summary{cursor:pointer;color:var(--text2)}
 .rs-missing ul{margin:4px 0 0;padding-left:18px;color:var(--text2)}
+/* Auth: hidden shell until the session is known; the expired-session view keeps the page underneath. */
+body.console-page :is(#topbar,#sidebar,#main,#skip-link){display:none}
+body.auth-pending :is(#topbar,#sidebar,#main,#skip-link,#con-wrap){visibility:hidden}
+.auth-screen{position:fixed;inset:0;z-index:1200;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:32px 12px;background:var(--bg)}
+.auth-screen[hidden]{display:none}
+.auth-screen.auth-overlay{background:var(--scrim)}
+.auth-card{width:min(440px,100%);min-width:0;margin:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-card);padding:24px;overflow-wrap:anywhere}
+.auth-card h1{font-size:26px;line-height:1.12;margin:12px 0}
+.auth-card .brand{width:auto}.auth-card .brand span{display:inline!important}
+.auth-form{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+.auth-form .fg{margin:0}.auth-form .inp{width:100%;min-width:0}
+.auth-form .mf{margin-top:4px;flex-wrap:wrap}
+.auth-note{color:var(--text2);margin:10px 0;font-size:12px}
+.auth-error{color:var(--red);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.auth-error:empty{display:none}
+.auth-secret{display:block;padding:12px;margin:8px 0;border:1px solid var(--border);border-radius:8px;background:var(--bg3);font:12px/1.8 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;user-select:all}
+.user-menu{position:relative;min-width:0;flex-shrink:1}
+#user-button{max-width:220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+#user-popup{z-index:1100}
+@media(max-width:1180px){.topbar .pal-btn{min-width:0}.topbar .pal-btn span,.topbar .pal-btn kbd,.topbar .conn span{display:none}.topbar .brand{width:auto}#user-button{max-width:160px}}
+@media(max-width:850px){.topbar .brand,#refresh-sel{display:none}.topbar .rl-lbl{display:none}}
+@media(max-width:650px){.topbar{gap:6px}.topbar .conn{display:none}.topbar .pal-btn{margin-left:auto}#cluster-select{min-width:70px!important;max-width:84px}.topbar .crumb{display:none}#user-button{max-width:112px}.auth-screen{padding:12px}.auth-card{padding:20px}}
+@media(pointer:coarse){.user-menu [role=menuitem],.topbar .pal-btn{min-height:44px}.topbar .pal-btn{min-width:44px}}
+/* Role visibility is a convenience; routeAccess remains the authority. */
+html:not(.role-operator):not(.role-admin) [data-min-role="operator"],
+html:not(.role-admin) [data-min-role="admin"],
+html.role-admin .role-readonly{display:none!important}
+.role-fields{border:0;padding:0;margin:0;min-width:0}
+.users-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#users-table{min-width:680px}
+#users-credentials-body code{display:block;font-family:var(--mono);overflow-wrap:anywhere;user-select:all;margin:8px 0}
+#users-credentials-body .fg{min-width:0}
 </style>
 </head>
-<body>
-<a class="skip" id="skip-link" href="#content" onclick="event.preventDefault();document.getElementById('content').focus()">Vai al contenuto</a>
+<body class="auth-pending">
+<section id="auth-screen" class="auth-screen" role="main" aria-labelledby="auth-title" tabindex="-1">
+  <div class="auth-card">
+    <div class="brand">Proxmox<span>Manager</span></div>
+    <h1 id="auth-title">Accesso</h1>
+    <div id="auth-body"><p role="status">Verifica della sessione…</p></div>
+  </div>
+</section>
+<a class="skip" id="skip-link" inert href="#content" onclick="event.preventDefault();document.getElementById('content').focus()">Vai al contenuto</a>
 
 <!-- BARRA SUPERIORE -->
-<header class="topbar" id="topbar">
+<header class="topbar" id="topbar" inert>
   <button type="button" class="btn bg2 sm menu-btn" id="menu-btn" aria-label="Apri menu" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <div class="brand">Proxmox<span>Manager</span></div>
   <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)" style="display:none;min-width:120px"></select>
@@ -988,12 +1027,19 @@ html.spiderman{
   </nav>
   <button type="button" class="pal-btn" id="pal-btn" onclick="Palette.open()" aria-haspopup="dialog" aria-label="Cerca VM, nodi, pagine e azioni"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Cerca…</span><kbd id="pal-kbd">Ctrl K</kbd></button>
   <div class="conn" role="status"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
-  <select id="refresh-sel" class="inp sm" aria-label="Aggiornamento automatico" onchange="AutoRefreshUI.save(this.value)"><option value="0">Auto: spento</option><option value="15">Auto: 15 s</option><option value="30">Auto: 30 s</option><option value="60">Auto: 1 min</option><option value="120">Auto: 2 min</option><option value="300">Auto: 5 min</option></select>
+  <select data-min-role="admin" id="refresh-sel" class="inp sm" aria-label="Aggiornamento automatico" onchange="AutoRefreshUI.save(this.value)"><option value="0">Auto: spento</option><option value="15">Auto: 15 s</option><option value="30">Auto: 30 s</option><option value="60">Auto: 1 min</option><option value="120">Auto: 2 min</option><option value="300">Auto: 5 min</option></select>
   <button id="refresh-btn" class="btn bg2 sm" onclick="App.refresh()" aria-label="Aggiorna i dati"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg><span class="rl-lbl">Aggiorna</span></button>
+  <div class="user-menu">
+    <button type="button" class="btn bg2 sm" id="user-button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-popup" onclick="ClusterMgr.toggleMenu(this)" onkeydown="ClusterMgr.menuKey(event)">Account</button>
+    <div class="cl-menu" id="user-popup" role="menu" aria-labelledby="user-button" hidden onkeydown="ClusterMgr.menuKey(event)">
+      <button type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();Auth.account()">Il mio account</button>
+      <button type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();Auth.logout()">Esci</button>
+    </div>
+  </div>
 </header>
 
 <!-- MENU LATERALE -->
-<aside id="sidebar" aria-label="Menu">
+<aside id="sidebar" inert aria-label="Menu">
   <nav class="nav" aria-label="Navigazione principale">
     <button type="button" class="ni active" data-page="dashboard" aria-current="page">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Panoramica
@@ -1015,10 +1061,10 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Gruppi
     </button>
     <div class="nav-sec">Operazioni</div>
-    <button type="button" class="ni" data-page="provision">
+    <button data-min-role="operator" type="button" class="ni" data-page="provision">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Nuova VM
     </button>
-    <button type="button" class="ni" data-page="batch">
+    <button data-min-role="operator" type="button" class="ni" data-page="batch">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h10"/><circle cx="17" cy="17" r="3"/><path d="m19.5 19.5 2 2"/></svg>Batch
     </button>
     <button type="button" class="ni" data-page="cluster">
@@ -1032,6 +1078,7 @@ html.spiderman{
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
     </button>
     <div class="nav-sec">Configurazione</div>
+    <button type="button" class="ni" data-page="users" data-min-role="admin"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Utenti</button>
     <button type="button" class="ni" data-page="settings">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
     </button>
@@ -1041,7 +1088,7 @@ html.spiderman{
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
 <!-- CONTENUTO -->
-<div id="main">
+<div id="main" inert>
 <main id="content" tabindex="-1">
 
     <!-- ██ DASHBOARD ██ -->
@@ -1098,9 +1145,9 @@ html.spiderman{
         </div>
         <div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp" type="search" id="grp-q" placeholder="Cerca VM, nodo, gruppo" aria-label="Cerca" maxlength="64" oninput="Groups.setQuery(this.value)"></div>
         <span class="sp"></span>
-        <button type="button" class="btn bg2 sm" onclick="Groups.tickAll(true)">Spunta le righe visibili con un gruppo scritto</button>
-        <button type="button" class="btn bg2 sm" onclick="Groups.tickAll(false)">Togli le spunte</button>
-        <button type="button" class="btn ba" id="grp-apply" onclick="Groups.apply()" disabled>Applica</button>
+        <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="Groups.tickAll(true)">Spunta le righe visibili con un gruppo scritto</button>
+        <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="Groups.tickAll(false)">Togli le spunte</button>
+        <button data-min-role="operator" type="button" class="btn ba" id="grp-apply" onclick="Groups.apply()" disabled>Applica</button>
       </div>
       <p class="cnote" style="margin:-4px 0 12px">Il gruppo e' il tag <span class="tm">gruppo-nome</span> della VM in Proxmox. Per le VM senza tag il campo propone il prefisso del nome: controllalo (non tutti i prefissi sono gruppi) e spunta solo le righe giuste. Nessuna VM viene riavviata; gli altri tag restano.</p>
       <div id="grp-body"></div>
@@ -1202,7 +1249,7 @@ html.spiderman{
       </div>
       <div class="tw"><table>
         <thead><tr>
-          <th class="ck"><input type="checkbox" class="chk" id="vca" aria-label="Seleziona tutte le VM visibili" onchange="VMs.pickAll(this)"></th>
+          <th class="ck"><input data-min-role="operator" type="checkbox" class="chk" id="vca" aria-label="Seleziona tutte le VM visibili" onchange="VMs.pickAll(this)"></th>
           <th class="s" onclick="VMs.sort('type')">Tipo</th>
           <th class="s" onclick="VMs.sort('vmid')">VMID</th>
           <th class="s" onclick="VMs.sort('name')">Nome</th>
@@ -1218,14 +1265,14 @@ html.spiderman{
         </tr></thead>
         <tbody id="vmtbody"><tr><td colspan="13" class="ldc"><div class="spin" role="status"><span class="sr">Caricamento in corso</span></div></td></tr></tbody>
       </table></div>
-      <div class="selbar" id="selbar" role="region" aria-label="Azioni sulla selezione" hidden>
+      <div class="selbar" data-min-role="operator" id="selbar" role="region" aria-label="Azioni sulla selezione" hidden>
         <span class="sb-n" id="sb-n" aria-live="polite"></span>
         <span class="sb-h" id="sb-h"></span>
         <span class="sb-sep" aria-hidden="true"></span>
-        <button type="button" class="btn bsuc sm" onclick="VMs.toBatch('start')">Start</button>
-        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('shutdown')">Shutdown</button>
-        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('reboot')">Reboot</button>
-        <button type="button" class="btn bg2 sm" onclick="VMs.toBatch('')">Altre azioni in Batch</button>
+        <button data-min-role="operator" type="button" class="btn bsuc sm" onclick="VMs.toBatch('start')">Start</button>
+        <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="VMs.toBatch('shutdown')">Shutdown</button>
+        <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="VMs.toBatch('reboot')">Reboot</button>
+        <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="VMs.toBatch('')">Altre azioni in Batch</button>
         <button type="button" class="btn bg2 sm" onclick="VMs.clearPick()">Deseleziona</button>
       </div>
     </div>
@@ -1385,7 +1432,7 @@ html.spiderman{
               <span class="td">Configura i parametri e clicca Provisiona.</span>
             </div>
             <label class="pv-opt mb12" for="pv-start"><input type="checkbox" class="chk" id="pv-start" checked> Avvia la VM al termine</label>
-            <button class="btn ba wf mb12" onclick="Provision.run()" id="pv-btn">Provisiona VM</button>
+            <button data-min-role="operator" class="btn ba wf mb12" onclick="Provision.run()" id="pv-btn">Provisiona VM</button>
             <h2 class="sec">Avanzamento</h2>
             <div class="plog pv-job" id="pv-log" aria-live="polite"><span class="td">In attesa...</span></div>
           </div>
@@ -1449,7 +1496,7 @@ html.spiderman{
               </select>
             </div>
             <div id="binfo" class="sel-sum">Nessuna VM selezionata</div>
-            <button class="btn ba wf" id="brun" onclick="Batch.run()">Esegui operazione batch</button>
+            <button data-min-role="operator" class="btn ba wf" id="brun" onclick="Batch.run()">Esegui operazione batch</button>
           </div>
           <h2 class="sec" style="margin-bottom:0">Log</h2>
           <div class="plog" id="blog" style="flex:1;min-height:80px;max-height:none"><span class="td">In attesa...</span></div>
@@ -1483,7 +1530,7 @@ html.spiderman{
               <div id="csinfo" class="sel-sum">Nessun nodo selezionato</div>
               <div class="sh-danger" style="margin-top:8px">
                 <p>Riavvio e spegnimento fermano le VM dei nodi scelti. Prima di eseguire ti viene chiesto di confermare scrivendo il nome del nodo.</p>
-                <button class="btn bd" id="crun" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
+                <button data-min-role="admin" class="btn bd" id="crun" onclick="Cluster.run()">Esegui sui nodi selezionati</button>
               </div>
             </div>
           </div>
@@ -1559,6 +1606,10 @@ html.spiderman{
     </div>
 
     <!-- ██ SETTINGS ██ -->
+    <div class="page" id="page-users">
+      <div class="panel"><div class="panel-h"><h2>Account del manager</h2><button type="button" class="btn ba sm" data-min-role="admin" onclick="Users.newUser()">Nuovo utente</button></div>
+      <div class="tw"><table id="users-table"><caption class="sr">Utenti del manager</caption><thead><tr><th scope="col">Nome</th><th scope="col">Ruolo</th><th scope="col">Stato</th><th scope="col">Creato</th><th scope="col">Azioni</th></tr></thead><tbody id="users-body"></tbody></table></div></div>
+    </div>
     <div class="page" id="page-settings">
       <div class="set">
         <div class="seg set-tabs" role="tablist" aria-label="Impostazioni">
@@ -1566,9 +1617,10 @@ html.spiderman{
           <button type="button" class="tab" role="tab" id="settings-tab-infra" aria-controls="settings-infra" aria-selected="false" tabindex="-1" onclick="Settings.selectTab('infra')">Infrastruttura</button>
           <button type="button" class="tab" role="tab" id="settings-tab-report" aria-controls="settings-report" aria-selected="false" tabindex="-1" onclick="Settings.selectTab('report')">Report e listini</button>
         </div>
+      <p class="hint role-readonly">solo gli amministratori possono cambiare queste impostazioni</p>
       <div id="settings-general" role="tabpanel" aria-labelledby="settings-tab-general">
         <div class="panel" id="settings-clusters-panel">
-          <div class="panel-h"><h2>Cluster Proxmox</h2><span class="sp" style="flex:1"></span><button class="btn ba sm" onclick="ClusterMgr.showAdd()">Aggiungi cluster</button></div>
+          <div class="panel-h"><h2>Cluster Proxmox</h2><span class="sp" style="flex:1"></span><button data-min-role="admin" class="btn ba sm" onclick="ClusterMgr.showAdd()">Aggiungi cluster</button></div>
           <div class="panel-b">
             <div id="cluster-form" style="display:none"></div>
             <div id="cluster-list"></div>
@@ -1580,18 +1632,18 @@ html.spiderman{
           <div class="panel-b">
             <input type="hidden" id="ctheme" value=""><input type="hidden" id="cdensity" value="">
             <div class="fl" id="lbl-theme">Tema</div>
-            <div class="tiles" id="theme-tiles" role="group" aria-labelledby="lbl-theme">
-              <button type="button" class="tile" data-v="" onclick="Settings.pickTheme('')"><span class="sw"><i style="background:#0b1424"></i><i style="background:#7fb2ff"></i><i style="background:#eef2f8"></i><i style="background:#1d5fd1"></i></span><b>Automatico</b><span>segue il sistema</span></button>
-              <button type="button" class="tile" data-v="dark" onclick="Settings.pickTheme('dark')"><span class="sw"><i style="background:#0b1424"></i><i style="background:#13213a"></i><i style="background:#7fb2ff"></i><i style="background:#e9eef7"></i></span><b>Notte</b><span>cielo notturno</span></button>
-              <button type="button" class="tile" data-v="light" onclick="Settings.pickTheme('light')"><span class="sw"><i style="background:#eef2f8"></i><i style="background:#ffffff"></i><i style="background:#1d5fd1"></i><i style="background:#0d1b33"></i></span><b>Alba</b><span>chiaro</span></button>
-              <button type="button" class="tile" data-v="eva01" onclick="Settings.pickTheme('eva01')"><span class="sw"><i style="background:#0d0617"></i><i style="background:#261540"></i><i style="background:#7cc443"></i><i style="background:#f0e6ff"></i></span><b>Eva 01</b><span>viola e lime</span></button>
-              <button type="button" class="tile" data-v="catppuccino" onclick="Settings.pickTheme('catppuccino')"><span class="sw"><i style="background:#1e1e2e"></i><i style="background:#313244"></i><i style="background:#fab387"></i><i style="background:#cdd6f4"></i></span><b>Catppuccin</b><span>Mocha</span></button>
-              <button type="button" class="tile" data-v="spiderman" onclick="Settings.pickTheme('spiderman')"><span class="sw"><i style="background:#070d1f"></i><i style="background:#1d3fa0"></i><i style="background:#ff5c62"></i><i style="background:#f2f5ff"></i></span><b>Spider-Man</b><span>blu e rosso</span></button>
+            <p class="role-readonly" id="theme-current"></p><div class="tiles" id="theme-tiles" role="group" aria-labelledby="lbl-theme">
+              <button data-min-role="admin" type="button" class="tile" data-v="" onclick="Settings.pickTheme('')"><span class="sw"><i style="background:#0b1424"></i><i style="background:#7fb2ff"></i><i style="background:#eef2f8"></i><i style="background:#1d5fd1"></i></span><b>Automatico</b><span>segue il sistema</span></button>
+              <button data-min-role="admin" type="button" class="tile" data-v="dark" onclick="Settings.pickTheme('dark')"><span class="sw"><i style="background:#0b1424"></i><i style="background:#13213a"></i><i style="background:#7fb2ff"></i><i style="background:#e9eef7"></i></span><b>Notte</b><span>cielo notturno</span></button>
+              <button data-min-role="admin" type="button" class="tile" data-v="light" onclick="Settings.pickTheme('light')"><span class="sw"><i style="background:#eef2f8"></i><i style="background:#ffffff"></i><i style="background:#1d5fd1"></i><i style="background:#0d1b33"></i></span><b>Alba</b><span>chiaro</span></button>
+              <button data-min-role="admin" type="button" class="tile" data-v="eva01" onclick="Settings.pickTheme('eva01')"><span class="sw"><i style="background:#0d0617"></i><i style="background:#261540"></i><i style="background:#7cc443"></i><i style="background:#f0e6ff"></i></span><b>Eva 01</b><span>viola e lime</span></button>
+              <button data-min-role="admin" type="button" class="tile" data-v="catppuccino" onclick="Settings.pickTheme('catppuccino')"><span class="sw"><i style="background:#1e1e2e"></i><i style="background:#313244"></i><i style="background:#fab387"></i><i style="background:#cdd6f4"></i></span><b>Catppuccin</b><span>Mocha</span></button>
+              <button data-min-role="admin" type="button" class="tile" data-v="spiderman" onclick="Settings.pickTheme('spiderman')"><span class="sw"><i style="background:#070d1f"></i><i style="background:#1d3fa0"></i><i style="background:#ff5c62"></i><i style="background:#f2f5ff"></i></span><b>Spider-Man</b><span>blu e rosso</span></button>
             </div>
             <div class="fl" id="lbl-dens" style="margin-top:18px">Densità</div>
-            <div class="seg" id="dens-seg" role="group" aria-labelledby="lbl-dens">
-              <button type="button" data-v="" onclick="Settings.pickDensity('')">Comoda</button>
-              <button type="button" data-v="compact" onclick="Settings.pickDensity('compact')">Compatta</button>
+            <p class="role-readonly" id="density-current"></p><div class="seg" id="dens-seg" role="group" aria-labelledby="lbl-dens">
+              <button data-min-role="admin" type="button" data-v="" onclick="Settings.pickDensity('')">Comoda</button>
+              <button data-min-role="admin" type="button" data-v="compact" onclick="Settings.pickDensity('compact')">Compatta</button>
             </div>
             <div class="hint">La compatta riduce spaziature e altezza delle righe: più VM visibili nelle tabelle. La scelta si salva subito.</div>
           </div>
@@ -1600,13 +1652,13 @@ html.spiderman{
           <div class="panel-h"><h2>Aggiornamento automatico</h2></div>
           <div class="panel-b">
             <div class="fl" id="lbl-refresh">Intervallo</div>
-            <div class="seg" id="refresh-seg" role="group" aria-labelledby="lbl-refresh" style="max-width:100%;flex-wrap:wrap">
-              <button type="button" data-v="0" onclick="AutoRefreshUI.save(0)">Spento</button>
-              <button type="button" data-v="15" onclick="AutoRefreshUI.save(15)">15 s</button>
-              <button type="button" data-v="30" onclick="AutoRefreshUI.save(30)">30 s</button>
-              <button type="button" data-v="60" onclick="AutoRefreshUI.save(60)">1 min</button>
-              <button type="button" data-v="120" onclick="AutoRefreshUI.save(120)">2 min</button>
-              <button type="button" data-v="300" onclick="AutoRefreshUI.save(300)">5 min</button>
+            <p class="role-readonly" id="refresh-current"></p><div class="seg" id="refresh-seg" role="group" aria-labelledby="lbl-refresh" style="max-width:100%;flex-wrap:wrap">
+              <button data-min-role="admin" type="button" data-v="0" onclick="AutoRefreshUI.save(0)">Spento</button>
+              <button data-min-role="admin" type="button" data-v="15" onclick="AutoRefreshUI.save(15)">15 s</button>
+              <button data-min-role="admin" type="button" data-v="30" onclick="AutoRefreshUI.save(30)">30 s</button>
+              <button data-min-role="admin" type="button" data-v="60" onclick="AutoRefreshUI.save(60)">1 min</button>
+              <button data-min-role="admin" type="button" data-v="120" onclick="AutoRefreshUI.save(120)">2 min</button>
+              <button data-min-role="admin" type="button" data-v="300" onclick="AutoRefreshUI.save(300)">5 min</button>
             </div>
             <div class="hint">Aggiorna da sola Panoramica, Nodi, VM e container, Cluster, GPU e Gruppi. Si ferma con la scheda nascosta, con una finestra aperta o mentre scrivi in un campo. La scelta si salva subito.</div>
           </div>
@@ -1623,7 +1675,7 @@ html.spiderman{
               <dt>Certificati</dt><dd>self-signed accettati, vedi SECURITY.md</dd>
             </dl>
             <div class="btns" style="margin-top:12px">
-              <button type="button" class="btn bg2 sm" id="update-check" onclick="UpdateUI.check()">Controlla ora</button>
+              <button data-min-role="operator" type="button" class="btn bg2 sm" id="update-check" onclick="UpdateUI.check()">Controlla ora</button>
               <button type="button" class="btn bg2 sm" onclick="UpdateUI.help()">Come aggiornare</button>
             </div>
             <p class="hint" id="update-message" role="status"></p>
@@ -1687,7 +1739,7 @@ html.spiderman{
   <div id="gpu-msg" role="status" style="margin-top:10px"></div>
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('mgpu')">Annulla</button>
-    <button class="btn ba" onclick="Gpu.next()">Continua</button>
+    <button data-min-role="admin" class="btn ba" onclick="Gpu.next()">Continua</button>
   </div>
 </div></div>
 
@@ -1701,8 +1753,8 @@ html.spiderman{
   <div id="mgm-msg" role="status" style="margin-top:10px"></div>
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('mgm')">Annulla</button>
-    <button class="btn bg2" id="mgm-reset" onclick="Gpu.modelSave(true)">Ripristina</button>
-    <button class="btn ba" id="mgm-ok" onclick="Gpu.modelSave(false)">Salva</button>
+    <button data-min-role="admin" class="btn bg2" id="mgm-reset" onclick="Gpu.modelSave(true)">Ripristina</button>
+    <button data-min-role="admin" class="btn ba" id="mgm-ok" onclick="Gpu.modelSave(false)">Salva</button>
   </div>
 </div></div>
 
@@ -1716,8 +1768,8 @@ html.spiderman{
   <div id="grp-msg" role="status" style="margin-top:10px"></div>
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('mgrp')">Annulla</button>
-    <button class="btn bg2" id="grp-clear" onclick="Groups.save(true)">Togli il gruppo</button>
-    <button class="btn ba" onclick="Groups.save(false)">Salva</button>
+    <button data-min-role="operator" class="btn bg2" id="grp-clear" onclick="Groups.save(true)">Togli il gruppo</button>
+    <button data-min-role="operator" class="btn ba" onclick="Groups.save(false)">Salva</button>
   </div>
 </div></div>
 
@@ -1744,7 +1796,7 @@ html.spiderman{
       <option value="sata">SATA</option>
     </select>
   </div>
-  <button class="btn ba mb16" id="disk-add-btn" onclick="DiskMgr.addDisk()">+ Aggiungi disco</button>
+  <button data-min-role="operator" class="btn ba mb16" id="disk-add-btn" onclick="DiskMgr.addDisk()">+ Aggiungi disco</button>
 
   <div class="sep"></div>
 
@@ -1769,7 +1821,7 @@ html.spiderman{
       </div>
     </div>
   </div>
-  <button class="btn bpurp wf mb12" id="disk-setup-btn" onclick="DiskMgr.setupDisk()">Configura disco</button>
+  <button data-min-role="operator" class="btn bpurp wf mb12" id="disk-setup-btn" onclick="DiskMgr.setupDisk()">Configura disco</button>
   <div class="hint mb12">Partiziona, formatta e monta l'unico disco vuoto (senza partizioni né filesystem) che il guest trova: il disco scelto sopra deve esistere nella VM, ma quello formattato è scelto nel guest. Se il guest non lo vede, la VM non viene toccata: ti viene chiesto prima se spegnerla e riaccenderla (fino a 2 minuti).</div>
 
   <h2 class="sec">Log</h2>
@@ -1792,17 +1844,55 @@ html.spiderman{
 <div class="ov" id="madduser"><div class="modal" style="min-width:min(420px,calc(100vw - 24px))">
   <div class="mt">Aggiungi utente VM</div>
   <div id="madduserB">
-    <div class="fr"><label class="fl" for="adduser-name">Nome utente</label><input class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
+    <div class="fr"><label class="fl" for="adduser-name">Nome utente</label><input data-min-role="operator" class="inp w" id="adduser-name" type="text" placeholder="nomeutente" autocomplete="off" onkeydown="if(event.key==='Enter')VMs.submitAddUser()"></div>
     <div class="hint" id="adduser-pwhint">Password iniziale: <code>p4ssw0rd</code> — scadrà al primo accesso.</div>
     <div class="fr" style="align-items:flex-start;margin-top:10px"><label class="fl" style="padding-top:4px" for="adduser-sshkey">Chiave pubblica SSH (opzionale)</label><textarea class="inp w" id="adduser-sshkey" rows="3" oninput="document.getElementById('adduser-pwhint').hidden=this.value.trim()!==''" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="ssh-ed25519 AAAA... (opzionale)"></textarea></div>
   </div>
   <div id="adduser-out" style="display:none;margin-top:12px" class="plog"></div>
   <div class="mf">
     <button class="btn bg2" onclick="closeModal('madduser')">Chiudi</button>
-    <button class="btn ba" id="adduser-ok" onclick="VMs.submitAddUser()">Aggiungi</button>
+    <button data-min-role="operator" class="btn ba" id="adduser-ok" onclick="VMs.submitAddUser()">Aggiungi</button>
   </div>
 </div></div>
 
+<div class="ov" id="mauth-step" inert><div class="modal">
+  <h2 class="mt">Conferma autenticazione</h2>
+  <p id="auth-step-help" class="auth-note">Questa azione richiede il codice dell'app di autenticazione</p>
+  <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.submitStep(this)">
+    <div class="fg"><label class="fl" for="auth-step-code">Codice a 6 cifre</label><input class="inp" id="auth-step-code" name="code" aria-describedby="auth-step-help" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+    <div class="mf"><button type="button" class="btn bg2" onclick="closeModal('mauth-step')">Annulla</button><button class="btn ba" type="submit">Conferma</button></div>
+  </form>
+</div></div>
+<div class="ov" id="mauth-account" inert><div class="modal">
+  <h2 class="mt">Il mio account</h2>
+  <p id="auth-account-user" class="auth-note"></p><p id="auth-expiry" class="auth-note"></p>
+  <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.password(this)">
+    <h3 class="sec">Cambia password</h3>
+    <input type="text" name="username" id="auth-account-name" autocomplete="username" hidden>
+    <div class="fg"><label class="fl" for="auth-old">Password attuale</label><input class="inp" id="auth-old" name="old" type="password" autocomplete="current-password" maxlength="256" required></div>
+    <div class="fg"><label class="fl" for="auth-new">Nuova password</label><input class="inp" id="auth-new" name="new" type="password" autocomplete="new-password" aria-describedby="auth-password-help" required></div>
+    <div class="fg"><label class="fl" for="auth-repeat">Ripeti nuova password</label><input class="inp" id="auth-repeat" name="repeat" type="password" autocomplete="new-password" required></div>
+    <p class="auth-note" id="auth-password-help">Da 12 a 256 caratteri, senza caratteri di controllo.</p>
+    <div class="fg"><label class="fl" for="auth-password-code">Codice dell'app di autenticazione</label><input class="inp" id="auth-password-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+    <p class="auth-error" data-error role="alert"></p>
+    <div class="mf"><button type="button" class="btn bg2" onclick="closeModal('mauth-account')">Chiudi</button><button type="submit" class="btn ba">Cambia password</button></div>
+  </form>
+</div></div>
+<div class="ov" id="musers-new" inert><div class="modal">
+  <h2 class="mt">Nuovo utente</h2>
+  <form class="auth-form" method="post" data-min-role="admin" onsubmit="event.preventDefault();Users.create(this)">
+    <div class="fg"><label class="fl" for="users-name">Nome utente</label><input class="inp" id="users-name" name="username" autocomplete="off" minlength="2" maxlength="32" pattern="[a-z][a-z0-9._\-]{1,31}" required></div>
+    <div class="fg"><label class="fl" for="users-role">Ruolo</label><select class="inp" id="users-role" name="role"><option value="reader">Lettore</option><option value="operator">Operatore</option><option value="admin">Amministratore</option></select></div>
+    <p class="auth-error" data-error role="alert"></p>
+    <div class="mf"><button type="button" class="btn bg2" onclick="closeModal('musers-new')">Annulla</button><button type="submit" class="btn ba" data-min-role="admin">Crea utente</button></div>
+  </form>
+</div></div>
+<div class="ov" id="musers-credentials" inert><div class="modal" aria-describedby="users-credentials-warning">
+  <h2 class="mt">Credenziali monouso</h2>
+  <p class="auth-note" id="users-credentials-warning">consegnali di persona, non verranno piu' mostrati</p>
+  <div id="users-credentials-body"></div>
+  <div class="mf"><button type="button" class="btn ba" onclick="Users.acknowledge()">Ho copiato</button></div>
+</div></div>
 <div id="toasts" role="status" aria-live="polite"></div>
 
 <script>
@@ -1810,31 +1900,299 @@ const _IS_CONSOLE = window.location.pathname === '/console';
 // ════════════════════════════════════════════════════════════════════════════
 // CORE
 // ════════════════════════════════════════════════════════════════════════════
+// pmgr:auth-ui:begin
+function roleRank(name){return name==='reader'?1:name==='operator'?2:name==='admin'?3:0;}
+function canDo(userRole,requiredRole){return roleRank(requiredRole)>0&&roleRank(userRole)>=roleRank(requiredRole);}
+function classifyApiError(status,body){
+  const b=body&&typeof body==='object'?body:{};
+  if(status===401)return b.setup===true?'setup':b.login===true?'login':'other';
+  if(status!==403)return 'other';
+  if(b.reason==='step_up')return 'step_up';
+  if(typeof b.required==='string'&&roleRank(b.required))return 'role';
+  if(b.reason==='csrf'||typeof b.error==='string'&&/csrf/i.test(b.error))return 'csrf';
+  return 'other';
+}
+// Empty string means valid. Count Unicode characters, not UTF-16 units; the server also checks its byte limit.
+function validateNewPassword(a,b){
+  if(typeof a!=='string'||typeof b!=='string')return 'Password non valida';
+  const n=Array.from(a).length;
+  if(n<12||n>256||/[\u0000-\u001f\u007f-\u009f]/u.test(a))return 'La password deve contenere da 12 a 256 caratteri, senza caratteri di controllo';
+  return a===b?'':'Le password non coincidono';
+}
+// Explicit attributes in static markup, the same helper for template strings.
+function roleAttrs(requiredRole){
+  if(!roleRank(requiredRole))throw new Error('Ruolo non valido');
+  return `data-min-role="${requiredRole}"`;
+}
+// pmgr:auth-ui:end
+const RoleUI={
+  sync(role){
+    for(const name of ['reader','operator','admin'])document.documentElement.classList.toggle('role-'+name,name===role);
+  },
+  mark(control,role){control.setAttribute('data-min-role',role);},
+  readonly(form){
+    const fields=form.querySelector('fieldset');
+    if(fields)fields.disabled=!canDo(Auth.role,'admin');
+  },
+  pageRole(page){return page==='users'?'admin':['provision','batch'].includes(page)?'operator':'reader';},
+  canPage(page){return canDo(Auth.role,this.pageRole(page));}
+};
+
+const Auth={
+  username:'',role:'',csrf:'',expires:0,locked:true,epoch:0,requests:new Set(),credentialsPending:false,overlay:false,previous:null,setup:null,step:null,
+  roleLabel(role){return {reader:'Lettore',operator:'Operatore',admin:'Amministratore'}[role]||'Sconosciuto';},
+  accept(d){
+    if(!d||typeof d.username!=='string'||!/^[a-z][a-z0-9._-]{1,31}$/.test(d.username)||!roleRank(d.role)||typeof d.csrf!=='string'||!d.csrf||d.csrf.length>256||!Number.isSafeInteger(d.expires)||d.expires<=0)throw new Error('Risposta di autenticazione non valida');
+    this.username=d.username;this.role=d.role;this.csrf=d.csrf;this.expires=d.expires;this.locked=false;this.epoch++;RoleUI.sync(this.role);
+    const button=document.getElementById('user-button');
+    button.textContent=`${this.username} · ${this.roleLabel(this.role)}`;button.title=button.textContent;
+  },
+  clear(){this.username='';this.role='';this.csrf='';this.expires=0;this.locked=true;this.credentialsPending=false;this.epoch++;RoleUI.sync('');},
+  stop(){
+    AutoRefreshUI.stop();Ceph.stop();clearInterval(App.connTimer);App.connTimer=null;
+    clearTimeout(Balance.timer);Balance.timer=null;
+    for(const request of this.requests)request.abort();this.requests.clear();
+  },
+  lock(){
+    this.stop();this.clear();ClusterMgr.closeMenu(false);
+    closeModal('musers-credentials');if(document.getElementById('musers-new').classList.contains('open'))closeModal('musers-new');
+    if(this.step)closeModal('mauth-step');
+    if(document.getElementById('mauth-account').classList.contains('open'))closeModal('mauth-account');
+    _syncModals();
+  },
+  screen(title,html,overlay=false){
+    this.overlay=overlay;
+    const screen=document.getElementById('auth-screen');screen.hidden=false;
+    screen.classList.toggle('auth-overlay',overlay);screen.setAttribute('role',overlay?'dialog':'main');
+    if(overlay)screen.setAttribute('aria-modal','true');else screen.removeAttribute('aria-modal');
+    document.body.classList.toggle('auth-pending',!overlay);
+    document.getElementById('auth-title').textContent=title;document.getElementById('auth-body').innerHTML=html;
+    _syncModals();
+    (screen.querySelector('input:not([type=hidden])')||screen.querySelector('button')||screen).focus();
+  },
+  reveal(){
+    document.getElementById('auth-screen').hidden=true;document.getElementById('auth-body').replaceChildren();
+    document.body.classList.remove('auth-pending');this.setup=null;_syncModals();
+    const top=_modalStack.at(-1);(top?document.getElementById(top.id).querySelector(FOCUSABLE):document.getElementById(_IS_CONSOLE?'con-term':'content'))?.focus();
+  },
+  showLogin(message='',overlay=false){
+    this.setup=null;
+    this.screen(overlay?'Sessione scaduta':'Accedi',`
+      <p class="auth-note" id="auth-login-help">${esc(message||'Inserisci le credenziali e il codice dell’app di autenticazione.')}</p>
+      <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.login(this)">
+        <div class="fg"><label class="fl" for="auth-username">Nome utente</label><input class="inp" id="auth-username" name="username" autocomplete="username" minlength="2" maxlength="32" pattern="[a-z][a-z0-9._\\-]{1,31}" value="${esc(overlay?this.previous?.username:'')}" required></div>
+        <div class="fg"><label class="fl" for="auth-login-password">Password</label><input class="inp" id="auth-login-password" name="password" type="password" autocomplete="current-password" required></div>
+        <div class="fg"><label class="fl" for="auth-login-code">Codice a 6 cifre</label><input class="inp" id="auth-login-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+        <p class="auth-error" data-error role="alert"></p>
+        <div class="mf"><button type="submit" class="btn ba">Accedi</button></div>
+      </form>`,overlay);
+  },
+  expired(){
+    if(this.locked)return;
+    this.previous={username:this.username,role:this.role};this.lock();
+    this.showLogin('Sessione scaduta. Accedi di nuovo, poi ripeti l’azione desiderata.',true);
+  },
+  errorText(e){
+    if(e.status!==429)return e.message;
+    const seconds=Number.isFinite(e.retryAfter)&&e.retryAfter>0?Math.ceil(e.retryAfter):900;
+    return `Troppi tentativi. Riprova tra ${seconds} secondi.`;
+  },
+  async form(form,fn){
+    if(form.dataset.busy)return;
+    form.dataset.busy='true';const button=form.querySelector('[type=submit]'),error=form.querySelector('[data-error]');
+    button.disabled=true;error.textContent='';
+    try{await fn();}catch(e){error.textContent=this.errorText(e);}
+    finally{delete form.dataset.busy;button.disabled=false;}
+  },
+  async login(form){
+    if(!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const overlay=this.overlay;
+      const body=JSON.stringify({username:form.elements.username.value,password:form.elements.password.value,code:form.elements.code.value});
+      form.elements.password.value='';form.elements.code.value='';
+      const d=await api('/auth/login',{method:'POST',body,quiet:true});this.accept(d);
+      // A different identity/role must never inherit another account's DOM, closures or caches.
+      if(overlay&&(this.previous?.username!==this.username||this.previous?.role!==this.role)){location.reload();return;}
+      this.reveal();
+      if(overlay){_tc.clear();Palette.data=null;toast('Accesso riuscito. Ripeti l’azione desiderata.','ok');}
+      else await App.boot();
+    });
+  },
+  async init(){
+    try{
+      const d=await api('/auth/me',{quiet:true});this.accept(d);this.reveal();await App.boot();
+    }catch(e){
+      if(e.status===401){
+        // Current /me has no setup flag: query the public status before exposing the wizard.
+        try{if((await api('/auth/setup',{quiet:true})).open===true){this.showSetup();return;}}
+        catch(statusError){this.bootError(statusError);return;}
+        this.showLogin();return;
+      }
+      this.bootError(e);
+    }
+  },
+  bootError(e){
+    this.lock();this.screen('Accesso non disponibile',`<p class="auth-error" role="alert">${esc(this.errorText(e))}</p><button type="button" class="btn bg2" onclick="App.init()">Riprova</button>`);
+  },
+  showSetup(message=''){
+    this.setup=null;
+    this.screen('Configura l’amministratore',`
+      <p class="auth-note">Passo 1 di 3 · Codice monouso</p>
+      <p class="auth-note">Lo trovi nel journal del servizio: <code>journalctl -u proxmox-manager</code></p>
+      <p class="auth-note">${esc(message)}</p>
+      <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.setupKey(this)">
+        <div class="fg"><label class="fl" for="auth-setup-code">Codice di configurazione</label><input class="inp" id="auth-setup-code" name="code" autocomplete="off" maxlength="128" required></div>
+        <p class="auth-error" data-error role="alert"></p><div class="mf"><button type="submit" class="btn ba">Continua</button></div>
+      </form>`);
+  },
+  async setupKey(form){
+    if(!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const code=form.elements.code.value;form.elements.code.value='';
+      try{
+        const d=await api('/auth/setup/totp',{method:'POST',body:JSON.stringify({code}),quiet:true});
+        if(typeof d.secret!=='string'||!/^[A-Z2-7]{16,128}$/.test(d.secret)||typeof d.uri!=='string'||!d.uri.startsWith('otpauth://totp/')||d.uri.length>2048)throw new Error('Risposta di configurazione non valida');
+        this.setup={code,secret:d.secret,uri:d.uri};this.setupSecret();
+      }catch(e){if(e.status===410){this.showLogin(e.message);return;}throw e;}
+    });
+  },
+  setupSecret(){
+    this.screen('Collega l’app di autenticazione',`
+      <p class="auth-note">Passo 2 di 3 · Conserva la chiave in un luogo sicuro.</p>
+      <p class="auth-note">Non viene mostrato un QR code: inserisci manualmente la chiave nell’app di autenticazione.</p>
+      <p class="fl" id="auth-key-label">Chiave TOTP</p><code class="auth-secret" aria-labelledby="auth-key-label">${esc(this.setup.secret.match(/.{1,4}/g).join(' '))}</code>
+      <button type="button" class="btn bg2" onclick="Auth.copy('secret')">Copia chiave</button>
+      <p class="fl" id="auth-uri-label">URI otpauth</p><code class="auth-secret" aria-labelledby="auth-uri-label">${esc(this.setup.uri)}</code>
+      <button type="button" class="btn bg2" onclick="Auth.copy('uri')">Copia URI</button>
+      <div class="mf"><button type="button" class="btn ba" onclick="Auth.setupAccount()">Ho inserito la chiave, continua</button></div>`);
+  },
+  async copy(field){
+    if(!this.setup||!['secret','uri'].includes(field))return;
+    try{await navigator.clipboard.writeText(this.setup[field]);toast('Copiato','ok');}
+    catch(e){toast('Copia non disponibile: seleziona e copia il testo manualmente.','err');}
+  },
+  setupAccount(){
+    if(!this.setup)return;
+    this.screen('Crea il primo account',`
+      <p class="auth-note">Passo 3 di 3 · Amministratore</p>
+      <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.completeSetup(this)">
+        <div class="fg"><label class="fl" for="auth-setup-user">Nome utente</label><input class="inp" id="auth-setup-user" name="username" autocomplete="username" minlength="2" maxlength="32" pattern="[a-z][a-z0-9._\\-]{1,31}" required></div>
+        <div class="fg"><label class="fl" for="auth-setup-password">Password</label><input class="inp" id="auth-setup-password" name="password" type="password" autocomplete="new-password" aria-describedby="auth-setup-help" required></div>
+        <div class="fg"><label class="fl" for="auth-setup-repeat">Ripeti password</label><input class="inp" id="auth-setup-repeat" name="repeat" type="password" autocomplete="new-password" required></div>
+        <p class="auth-note" id="auth-setup-help">Da 12 a 256 caratteri, senza caratteri di controllo.</p>
+        <div class="fg"><label class="fl" for="auth-setup-totp">Primo codice a 6 cifre dell’app</label><input class="inp" id="auth-setup-totp" name="totp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+        <p class="auth-error" data-error role="alert"></p>
+        <div class="mf"><button type="button" class="btn bg2" onclick="Auth.setupSecret()">Rivedi chiave</button><button type="submit" class="btn ba">Crea account</button></div>
+      </form>`);
+  },
+  async completeSetup(form){
+    if(!this.setup||!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const error=validateNewPassword(form.elements.password.value,form.elements.repeat.value);if(error)throw new Error(error);
+      const body=JSON.stringify({code:this.setup.code,username:form.elements.username.value,password:form.elements.password.value,totp:form.elements.totp.value});
+      form.elements.password.value='';form.elements.repeat.value='';form.elements.totp.value='';
+      try{await api('/auth/setup/complete',{method:'POST',body,quiet:true});this.showLogin('Account creato. Accedi con la password e un nuovo codice dell’app (attendi il prossimo codice).');}
+      catch(e){if(e.status===410){this.showLogin(e.message);return;}throw e;}
+    });
+  },
+  promptStep(){
+    // Serialize challenges: two requests must never share a one-use TOTP code.
+    if(this.step)return Promise.reject(new Error('Un’altra conferma di autenticazione è già aperta. Ripeti l’azione.'));
+    if(this.locked)return Promise.reject(new Error('Sessione scaduta. Accedi e ripeti l’azione.'));
+    return new Promise((resolve,reject)=>{this.step={resolve,reject};document.getElementById('auth-step-code').value='';openModal('mauth-step');});
+  },
+  submitStep(form){
+    if(!this.step||!form.reportValidity())return;
+    const code=form.elements.code.value, pending=this.step;this.step=null;closeModal('mauth-step');pending.resolve(code);
+  },
+  modalClosed(id){
+    if(id==='mauth-step'){
+      document.getElementById('auth-step-code').value='';
+      if(this.step){const pending=this.step;this.step=null;pending.reject(new Error('Azione annullata: codice di autenticazione non fornito.'));}
+    }
+    if(id==='mauth-account')document.querySelector('#mauth-account form').reset();
+  },
+  account(){
+    if(this.locked)return;
+    document.querySelector('#mauth-account form').reset();document.querySelector('#mauth-account [data-error]').textContent='';
+    document.getElementById('auth-account-name').value=this.username;
+    document.getElementById('auth-account-user').textContent=`${this.username} · ${this.roleLabel(this.role)}`;
+    document.getElementById('auth-expiry').textContent='Scadenza sessione: '+new Date(this.expires*1000).toLocaleString('it-IT')+' (salvo scadenza per inattività).';
+    openModal('mauth-account');
+  },
+  async password(form){
+    if(!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const error=validateNewPassword(form.elements.new.value,form.elements.repeat.value);if(error)throw new Error(error);
+      const body=JSON.stringify({old:form.elements.old.value,new:form.elements.new.value,code:form.elements.code.value});form.reset();
+      await api('/auth/password',{method:'POST',body,quiet:true});closeModal('mauth-account');toast('Password cambiata. Le altre sessioni sono state chiuse.','ok');
+    });
+  },
+  async logout(){
+    if(this.loggingOut)return;this.loggingOut=true;
+    try{
+      await api('/auth/logout',{method:'POST',quiet:true});this.lock();_tc.clear();Palette.data=null;this.previous=null;
+      this.showLogin('Disconnessione riuscita.');
+      // Reload discards all page data, module-private caches and pending work, including console state.
+      location.reload();
+    }catch(e){toast(this.errorText(e),'err');}
+    finally{this.loggingOut=false;}
+  }
+};
+
 async function api(path, opts={}) {
-  const NO_CLUSTER_ROUTES=['/clusters','/config','/version','/update-status','/update-check'];
+  const publicAuth=['/auth/me','/auth/login','/auth/setup','/auth/setup/totp','/auth/setup/complete'].includes(path);
+  if(!publicAuth&&(Auth.locked||Auth.credentialsPending))throw new Error('Accesso richiesto. Accedi e ripeti l’azione.');
+  const NO_CLUSTER_ROUTES=['/auth/','/users','/audit','/clusters','/config','/version','/update-status','/update-check'];
   const needsCluster=!NO_CLUSTER_ROUTES.some(p=>path.startsWith(p));
   let fullPath='/api'+path;
   if(needsCluster&&!new URLSearchParams(path.split('?')[1]||'').has('cluster')){
-    const sep=path.includes('?')?'&':'?';
-    const cidx=(typeof ClusterMgr!=='undefined')?(ClusterMgr.current??0):0;
-    fullPath+=sep+'cluster='+cidx;
+    fullPath+=(path.includes('?')?'&':'?')+'cluster='+(ClusterMgr.current??0);
   }
-  // quiet: il chiamante gestisce l'errore in pagina, niente toast
-  const {quiet=false,timeoutMs=0,...fetchOpts}=opts;
-  let r, timer;
+  // Preserve existing operation budgets; auth requests always have a bounded wait.
+  const {quiet=false,timeoutMs=path.startsWith('/auth/')?30000:0,...fetchOpts}=opts;
+  const epoch=Auth.epoch;
+  const headers=new Headers(fetchOpts.headers);headers.set('Content-Type','application/json');
+  if((fetchOpts.method||'GET').toUpperCase()!=='GET'&&Auth.csrf)headers.set('X-CSRF-Token',Auth.csrf);
+  const stale=()=>!publicAuth&&(Auth.locked||epoch!==Auth.epoch);
+  const send=async()=>{
+    if(stale())throw new Error('Sessione cambiata. Ripeti l’azione.');
+    const ac=new AbortController(), external=fetchOpts.signal, abort=()=>ac.abort();
+    let timer;
+    if(external?.aborted)ac.abort();else external?.addEventListener('abort',abort,{once:true});
+    if(timeoutMs)timer=setTimeout(abort,timeoutMs);
+    if(!publicAuth)Auth.requests.add(ac);
+    try{
+      const response=await fetch(fullPath,{...fetchOpts,headers,signal:ac.signal,credentials:'same-origin',cache:'no-store'});
+      const body=await response.json().catch(()=>({}));
+      if(stale())throw new Error('Sessione cambiata. Ripeti l’azione.');
+      return {response,body};
+    }catch(e){
+      if(stale())throw new Error('Sessione scaduta. Accedi e ripeti l’azione.');
+      if(e.name==='AbortError')throw new Error('Richiesta interrotta o tempo scaduto: ripeti l’azione.');
+      throw new Error('Proxy non raggiungibile');
+    }finally{clearTimeout(timer);Auth.requests.delete(ac);external?.removeEventListener('abort',abort);}
+  };
   try{
-    if(timeoutMs){const ac=new AbortController();fetchOpts.signal=ac.signal;timer=setTimeout(()=>ac.abort(),timeoutMs);}
-    r = await fetch(fullPath, {headers:{'Content-Type':'application/json'}, ...fetchOpts});
-    clearTimeout(timer);
-  }catch(netErr){
-    clearTimeout(timer);
-    const e=new Error(netErr&&netErr.name==='AbortError'?'Tempo scaduto: nessuna risposta dal proxy':'Proxy non raggiungibile');
-    if(!quiet) toast(e.message,'err');
-    throw e;
-  }
-  const d = await r.json().catch(()=>({}));
-  if(!r.ok) { const e=new Error(d.error||r.statusText||`HTTP ${r.status}`); e.body=d; e.status=r.status; if(!quiet) toast(e.message,'err'); throw e; }
-  return d;
+    let {response:r,body:d}=await send();
+    if(classifyApiError(r.status,d)==='step_up'){
+      const code=await Auth.promptStep();
+      if(stale())throw new Error('Sessione cambiata. Ripeti l’azione.');
+      headers.set('X-TOTP-Code',code);
+      ({response:r,body:d}=await send()); // Exactly one retry, with the original URL, method and body.
+    }
+    if(!r.ok){
+      const kind=classifyApiError(r.status,d);
+      if(!publicAuth&&r.status===401)Auth.expired();
+      const message=kind==='step_up'?"Codice non valido o gia' usato: attendi il codice successivo dell'app e riprova":kind==='role'?`Il tuo ruolo (${Auth.roleLabel(Auth.role)}) non permette questa azione`:typeof d?.error==='string'?d.error:r.statusText||`HTTP ${r.status}`;
+      const e=new Error(message);e.body=d;e.status=r.status;
+      const retry=r.headers.get('Retry-After');
+      e.retryAfter=retry&&/^\d+$/.test(retry)?Number(retry):retry?Math.max(0,(Date.parse(retry)-Date.now())/1000):Number(d?.retry_after);
+      if(kind==='role')toast(message,'err');
+      throw e;
+    }
+    return d;
+  }catch(e){if(!quiet)toast(Auth.errorText(e),'err');throw e;}
 }
 
 // Librerie incorporate caricate al primo uso: la pagina /console non scarica Chart.js né SheetJS,
@@ -1878,27 +2236,32 @@ function toast(msg,type='info'){
 const FOCUSABLE='button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const _modalStack=[];
 function _syncModals(){
-  const top=_modalStack.length?_modalStack[_modalStack.length-1].id:null;
+  const top=!Auth.locked&&_modalStack.length?_modalStack[_modalStack.length-1].id:null;
   document.querySelectorAll('.ov').forEach(o=>{o.inert=(o.id!==top);});
-  for(const id of ['topbar','sidebar','main','skip-link']){const el=document.getElementById(id);if(el)el.inert=_modalStack.length>0;}
+  for(const id of ['topbar','sidebar','main','skip-link','con-wrap']){const el=document.getElementById(id);if(el)el.inert=Auth.locked||_modalStack.length>0;}
 }
 function openModal(id){
+  if(Auth.locked)return;
   const el=document.getElementById(id); if(!el)return;
   const i=_modalStack.findIndex(m=>m.id===id); if(i>=0)_modalStack.splice(i,1);
   _modalStack.push({id,opener:document.activeElement});
   el.classList.add('open'); _syncModals();
   // focus iniziale sul primo controllo, a meno che il chiamante non lo sposti subito dopo
   setTimeout(()=>{
-    if(el.contains(document.activeElement)&&document.activeElement!==el)return;
+    if(Auth.locked||_modalStack.at(-1)?.id!==id||el.contains(document.activeElement)&&document.activeElement!==el)return;
     (el.querySelector(FOCUSABLE)||el.querySelector('.modal'))?.focus();
   },0);
 }
-function closeModal(id){
+function closeModal(id,acknowledged=false){
+  if(id==='musers-credentials'&&!acknowledged&&!Auth.locked)return;
+  if(id==='musers-credentials')document.getElementById('users-credentials-body').replaceChildren();
+  if(id==='musers-new')document.querySelector('#musers-new form').reset();
+  Auth.modalClosed(id);
   const el=document.getElementById(id); if(el)el.classList.remove('open');
   if(id==='mov'){Dmesg.reset();if(location.hash.startsWith('#/vm/'))Route.replace('#/'+App.cur);}
   const i=_modalStack.findIndex(m=>m.id===id); if(i<0)return;
   const [m]=_modalStack.splice(i,1); _syncModals();
-  if(m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
+  if(!Auth.locked&&m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
 }
 
 // Riga di errore con "Riprova" per tabelle che non hanno caricato. retry = codice JS statico.
@@ -1915,7 +2278,7 @@ function errBox(msg,retry){
 //  level 'danger' → bottone rosso pieno (perdita dati o fermo prolungato)
 //  typed          → testo da digitare per abilitare il bottone (solo azioni più gravi)
 //  Tutto il contenuto è inserito via textContent.
-function askConfirm({title,lines=[],consequence='',items=[],level='warn',typed=null,okLabel='Conferma'},onOk){
+function askConfirm({title,lines=[],consequence='',items=[],level='warn',typed=null,okLabel='Conferma',minRole='reader'},onOk){
   document.getElementById('mconfT').textContent=title;
   const box=document.getElementById('mconfB'); box.replaceChildren();
   for(const l of lines){const p=document.createElement('div');p.className='cf-line';p.textContent=l;box.append(p);}
@@ -1927,6 +2290,7 @@ function askConfirm({title,lines=[],consequence='',items=[],level='warn',typed=n
     box.append(ul);
   }
   const btn=document.getElementById('mconfOk');
+  RoleUI.mark(btn,minRole);
   btn.className='btn '+(level==='safe'?'ba':level==='danger'?'bx':'bd');
   btn.textContent=okLabel;
   let inp=null;
@@ -1959,6 +2323,16 @@ const VM_ACTIONS={
 // Tastiera: Esc chiude il modal in cima (o il selettore nodi); Invio/Spazio attivano intestazioni
 // ordinabili e elementi role=button; frecce spostano tra le tab.
 document.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){
+    const area=Auth.locked?document.getElementById('auth-screen'):_modalStack.length?document.getElementById(_modalStack.at(-1).id):null;
+    if(area){
+      const controls=[...area.querySelectorAll(FOCUSABLE)].filter(el=>!el.closest('[hidden]')&&el.getClientRects().length);
+      const first=controls[0],last=controls.at(-1);
+      if(!first){e.preventDefault();area.focus();return;}
+      if(!area.contains(document.activeElement)||e.shiftKey&&document.activeElement===first||!e.shiftKey&&document.activeElement===last){e.preventDefault();(e.shiftKey?last:first).focus();}
+    }
+  }
+  if(Auth.locked)return;
   if(e.key==='Escape'){
     if(_modalStack.length){e.preventDefault();closeModal(_modalStack[_modalStack.length-1].id);return;}
     if(Drawer.isOpen()){e.preventDefault();Drawer.set(false);return;}
@@ -2003,7 +2377,7 @@ const Drawer={
     open=open&&Drawer.mq.matches;
     sb.classList.toggle('open',open);
     btn.setAttribute('aria-expanded',open); btn.setAttribute('aria-label',open?'Chiudi menu':'Apri menu');
-    if(!_modalStack.length) main.inert=open;
+    if(!_modalStack.length) main.inert=Auth.locked||open;
     if(open) (sb.querySelector('.ni.active')||sb.querySelector('.ni'))?.focus();
     else if(was) btn.focus();
   },
@@ -2205,16 +2579,14 @@ const ClusterMgr={
     return c ? (c.has_console_credentials === true) : false;
   },
   async load(preserveCurrent=false){
-    try{
-      const data=await fetch('/api/clusters',{headers:{'Content-Type':'application/json'}}).then(r=>r.json());
-      this.clusters=Array.isArray(data)?data:[];
-      const sel=document.getElementById('cluster-select');
-      sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
-      const def=this.clusters.find(c=>c.default);
-      this.current=preserveCurrent&&this.clusters.some(c=>c.idx===this.current)?this.current:(def?def.idx:0);
-      sel.value=this.current;
-      sel.style.display=this.clusters.length>1?'':'none';
-    }catch(e){}
+    const data=await api('/clusters',{quiet:true});
+    this.clusters=Array.isArray(data)?data:[];
+    const sel=document.getElementById('cluster-select');
+    sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
+    const def=this.clusters.find(c=>c.default);
+    this.current=preserveCurrent&&this.clusters.some(c=>c.idx===this.current)?this.current:(def?def.idx:0);
+    sel.value=this.current;
+    sel.style.display=this.clusters.length>1?'':'none';
   },
   switchTo(idx){
     const selected=Number(idx);
@@ -2242,13 +2614,13 @@ const ClusterMgr={
         <div class="cl-label"><strong>${esc(c.label)}</strong>${c.default?'<span class="badge bn">Predefinito</span>':''}</div>
         <span class="cl-u">${esc(c.url)}</span><span class="cl-u tm">${esc(c.api_token_hint)}</span>
         <div class="cl-a">
-          <button class="btn bg2 sm" onclick="ClusterMgr.testCluster(${i})">Test</button>
-          <button class="btn bg2 sm" onclick="ClusterMgr.showEdit(${i})">Modifica</button>
+          <button data-min-role="admin" class="btn bg2 sm" onclick="ClusterMgr.testCluster(${i})">Test</button>
+          <button data-min-role="admin" class="btn bg2 sm" onclick="ClusterMgr.showEdit(${i})">Modifica</button>
           ${!c.default||this.clusters.length>1?`<div class="cl-more">
-            <button type="button" class="btn bg2 sm" id="cl-more-${i}" aria-haspopup="menu" aria-expanded="false" aria-controls="cl-menu-${i}" onclick="ClusterMgr.toggleMenu(this)" onkeydown="ClusterMgr.menuKey(event)">Altro…<span class="sr"> ${esc(c.label)}</span></button>
+            <button data-min-role="admin" type="button" class="btn bg2 sm" id="cl-more-${i}" aria-haspopup="menu" aria-expanded="false" aria-controls="cl-menu-${i}" onclick="ClusterMgr.toggleMenu(this)" onkeydown="ClusterMgr.menuKey(event)">Altro…<span class="sr"> ${esc(c.label)}</span></button>
             <div class="cl-menu" id="cl-menu-${i}" role="menu" aria-labelledby="cl-more-${i}" hidden onkeydown="ClusterMgr.menuKey(event)">
-              ${!c.default?`<button type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();ClusterMgr.setDefault(${i})">Imposta predefinito</button>`:''}
-              ${this.clusters.length>1?`<button type="button" role="menuitem" tabindex="-1" class="cl-delete" onclick="ClusterMgr.closeMenu();ClusterMgr.deleteCluster(${i})">Elimina</button>`:''}
+              ${!c.default?`<button data-min-role="admin" type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();ClusterMgr.setDefault(${i})">Imposta predefinito</button>`:''}
+              ${this.clusters.length>1?`<button data-min-role="admin" type="button" role="menuitem" tabindex="-1" class="cl-delete" onclick="ClusterMgr.closeMenu();ClusterMgr.deleteCluster(${i})">Elimina</button>`:''}
             </div>
           </div>`:''}
         </div>
@@ -2301,7 +2673,7 @@ const ClusterMgr={
       <div class="fr" style="margin-bottom:10px"><label class="fl" for="cf-pwd">Password${idx>=0?' (vuoto=invariato)':''}</label><input class="inp w" id="cf-pwd" type="password" placeholder="••••••••"></div>
       <div class="fr" style="margin-bottom:10px"><label class="fl" for="cf-default">Default</label><input type="checkbox" id="cf-default" ${c&&c.default?'checked':''}></div>
       <div style="display:flex;gap:6px">
-        <button class="btn ba sm" onclick="ClusterMgr.saveForm(${idx})">Salva</button>
+        <button data-min-role="admin" class="btn ba sm" onclick="ClusterMgr.saveForm(${idx})">Salva</button>
         <button class="btn bg2 sm" onclick="ClusterMgr.hideForm()">Annulla</button>
       </div>
     </div>`;
@@ -2324,16 +2696,16 @@ const ClusterMgr={
     try{
       let savedIdx;
       if(editIdx<0){
-        const res=await fetch('/api/clusters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        const res=await api('/clusters',{method:'POST',body:JSON.stringify(body)});
         savedIdx=res.idx??this.clusters.length;
         toast('Cluster aggiunto','ok');
       }else{
-        await fetch(`/api/clusters/${editIdx}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await api(`/clusters/${editIdx}`,{method:'PUT',body:JSON.stringify(body)});
         savedIdx=editIdx;
         toast('Cluster aggiornato','ok');
       }
       if(isDef){
-        await fetch(`/api/clusters/${savedIdx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await api(`/clusters/${savedIdx}/default`,{method:'PUT'});
       }
       this.hideForm();
       await this.renderList();
@@ -2342,14 +2714,14 @@ const ClusterMgr={
   },
   async deleteCluster(idx){
     const c=this.clusters[idx];
-    askConfirm({
+    askConfirm({minRole:'admin',
       title:'Elimina cluster',
       lines:[`Cluster: ${c?.label??'?'}`,`URL: ${c?.url??'?'}`],
       consequence:'La configurazione e il token di questo cluster vengono rimossi da config.json. Il cluster Proxmox non viene toccato.',
       level:'danger', typed:c?.label, okLabel:'Elimina cluster'
     },async()=>{
       try{
-        await fetch(`/api/clusters/${idx}`,{method:'DELETE',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await api(`/clusters/${idx}`,{method:'DELETE'});
         await this.renderList();
         await ReportSettingsUI.load();
         toast('Cluster eliminato','ok');
@@ -2358,7 +2730,7 @@ const ClusterMgr={
   },
   async setDefault(idx){
     try{
-      await fetch(`/api/clusters/${idx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      await api(`/clusters/${idx}/default`,{method:'PUT'});
       await this.renderList();
       await ReportSettingsUI.load();
       toast('Default aggiornato','ok');
@@ -2368,7 +2740,7 @@ const ClusterMgr={
     const res=document.getElementById('ctres');
     if(res)res.innerHTML='<span class="td">Test...</span>';
     try{
-      await fetch(`/api/clusters/${idx}/test`,{method:'POST',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      await api(`/clusters/${idx}/test`,{method:'POST'});
       if(res)res.innerHTML='<span class="tg">Connessione OK</span>';
       toast(`${this.clusters[idx]?.label||'Cluster'}: OK`,'ok');
     }catch(e){
@@ -2378,11 +2750,117 @@ const ClusterMgr={
   }
 };
 
+// pmgr:users-ui:begin
+const Users={
+  seq:0,busy:false,
+  validName(name){return typeof name==='string'&&/^[a-z][a-z0-9._-]{1,31}$/.test(name);},
+  roles(selected){return ['reader','operator','admin'].map(role=>`<option value="${role}"${role===selected?' selected':''}>${Auth.roleLabel(role)}</option>`).join('');},
+  async load(){
+    if(Auth.locked||!canDo(Auth.role,'admin'))return;
+    const seq=++this.seq,body=document.getElementById('users-body');
+    body.innerHTML='<tr><td colspan="5" class="empty">Caricamento…</td></tr>';
+    try{
+      const users=await api('/users',{quiet:true,timeoutMs:15000});
+      if(seq!==this.seq)return;
+      if(!Array.isArray(users)||!users.every(u=>u&&this.validName(u.username)&&roleRank(u.role)&&typeof u.disabled==='boolean'&&Number.isSafeInteger(u.created)&&u.created>0))throw new Error('Elenco utenti non valido');
+      body.innerHTML=users.map(u=>{
+        const own=u.username===Auth.username,name=js(u.username);
+        return `<tr><td class="tm">${esc(u.username)}${own?' <span class="td">(tu)</span>':''}</td>
+          <td><select class="inp sm" ${roleAttrs('admin')} aria-label="${esc('Ruolo di '+u.username)}" ${own||this.busy?'disabled':''} onchange="Users.changeRole(${name},this.value)">${this.roles(u.role)}</select></td>
+          <td>${u.disabled?'Disabilitato':'Attivo'}</td><td>${esc(new Date(u.created*1000).toLocaleString('it-IT'))}</td>
+          <td><div class="users-actions"><button type="button" class="btn bg2 sm" ${roleAttrs('admin')} ${own||this.busy?'disabled':''} onclick="Users.setDisabled(${name},${!u.disabled})">${u.disabled?'Abilita':'Disabilita'}</button>
+          <button type="button" class="btn bg2 sm" ${roleAttrs('admin')} ${this.busy?'disabled':''} onclick="Users.reset(${name})">Reimposta credenziali</button></div></td></tr>`;
+      }).join('')||'<tr><td colspan="5" class="empty">Nessun utente</td></tr>';
+    }catch(e){if(seq===this.seq)body.innerHTML=errRow(5,Auth.errorText(e),'Users.load()');}
+  },
+  newUser(){
+    if(this.busy||!canDo(Auth.role,'admin'))return;
+    const form=document.querySelector('#musers-new form');form.reset();form.querySelector('[data-error]').textContent='';openModal('musers-new');
+  },
+  async create(form){
+    if(this.busy||!canDo(Auth.role,'admin')||!form.reportValidity())return;
+    await Auth.form(form,async()=>{
+      const username=form.elements.username.value,role=form.elements.role.value;
+      if(!this.validName(username)||!roleRank(role))throw new Error('Nome utente o ruolo non valido');
+      this.busy=true;
+      try{
+        this.showCredentials(await api('/users',{method:'POST',body:JSON.stringify({username,role}),quiet:true,timeoutMs:30000}));
+      }finally{this.busy=false;}
+      await this.load();
+    });
+  },
+  async update(name,change){
+    if(this.busy||!canDo(Auth.role,'admin')||!this.validName(name))return;
+    this.busy=true;
+    document.querySelectorAll('#users-body button,#users-body select').forEach(el=>el.disabled=true);
+    try{await api('/users/'+encodeURIComponent(name),{method:'PUT',body:JSON.stringify(change),quiet:true,timeoutMs:30000});toast('Account aggiornato','ok');}
+    catch(e){toast(Auth.errorText(e),'err');}
+    finally{this.busy=false;await this.load();}
+  },
+  changeRole(name,role){
+    if(name===Auth.username||!roleRank(role))return;
+    this.update(name,{role});
+  },
+  setDisabled(name,disabled){
+    if(name===Auth.username||typeof disabled!=='boolean')return;
+    this.update(name,{disabled});
+  },
+  reset(name){
+    if(this.busy||!canDo(Auth.role,'admin')||!this.validName(name))return;
+    askConfirm({minRole:'admin',title:`Reimposta credenziali di ${name}`,level:'danger',okLabel:'Reimposta credenziali',
+      consequence:'Password e chiave TOTP precedenti smetteranno di funzionare. Tutte le sessioni di questo account saranno chiuse.'},()=>this.resetNow(name));
+  },
+  async resetNow(name){
+    if(this.busy||!canDo(Auth.role,'admin')||!this.validName(name))return;
+    this.busy=true;
+    try{
+      const credentials=await api('/users/'+encodeURIComponent(name)+'/reset',{method:'POST',quiet:true,timeoutMs:30000});
+      if(name===Auth.username)Auth.stop();
+      this.showCredentials(credentials);
+      if(name===Auth.username)Auth.credentialsPending=true;
+    }
+    catch(e){toast(Auth.errorText(e),'err');}
+    finally{this.busy=false;}
+    // Resetting oneself invalidates this session. Keep the one-time material visible until acknowledged.
+    if(name!==Auth.username)await this.load();
+  },
+  showCredentials(d){
+    const box=document.getElementById('users-credentials-body');box.replaceChildren();
+    try{
+      if(!d||!this.validName(d.username)||typeof d.password!=='string'||d.password.length<12||d.password.length>256||typeof d.totp_secret!=='string'||!/^[A-Z2-7]{16,128}$/.test(d.totp_secret))throw new Error('Credenziali ricevute non valide');
+      for(const [key,label,value] of [['username','Nome utente',d.username],['password','Password',d.password],['totp','Chiave TOTP',d.totp_secret]]){
+        const row=document.createElement('div');row.className='fg';
+        const title=document.createElement('strong');title.textContent=label;
+        const code=document.createElement('code');code.id='users-credential-'+key;code.textContent=value;
+        const copy=document.createElement('button');copy.type='button';copy.className='btn bg2 sm';copy.textContent='Copia '+label.toLowerCase();
+        // No closure captures the response or a credential; copy reads only the open dialog's DOM.
+        copy.setAttribute('onclick',`Users.copy('${key}')`);row.append(title,code,copy);box.append(row);
+      }
+      if(document.getElementById('musers-new').classList.contains('open'))closeModal('musers-new');
+      openModal('musers-credentials');
+    }finally{
+      // Do not retain password, secret or URI in the response object after rendering.
+      if(d&&typeof d==='object')for(const key of Object.keys(d))delete d[key];
+    }
+  },
+  acknowledge(){
+    const reauthenticate=Auth.credentialsPending;
+    closeModal('musers-credentials',true);
+    if(reauthenticate){Auth.credentialsPending=false;Auth.expired();}
+  },
+  async copy(key){
+    if(!['username','password','totp'].includes(key)||Auth.locked||!document.getElementById('musers-credentials').classList.contains('open'))return;
+    try{await navigator.clipboard.writeText(document.getElementById('users-credential-'+key).textContent);toast('Copiato','ok');}
+    catch(e){toast('Copia non disponibile: seleziona il testo e copialo manualmente.','err');}
+  }
+};
+// pmgr:users-ui:end
+
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',reports:'Report',settings:'Impostazioni'};
-// Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',reports:'Report',settings:'Impostazioni',users:'Utenti'};
+// Indirizzi nell'hash (memoria della navigazione): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
   parse(h){
@@ -2396,6 +2874,7 @@ const Route={
   push(h){if(location.hash!==h)history.pushState(null,'',h);},
   replace(h){if(location.hash!==h)history.replaceState(null,'',h);},
   apply(){
+    if(Auth.locked||_IS_CONSOLE)return;
     const r=Route.parse(location.hash)||{page:'dashboard'};
     const dirty=SettingsGuard.dirtyForm();
     if(dirty){
@@ -2406,7 +2885,7 @@ const Route={
     }
     if(r.vm){App.nav('vms',{silent:true});VMs.detail(r.vm.node,r.vm.vmid,r.vm.type);return;}
     if(document.getElementById('mov').classList.contains('open'))closeModal('mov');
-    App.nav(r.page,{silent:true,settingsTab:r.tab??'general'}); Route.replace(r.page==='settings'?Settings.hash(r.tab??'general'):'#/'+r.page);
+    App.nav(r.page,{silent:true,settingsTab:r.tab??'general'}); Route.replace(App.cur==='settings'?Settings.hash(r.tab??'general'):'#/'+App.cur);
   }
 };
 window.addEventListener('popstate',()=>Route.apply());
@@ -2427,6 +2906,7 @@ const AutoRefreshUI={
     this.seconds=AutoRefresh.CHOICES.includes(value)?value:60; this.configured=true; this.sync();
   },
   sync(){
+    document.getElementById('refresh-current').textContent='Intervallo: '+(this.seconds?this.seconds+' s':'Spento');
     const sel=document.getElementById('refresh-sel'); sel.value=String(this.seconds); sel.disabled=this.saving;
     document.querySelectorAll('#refresh-seg button').forEach(b=>{const on=Number(b.dataset.v)===this.seconds;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);b.disabled=this.saving;});
   },
@@ -2437,14 +2917,15 @@ const AutoRefreshUI={
     catch(e){toast(e.message,'err');}
     finally{this.saving=false;this.sync();}
   },
-  init(){this.started=true;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});this.reset();},
+  init(){if(!this.bound){this.bound=true;document.addEventListener('visibilitychange',()=>{if(this.started&&!Auth.locked&&!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});}this.started=true;this.reset();},
   mark(){this.last=Date.now();const b=document.getElementById('refresh-btn');const t='Ultimo aggiornamento '+new Date(this.last).toLocaleTimeString('it-IT');b.title=t;},
-  reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
+  stop(){this.started=false;clearTimeout(this.timer);this.timer=null;this.generation++;this.busy=false;},
+  reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(!Auth.locked&&this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
   state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,unsaved:SettingsGuard.isDirty(),typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
-  canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
+  canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return !Auth.locked&&generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
   async tick(){
     clearTimeout(this.timer);this.timer=null;
-    if(!this.started||!this.seconds)return;
+    if(Auth.locked||!this.started||!this.seconds)return;
     const generation=this.generation, page=App.cur;
     this.timer=setTimeout(()=>this.tick(),this.seconds*1000);
     if(AutoRefresh.shouldRun(this.state())){
@@ -2456,13 +2937,27 @@ const AutoRefreshUI={
   }
 };
 const App={
-  cur:'dashboard',
-  init(){
-    UpdateUI.load();
-    document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
-    ClusterMgr.load().then(async()=>{await Settings.load();Route.apply();AutoRefreshUI.init();App.checkConn();setInterval(App.checkConn,30000);});
+  cur:'dashboard',bound:false,connTimer:null,
+  async init(){await Auth.init();},
+  async boot(){
+    try{
+      if(Auth.locked)return;
+      if(_IS_CONSOLE){await ConsolePage.init();return;}
+      const epoch=Auth.epoch;
+      if(!this.bound){
+        this.bound=true;Palette.init();Provision.bind();Drawer.init();
+        document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
+      }
+      UpdateUI.load();
+      await ClusterMgr.load();if(Auth.locked||epoch!==Auth.epoch)return;
+      await Settings.load();if(Auth.locked||epoch!==Auth.epoch)return;
+      Reports.init();Route.apply();AutoRefreshUI.init();App.checkConn();
+      clearInterval(this.connTimer);this.connTimer=setInterval(()=>App.checkConn(),30000);
+    }catch(e){if(!Auth.locked)Auth.bootError(e);}
   },
   nav(p,opts={}){
+    if(Auth.locked)return;
+    if(p==='users'&&!RoleUI.canPage(p))p='dashboard';
     const dirty=SettingsGuard.dirtyForm();
     if(dirty){
       if(p==='settings'&&opts.settingsTab===dirty.tab)return;
@@ -2484,6 +2979,7 @@ const App={
     document.getElementById('crumb-sep').style.display=one&&ClusterMgr.currentLabel()?'':'none';
   },
   refresh(){
+    if(Auth.locked)return;
     AutoRefreshUI.mark();
     App.crumb();
     const p=App.cur;
@@ -2500,9 +2996,10 @@ const App={
     if(p==='gpu')       Gpu.load();
     else                Gpu.probe();
     if(p==='settings')  Settings.load();
+    if(p==='users')     Users.load();
   },
   async checkConn(){
-    if(document.hidden)return; // scheda in background: niente sondaggio ogni 30s
+    if(Auth.locked||document.hidden)return; // scheda in background: niente sondaggio ogni 30s
     const dot=document.getElementById('cdot'), lbl=document.getElementById('clbl');
     // quiet: lo stato è già nel pallino; un cluster offline non deve produrre un toast ogni 30s
     try{await api('/nodes',{quiet:true});dot.className='ok';lbl.textContent='Connesso';lbl.title='';}
@@ -2526,11 +3023,11 @@ const Dmesg={
   reset(){Dmesg.seq++;Dmesg.ctx=null;Dmesg.data=null;Dmesg.loading=false;},
 
   ctl(p,wide){
-    const lv=(v,l)=>`<button type="button" data-v="${v}" class="${Dmesg.level===v?'on':''}" aria-pressed="${Dmesg.level===v}" onclick="Dmesg.setLevel('${v}')">${l}</button>`;
+    const lv=(v,l)=>`<button data-min-role="operator" type="button" data-v="${v}" class="${Dmesg.level===v?'on':''}" aria-pressed="${Dmesg.level===v}" onclick="Dmesg.setLevel('${v}')">${l}</button>`;
     return `<div class="dm-bar">
-      <button type="button" class="btn ba sm" id="dm-${p}-go" onclick="Dmesg.load()">Leggi dmesg</button>
+      <button data-min-role="operator" type="button" class="btn ba sm" id="dm-${p}-go" onclick="Dmesg.load()">Leggi dmesg</button>
       <label class="sr" for="dm-${p}-n">Numero di righe</label>
-      <select class="inp sm" id="dm-${p}-n" onchange="Dmesg.setLines(+this.value)">${[100,300,1000].map(n=>`<option value="${n}"${Dmesg.lines===n?' selected':''}>${n} righe</option>`).join('')}</select>
+      <select data-min-role="operator" class="inp sm" id="dm-${p}-n" onchange="Dmesg.setLines(+this.value)">${[100,300,1000].map(n=>`<option value="${n}"${Dmesg.lines===n?' selected':''}>${n} righe</option>`).join('')}</select>
       <div class="seg" role="group" aria-label="Livello">${lv('all','Tutto')}${lv('warn','Avvisi ed errori')}</div>
       ${wide?`<div class="sfield"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="inp sm dm-q" id="dm-${p}-q" type="text" placeholder="Cerca nel log" aria-label="Cerca nel log" autocomplete="off" oninput="Dmesg.setQuery(this.value)" value="${esc(Dmesg.q)}"></div>
         <button type="button" class="btn bg2 sm" onclick="Dmesg.copy()">Copia</button>
@@ -2583,7 +3080,7 @@ const Dmesg={
       if(Dmesg.loading){meta.textContent='Lettura del log dalla VM…';}
       else if(Dmesg.err){
         meta.classList.add('err'); meta.append(document.createTextNode(Dmesg.err));
-        const b=document.createElement('button'); b.type='button'; b.className='btn bg2 sm'; b.textContent='Riprova'; b.onclick=()=>Dmesg.load(); meta.append(b);
+        const b=document.createElement('button'); b.type='button'; b.className='btn bg2 sm'; b.textContent='Riprova'; RoleUI.mark(b,'operator');b.onclick=()=>Dmesg.load(); meta.append(b);
       }
       else if(Dmesg.data){
         const d=Dmesg.data, vis=Dmesg.visible(), q=Dmesg.q.trim();
@@ -2664,6 +3161,7 @@ const Palette={
     });
   },
   open(){
+    if(Auth.locked)return;
     // non si sovrappone a conferme o altri dialoghi aperti
     if(_modalStack.length&&!Palette.isOpen())return;
     const q=document.getElementById('pal-q'); q.value=''; Palette.sel=0;
@@ -2691,7 +3189,7 @@ const Palette={
       balance:'bilanciamento pareggio carico ram migrazione sposta vm nodo simulazione spegni nodo',
       groups:'gruppo gruppi tag etichetta progetto laboratorio proprietario',
       reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
-    const items=Object.entries(PMETA).filter(([k])=>(k!=='ceph'||Ceph.isAvail())&&(k!=='gpu'||Gpu.isAvail())).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',run:()=>App.nav(k)}));
+    const items=Object.entries(PMETA).filter(([k])=>RoleUI.canPage(k)&&(k!=='ceph'||Ceph.isAvail())&&(k!=='gpu'||Gpu.isAvail())).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',minRole:RoleUI.pageRole(k),run:()=>App.nav(k)}));
     items.push({group:'Azioni',label:'Aggiorna i dati',sub:'',run:()=>App.refresh()});
     for(const c of ClusterMgr.clusters.filter(c=>c.idx!==ClusterMgr.current)){
       items.push({group:'Azioni',label:`Passa al cluster ${c.label}`,sub:'',run:()=>{document.getElementById('cluster-select').value=c.idx;ClusterMgr.switchTo(c.idx);}});
@@ -2724,6 +3222,7 @@ const Palette={
       const h=document.createElement('div'); h.className='pal-grp'; h.setAttribute('role','presentation'); h.textContent=g.name; list.append(h);
       for(const it of g.items){
         const idx=i++, o=document.createElement('div');
+        if(it.minRole)RoleUI.mark(o,it.minRole);
         o.className='pal-o'; o.id=`pal-o-${idx}`; o.setAttribute('role','option'); o.setAttribute('aria-selected',idx===Palette.sel?'true':'false');
         if(it.vm){
           const dot=document.createElement('i'); const run=it.vm.status==='running';
@@ -2752,7 +3251,7 @@ const Palette={
     Palette.select((Palette.sel+d+n)%n);
   },
   run(idx){
-    const it=Palette.shown[idx]; if(!it)return;
+    const it=Palette.shown[idx]; if(!it||it.minRole&&!canDo(Auth.role,it.minRole))return;
     closeModal('mpal');
     it.run();
   }
@@ -2764,7 +3263,7 @@ const Palette={
 // ════════════════════════════════════════════════════════════════════════════
 // CEPH: osservatorio meteo. Sola lettura. La pagina esiste solo nei cluster dove Ceph risponde.
 // `/api/ceph/summary` alimenta la panoramica, `/api/ceph` la pagina (aggiornata ogni 5 s con la pagina aperta;
-// la curva dell'I/O tiene 10 minuti in memoria del browser, nessun localStorage). Ogni testo esterno passa da esc().
+// la curva dell'I/O tiene 10 minuti in memoria del browser, senza persistenza). Ogni testo esterno passa da esc().
 // ════════════════════════════════════════════════════════════════════════════
 const Ceph={
   focus:null,       // null | {k:'g',v:chiave gruppo} | {k:'p',v:nome pool}: evidenzia gli OSD scelti, gli altri si attenuano
@@ -2950,7 +3449,7 @@ const Ceph={
     await Ceph.tick(seq,idx);
   },
   async tick(seq,idx){
-    if(seq!==Ceph.seq)return;
+    if(Auth.locked||seq!==Ceph.seq)return;
     if(!document.hidden){
       try{
         const o=await api('/ceph',{quiet:true,timeoutMs:9000});
@@ -3265,7 +3764,7 @@ const Gpu={
     if(!d.problems.length)return'';
     const rows=d.problems.map(p=>{
       const acts=p.uses.map(u=>u.editable
-        ?`<button type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(p.node)},${js(u.vmid)},${js(u.slot)})">Togli da ${esc(u.name||'VM '+u.vmid)}</button>`
+        ?`<button data-min-role="admin" type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(p.node)},${js(u.vmid)},${js(u.slot)})">Togli da ${esc(u.name||'VM '+u.vmid)}</button>`
         :`<span class="cnote">${esc(u.name||'VM '+u.vmid)}: assegnazione diretta (${esc(u.slot)}), correggila in Proxmox</span>`).join('');
       return`<div class="calert"><span class="sev w">Da correggere</span><span class="ccode">${esc(p.node)}</span><div class="cmsg">${esc(Gpu.problemText(p))}<div class="gacts">${acts}</div></div></div>`;
     }).join('');
@@ -3277,10 +3776,10 @@ const Gpu={
     const rows=n.cards.map(c=>{
       const st=c.status==='free'?'<span class="st ok">Libera</span>':c.status==='conflict'?'<span class="st warn">In conflitto</span>':'<span class="st">Assegnata</span>';
       const uses=c.uses.map(u=>`<div>${Gpu.vmBtn(n.node,u)} ${Gpu.useBadge(u)}${u.status==='running'?' <span class="td">· accesa</span>':''}</div>`).join('')||'<span class="td">—</span>';
-      const acts=c.uses.filter(u=>u.editable).map(u=>`<button type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(n.node)},${js(u.vmid)},${js(u.slot)})">Togli</button>`).join(' ')
-        ||(c.status==='free'?(c.mappings.length?`<button type="button" class="btn ba sm" onclick="Gpu.assign(${js(n.node)},${js(c.addr)})">Assegna…</button>`:'<span class="td" title="In Proxmox: Datacenter › Resource Mappings › PCI">serve un mapping</span>'):'');
+      const acts=c.uses.filter(u=>u.editable).map(u=>`<button data-min-role="admin" type="button" class="btn bg2 sm" onclick="Gpu.unassign(${js(n.node)},${js(u.vmid)},${js(u.slot)})">Togli</button>`).join(' ')
+        ||(c.status==='free'?(c.mappings.length?`<button data-min-role="admin" type="button" class="btn ba sm" onclick="Gpu.assign(${js(n.node)},${js(c.addr)})">Assegna…</button>`:'<span class="td" title="In Proxmox: Datacenter › Resource Mappings › PCI">serve un mapping</span>'):'');
       const mem=c.memory_gb?`${c.memory_gb} GB${c.memory_custom?' (corretta)':''}`:'memoria non nota';
-      const model=`<b>${esc(c.display_name||Gpu.short(c.name))}</b><div class="td">${esc(mem)} <button type="button" class="btn bg2 sm" style="margin-left:4px" aria-label="${esc('Modifica nome e memoria del modello '+(c.display_name||Gpu.short(c.name)))}" onclick="Gpu.modelEdit(${js(n.node)},${js(c.addr)})">Modifica</button></div>`;
+      const model=`<b>${esc(c.display_name||Gpu.short(c.name))}</b><div class="td">${esc(mem)} <button data-min-role="admin" type="button" class="btn bg2 sm" style="margin-left:4px" aria-label="${esc('Modifica nome e memoria del modello '+(c.display_name||Gpu.short(c.name)))}" onclick="Gpu.modelEdit(${js(n.node)},${js(c.addr)})">Modifica</button></div>`;
       return`<tr><td>${model}</td><td class="tm">${esc(c.addr)}</td><td>${st}</td><td>${uses}</td><td>${esc(c.mappings.join(', ')||'—')}</td>${showUse?`<td>${c.uses.length?c.uses.map(u=>Gpu.usage(usage.vms.find(v=>v.vmid===Number(u.vmid)))).join(''):'<span class="td">—</span>'}</td>`:''}<td>${acts}</td></tr>`;
     }).join('');
     const groups=n.groups.length?`<p class="cnote" style="padding:0 var(--card-pad) 12px">Mapping a gruppo (sola lettura): ${n.groups.map(g=>esc(`${g.id} · ${g.cards} schede · ${new Set(g.uses.map(u=>u.vmid)).size} VM`)).join(' · ')}</p>`:'';
@@ -3341,7 +3840,7 @@ const Gpu={
   msg(text,kind,action){
     const el=document.getElementById('gpu-msg'); el.replaceChildren(); el.className='cnote'; if(!text)return;
     const p=document.createElement('div'); p.textContent=text; if(kind==='err')p.style.color='var(--red)'; el.append(p);
-    if(action){const b=document.createElement('button');b.type='button';b.className='btn bg2 sm mt8';b.textContent=action.label;b.onclick=action.run;el.append(b);}
+    if(action){const b=document.createElement('button');b.type='button';b.className='btn bg2 sm mt8';b.textContent=action.label;RoleUI.mark(b,'admin');b.onclick=action.run;el.append(b);}
   },
   vmSel(){const v=document.getElementById('gpu-vm').value;return/^[1-9][0-9]{0,8}$/.test(v)?Number(v):0;},
   async next(){
@@ -3359,7 +3858,7 @@ const Gpu={
     }
     closeModal('mgpu');
     const vm=(Gpu.ctx.vms||[]).find(v=>v.vmid===vmid), label=vm&&vm.name?`${vm.name} (${vmid})`:`VM ${vmid}`;
-    askConfirm({title:`Assegna la scheda a ${label}`,
+    askConfirm({minRole:'admin',title:`Assegna la scheda a ${label}`,
       lines:[`Scheda: ${Gpu.short(plan.card)} (${plan.addr})`,`Nodo: ${plan.node}`,`Mapping: ${plan.mapping}`,`Slot: ${plan.slot}${plan.options?' · opzioni: '+plan.options:' · nessuna opzione'}`],
       consequence:'La scheda viene collegata alla VM spenta; sarà disponibile al prossimo avvio. Nessun altro dato viene modificato.',level:'warn',okLabel:'Assegna'},
       async()=>{
@@ -3378,7 +3877,7 @@ const Gpu={
     for(const n of d.nodes)if(n.node===node)for(const c of n.cards)for(const x of c.uses)if(x.vmid===vmid&&x.slot===slot)u=x;
     for(const p of d.problems)for(const x of p.uses)if(p.node===node&&x.vmid===vmid&&x.slot===slot&&!u)u=x;
     const label=u&&u.name?`${u.name} (${vmid})`:`VM ${vmid}`;
-    const go=()=>askConfirm({title:`Togli la scheda da ${label}`,lines:[`VM: ${label}`,`Nodo: ${node}`,`Slot: ${slot}${u&&u.mapping?' · mapping '+u.mapping:''}`],
+    const go=()=>askConfirm({minRole:'admin',title:`Togli la scheda da ${label}`,lines:[`VM: ${label}`,`Nodo: ${node}`,`Slot: ${slot}${u&&u.mapping?' · mapping '+u.mapping:''}`],
       consequence:'La scheda viene scollegata dalla VM spenta e torna libera. Il resto della configurazione non cambia.',level:'warn',okLabel:'Togli'},
       async()=>{
         Gpu.busy=true;
@@ -3394,7 +3893,7 @@ const Gpu={
     }else go();
   },
   askShutdown(node,vmid,then){
-    askConfirm({title:`Spegni la VM ${vmid}`,lines:[`Nodo: ${node}`],consequence:VM_ACTIONS.shutdown.cons+' Attendo fino a 2 minuti; se non basta ti propongo lo stop forzato.',level:'warn',okLabel:'Spegni'},()=>Gpu.shutdown(node,vmid,then));
+    askConfirm({minRole:'admin',title:`Spegni la VM ${vmid}`,lines:[`Nodo: ${node}`],consequence:VM_ACTIONS.shutdown.cons+' Attendo fino a 2 minuti; se non basta ti propongo lo stop forzato.',level:'warn',okLabel:'Spegni'},()=>Gpu.shutdown(node,vmid,then));
   },
   // ── spegnimento (D24 A): ordinato, attesa 2 minuti, poi stop forzato con conferma di pericolo ──
   async shutdown(node,vmid,then){
@@ -3408,7 +3907,7 @@ const Gpu={
         if(r&&r.status&&r.status.status==='stopped'){dropVmCache(node,vmid);_tc.clear();toast(`VM ${vmid} spenta`,'ok');if(then&&App.cur==='gpu')then();return;}}catch(e){}
     }
     if(App.cur!=='gpu'){toast(`La VM ${vmid} è ancora accesa dopo 2 minuti`,'err');return;}
-    askConfirm({title:`La VM ${vmid} è ancora accesa`,lines:['Lo spegnimento ordinato non è riuscito entro 2 minuti.'],
+    askConfirm({minRole:'admin',title:`La VM ${vmid} è ancora accesa`,lines:['Lo spegnimento ordinato non è riuscito entro 2 minuti.'],
       consequence:VM_ACTIONS.stop.cons,level:'danger',okLabel:'Stop forzato'},async()=>{
       try{await api(`/nodes/${encodeURIComponent(node)}/qemu/${vmid}/action/stop`,{method:'POST',body:'{}',quiet:true});}
       catch(e){toast(`Stop forzato non riuscito: ${e.message}`,'err');return;}
@@ -3532,7 +4031,7 @@ const Groups={
     if(!r.length){body.innerHTML=`<div class="panel"><div class="empty">${Groups.view==='todo'&&!Groups.q?'Nessuna VM da assegnare.':'Nessuna VM corrisponde.'}</div></div>`;Groups.sync();return;}
     const rows=r.slice(0,MAX).map(v=>{
       const k=Groups.key(v), bad=!Groups.parse(Groups.text(v)).ok, res=Groups.res[k];
-      return`<tr data-k="${esc(k)}"><td><input type="checkbox" class="chk" aria-label="${esc('Applica a '+v.name)}" ${Groups.ticked(v)?'checked':''} onchange="Groups.tick(${js(k)},this.checked)"></td>
+      return`<tr data-k="${esc(k)}"><td><input data-min-role="operator" type="checkbox" class="chk" aria-label="${esc('Applica a '+v.name)}" ${Groups.ticked(v)?'checked':''} onchange="Groups.tick(${js(k)},this.checked)"></td>
         <td><button type="button" class="nm-btn" onclick="VMs.detail(${js(v.node)},${js(v.vmid)},${js(v.kind)})"><span class="nm" title="${esc(v.name)}">${esc(v.name||'VM '+v.vmid)}</span></button> <span class="tm">${esc(v.vmid)}</span></td>
         <td>${esc(v.node)}</td><td>${v.kind==='lxc'?'LXC':'QEMU'}</td><td>${Groups.label(v)}</td>
         <td><input class="inp" style="width:170px" type="text" list="grp-dl" autocomplete="off" spellcheck="false" maxlength="200" value="${esc(Groups.text(v))}" placeholder="nessun gruppo" aria-label="${esc('Nuovo gruppo di '+v.name)}" ${bad?'aria-invalid="true"':''} oninput="Groups.type(${js(k)},this)"></td>
@@ -3586,7 +4085,7 @@ const Groups={
     const vis=new Set(Groups.rows().map(Groups.key)), hidden=out.filter(o=>!vis.has(Groups.key(o.v))).length;
     if(hidden)lines.push(`Di queste, ${hidden} non sono visibili con il filtro o la ricerca attuali.`);
     if(fresh.size)lines.push(`Gruppi NUOVI (non esistono ancora su nessuna VM): ${[...fresh].sort().join(', ')}. Controlla che non siano refusi o prefissi che non sono gruppi.`);
-    askConfirm({title:'Applica i gruppi',lines,
+    askConfirm({minRole:'operator',title:'Applica i gruppi',lines,
       items:out.map(o=>`${o.v.name||'VM '+o.v.vmid} (${o.v.vmid}) → ${o.groups.length?o.groups.join(', '):'nessun gruppo'}`),
       consequence:'Viene scritto solo il tag gruppo-… di ogni VM, una alla volta; gli altri tag restano. Nessun riavvio. Se una VM e\' cambiata nel frattempo viene saltata.',
       level:'warn',okLabel:`Applica a ${out.length}`},()=>Groups.run(out,ex));
@@ -3638,24 +4137,24 @@ const Groups={
   inlPaint(){
     const box=document.getElementById('grp-inl'), st=Groups.inl; if(!box||!st)return;
     if(!st.editing){
-      box.innerHTML=`<div class="flex g8" style="flex-wrap:wrap;align-items:center">${Groups.label(st.v)} <button type="button" class="btn bg2 sm" onclick="Groups.inlEdit()">Modifica</button></div><div class="hint" id="grp-inline-msg" role="status"></div>`;
+      box.innerHTML=`<div class="flex g8" style="flex-wrap:wrap;align-items:center">${Groups.label(st.v)} <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="Groups.inlEdit()">Modifica</button></div><div class="hint" id="grp-inline-msg" role="status"></div>`;
       return;
     }
     const left=[...Groups.existing()].filter(g=>!st.sel.includes(g)).sort();
     const full=st.sel.length>=4;
     box.innerHTML=`<div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
-        ${st.sel.map(g=>`<span class="badge bn">${esc(g)} <button type="button" class="btn bg2 sm" style="padding:0 6px" aria-label="${esc('Togli il gruppo '+g)}" onclick="Groups.inlDel(${js(g)})">×</button></span>`).join('')||'<span class="td">nessun gruppo scelto</span>'}
+        ${st.sel.map(g=>`<span class="badge bn">${esc(g)} <button data-min-role="operator" type="button" class="btn bg2 sm" style="padding:0 6px" aria-label="${esc('Togli il gruppo '+g)}" onclick="Groups.inlDel(${js(g)})">×</button></span>`).join('')||'<span class="td">nessun gruppo scelto</span>'}
       </div>
       <div class="flex g8" style="margin-top:6px;flex-wrap:wrap">
-        <select class="inp" id="grp-inl-sel" aria-label="Aggiungi un gruppo esistente" ${full||!left.length?'disabled':''} onchange="Groups.inlAdd(this.value)">
+        <select data-min-role="operator" class="inp" id="grp-inl-sel" aria-label="Aggiungi un gruppo esistente" ${full||!left.length?'disabled':''} onchange="Groups.inlAdd(this.value)">
           <option value="">Aggiungi un gruppo…</option>${left.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('')}
         </select>
-        <button type="button" class="btn bg2 sm" ${full?'disabled':''} onclick="Groups.inlNew()">Nuovo gruppo</button>
-        <button type="button" class="btn bsuc sm" ${st.dirty?'':'disabled'} onclick="Groups.saveInline()">Salva</button>
+        <button data-min-role="operator" type="button" class="btn bg2 sm" ${full?'disabled':''} onclick="Groups.inlNew()">Nuovo gruppo</button>
+        <button data-min-role="operator" type="button" class="btn bsuc sm" ${st.dirty?'':'disabled'} onclick="Groups.saveInline()">Salva</button>
         <button type="button" class="btn bg2 sm" onclick="Groups.inlInit(Groups.inl.v)">Annulla</button>
       </div>
-      ${st.adding?`<div class="flex g8" style="margin-top:6px"><input class="inp" id="grp-inl-new" type="text" maxlength="32" autocomplete="off" spellcheck="false" aria-label="Nome del nuovo gruppo" placeholder="nuovo gruppo, es. rossi" style="max-width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();Groups.inlNewOk()}">
-        <button type="button" class="btn bg2 sm" onclick="Groups.inlNewOk()">Aggiungi</button></div>`:''}
+      ${st.adding?`<div class="flex g8" style="margin-top:6px"><input data-min-role="operator" class="inp" id="grp-inl-new" type="text" maxlength="32" autocomplete="off" spellcheck="false" aria-label="Nome del nuovo gruppo" placeholder="nuovo gruppo, es. rossi" style="max-width:220px" onkeydown="if(event.key==='Enter'){event.preventDefault();Groups.inlNewOk()}">
+        <button data-min-role="operator" type="button" class="btn bg2 sm" onclick="Groups.inlNewOk()">Aggiungi</button></div>`:''}
       <div class="hint" id="grp-inline-msg" role="status"></div>`;
     if(st.adding)document.getElementById('grp-inl-new').focus();
   },
@@ -3685,7 +4184,7 @@ const Groups={
         VMs.detail(v.node,v.vmid,v.kind); VMs.regroup();
       }catch(e){Groups.busy=false;Groups.inlMsg(e.body&&e.body.reason==='new_group'?'Il server non conosce ancora questo gruppo: riprova.':e.message,true);}
     };
-    if(fresh.length)askConfirm({title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
+    if(fresh.length)askConfirm({minRole:'operator',title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
     else go();
   },
   msg(t,err){const el=document.getElementById('grp-msg');el.textContent=t||'';el.style.color=err?'var(--red)':'';},
@@ -3704,7 +4203,7 @@ const Groups={
         VMs.detail(v.node,v.vmid,v.kind);
       }catch(e){Groups.busy=false;Groups.msg(e.body&&e.body.reason==='new_group'?'Il server non conosce ancora questo gruppo: riprova.':e.message,true);}
     };
-    if(fresh.length)askConfirm({title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
+    if(fresh.length)askConfirm({minRole:'operator',title:`Nuovo gruppo: ${fresh.join(', ')}`,lines:['Non esiste ancora su nessuna VM.'],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\'.',level:'warn',okLabel:'Crea e assegna'},go);
     else go();
   },
 };
@@ -3818,7 +4317,7 @@ const Balance={
       <td>${Balance.modeCell(s)}</td>
       <td>${(s.warnings||[]).map(w=>`<span class="bal-flag w">${esc(Balance.warnTxt(w,p))}</span>`).join(' ')||'<span class="td">—</span>'}</td>
       <td>${s.spread_after}</td>
-      <td>${i!==0?'<span class="td">dopo il passo '+(i)+'</span>':!d.meta.exec_allowed?'<span class="td">solo simulazione</span>':`<button type="button" class="btn ba sm" onclick="Balance.exec(0)" ${Balance.run||Balance.busy?'disabled':''}>Esegui</button>`}</td></tr>`).join('');
+      <td>${i!==0?'<span class="td">dopo il passo '+(i)+'</span>':!d.meta.exec_allowed?'<span class="td">solo simulazione</span>':`<button data-min-role="admin" type="button" class="btn ba sm" onclick="Balance.exec(0)" ${Balance.run||Balance.busy?'disabled':''}>Esegui</button>`}</td></tr>`).join('');
     const sim=d.meta.exec_allowed?'':`<p class="cnote" style="margin:8px 0 0"><b>Solo simulazione:</b> con una riserva sotto ${esc(d.meta.exec_min_reserve_gb)} GB per nodo il piano si puo' guardare ma non eseguire (un nodo potrebbe riempirsi fino alla RAM fisica). Riporta la riserva host ad almeno ${esc(d.meta.exec_min_reserve_gb)} GB per eseguire.</p>`;
     return`<h2 class="sec" style="margin-top:22px">Piano <small>si esegue un passo alla volta: dopo ogni migrazione il piano si ricalcola da zero</small></h2>
       <div class="panel"><div class="tw"><table class="bal-steps"><thead><tr><th>#</th><th>VM</th><th>Da → a</th><th>RAM</th><th>Perche'</th><th>Modo</th><th>Avvisi sul nodo di arrivo</th><th>Scarto dopo</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>${sim}
@@ -3852,14 +4351,14 @@ const Balance={
     if(r.phase==='need_force'){
       const by=r.decideBy?new Date(r.decideBy*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
       return`<div class="bal-run ask" id="bal-run" role="alert"><div><b>${esc(r.name)}</b> non si e' spenta entro 3 minuti. Forzare lo stop (come staccare la corrente: i dati non salvati nella VM si perdono)? ${by?`Senza risposta entro le ${esc(by)} lo spostamento si annulla e la VM resta accesa.`:''}</div>
-        <div class="bal-act"><button type="button" class="btn bg2 sm" onclick="Balance.decide(false)" ${r.deciding?'disabled':''}>Annulla, resta accesa</button><button type="button" class="btn bx sm" onclick="Balance.askForce()" ${r.deciding?'disabled':''}>Stop forzato…</button></div></div>`;
+        <div class="bal-act"><button data-min-role="admin" type="button" class="btn bg2 sm" onclick="Balance.decide(false)" ${r.deciding?'disabled':''}>Annulla, resta accesa</button><button data-min-role="admin" type="button" class="btn bx sm" onclick="Balance.askForce()" ${r.deciding?'disabled':''}>Stop forzato…</button></div></div>`;
     }
     return`<div class="bal-run" id="bal-run" role="status"><div class="spin"></div><div>Spostamento a freddo: <b>${esc(r.name)}</b> ${esc(r.from)} → ${esc(r.to)} · ${esc(Balance.PHASE[r.phase]||'in corso')}. La procedura continua sul server anche se chiudi la pagina.</div></div>`;
   },
   repaintRun(){const el=document.getElementById('bal-run'), h=Balance.runHTML();if(el){if(h)el.outerHTML=h;else el.remove();}else if(App.cur==='balance'&&Balance.d)Balance.paint();},
   askForce(){
     const r=Balance.run; if(!r||!r.job)return;
-    askConfirm({title:`Stop forzato di ${r.name}`,lines:[`La VM ${r.name} su ${r.from} non ha completato lo spegnimento ordinato.`,`Dopo lo stop verra' spostata su ${r.to} e riaccesa.`],
+    askConfirm({minRole:'admin',title:`Stop forzato di ${r.name}`,lines:[`La VM ${r.name} su ${r.from} non ha completato lo spegnimento ordinato.`,`Dopo lo stop verra' spostata su ${r.to} e riaccesa.`],
       consequence:'Lo stop forzato equivale a staccare la corrente: i dati non salvati nella VM vanno persi.',level:'danger',okLabel:'Stop forzato'},()=>Balance.decide(true));
   },
   async decide(force){
@@ -3894,7 +4393,7 @@ const Balance={
     const cons=s.kind==='lxc'&&s.running?'Il container viene riavviato durante lo spostamento (interruzione breve).'
       :cold?`La VM viene spenta in modo ordinato (fino a 3 minuti), spostata e riaccesa su ${s.to}: resta ferma per tutta la durata. Se non si spegne ti verra' chiesto se forzare lo stop.`
       :s.running?'Migrazione a caldo: la VM resta accesa, ma carica rete e storage per tutta la durata.':'La VM e\' spenta: viene spostata a freddo.';
-    askConfirm({title:`Sposta ${s.name||('VM '+s.vmid)} su ${s.to}`,lines,consequence:cons,level:s.running?'warn':'safe',okLabel:'Sposta'},()=>Balance.go(s,cold));
+    askConfirm({minRole:'admin',title:`Sposta ${s.name||('VM '+s.vmid)} su ${s.to}`,lines,consequence:cons,level:s.running?'warn':'safe',okLabel:'Sposta'},()=>Balance.go(s,cold));
   },
   async go(s,cold){
     Balance.busy=true; Balance.notice=null;
@@ -3913,6 +4412,7 @@ const Balance={
     }
   },
   poll(){
+    if(Auth.locked)return;
     clearTimeout(Balance.timer);
     Balance.timer=setTimeout(async()=>{
       const r=Balance.run; if(!r)return;
@@ -4498,7 +4998,7 @@ const VMs=(()=>{
         :bar(pct(v.disk,v.maxdisk));
       const n=js(v.node), id=js(v.vmid), t=js(v.type);
       return `<tr>
-      <td class="ck"><input type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
+      <td class="ck"><input ${roleAttrs('operator')} type="checkbox" class="chk" aria-label="Seleziona ${esc(v.name||v.vmid)}" value="${esc(keyOf(v))}" ${picked.has(keyOf(v))?'checked':''} onchange="VMs.pick(this)"></td>
       <td>${tbadge(v.type)}</td><td class="tm">${esc(v.vmid)}</td>
       <td class="tn"><button type="button" class="nm-btn" title="Apri i dettagli" onclick="VMs.detail(${n},${id},${t})"><span class="nm" title="${esc(v.name||'—')}">${esc(v.name||'—')}</span></button>${gpuBadge(v)}</td>
       <td>${nodeCell(v)}</td><td id="${esc(`gp-${v.node}-${v.vmid}`)}">${groupCell(v)}</td><td class="tm" id="${esc(`ip-${v.node}-${v.vmid}`)}">${ipCell(v)}</td><td id="${esc(`os-${v.node}-${v.vmid}`)}">${osCell(v)}</td><td>${sbadge(v.status)}</td>
@@ -4507,11 +5007,11 @@ const VMs=(()=>{
       <td id="${esc(`dk-${v.node}-${v.vmid}`)}">${diskCell}</td>
       <td><div class="flex g8">
         ${v.status==='running'
-          ?`<button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
-             <button class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'reboot')">Reboot</button>
-             ${v.type==='qemu'?`<button class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>`:''}
-             ${v.has_serial&&ClusterMgr.hasConsole?`<button class="btn bg2 sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">Console</button>`:''}`
-          :`<button class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
+          ?`<button ${roleAttrs('operator')} class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'shutdown')">Shutdown</button>
+             <button ${roleAttrs('operator')} class="btn bg2 sm" onclick="VMs.action(${n},${id},${t},'reboot')">Reboot</button>
+             ${v.type==='qemu'?`<button ${roleAttrs('operator')} class="btn bg2 sm" onclick="VMs.addUser(${n},${id})">+ Utente</button>`:''}
+             ${v.has_serial&&ClusterMgr.hasConsole?`<button ${roleAttrs('operator')} class="btn bg2 sm" onclick="Console.open(${n},${id},${js(v.name||String(v.vmid))},${js(v.cluster_idx??0)})">Console</button>`:''}`
+          :`<button ${roleAttrs('operator')} class="btn bsuc sm" onclick="VMs.action(${n},${id},${t},'start')">Start</button>`}
       </div></td>
     </tr>`;}).join('')||'<tr><td colspan="13" class="empty">Nessuna VM con questi filtri</td></tr>';
     updateBar();
@@ -4663,7 +5163,7 @@ const VMs=(()=>{
       if(!a){toast(`Azione non supportata: ${action}`,'err');return;}
       const v=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
       const label=v?.name?`${v.name} (${vmid})`:`VM ${vmid}`;
-      askConfirm({
+      askConfirm({minRole:'operator',
         title:`${a.label} — ${label}`,
         lines:[`VM: ${label}`,`Tipo: ${type==='lxc'?'LXC':'QEMU'} · Nodo: ${node}`],
         consequence:a.cons, level:a.level, okLabel:a.label
@@ -4726,8 +5226,8 @@ const VMs=(()=>{
         const resTxt=[s.cpus?esc(s.cpus)+' core':'',s.maxmem?fmtB(s.maxmem)+' RAM':'',s.maxdisk?'disco '+fmtB(s.maxdisk):''].filter(Boolean).join(' · ')||'—';
         document.getElementById('movA').innerHTML=`
           <div class="sh-st">${sbadge(st)}${up?`<span>${esc(up)}</span>`:''}</div>
-          ${power.map(([c,l,a])=>`<button class="btn ${c} sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'${a}')">${l}</button>`).join('')}
-          ${canConsole?`<button class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">Console</button>`:''}`;
+          ${power.map(([c,l,a])=>`<button ${roleAttrs('operator')} class="btn ${c} sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'${a}')">${l}</button>`).join('')}
+          ${canConsole?`<button ${roleAttrs('operator')} class="btn bpurp sm" onclick="closeModal('mov');Console.open(${n},${id},${js(s.name||String(vmid))},ClusterMgr.current)">Console</button>`:''}`;
         document.getElementById('movB').innerHTML=`
           <section class="sh-sec" aria-label="Uso adesso">
             <h3>Uso adesso</h3>
@@ -4750,7 +5250,7 @@ const VMs=(()=>{
             <h3>Configurazione</h3>
             <dl class="dl">
               <dt>Risorse</dt><dd>${resTxt}</dd>
-              ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button><div class="td" data-gpu-usage></div></dd>`:''}
+              ${Array.isArray(v0?.gpus)&&v0.gpus.length?`<dt>Scheda video</dt><dd>${v0.gpus.map(g=>esc(g&&g.name?g.name:'Scheda video')).join('<br>')} <button data-min-role="admin" type="button" class="btn bg2 sm" onclick="closeModal('mov');App.nav('gpu')">Gestisci</button><div class="td" data-gpu-usage></div></dd>`:''}
               ${grow?`<dt>Gruppo</dt><dd><div id="grp-inl"></div></dd>`:''}
               ${snaps.length?`<dt>Snapshot</dt><dd>${snaps.length}</dd>`:''}
             </dl>
@@ -4758,15 +5258,15 @@ const VMs=(()=>{
           ${kind==='qemu'?`<section class="sh-sec" aria-label="Strumenti">
             <h3>Strumenti</h3>
             <div class="sh-act">
-              ${st==='running'?`<button class="btn bg2 sm" onclick="closeModal('mov');VMs.addUser(${n},${id})">+ Utente</button>`:''}
-              <button class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>
-              <button class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>
+              ${st==='running'?`<button ${roleAttrs('operator')} class="btn bg2 sm" onclick="closeModal('mov');VMs.addUser(${n},${id})">+ Utente</button>`:''}
+              <button ${roleAttrs('operator')} class="btn bg2 sm" onclick="closeModal('mov');VMs.snapshot(${n},${id})">Snapshot</button>
+              <button ${roleAttrs('operator')} class="btn bg2 sm" onclick="closeModal('mov');DiskMgr.open(${n},${id})">+ Disco</button>
             </div>
           </section>`:''}
           <details class="sh-det"><summary>Log del kernel</summary><div id="dm-inline"></div></details>
           ${canForce?`<div class="sh-danger">
             <p>Lo stop forzato interrompe subito la VM senza spegnere il sistema operativo: i dati non salvati si perdono.</p>
-            <button class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
+            <button ${roleAttrs('operator')} class="btn bd sm" onclick="closeModal('mov');VMs.action(${n},${id},${t},'stop')">Stop forzato</button>
           </div>`:''}`;
         const usageEl=document.querySelector('#movB [data-gpu-usage]');
         if(usageEl)gpuUsage.then(u=>{if(!usageEl.isConnected||ClusterMgr.current!==gpuCluster||!u?.enabled)return;const v=u.vms.find(x=>x.vmid===Number(vmid));if(v)usageEl.textContent=Gpu.usageLine(v);});
@@ -4780,7 +5280,7 @@ const VMs=(()=>{
       const name=`snap-${Date.now()}`;
       const v=all.find(x=>x.node===node&&String(x.vmid)===String(vmid));
       const label=v?.name?`${v.name} (${vmid})`:`VM ${vmid}`;
-      askConfirm({
+      askConfirm({minRole:'operator',
         title:`Snapshot — ${label}`,
         lines:[`VM: ${label} · Nodo: ${node}`,`Nome snapshot: ${name}`],
         consequence:'Crea un punto di ripristino. La VM continua a funzionare.',
@@ -4915,7 +5415,7 @@ const DiskMgr = {
     if (!disk) { toast('Seleziona un disco da configurare', 'err'); return; }
 
     // Formattare è irreversibile: conferma digitando il VMID.
-    askConfirm({
+    askConfirm({minRole:'operator',
       title: `Formatta disco — VM ${this.vmid}`,
       lines: [
         `VM: ${this.vmid} · Nodo: ${this.node}`,
@@ -4945,7 +5445,7 @@ const DiskMgr = {
         // il guest non vede il disco: l'unico rimedio e' spegnere e riaccendere la VM, solo se l'utente lo vuole
         this.log('⚠ Il disco non e\' stato rilevato nel guest.', 'tr');
         this.busy(false);
-        askConfirm({
+        askConfirm({minRole:'operator',
           title: `Spegnere e riaccendere la VM ${this.vmid}?`,
           lines: [`Il guest non vede il disco ${disk}: l'unico rimedio e' un riavvio completo della VM.`, `VM: ${this.vmid} · Nodo: ${this.node}`],
           consequence: 'La VM viene spenta (ordinatamente, poi forzata se serve) e riaccesa: ci vuole fino a 2 minuti e i servizi nel guest si interrompono. Se il disco era gia\' configurato il riavvio e\' inutile: controlla prima nel guest.',
@@ -5378,7 +5878,7 @@ const Provision=(()=>{
       if(!gp.ok||gp.groups.length>1){toast(gp.ok?'In creazione si sceglie un solo gruppo':'Gruppo non valido: '+gp.err,'err');document.getElementById('pv-group').focus();return;}
       const grp=gp.groups[0]||'', grpNew=!!grp&&!Groups.existing().has(grp);
       if(grpNew&&!grpConfirmed){
-        askConfirm({title:`Nuovo gruppo: ${grp}`,lines:[`Il gruppo "${grp}" non esiste ancora su nessuna VM.`],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\': controlla il nome prima di continuare.',level:'warn',okLabel:'Crea il gruppo e provisiona'},()=>{Provision._grpOk=true;Provision.run();});
+        askConfirm({minRole:'operator',title:`Nuovo gruppo: ${grp}`,lines:[`Il gruppo "${grp}" non esiste ancora su nessuna VM.`],consequence:'Se e\' un refuso comparira\' nei report come un gruppo a se\': controlla il nome prima di continuare.',level:'warn',okLabel:'Crea il gruppo e provisiona'},()=>{Provision._grpOk=true;Provision.run();});
         return;
       }
       const xuser=val('pv-xuser');
@@ -5571,7 +6071,7 @@ const Batch=(()=>{
       const keys=[...sel];
       const visible=new Set(filtered.map(keyOf));
       const hidden=keys.filter(k=>!visible.has(k)).length;
-      askConfirm({
+      askConfirm({minRole:'operator',
         title:`Batch: ${a.label} su ${keys.length} VM`,
         lines:hidden?[`Attenzione: ${hidden} delle VM selezionate non sono visibili con i filtri attuali.`]:[],
         consequence:a.cons,
@@ -5690,7 +6190,7 @@ const Cluster={
     }catch{running=null;}
     btn.disabled=false;
     const total=running?[...running.values()].reduce((a,b)=>a+b,0):null;
-    askConfirm({
+    askConfirm({minRole:'admin',
       title:`${c.label} di ${nodes.length} nodo/i`,
       lines:[total==null?'VM in esecuzione: conteggio non disponibile':`VM in esecuzione coinvolte: ${total}`],
       consequence:c.cons,
@@ -6358,24 +6858,24 @@ const NetworkSettingsUI={
     }catch(e){if(generation===this.generation&&idx===ClusterMgr.current)editor.innerHTML=errBox(e.message,'NetworkSettingsUI.load()');}
   },
   row(value={}){
-    return `<div class="ns-network" data-network><label class="rs-field"><span>Rete IPv4 (CIDR)</span><input class="inp" data-key="cidr" maxlength="20" placeholder="10.75.4.0/24" value="${esc(value.cidr??'')}" spellcheck="false" autocomplete="off"></label><label class="rs-field"><span>Gateway</span><input class="inp" data-key="gateway" maxlength="45" placeholder="10.75.4.254" value="${esc(value.gateway??'')}" spellcheck="false" autocomplete="off"></label><button type="button" class="btn bg2 sm" data-remove>Rimuovi rete</button></div>`;
+    return `<div class="ns-network" data-network><label class="rs-field"><span>Rete IPv4 (CIDR)</span><input class="inp" data-key="cidr" maxlength="20" placeholder="10.75.4.0/24" value="${esc(value.cidr??'')}" spellcheck="false" autocomplete="off"></label><label class="rs-field"><span>Gateway</span><input class="inp" data-key="gateway" maxlength="45" placeholder="10.75.4.254" value="${esc(value.gateway??'')}" spellcheck="false" autocomplete="off"></label><button data-min-role="admin" type="button" class="btn bg2 sm" data-remove>Rimuovi rete</button></div>`;
   },
   render(settings){
-    document.getElementById('ns-editor').innerHTML=`<form id="ns-form" novalidate>
+    document.getElementById('ns-editor').innerHTML=`<form id="ns-form" novalidate><fieldset class="role-fields">
       <details class="rs-section" open><summary>Rete delle VM nuove</summary>
         <p class="hint">Nuova VM sceglie il gateway dalla rete che contiene l'IP; il DNS e il dominio vengono da qui; il template conta solo se qui manca.</p>
         <div id="ns-networks">${settings.networks.map(value=>this.row(value)).join('')}</div>
-        <button type="button" class="btn bg2 sm" id="ns-add" data-add>Aggiungi rete</button>
+        <button data-min-role="admin" type="button" class="btn bg2 sm" id="ns-add" data-add>Aggiungi rete</button>
         <div class="rs-grid"><label class="rs-field"><span>DNS (fino a 3, separati da spazi)</span><input class="inp" id="ns-dns" maxlength="137" value="${esc(settings.dns.join(' '))}" placeholder="es. 1.1.1.1 9.9.9.9" spellcheck="false" autocomplete="off"></label>
         <label class="rs-field"><span>Dominio di ricerca (opzionale)</span><input class="inp" id="ns-search" maxlength="253" value="${esc(settings.search_domain)}" placeholder="es. example.org" spellcheck="false" autocomplete="off"></label></div>
       </details>
       <div class="rs-savebar" id="ns-savebar" role="region" aria-label="Salvataggio delle impostazioni di rete" hidden>
         <span class="rs-savebar-status" role="status">Modifiche non salvate</span>
-        <div class="rs-savebar-actions"><button type="button" class="btn bg2" id="ns-cancel" data-cancel>Annulla</button><button type="submit" class="btn ba" id="ns-save">Salva</button></div>
+        <div class="rs-savebar-actions"><button data-min-role="admin" type="button" class="btn bg2" id="ns-cancel" data-cancel>Annulla</button><button data-min-role="admin" type="submit" class="btn ba" id="ns-save">Salva</button></div>
         <span class="rs-savebar-error" id="ns-save-error" role="alert"></span>
       </div>
-    </form>`;
-    const form=document.getElementById('ns-form');
+    </fieldset></form>`;
+    const form=document.getElementById('ns-form');RoleUI.readonly(form);
     form.addEventListener('input',()=>this.updateDirty());form.addEventListener('change',()=>this.updateDirty());
     form.addEventListener('submit',e=>{e.preventDefault();this.save();});
     form.addEventListener('click',e=>this.click(e));
@@ -6619,12 +7119,12 @@ const ReportSettingsUI={
   select(key,label,value,options){
     return `<label class="rs-field"><span>${esc(label)}</span><select class="inp" data-key="${esc(key)}">${options.map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
   },
-  remove(label='Rimuovi riga'){return `<button type="button" class="btn bg2 sm" data-remove>${esc(label)}</button>`;},
+  remove(label='Rimuovi riga'){return `<button data-min-role="admin" type="button" class="btn bg2 sm" data-remove>${esc(label)}</button>`;},
   tier(t={},key='tokens'){
     return `<div class="rs-row rs-grid rs-line" data-tier>${this.field(['min_gib','Da (GiB)',0,1024],t.min_gib??0)}${this.field([key,key==='tokens'?'Gettoni GPU/mese':'GPU-ora (valuta del provider)',0,1000],t[key]??0)}${this.remove()}</div>`;
   },
   provider(p={}){
-    return `<div class="rs-row" data-provider><div class="rs-grid">${this.text('name','Nome provider',p.name??'',64)}${this.select('level','Livello',p.level??'low',[['low','Basso'],['high','Alto']])}${this.select('currency','Valuta',p.currency??'EUR',[['EUR','EUR'],['USD','USD']])}${this.market.map(f=>this.field(f,p[f[0]]??0)).join('')}${this.text('source','Fonte (solo testo)',p.source??'',300)}${this.text('date','Data del listino',p.date??'',10,'AAAA-MM-GG')}</div><p class="hint">Prezzi nella valuta selezionata. Fasce GPU per memoria minima, in ordine crescente.</p><div data-market-tiers>${(p.gpu_hour??[]).map(t=>this.tier(t,'price')).join('')}</div><button type="button" class="btn bg2 sm" data-add-market-tier>Aggiungi fascia GPU</button> ${this.remove('Rimuovi provider')}</div>`;
+    return `<div class="rs-row" data-provider><div class="rs-grid">${this.text('name','Nome provider',p.name??'',64)}${this.select('level','Livello',p.level??'low',[['low','Basso'],['high','Alto']])}${this.select('currency','Valuta',p.currency??'EUR',[['EUR','EUR'],['USD','USD']])}${this.market.map(f=>this.field(f,p[f[0]]??0)).join('')}${this.text('source','Fonte (solo testo)',p.source??'',300)}${this.text('date','Data del listino',p.date??'',10,'AAAA-MM-GG')}</div><p class="hint">Prezzi nella valuta selezionata. Fasce GPU per memoria minima, in ordine crescente.</p><div data-market-tiers>${(p.gpu_hour??[]).map(t=>this.tier(t,'price')).join('')}</div><button data-min-role="admin" type="button" class="btn bg2 sm" data-add-market-tier>Aggiungi fascia GPU</button> ${this.remove('Rimuovi provider')}</div>`;
   },
   storageProposal(name){return /ssd/i.test(name)?'ssd':/hdd/i.test(name)?'hdd':'';},
   storage(name='',value='',detected=false,proposed=false){
@@ -6642,7 +7142,7 @@ const ReportSettingsUI={
   proposalButton(){
     const box=document.getElementById('rs-storage-propose');if(!box)return;
     const n=this.proposable().length;
-    box.innerHTML=n?`<button type="button" class="btn bg2 sm" data-storage-propose>${esc(n===1?'Applica la proposta dal nome (1 storage)':'Applica le proposte dal nome ('+n+' storage)')}</button>`:'';
+    box.innerHTML=n?`<button data-min-role="admin" type="button" class="btn bg2 sm" data-storage-propose>${esc(n===1?'Applica la proposta dal nome (1 storage)':'Applica le proposte dal nome ('+n+' storage)')}</button>`:'';
   },
   // Name-based proposals never fill the form by themselves (the page would open with unsaved changes):
   // the administrator applies them with one click, and they are saved with the normal Salva.
@@ -6776,26 +7276,26 @@ const ReportSettingsUI={
   render(r,proposeStorage=false){
     const p=r.internal_prices??{}, d=r.defaults??{};
     this.savedStorage={...r.storage_classes??{}};
-    document.getElementById('rs-editor').innerHTML=`<form id="rs-form" novalidate>
+    document.getElementById('rs-editor').innerHTML=`<form id="rs-form" novalidate><fieldset class="role-fields">
       <div class="rs-status" id="rs-status" role="status" aria-label="Stato dei parametri dei report">${this.status(r)}</div>
       <details class="rs-section" open><summary>Listino interno</summary><div class="rs-grid" id="rs-internal">${this.internal.map(f=>this.field(f,p[f[0]]??(f[5]==='optional'?null:0))).join('')}</div>
       <p class="hint">Blocchi vuoti: dimensione predefinita. Le risorse oltre la base si arrotondano per eccesso. Fasce GPU: da X GiB, N gettoni GPU; vale la fascia più alta raggiunta. Per il supplemento da 89 GiB, aggiungi una fascia dedicata.</p>
-      <div id="rs-tiers">${(p.gpu_tiers??[]).map(t=>this.tier(t)).join('')}</div><button type="button" class="btn bg2 sm" data-add="tier">Aggiungi fascia GPU</button>
+      <div id="rs-tiers">${(p.gpu_tiers??[]).map(t=>this.tier(t)).join('')}</div><button data-min-role="admin" type="button" class="btn bg2 sm" data-add="tier">Aggiungi fascia GPU</button>
       <div class="rs-preview" id="rs-internal-preview" role="status" aria-live="polite"></div>
       </details>
-      <details class="rs-section" open><summary>Prezzi di mercato</summary><p class="hint">Livello basso: provider europeo economico, per esempio OVHcloud; è la cifra in evidenza nel report. Livello alto: hyperscaler, per esempio Azure; completa l’intervallo di confronto.</p><p class="hint">AWS, Scaleway e Aruba non hanno un listino pubblico leggibile senza credenziali: aggiornali a mano</p><div class="rs-actions"><button type="button" class="btn ba sm" data-price-check>Controlla i listini</button><button type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider a mano</button></div><div id="rs-price-status" role="status"></div><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div>
+      <details class="rs-section" open><summary>Prezzi di mercato</summary><p class="hint">Livello basso: provider europeo economico, per esempio OVHcloud; è la cifra in evidenza nel report. Livello alto: hyperscaler, per esempio Azure; completa l’intervallo di confronto.</p><p class="hint">AWS, Scaleway e Aruba non hanno un listino pubblico leggibile senza credenziali: aggiornali a mano</p><div class="rs-actions"><button data-min-role="admin" type="button" class="btn ba sm" data-price-check>Controlla i listini</button><button data-min-role="admin" type="button" class="btn bg2 sm" data-add="provider">Aggiungi provider a mano</button></div><div id="rs-price-status" role="status"></div><div id="rs-market">${(r.market_prices??[]).map(p=>this.provider(p)).join('')}</div>
       <h3>Cambio USD/EUR</h3><div id="rs-exchange">${this.field(['usd_eur','EUR per 1 USD',0,10],r.usd_eur??0)}</div>
       </details>
-      <details class="rs-section"><summary>Classi degli storage</summary><p class="hint" id="rs-storage-hint">Le classi non assegnate non vengono salvate.</p><div class="rs-actions" id="rs-storage-propose"></div><table class="rs-storage-table"><caption class="sr">Classi degli storage del cluster</caption><thead><tr><th scope="col">Storage</th><th scope="col">Classe</th></tr></thead><tbody id="rs-storage">${this.storageTable(r.storage_classes??{},proposeStorage)}</tbody></table><button type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage manuale</button></details>
-      <details class="rs-section"><summary>Registro delle interruzioni</summary><p class="hint" id="rs-offset-note">Le date locali usano il fuso del server. Le date con fuso esplicito sono in sola lettura per conservarne il valore. Durata massima: 31 giorni per riga.</p><div id="rs-interruptions">${(r.interruptions??[]).map(v=>this.interruption(v)).join('')}</div><button type="button" class="btn bg2 sm" data-add="interruption">Aggiungi interruzione</button></details>
+      <details class="rs-section"><summary>Classi degli storage</summary><p class="hint" id="rs-storage-hint">Le classi non assegnate non vengono salvate.</p><div class="rs-actions" id="rs-storage-propose"></div><table class="rs-storage-table"><caption class="sr">Classi degli storage del cluster</caption><thead><tr><th scope="col">Storage</th><th scope="col">Classe</th></tr></thead><tbody id="rs-storage">${this.storageTable(r.storage_classes??{},proposeStorage)}</tbody></table><button data-min-role="admin" type="button" class="btn bg2 sm" data-add="storage">Aggiungi storage manuale</button></details>
+      <details class="rs-section"><summary>Registro delle interruzioni</summary><p class="hint" id="rs-offset-note">Le date locali usano il fuso del server. Le date con fuso esplicito sono in sola lettura per conservarne il valore. Durata massima: 31 giorni per riga.</p><div id="rs-interruptions">${(r.interruptions??[]).map(v=>this.interruption(v)).join('')}</div><button data-min-role="admin" type="button" class="btn bg2 sm" data-add="interruption">Aggiungi interruzione</button></details>
       <details class="rs-section"><summary>Soglie avanzate</summary><p class="hint">Campi vuoti o zero: predefinito del report. Le percentuali si inseriscono in %, anche quando il valore salvato è una frazione.</p><div class="rs-grid" id="rs-defaults">${this.thresholds.map(f=>this.field(f,d[f[0]],true)).join('')}</div></details>
       <div class="rs-savebar" id="rs-savebar" role="region" aria-label="Salvataggio dei parametri dei report" hidden>
         <span class="rs-savebar-status" role="status">Modifiche non salvate</span>
-        <div class="rs-savebar-actions"><button type="button" class="btn bg2" id="rs-cancel" data-cancel ${this.saving?'disabled':''}>Annulla</button><button type="submit" class="btn ba" id="rs-save" ${this.saving?'disabled':''}>Salva</button></div>
+        <div class="rs-savebar-actions"><button data-min-role="admin" type="button" class="btn bg2" id="rs-cancel" data-cancel ${this.saving?'disabled':''}>Annulla</button><button data-min-role="admin" type="submit" class="btn ba" id="rs-save" ${this.saving?'disabled':''}>Salva</button></div>
         <span class="rs-savebar-error" id="rs-save-error" role="alert"></span>
       </div>
-    </form>`;
-    const form=document.getElementById('rs-form');
+    </fieldset></form>`;
+    const form=document.getElementById('rs-form');RoleUI.readonly(form);
     form.addEventListener('click',e=>this.click(e));form.addEventListener('submit',e=>{e.preventDefault();this.save();});
     form.addEventListener('input',()=>this.updateStatus());form.addEventListener('change',()=>this.updateStatus());
     this.baseline=this.serialize({...this.read(false),storage_classes:this.savedStorage});
@@ -6851,7 +7351,7 @@ const ReportSettingsUI={
         const diff=old>0&&currency==='EUR'?` (${((t.price-old)/old*100).toFixed(1)}%)`:'';
         return `<li>GPU da ${esc(t.min_gib)} GiB: attuale ${old===null?'non presente':esc(fmt(old))+' '+esc(currency)}, proposto ${esc(fmt(t.price))} EUR/ora${esc(diff)}</li>`;
       }).join('');
-      const html=`<div class="rs-row" data-price-result><strong>${esc(p.provider_name)} — livello ${p.level==='low'?'basso':'alto'}</strong><ul>${compare('vCPU/ora',p.vcpu_hour,'vcpu_hour')}${compare('RAM GB/ora',p.ram_gb_hour,'ram_gb_hour')}${gpu}</ul><p>Voci: ${p.items.length?p.items.map(v=>esc(v.sku)+': '+esc(fmt(v.price))+' EUR/ora').join(', '):'nessuna'}</p><p>${p.errors.length?'Errori: '+p.errors.map(esc).join('; '):'Nessun errore.'}</p><button type="button" class="btn bg2 sm" data-apply-price="${i}" ${!p.items.length?'disabled':''}>Applica alla riga ${p.level==='low'?'bassa':'alta'}</button></div>`;
+      const html=`<div class="rs-row" data-price-result><strong>${esc(p.provider_name)} — livello ${p.level==='low'?'basso':'alto'}</strong><ul>${compare('vCPU/ora',p.vcpu_hour,'vcpu_hour')}${compare('RAM GB/ora',p.ram_gb_hour,'ram_gb_hour')}${gpu}</ul><p>Voci: ${p.items.length?p.items.map(v=>esc(v.sku)+': '+esc(fmt(v.price))+' EUR/ora').join(', '):'nessuna'}</p><p>${p.errors.length?'Errori: '+p.errors.map(esc).join('; '):'Nessun errore.'}</p><button data-min-role="admin" type="button" class="btn bg2 sm" data-apply-price="${i}" ${!p.items.length?'disabled':''}>Applica alla riga ${p.level==='low'?'bassa':'alta'}</button></div>`;
       (row??status).insertAdjacentHTML('afterend',html);
     });
   },
@@ -7038,6 +7538,9 @@ const Settings={
   pickDensity(d){this.saveAppearance('density',d);},
   syncAppearance(){
     const t=document.getElementById('ctheme').value, d=document.getElementById('cdensity').value;
+    const names={'':'Automatico',dark:'Notte',light:'Alba',eva01:'Eva 01',catppuccino:'Catppuccin',spiderman:'Spider-Man'};
+    document.getElementById('theme-current').textContent='Tema: '+(names[t]||t);
+    document.getElementById('density-current').textContent='Densità: '+(d==='compact'?'Compatta':'Comoda');
     document.querySelectorAll('#theme-tiles .tile').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===t));
     document.querySelectorAll('#dens-seg button').forEach(b=>{const on=b.dataset.v===d;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
   },
@@ -7067,9 +7570,12 @@ const Console = {
 
 const ConsolePage = {
   async init() {
+    if(Auth.locked)return;
     document.body.style.cssText = 'margin:0;padding:0;overflow:hidden;width:100%;height:100vh;';
 
-    document.body.innerHTML = `
+    document.body.classList.add('console-page');
+    const host=document.createElement('div');
+    host.innerHTML = `
         <div id="con-wrap" style="
             position:fixed;top:0;left:0;right:0;bottom:0;
             display:flex;flex-direction:column;
@@ -7087,6 +7593,7 @@ const ConsolePage = {
                 ">CONSOLE</span>
                 <span id="con-sub" style="font-size:12px;color:var(--text3)"></span>
                 <div style="flex:1"></div>
+                <button type="button" class="btn bg2 sm" onclick="location.reload()">Riconnetti</button>
                 <button onclick="window.close()" style="
                     background:transparent;border:1px solid var(--border2);
                     color:var(--text2);padding:3px 10px;border-radius:8px;
@@ -7099,6 +7606,7 @@ const ConsolePage = {
                 width:100%;overflow:hidden;background:var(--bg);
             "></div>
         </div>`;
+    document.getElementById('con-wrap')?.remove();document.body.append(host.firstElementChild);
 
     const p     = new URLSearchParams(window.location.search);
     const node  = p.get('node')    || '';
@@ -7139,15 +7647,10 @@ const ConsolePage = {
     term.writeln('\x1b[33mConnessione console seriale...\x1b[0m');
 
     try {
-        const res = await fetch(
-            `/api/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(vmid)}/termproxy?cluster=${encodeURIComponent(cidx)}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+        const data = await api(
+            `/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(vmid)}/termproxy?cluster=${encodeURIComponent(cidx)}`,
+            {method:'POST',quiet:true}
         );
-        if (!res.ok) {
-            const e = await res.json().catch(() => ({}));
-            throw new Error(e.error || `HTTP ${res.status}`);
-        }
-        const data   = await res.json();
         const ticket = data.ticket;
         const port   = data.port;
 
@@ -7223,17 +7726,9 @@ const ConsolePage = {
 
 // INIT
 document.addEventListener('DOMContentLoaded', () => {
-    if (_IS_CONSOLE) {
-        ConsolePage.init();
-        return;
-    }
     A11y.init();
-    Palette.init();
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!_modalStack.length&&App.cur==='vms'&&VMs.hasPick())VMs.clearPick();});
-    Provision.bind();
-    Drawer.init();
+    document.addEventListener('keydown',e=>{if(!Auth.locked&&e.key==='Escape'&&!_modalStack.length&&App.cur==='vms'&&VMs.hasPick())VMs.clearPick();});
     App.init();
-    Reports.init();
 });
 </script>
 </body>

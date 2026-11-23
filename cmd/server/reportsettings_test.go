@@ -27,6 +27,7 @@ func TestReportSettingsClientValidation(t *testing.T) {
 	start, finish := strings.Index(text, begin)+len(begin), strings.Index(text, end)
 	driver := `
 const assert=require('node:assert/strict');
+global.RoleUI={readonly(){}};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ui=ReportSettingsUI;
 const empty=()=>({internal_prices:{gpu_tiers:[]},market_prices:[],usd_eur:0,storage_classes:{},defaults:{},interruptions:[]});
@@ -189,14 +190,15 @@ func TestSettingsTabsAndClusterBinding(t *testing.T) {
 	driver := `
 const assert=require('node:assert/strict');
 const elements=new Map(),listeners={};
+global.Auth={locked:false};global._IS_CONSOLE=false;
 global.document={getElementById(id){if(!elements.has(id))elements.set(id,{innerHTML:'',value:'',style:{},classList:{contains:()=>false,toggle(){}},setAttribute(k,v){this[k]=v;}});return elements.get(id);},querySelectorAll:()=>[]};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings'};
 global.history={pushState(a,b,h){location.hash=h;},replaceState(a,b,h){location.hash=h;}};
 global.esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clusters=[{idx:0,label:'Default',default:true},{idx:1,label:'Other'}];
-global.fetch=async()=>({json:async()=>clusters});
-global.api=async()=>({theme:'',density:'',refresh_seconds:0});
+const config={theme:'',density:'',refresh_seconds:0};
+global.api=async path=>path==='/clusters'?clusters:config;
 global.applyTheme=()=>{};global.applyDensity=()=>{};
 global.AutoRefreshUI={reset(){},configure(){}};
 global.VMs={clearCache(){},detail(){}};global.Nodes={};global.Batch={};
@@ -241,10 +243,10 @@ global.App={cur:'settings',nav(page,opts){this.cur=page;if(page==='settings')Set
  ClusterMgr.switchTo(0);await new Promise(setImmediate);assert.equal(ClusterMgr.current,0);assert.deepEqual(loads,[1,0]);
  ClusterMgr.switchTo(999);ClusterMgr.switchTo('1bad');assert.equal(ClusterMgr.current,0);
  // Resolve overlapping cluster-list refreshes in reverse order.
- const pending=[];global.fetch=()=>new Promise(resolve=>pending.push(resolve));
+ const pending=[];global.api=path=>path==='/clusters'?new Promise(resolve=>pending.push(resolve)):Promise.resolve(config);
  ClusterMgr.current=0;const first=Settings.load();ClusterMgr.current=1;const second=Settings.load();
- pending[1]({json:async()=>clusters});await second;
- pending[0]({json:async()=>clusters});await first;
+ pending[1](clusters);await second;
+ pending[0](clusters);await first;
  assert.equal(ClusterMgr.current,1);assert.equal(loads.at(-1),1);
 })().catch(err=>{console.error(err);process.exitCode=1;});
 `
