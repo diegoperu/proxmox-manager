@@ -202,24 +202,61 @@ No IP addresses, no guest content, no processes. VMIDs are reused by Proxmox, so
 
 ---
 
-## Creating a Proxmox API Token
+## Creating the Proxmox service account and API tokens
 
-1. Open Proxmox web UI → **Datacenter** → **Permissions** → **API Tokens** → **Add**
-2. Select the user (e.g. `root@pam` or a dedicated service account)
-3. Enter a Token ID (e.g. `proxmox-manager`)
-4. **Privilege Separation**: leave unchecked to inherit the user's full permissions
-5. Click **Add** and copy the token secret immediately — it is shown only once
-6. The token format used in `config.json` is: `root@pam!proxmox-manager=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+The manager talks to every cluster with **one dedicated service account per cluster**, `pmgr@pve`, through API tokens; who did what is recorded by the manager itself (action log with the Proxmox task UPID). Do **not** use `root@pam` or the built-in `Administrator` role: it also grants `Permissions.Modify`, `User.Modify`, `Realm.Allocate`, `Group.Allocate`, `Sys.Modify` and `Sys.Incoming`, so a stolen token could create users, grant itself rights and change the cluster configuration. No other built-in role fits either (`PVEVMAdmin` lacks node and storage access, `PVEAdmin` includes `User.Modify`, only `Administrator` has `Sys.PowerMgmt`).
 
-**Minimum privileges** (if using privilege separation):
-- `VM.Audit`, `VM.PowerMgmt`, `VM.Snapshot`, `VM.Clone`, `VM.Config.CPU`, `VM.Config.Memory`, `VM.Config.Disk`, `VM.Config.Network`, `VM.Migrate`, `VM.Allocate`
-- `Sys.Audit`, `Sys.PowerMgmt`
-- `Datastore.Audit`, `Datastore.AllocateSpace` (VM creation, extra disks)
-- `VM.Config.Options` (group tags), `VM.Config.Cloudinit` (VM creation)
-- `VM.Config.HWType`, `Mapping.Audit`, `Mapping.Use` (GPU assignment through PCI mappings)
-- guest agent features (add user, disks, dmesg, OS and IP info, GPU usage): `VM.Monitor` on Proxmox 8, the `VM.GuestAgent.*` privileges on Proxmox 9
+### 1. Custom role `PMGRManager` (24 privileges)
 
-Missing privileges show up as an explained error (403) on the feature that needs them; the rest keeps working.
+| Area | Privileges | Used for |
+|---|---|---|
+| Nodes and cluster | `Sys.Audit` `Sys.PowerMgmt` | node status, network, PCI devices, tasks, Ceph, HA; node reboot/shutdown |
+| VMs | `VM.Audit` `VM.PowerMgmt` `VM.Snapshot` `VM.Migrate` `VM.Clone` `VM.Allocate` | lists, power actions, snapshots, migrations and balance, New VM, deletion |
+| VM configuration | `VM.Config.Disk` `VM.Config.CPU` `VM.Config.Memory` `VM.Config.Network` `VM.Config.Cloudinit` `VM.Config.Options` `VM.Config.HWType` | disks, cores/RAM, cloud-init, group tags, GPU assignment |
+| Guest agent | `VM.GuestAgent.Audit` `VM.GuestAgent.Unrestricted` | IP, OS and disk info; add user, disk setup, kernel log, GPU usage |
+| Storage | `Datastore.Audit` `Datastore.AllocateSpace` | free space, snippets, new disks |
+| Other | `Pool.Audit` `Mapping.Audit` `Mapping.Use` `SDN.Audit` `SDN.Use` | pools, PCI mappings of the GPUs, network bridges of new VMs |
+
+Deliberately left out: everything that changes users, permissions, realms and the cluster configuration, `Sys.Console` (node shell), `VM.Console` (the serial console uses its own credentials, see [Security — Console credentials](#security--console-credentials)), `VM.Backup`, `VM.Snapshot.Rollback`, `VM.GuestAgent.File*`. Proxmox 8 has `VM.Monitor` instead of the `VM.GuestAgent.*` privileges.
+
+### 2. Commands (as root on one node of each cluster)
+
+```bash
+pveum role add PMGRManager --privs "Sys.Audit,Sys.PowerMgmt,VM.Audit,VM.PowerMgmt,VM.Snapshot,VM.Migrate,VM.Clone,VM.Allocate,VM.Config.Disk,VM.Config.CPU,VM.Config.Memory,VM.Config.Network,VM.Config.Cloudinit,VM.Config.Options,VM.Config.HWType,VM.GuestAgent.Audit,VM.GuestAgent.Unrestricted,Datastore.Audit,Datastore.AllocateSpace,Pool.Audit,Mapping.Audit,Mapping.Use,SDN.Audit,SDN.Use"
+
+# service account: no password, so it cannot log in to the Proxmox web UI
+pveum user add pmgr@pve --comment "ProxmoxManager service account (no login)"
+pveum acl modify / --users pmgr@pve --roles PMGRManager
+
+# token of the production server
+pveum user token add pmgr@pve manager --privsep 1 --comment "ProxmoxManager server"
+pveum acl modify / --tokens 'pmgr@pve!manager' --roles PMGRManager
+
+# separate token for the local copy (development and emergency access), revocable on its own
+pveum user token add pmgr@pve local --privsep 1 --comment "ProxmoxManager local copy"
+pveum acl modify / --tokens 'pmgr@pve!local' --roles PMGRManager
+```
+
+- `token add` prints the secret **once**: copy it immediately into the manager (Settings → General → cluster → Edit). Format: `pmgr@pve!manager=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`.
+- With `--privsep 1` the effective rights of a token are the intersection of the user's and the token's ACLs: that is why both ACL lines are needed.
+- Proxmox task logs show `pmgr@pve!manager` (or `!local`); the manager's action log names the person, linked by the task UPID.
+- Check what a token can do: `pveum user token permissions pmgr@pve manager` (or `GET /access/permissions` with the token).
+
+### 3. Rotation and revocation
+
+A token secret that has been exposed (pasted in a chat, a ticket, a shared file) must be regenerated:
+
+```bash
+pveum user token remove pmgr@pve local
+pveum user token add pmgr@pve local --privsep 1 --comment "ProxmoxManager local copy"
+pveum acl modify / --tokens 'pmgr@pve!local' --roles PMGRManager
+```
+
+Then put the new secret in the manager that uses it. Removing a token stops that instance only; the other token keeps working.
+
+### 4. Verified
+
+On Proxmox VE 9.2 (test cluster, 2026-11-23) with the `pmgr@pve!local` token: all 34 read calls used by the manager, and the writes snapshot create/delete, tags, cores/RAM, guest agent exec, reboot, live migration both ways, clone from a template, cloud-init and network settings, disk resize and extra disk, VM deletion. Not exercised yet: node reboot/shutdown (`Sys.PowerMgmt`) and GPU assignment (`VM.Config.HWType`, `Mapping.Use`, no PCI mapping on the test cluster). A missing privilege shows up in the manager as an explained 403 on the feature that needs it.
 
 ---
 
