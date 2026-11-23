@@ -1491,11 +1491,11 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: A con una modifica (2026-11-23): la copia locale **mantiene l'accesso ai cluster veri e le raccolte attive** (utile per provare i report) ed e' l'**accesso di emergenza** se la macchina salta; le operazioni reali si fanno dal sistema in servizio. Proposta conseguente: un token Proxmox **distinto** per la copia locale (`pmgr@pve!local`), revocabile da solo e riconoscibile nei task.
 
 ### D147 — Reverse proxy: dove sta e come parla con il manager
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no per il codice (serve all'installazione)
 **Domanda**: il reverse proxy gira sulla stessa macchina Debian o su un'altra? Quale software (nginx, Apache, Caddy, HAProxy)?
 **Perché conta**: se e' sulla stessa macchina il manager ascolta solo su `127.0.0.1` e non serve altro; se e' su un'altra macchina il tratto proxy -> manager passa in rete e va protetto (firewall che accetta solo l'IP del proxy, ed eventualmente TLS anche su quel tratto). In tutti e due i casi il manager deve fidarsi di `X-Forwarded-For`/`X-Forwarded-Host` **solo** se arrivano dall'indirizzo del proxy (`trusted_proxies`), altrimenti chiunque potrebbe falsificare l'IP nel registro e aggirare il limite dei tentativi di login.
 **Opzioni**: A) stessa macchina, manager su `127.0.0.1:8080`, `trusted_proxies: ["127.0.0.1"]`; B) altra macchina, manager su IP di management con firewall solo dal proxy, `trusted_proxies: [<IP proxy>]`.
 **Suggerimento**: A se possibile.
-**Risposta utente**:
+**Risposta utente**: A, stessa macchina (2026-11-23): manager su `127.0.0.1:8080`, `trusted_proxies: ["127.0.0.1"]`.
 
