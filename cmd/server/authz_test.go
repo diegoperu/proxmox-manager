@@ -291,3 +291,31 @@ func TestUnknownRuleIsRefusedAndUPIDIsLogged(t *testing.T) {
 	}
 	_ = chi.URLParam
 }
+
+// Regression (step 7 review): an encoded slash in a route parameter made the authorization layer look up a
+// different path than the router and skip every check.
+func TestEncodedPathsCannotSkipAuthorization(t *testing.T) {
+	store, _ := newAuthStore(t)
+	login(t, store, "capo", auth.RoleAdmin)
+	router := buildRouter(handlers.New(), &auth.Handlers{Store: store}, store, nil)
+	for _, c := range []struct {
+		method, raw string
+		want        int
+	}{
+		{"GET", "/api/nodes/a%2Fb/status", http.StatusBadRequest},
+		{"GET", "/api/nodes/x%2F..%2F..%2Fauth%2Flogin/status", http.StatusBadRequest},
+		{"GET", "/api/nodes/a%2fb/status", http.StatusBadRequest},
+		{"GET", "/api/nodes/a%5Cb/status", http.StatusBadRequest},
+		{"DELETE", "/api/nodes/a%2Fb/qemu/101", http.StatusBadRequest},
+		{"GET", "/api/vms", http.StatusUnauthorized},
+		{"GET", "/api/nodes/n%31/status", http.StatusUnauthorized}, // other encodings: still checked
+		{"GET", "/api/does-not-exist", http.StatusNotFound},
+	} {
+		req := httptest.NewRequest(c.method, c.raw, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != c.want {
+			t.Errorf("%s %s: %d %s, want %d", c.method, c.raw, w.Code, w.Body, c.want)
+		}
+	}
+}

@@ -114,6 +114,9 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		} else if tok != "" {
 			cfg.Clusters[i].APIToken = "..."
 		}
+		// The console password never leaves the server (it was returned in clear until 2026-11-23, found in the
+		// voce 20 review); the page only needs to know whether console credentials exist (GET /api/clusters).
+		cfg.Clusters[i].Password = ""
 	}
 	writeJSON(w, cfg)
 }
