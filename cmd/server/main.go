@@ -43,6 +43,9 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 	cfg := config.Get()
+	for _, warning := range startupWarnings(cfg) {
+		log.Print(warning)
+	}
 
 	proxies, err := auth.ParseTrustedProxies(cfg.TrustedProxies)
 	if err != nil {
@@ -91,7 +94,7 @@ func main() {
 
 	r := buildRouter(h, authH, accounts, proxies)
 
-	log.Printf("ProxmoxManager → http://localhost%s", cfg.ListenAddr)
+	log.Printf("ProxmoxManager in ascolto su %s", cfg.ListenAddr)
 	log.Fatal(http.ListenAndServe(cfg.ListenAddr, r))
 }
 
@@ -159,6 +162,7 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 // route must have a rule in routeAccess, or it is refused.
 func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store, proxies []netip.Prefix) *chi.Mux {
 	r := chi.NewRouter()
+	r.Use(securityHeaders(proxies))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(authorize(r, accounts, proxies))

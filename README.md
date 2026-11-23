@@ -260,6 +260,166 @@ On Proxmox VE 9.2 (test cluster, 2026-11-23) with the `pmgr@pve!local` token: al
 
 ---
 
+## Deployment on a dedicated Debian 13 machine (Caddy)
+
+Use a dedicated **Debian 13 amd64** machine on the internal network/VPN. Caddy
+runs on that same machine and provides HTTPS using the university certificate.
+The manager listens only on `127.0.0.1:8080`. Restrict inbound access to the
+internal network/VPN; do not expose it to the Internet.
+
+1. **Create the Proxmox service account first.** Follow
+   [Creating the Proxmox service account and API tokens](#creating-the-proxmox-service-account-and-api-tokens)
+   on every cluster. The dedicated machine uses `pmgr@pve!manager`; the workstation
+   emergency copy uses its own `pmgr@pve!local` token. Never reuse either secret
+   in the other instance.
+
+2. **Install a signed release.** Copy this repository's `deploy/` directory to a
+   trusted, root-owned location on the Debian machine. Keep `install.sh`,
+   `release-verify.sh` and `systemd/proxmox-manager.service` together. Required OS
+   tools: Bash, systemd, curl, CA certificates, OpenSSL 3 (ed25519), Python 3,
+   coreutils, util-linux (`flock`) and passwd (`useradd`). Install Caddy separately
+   using the Debian package. No Go compiler or private release-signing key belongs
+   on this machine.
+
+   Choose a **published, signed** release tag, replacing `vYYYY.MM.DD` below with
+   that actual tag (an optional `.N` suffix is supported). The tag must include
+   this deployment support; older binaries do not implement its health probe.
+
+   ```bash
+   sudo bash deploy/install.sh install --release vYYYY.MM.DD --host pmgr.example.edu
+   ```
+
+   The installer checks Debian 13/root/amd64, creates the locked system account
+   `pmgr` with `/usr/sbin/nologin`, verifies the release signature **and** SHA-256
+   checksum, installs the hardened unit and enables/starts it. The raw ed25519
+   public key is pinned in the installer; the key published by the selected tag
+   must match it. Downloads allow HTTPS only, verify certificates, and have size
+   limits and timeouts. GitHub's API resolves the tag's commit without credentials.
+   The installer never prints config contents or tokens. A release without its
+   offline `SHA256SUMS.sig` is refused.
+
+3. **Create and verify the first administrator.** The command line is always
+   available, including when web login is broken:
+
+   ```bash
+   sudo -u pmgr -H sh -c 'cd ~/proxmox-manager && ./bin/proxmox-manager user add NAME --role admin'
+   ```
+
+   Replace `NAME` with the administrator's username. The command displays generated
+   credentials once: enrol the TOTP key in an authenticator and store the password
+   securely. For recovery use `user reset NAME` or `user enable NAME` from the same
+   directory. Alternatively, after Caddy is ready, use the web setup wizard with
+   the one-hour, one-use setup code from the journal:
+
+   ```bash
+   sudo journalctl -u proxmox-manager | grep CONFIGURAZIONE
+   ```
+
+   This command deliberately reveals the setup secret **locally**. Do not paste
+   its output into tickets or chats. No default account/password exists. Creating
+   an account from the command line permanently closes first-start web setup.
+
+4. **Configure Caddy on the same host.** Start from
+   [`deploy/caddy/Caddyfile.example`](deploy/caddy/Caddyfile.example). Replace
+   `{$PMGR_HOST}` with the same DNS name supplied to `--host` (or set `PMGR_HOST`
+   in the **Caddy systemd service environment**, not just the current shell).
+   Replace the certificate paths with the university certificate chain and key.
+   Keep the key `root:caddy 0640` under a `root:caddy 0750` directory outside the
+   manager's home. Give Caddy a `0750` log directory at `/var/log/caddy`; its access
+   log files use `0600`. Retain existing site blocks if Caddy already serves others.
+
+   Validate as the Caddy user so certificate permissions are checked, then reload:
+
+   ```bash
+   sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+   sudo systemctl reload caddy
+   ```
+
+   For a new Caddy service, enable/start it after successful validation instead.
+   The example enforces a 1 MB request-body limit and HSTS. Caddy sets the
+   forwarded client address, host and protocol; it ignores client-supplied
+   forwarded values by default. Keep this single-proxy topology: the manager
+   trusts only `127.0.0.1` and `::1`. Console WebSockets pass through the proxy
+   without extra rewrite or upgrade directives. See
+   [Caddy's reverse proxy documentation](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
+   The example's `tls internal` alternative requires distributing Caddy's CA to
+   clients before testing; use the university certificate for the real deployment.
+
+   Open `https://pmgr.example.edu`, verify certificate trust, complete setup/login,
+   and test a cluster read and the console. Verify admin recovery and a login on
+   this isolated instance **before** directing the team to it.
+
+5. **Upgrade, inspect or roll back.** Keep the trusted deployment scripts outside
+   the service's writable directory:
+
+   ```bash
+   sudo bash deploy/install.sh status
+   sudo bash deploy/install.sh upgrade --release vYYYY.MM.DD
+   sudo bash deploy/install.sh rollback
+   ```
+
+   Upgrade repeats signature/checksum verification, saves the current binary as
+   `bin/proxmox-manager.prev`, atomically replaces the executable and restarts.
+   Within 30 seconds the loopback `/api/version` probe must report the selected
+   tag's exact commit; a failed restart/probe restores the previous binary,
+   restarts it and returns failure. Manual rollback swaps the two binaries and
+   restarts. This is a **binary-only** rollback: keep a data backup before any
+   future release that changes database/config formats. `status` shows service
+   state, the running commit and config ownership/mode; it never prints config.
+   Only a direct loopback `GET /api/version` without any `Forwarded` or
+   `X-Forwarded-*` headers can skip login for this probe. Requests through Caddy
+   still require a reader session; other API routes keep their existing roles.
+
+Data lives under `/home/pmgr/proxmox-manager/`: `config.json`, `proxmox.db`
+(including SQLite `-wal`/`-shm` sidecars while running), and `auth.key`, the key
+encrypting account TOTP secrets. Back up config, database **and key together**
+using the machine's existing backup system, with access limited to administrators.
+Use a clean service stop or a SQLite-consistent backup, not a live copy of only
+the main database file. The application directory is `pmgr:pmgr 0750`; config,
+database and key are private (`0600`, including new files via `UMask=0077`). The
+home's parent is root-owned. `bin/` is `root:pmgr 0755`, binaries are
+`root:root 0755`, and systemd mounts `bin/` read-only for the service while
+allowing atomic config rewrites in its parent. Other home directories are hidden.
+Outbound networking remains available to Proxmox, GitHub and public price lists.
+The unit uses systemd's filesystem, capability and syscall restrictions; see
+[systemd.exec](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html).
+
+**Migration from the workstation copy:** prepare the DNS/certificate, dedicated
+cluster tokens and an isolated login test first. Stop the workstation instance
+cleanly, then transfer its `config.json` and `proxmox.db` through a protected
+channel into a private staging directory on Debian. Use the dedicated machine's
+`!manager` tokens in the staged config, never the workstation's `!local` tokens.
+Install into a **fresh data directory** with both import options:
+
+```bash
+sudo bash deploy/install.sh install --release vYYYY.MM.DD --host pmgr.example.edu \
+  --import-config /root/pmgr-import/config.json --import-db /root/pmgr-import/proxmox.db
+```
+
+The installer preserves cluster configuration/history, copies imports with
+`pmgr:pmgr 0600`, and sets `listen_addr`, `trusted_proxies` and `allowed_hosts`
+for the local proxy. It normalizes `db_path` to `proxmox.db` and `auth_key_path`
+to `auth.key`; keep these names and the loopback address for the installer's
+upgrade/status checks. Imports require current JSON configuration with a
+`clusters` array; convert any old flat `proxmox_url` configuration first.
+If the imported database already contains accounts, transfer its **matching**
+32-byte authentication key too, beside the staged config, with permissions
+`0600`. Set the staged config's `auth_key_path` to that key's filename (for example
+`auth.key`). The installer automatically imports that key, refuses symlinks or
+keys outside the staging directory, and stores it as `auth.key`. A missing,
+exposed or malformed key stops installation; a different 32-byte key cannot
+decrypt existing TOTP secrets, so verify login before handover. A database from
+the old version without accounts needs no key. A nonempty source WAL/journal is
+refused: stop the source cleanly or create a consistent SQLite backup first.
+Imports never overwrite existing configuration/data. Normal
+installation creates config only if missing. Test HTTPS login, existing history,
+cluster permissions and administrator recovery before the final handover. Keep
+the previous binary and the workstation copy available for emergency access.
+The workstation remains a separate local instance with its **own** config,
+database, authentication key, accounts, port and `!local` tokens; its collections
+remain enabled as agreed in D146. Production operations belong on the dedicated
+machine. Protect or remove staging copies once the backup and login checks pass.
+
 ## Security
 
 - TLS certificate verification is **intentionally disabled** for Proxmox connections — Proxmox VE ships with self-signed certificates. See [`SECURITY.md`](SECURITY.md).
