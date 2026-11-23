@@ -1397,69 +1397,96 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente** (2026-11-23): **solo il team** tecnico di DataCloud (niente gruppi di ricerca: nessun filtro per gruppo); **account locali + TOTP**; **macchina fuori dai cluster**; **solo rete interna/VPN**, mai Internet, HTTPS obbligatorio.
 
 ### D136 — Ruoli e cosa puo' fare ciascuno
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si'
 **Domanda**: quali livelli e quali azioni per livello?
 **Perché conta**: e' la tabella che il server applica a ogni richiesta; un'azione assegnata al livello sbagliato e' una scrittura sui cluster concessa a chi non dovrebbe.
 **Opzioni**: A) tre ruoli globali: **Lettore** (tutte le pagine in sola lettura, report ed export; niente comandi nei guest, niente console); **Operatore** (in piu': avvio/spegnimento/riavvio/sospensione/reset di VM e container, snapshot, console, log del kernel, aggiungi utente e disco, Nuova VM, gruppi, Batch); **Amministratore** (in piu': cancellare VM e container, migrazioni e Bilanciamento, assegnazione GPU, riavvio/spegnimento dei nodi, Impostazioni, utenti del manager, registro delle azioni, sincronizzazione snippet, aggiornamento del servizio); B) come A ma ruolo per cluster (es. amministratore su Magi, operatore su CALCOLO); C) due soli ruoli (lettore, amministratore).
 **Suggerimento**: A: per un team piccolo i ruoli per cluster complicano senza un bisogno concreto; si possono aggiungere dopo senza rifare nulla (la tabella e' una sola).
-**Risposta utente**:
+**Risposta utente**: A, tre ruoli globali come proposto (2026-11-23).
 
 ### D137 — HTTPS: certificato e chi lo serve
-**Stato**: APERTA
+**Stato**: APERTA (in attesa)
 **Bloccante**: si'
 **Domanda**: da dove viene il certificato e chi termina il TLS?
 **Perché conta**: senza HTTPS password, TOTP e cookie di sessione viaggiano in chiaro sulla rete interna; un certificato non riconosciuto abitua a ignorare gli avvisi del browser.
 **Opzioni**: A) certificato rilasciato dai servizi IT di ateneo per un nome DNS interno (es. `pmgr.<dominio interno>`), TLS servito **direttamente dal binario** (libreria standard di Go, solo TLS 1.2+, HSTS), file con permessi 0600; B) come A ma dietro un reverse proxy (nginx/Caddy) sulla stessa macchina; C) CA interna del laboratorio da installare nei browser del team; D) autofirmato (sconsigliato).
 **Suggerimento**: A: un componente in meno da mantenere, il binario e' gia' statico; B solo se sulla macchina girano altri servizi web.
-**Risposta utente**:
+**Risposta utente**: si' al certificato di ateneo, l'utente lo puo' richiedere; nome DNS ancora da decidere (2026-11-23).
 
 ### D138 — Sessioni e conferme forti
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (assunzione provvisoria = suggerimento)
 **Domanda**: durata delle sessioni e se le azioni piu' pericolose richiedono di ridigitare il codice TOTP.
 **Opzioni**: A) cookie `HttpOnly; Secure; SameSite=Strict`, scadenza dopo 30 minuti di inattivita' e comunque dopo 12 ore, nuovo identificativo a ogni login, logout che invalida sul server; **codice TOTP richiesto di nuovo** per: cancellare VM, riavviare/spegnere un nodo, sincronizzare gli snippet, aggiornare il servizio, gestire utenti e token; B) come A senza conferma TOTP; C) sessioni piu' lunghe (8 h di inattivita').
 **Suggerimento**: A.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-23).
 
 ### D139 — Registro delle azioni
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (assunzione provvisoria = suggerimento)
 **Domanda**: cosa si registra, per quanto, chi lo vede.
 **Opzioni**: A) ogni azione che scrive (e ogni login riuscito o fallito): ora, utente, indirizzo IP, azione, cluster, bersaglio (nodo/VMID), esito; mai password, TOTP, chiavi, token o contenuti dei guest; tabella SQLite in sola aggiunta + una riga nel journal di systemd; conservato **2 anni**; pagina per gli amministratori con filtri ed export; B) solo nel journal; C) conservazione 13 mesi come gli altri storici.
 **Suggerimento**: A (2 anni perche' e' un registro di sicurezza, non un dato d'uso).
-**Risposta utente**:
+**Risposta utente**: A (2026-11-23).
 
 ### D140 — Token di Proxmox usati dal manager
-**Stato**: APERTA
+**Stato**: APERTA (proposta rivista)
 **Bloccante**: si'
 **Domanda**: con quale utente/token il manager parla con i cluster?
 **Perché conta**: il token e' sul server: se il server viene compromesso, il token decide quanto danno si fa sui cluster.
 **Opzioni**: A) per ogni cluster un utente Proxmox dedicato `pmgr@pve` con un **ruolo personalizzato con solo i privilegi usati** (elenco nel README), token con separazione dei privilegi, niente `root@pam`; B) come A piu' un secondo token in sola lettura (`PVEAuditor`) usato da Lettore e raccolte periodiche; C) lasciare i token attuali.
 **Suggerimento**: A subito (con la migrazione), B in un secondo momento se serve.
-**Risposta utente**:
+**Risposta utente**: l'utente chiede conferma che si tratta di **un solo token per cluster mediato dall'app** invece di un token per persona; in quel caso ogni azione di ogni utente va registrata, conservata e mostrata in panoramica **insieme ai log (task) di Proxmox**. Proposta rivista in D144.
 
 ### D141 — Primo amministratore e recupero
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (assunzione provvisoria = suggerimento)
 **Domanda**: come nasce il primo account e come si recupera un accesso perso.
 **Opzioni**: A) nessun account predefinito: il primo amministratore si crea **da riga di comando sul server** (`proxmox-manager user add --admin <nome>`), che mostra la chiave TOTP una volta; reset di password/TOTP solo da riga di comando o da un altro amministratore; blocco per 15 minuti dopo 5 tentativi falliti per account, limite di tentativi per indirizzo; B) primo accesso via pagina web con un codice monouso stampato nel log.
 **Suggerimento**: A.
-**Risposta utente**:
+**Risposta utente**: A **piu'** configurazione guidata dal web al primo avvio, mantenendo entrambe le strade (2026-11-23): fattibilita' in D145.
 
 ### D142 — La macchina: chi la fornisce, sistema operativo, backup
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si' (per il passo di installazione, non per il codice)
 **Domanda**: quale macchina fuori dai cluster, con quale sistema, nome DNS e indirizzo; dove vanno le copie di sicurezza di `config.json` e del database.
 **Opzioni**: A) VM o server indicati da te, **ultima LTS** (Debian 13 o Ubuntu 26.04 LTS), IP fisso nella rete interna, servizio systemd con utente dedicato non root e protezioni (`ProtectSystem=strict`, `NoNewPrivileges`, nessuna capability, porta 8443), copia notturna di `/etc/proxmox-manager` e `/var/lib/proxmox-manager` verso una destinazione che indichi tu; B) altro.
 **Suggerimento**: A; dimmi macchina, nome DNS e destinazione delle copie.
-**Risposta utente**:
+**Risposta utente**: **Debian 13**, macchina gia' in uso per agire sulla rete di management a cui sono collegati i nodi, **gia' sottoposta a backup regolare** (2026-11-23). Nome DNS e IP da indicare con D137.
 
 ### D143 — Passaggio dalla postazione alla macchina nuova
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (assunzione provvisoria = suggerimento)
 **Domanda**: come si sposta il servizio.
 **Perché conta**: due istanze accese insieme raccoglierebbero due volte uso GPU e fotografie, in due database diversi.
 **Opzioni**: A) un solo passaggio: si ferma l'istanza della postazione, si copiano `config.json` (con i token nuovi di D140) e `proxmox.db` (lo storico), si avvia la macchina nuova, si verifica, la postazione resta spenta; B) periodo in parallelo con le raccolte spente sulla postazione.
 **Suggerimento**: A.
+**Risposta utente**: A: si', e' il passaggio dall'attuale manager senza login a quello multiutente, conservando configurazione e storico (2026-11-23).
+
+### D144 — Un token per cluster, mediato dall'app, e attribuzione delle azioni
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: confermi un solo utente/token Proxmox per cluster usato dal manager, con l'attribuzione delle azioni fatta dal manager?
+**Perché conta**: in Proxmox tutte le azioni fatte dal manager risulteranno di `pmgr@pve!manager`: senza un collegamento, nei task di Proxmox non si vede quale persona le ha fatte.
+**Opzioni**: A) **token unico per cluster** (privilegi minimi, D140) e **registro delle azioni del manager** come fonte di "chi": ogni azione che scrive salva utente, ora, IP, azione, bersaglio, esito **e l'UPID del task** che Proxmox restituisce; la colonna Attivita' della panoramica e una pagina "Registro" **uniscono i task di Proxmox e il registro**: un task con UPID noto mostra "Mario Rossi tramite il manager", un task fatto fuori dal manager mostra l'utente Proxmox che l'ha fatto; conservazione 2 anni (D139); B) un token per persona, inserito da ciascuno: Proxmox registra la persona vera, ma il manager deve custodire N token, le raccolte periodiche ne vogliono comunque uno di servizio e la revoca di una persona va fatta in due posti; C) token per ruolo (tre token per cluster).
+**Suggerimento**: A: un solo segreto per cluster da proteggere e ruotare, permessi decisi in un punto solo (il manager), e l'UPID rende l'attribuzione verificabile anche dal lato Proxmox. Limite dichiarato: le operazioni che non producono un task (es. modifica dei tag di gruppo, impostazioni) sono attribuite solo dal registro del manager.
 **Risposta utente**:
+
+### D145 — Configurazione guidata dal web al primo avvio
+**Stato**: APERTA
+**Bloccante**: no (fattibile; serve solo l'ok sul meccanismo)
+**Domanda**: va bene questo meccanismo per la configurazione da web, accanto alla riga di comando?
+**Perché conta**: un server appena avviato e senza utenti e' il momento piu' esposto: chi arriva per primo alla pagina potrebbe crearsi l'account di amministratore.
+**Opzioni**: A) **modalita' di configurazione** solo finche' non esiste alcun utente: all'avvio il server genera un **codice monouso** (128 bit) e lo scrive solo nel journal di systemd (`journalctl -u proxmox-manager`); la pagina chiede quel codice prima di tutto; HTTPS anche al primo avvio con un **certificato temporaneo autofirmato** di cui il journal stampa l'impronta (si confronta con quella mostrata dal browser); passi guidati: amministratore (password + TOTP con verifica del primo codice), primo cluster (URL e token, con prova di connessione), nome DNS ammesso, caricamento del certificato vero; il codice scade dopo 1 ora o al primo uso e la modalita' si chiude per sempre appena esiste un amministratore; la riga di comando `user add --admin` resta disponibile; B) solo riga di comando; C) configurazione web senza codice, solo da `localhost` (via tunnel SSH).
+**Suggerimento**: A: e' lo schema usato da prodotti diffusi (es. Jenkins, Grafana con codice iniziale), sicuro se il codice sta solo nel journal di una macchina a cui accedono gli amministratori.
+**Risposta utente**:
+
+### D146 — Sviluppo in locale dopo il passaggio
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: come si continua a sviluppare sulla postazione?
+**Opzioni**: A) si': la postazione resta l'ambiente di sviluppo con una **copia separata** (cartella, database e porta propri): cluster finto (`mockpve`) e Magi, **mai i token di produzione** (CALCOLO/HOSTING), raccolte periodiche spente (`gpu_usage`/`vm_usage` false) per non duplicare i dati della macchina vera; login sempre attivo anche in sviluppo (account locali creati con la riga di comando), HTTPS con certificato autofirmato generato da solo; **nessun interruttore che spenga il login** nel binario (un "modo sviluppo" senza login finirebbe prima o poi in produzione). In produzione si installa solo da release firmata (`tools/release.sh`), mai una build della postazione; B) sviluppo direttamente sulla macchina vera (sconsigliato).
+**Suggerimento**: A.
+**Risposta utente**:
+
