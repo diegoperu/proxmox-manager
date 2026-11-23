@@ -7,9 +7,12 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"strings"
+	"time"
 
+	"proxmox-manager/internal/auth"
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/handlers"
 	"proxmox-manager/internal/history"
@@ -27,10 +30,39 @@ import (
 var staticFiles embed.FS
 
 func main() {
+	// `proxmox-manager user ...`: account management from the command line (D141), then exit.
+	if len(os.Args) > 1 && os.Args[1] == "user" {
+		if err := runUserCommand(os.Args[2:], os.Stdout); err != nil {
+			log.SetFlags(0)
+			log.Fatal(err)
+		}
+		return
+	}
 	if err := config.Load(); err != nil {
 		log.Fatalf("config: %v", err)
 	}
 	cfg := config.Get()
+
+	proxies, err := auth.ParseTrustedProxies(cfg.TrustedProxies)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	// Accounts (voce 20). With no account yet a one-time setup code goes to the log (journal) only (D145).
+	accounts, err := auth.Open(cfg.DBPath, cfg.AuthKeyFile(), func(code string) {
+		log.Printf("CONFIGURAZIONE INIZIALE: nessun utente. Codice monouso per la configurazione dal web, valido 1 ora: %s (oppure: proxmox-manager user add <nome> --role admin)", code)
+	})
+	if err != nil {
+		log.Fatalf("accounts: %v", err)
+	}
+	defer accounts.Close()
+	go func() {
+		for range time.Tick(time.Hour) {
+			if err := accounts.PruneSessions(); err != nil {
+				log.Printf("accounts: prune sessions: %v", err)
+			}
+		}
+	}()
+	authH := &auth.Handlers{Store: accounts, Proxies: proxies}
 
 	h := handlers.New()
 
@@ -68,6 +100,14 @@ func main() {
 	// API
 	r.Route("/api", func(r chi.Router) {
 		r.Use(apiGuard)
+		// Accounts (voce 20, step 2). Route protection comes with step 3.
+		r.Post("/auth/login", authH.Login)
+		r.Post("/auth/logout", authH.Logout)
+		r.Get("/auth/me", authH.Me)
+		r.Post("/auth/password", authH.ChangePassword)
+		r.Get("/auth/setup", authH.SetupStatus)
+		r.Post("/auth/setup/totp", authH.SetupTOTP)
+		r.Post("/auth/setup/complete", authH.SetupComplete)
 		r.Get("/config", h.GetConfig)
 		r.Post("/config", h.SaveConfig)
 		r.Post("/config/test", h.TestConnection)

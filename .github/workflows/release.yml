@@ -1,6 +1,6 @@
 # Release of the static linux/amd64 binary (ROADMAP 24, part 2, D134).
 # Trigger: pushing a tag vYYYY.MM.DD[.N] that points to a commit already on main.
-# The binary is built in a pinned Alpine/musl container (fully static, runs on any Linux x86-64),
+# The binary is built in a pinned Alpine/musl container (golang:1.26-alpine, go.mod requires Go 1.26) (fully static, runs on any Linux x86-64),
 # tested, checksummed and attested (SLSA build provenance, verifiable with `gh attestation verify`).
 # No secret is used. The ed25519 signature of SHA256SUMS is made offline, on the maintainer's workstation, by
 # tools/release.sh (which creates the tag, waits for this workflow, verifies, signs and uploads SHA256SUMS.sig):
@@ -53,7 +53,7 @@ jobs:
           docker run --rm \
             -e COMMIT="$COMMIT" -e DATE="$date_iso" \
             -v "$PWD":/src -w /src \
-            docker.io/library/golang@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f \
+            docker.io/library/golang@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab \
             sh -euxc '
               apk add --no-cache gcc musl-dev nodejs git >/dev/null
               git config --global --add safe.directory /src
