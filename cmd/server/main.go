@@ -73,6 +73,7 @@ func main() {
 	}}
 
 	h := handlers.New()
+	h.SetTaskAttribution(accounts.AuditByUPID)
 
 	// Daily inventory snapshot for the reports (D28): counts and assignments only.
 	hist, err := history.New(cfg.DBPath)

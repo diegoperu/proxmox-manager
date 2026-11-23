@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"errors"
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 // AuditRetention: the action log is a security record, kept 2 years (D139).
@@ -54,6 +56,20 @@ func clean(s string, max int) string {
 
 // AddAudit appends a row (append only: there is no update or delete except the retention prune).
 func (s *Store) AddAudit(e AuditEntry) error {
+	// Authentication events arrive without a status from the existing audit callback.
+	// Store their actual HTTP outcome so failed logins are not displayed or filtered as successes.
+	if e.Status == 0 {
+		switch e.Action + ":" + e.Detail {
+		case "login:riuscito", "logout:riuscito", "setup:primo amministratore creato", "password:cambiata":
+			e.Status = 200
+		case "login:fallito":
+			e.Status = 401
+		case "login:limite di tentativi per indirizzo":
+			e.Status = 429
+		case "setup:codice errato", "password:rifiutata":
+			e.Status = 403
+		}
+	}
 	if e.Time == 0 {
 		e.Time = s.now().Unix()
 	}
@@ -62,23 +78,94 @@ func (s *Store) AddAudit(e AuditEntry) error {
 	return err
 }
 
-// ListAudit returns rows newest first: before = id to page backwards (0 = newest), user = exact filter.
-func (s *Store) ListAudit(limit int, before int64, user string) ([]AuditEntry, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
+// AuditFilter selects action log rows; dates use the server's local calendar.
+type AuditFilter struct {
+	Limit                          int
+	Before                         int64
+	User, Q, Since, Until, Outcome string
+}
+
+var ErrAuditFilter = errors.New("filtri del registro non validi")
+
+func auditDate(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
 	}
+	if len(value) != 10 {
+		return time.Time{}, ErrAuditFilter
+	}
+	t, err := time.ParseInLocation("2006-01-02", value, time.Local)
+	if err != nil || t.Year() < 1 {
+		return time.Time{}, ErrAuditFilter
+	}
+	return t, nil
+}
+
+// Validate also runs in the store so callers cannot bypass the HTTP boundary.
+func (f AuditFilter) Validate() error {
+	if f.Limit < 0 || f.Limit > 500 || f.Before < 0 || (f.User != "" && !ValidUsername(f.User)) ||
+		!utf8.ValidString(f.Q) || utf8.RuneCountInString(f.Q) > 64 ||
+		(f.Outcome != "" && f.Outcome != "ok" && f.Outcome != "error") {
+		return ErrAuditFilter
+	}
+	for _, r := range f.Q {
+		if !unicode.IsPrint(r) {
+			return ErrAuditFilter
+		}
+	}
+	since, err := auditDate(f.Since)
+	if err != nil {
+		return err
+	}
+	until, err := auditDate(f.Until)
+	if err != nil || (f.Since != "" && f.Until != "" && since.After(until)) {
+		return ErrAuditFilter
+	}
+	return nil
+}
+
+// ListAudit returns rows newest first; Before is an exclusive id cursor (0 = newest).
+func (s *Store) ListAudit(f AuditFilter) ([]AuditEntry, error) {
+	if err := f.Validate(); err != nil {
+		return nil, err
+	}
+	if f.Limit == 0 {
+		f.Limit = 100
+	}
+
 	q := `SELECT id, ts, user, ip, action, target, status, upid, detail FROM audit_log WHERE 1=1`
 	args := []any{}
-	if before > 0 {
+	if f.Before > 0 {
 		q += ` AND id < ?`
-		args = append(args, before)
+		args = append(args, f.Before)
 	}
-	if user != "" {
+	if f.User != "" {
 		q += ` AND user = ?`
-		args = append(args, user)
+		args = append(args, f.User)
+	}
+	if f.Q != "" {
+		pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(f.Q) + "%"
+		q += ` AND (action LIKE ? ESCAPE '\' OR target LIKE ? ESCAPE '\')`
+		args = append(args, pattern, pattern)
+	}
+	if f.Since != "" {
+		since, _ := auditDate(f.Since)
+		q += ` AND ts >= ?`
+		args = append(args, since.Unix())
+	}
+	if f.Until != "" {
+		until, _ := auditDate(f.Until)
+		q += ` AND ts < ?`
+		args = append(args, until.AddDate(0, 0, 1).Unix())
+	}
+	if f.Outcome == "ok" {
+		q += ` AND status < 400`
+	}
+	if f.Outcome == "error" {
+		q += ` AND status >= 400`
 	}
 	q += ` ORDER BY id DESC LIMIT ?`
-	args = append(args, limit)
+	args = append(args, f.Limit)
 	rows, err := s.db.Query(q, args...)
 	if err != nil {
 		return nil, err
