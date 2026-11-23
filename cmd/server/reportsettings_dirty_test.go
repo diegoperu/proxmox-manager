@@ -46,6 +46,7 @@ function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,dis
  classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},
  addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
+global.Auth={locked:false};global._IS_CONSOLE=false;
 global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:()=>[],querySelector:()=>null};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings/report'};

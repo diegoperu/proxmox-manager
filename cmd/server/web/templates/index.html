@@ -972,13 +972,43 @@ html.spiderman{
 .rs-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .rs-missing summary{cursor:pointer;color:var(--text2)}
 .rs-missing ul{margin:4px 0 0;padding-left:18px;color:var(--text2)}
+/* Auth: hidden shell until the session is known; the expired-session view keeps the page underneath. */
+body.console-page :is(#topbar,#sidebar,#main,#skip-link){display:none}
+body.auth-pending :is(#topbar,#sidebar,#main,#skip-link,#con-wrap){visibility:hidden}
+.auth-screen{position:fixed;inset:0;z-index:1200;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:32px 12px;background:var(--bg)}
+.auth-screen[hidden]{display:none}
+.auth-screen.auth-overlay{background:var(--scrim)}
+.auth-card{width:min(440px,100%);min-width:0;margin:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-card);padding:24px;overflow-wrap:anywhere}
+.auth-card h1{font-size:26px;line-height:1.12;margin:12px 0}
+.auth-card .brand{width:auto}.auth-card .brand span{display:inline!important}
+.auth-form{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+.auth-form .fg{margin:0}.auth-form .inp{width:100%;min-width:0}
+.auth-form .mf{margin-top:4px;flex-wrap:wrap}
+.auth-note{color:var(--text2);margin:10px 0;font-size:12px}
+.auth-error{color:var(--red);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.auth-error:empty{display:none}
+.auth-secret{display:block;padding:12px;margin:8px 0;border:1px solid var(--border);border-radius:8px;background:var(--bg3);font:12px/1.8 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;user-select:all}
+.user-menu{position:relative;min-width:0;flex-shrink:1}
+#user-button{max-width:220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+#user-popup{z-index:1100}
+@media(max-width:1180px){.topbar .pal-btn{min-width:0}.topbar .pal-btn span,.topbar .pal-btn kbd,.topbar .conn span{display:none}.topbar .brand{width:auto}#user-button{max-width:160px}}
+@media(max-width:850px){.topbar .brand,#refresh-sel{display:none}.topbar .rl-lbl{display:none}}
+@media(max-width:650px){.topbar{gap:6px}.topbar .conn{display:none}.topbar .pal-btn{margin-left:auto}#cluster-select{min-width:70px!important;max-width:84px}.topbar .crumb{display:none}#user-button{max-width:112px}.auth-screen{padding:12px}.auth-card{padding:20px}}
+@media(pointer:coarse){.user-menu [role=menuitem],.topbar .pal-btn{min-height:44px}.topbar .pal-btn{min-width:44px}}
 </style>
 </head>
-<body>
-<a class="skip" id="skip-link" href="#content" onclick="event.preventDefault();document.getElementById('content').focus()">Vai al contenuto</a>
+<body class="auth-pending">
+<section id="auth-screen" class="auth-screen" role="main" aria-labelledby="auth-title" tabindex="-1">
+  <div class="auth-card">
+    <div class="brand">Proxmox<span>Manager</span></div>
+    <h1 id="auth-title">Accesso</h1>
+    <div id="auth-body"><p role="status">Verifica della sessione…</p></div>
+  </div>
+</section>
+<a class="skip" id="skip-link" inert href="#content" onclick="event.preventDefault();document.getElementById('content').focus()">Vai al contenuto</a>
 
 <!-- BARRA SUPERIORE -->
-<header class="topbar" id="topbar">
+<header class="topbar" id="topbar" inert>
   <button type="button" class="btn bg2 sm menu-btn" id="menu-btn" aria-label="Apri menu" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <div class="brand">Proxmox<span>Manager</span></div>
   <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)" style="display:none;min-width:120px"></select>
@@ -990,10 +1020,17 @@ html.spiderman{
   <div class="conn" role="status"><div id="cdot"></div><span id="clbl">Verifica...</span></div>
   <select id="refresh-sel" class="inp sm" aria-label="Aggiornamento automatico" onchange="AutoRefreshUI.save(this.value)"><option value="0">Auto: spento</option><option value="15">Auto: 15 s</option><option value="30">Auto: 30 s</option><option value="60">Auto: 1 min</option><option value="120">Auto: 2 min</option><option value="300">Auto: 5 min</option></select>
   <button id="refresh-btn" class="btn bg2 sm" onclick="App.refresh()" aria-label="Aggiorna i dati"><svg class="ic" aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg><span class="rl-lbl">Aggiorna</span></button>
+  <div class="user-menu">
+    <button type="button" class="btn bg2 sm" id="user-button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-popup" onclick="ClusterMgr.toggleMenu(this)" onkeydown="ClusterMgr.menuKey(event)">Account</button>
+    <div class="cl-menu" id="user-popup" role="menu" aria-labelledby="user-button" hidden onkeydown="ClusterMgr.menuKey(event)">
+      <button type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();Auth.account()">Il mio account</button>
+      <button type="button" role="menuitem" tabindex="-1" onclick="ClusterMgr.closeMenu();Auth.logout()">Esci</button>
+    </div>
+  </div>
 </header>
 
 <!-- MENU LATERALE -->
-<aside id="sidebar" aria-label="Menu">
+<aside id="sidebar" inert aria-label="Menu">
   <nav class="nav" aria-label="Navigazione principale">
     <button type="button" class="ni active" data-page="dashboard" aria-current="page">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Panoramica
@@ -1041,7 +1078,7 @@ html.spiderman{
 <div class="sb-scrim" id="sb-scrim" aria-hidden="true"></div>
 
 <!-- CONTENUTO -->
-<div id="main">
+<div id="main" inert>
 <main id="content" tabindex="-1">
 
     <!-- ██ DASHBOARD ██ -->
@@ -1803,6 +1840,29 @@ html.spiderman{
   </div>
 </div></div>
 
+<div class="ov" id="mauth-step" inert><div class="modal">
+  <h2 class="mt">Conferma autenticazione</h2>
+  <p id="auth-step-help" class="auth-note">Questa azione richiede il codice dell'app di autenticazione</p>
+  <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.submitStep(this)">
+    <div class="fg"><label class="fl" for="auth-step-code">Codice a 6 cifre</label><input class="inp" id="auth-step-code" name="code" aria-describedby="auth-step-help" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+    <div class="mf"><button type="button" class="btn bg2" onclick="closeModal('mauth-step')">Annulla</button><button class="btn ba" type="submit">Conferma</button></div>
+  </form>
+</div></div>
+<div class="ov" id="mauth-account" inert><div class="modal">
+  <h2 class="mt">Il mio account</h2>
+  <p id="auth-account-user" class="auth-note"></p><p id="auth-expiry" class="auth-note"></p>
+  <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.password(this)">
+    <h3 class="sec">Cambia password</h3>
+    <input type="text" name="username" id="auth-account-name" autocomplete="username" hidden>
+    <div class="fg"><label class="fl" for="auth-old">Password attuale</label><input class="inp" id="auth-old" name="old" type="password" autocomplete="current-password" maxlength="256" required></div>
+    <div class="fg"><label class="fl" for="auth-new">Nuova password</label><input class="inp" id="auth-new" name="new" type="password" autocomplete="new-password" aria-describedby="auth-password-help" required></div>
+    <div class="fg"><label class="fl" for="auth-repeat">Ripeti nuova password</label><input class="inp" id="auth-repeat" name="repeat" type="password" autocomplete="new-password" required></div>
+    <p class="auth-note" id="auth-password-help">Da 12 a 256 caratteri, senza caratteri di controllo.</p>
+    <div class="fg"><label class="fl" for="auth-password-code">Codice dell'app di autenticazione</label><input class="inp" id="auth-password-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+    <p class="auth-error" data-error role="alert"></p>
+    <div class="mf"><button type="button" class="btn bg2" onclick="closeModal('mauth-account')">Chiudi</button><button type="submit" class="btn ba">Cambia password</button></div>
+  </form>
+</div></div>
 <div id="toasts" role="status" aria-live="polite"></div>
 
 <script>
@@ -1810,31 +1870,281 @@ const _IS_CONSOLE = window.location.pathname === '/console';
 // ════════════════════════════════════════════════════════════════════════════
 // CORE
 // ════════════════════════════════════════════════════════════════════════════
+// pmgr:auth-ui:begin
+function roleRank(name){return name==='reader'?1:name==='operator'?2:name==='admin'?3:0;}
+function canDo(userRole,requiredRole){return roleRank(requiredRole)>0&&roleRank(userRole)>=roleRank(requiredRole);}
+function classifyApiError(status,body){
+  const b=body&&typeof body==='object'?body:{};
+  if(status===401)return b.setup===true?'setup':b.login===true?'login':'other';
+  if(status!==403)return 'other';
+  if(b.reason==='step_up')return 'step_up';
+  if(typeof b.required==='string'&&roleRank(b.required))return 'role';
+  if(b.reason==='csrf'||typeof b.error==='string'&&/csrf/i.test(b.error))return 'csrf';
+  return 'other';
+}
+// Empty string means valid. Count Unicode characters, not UTF-16 units; the server also checks its byte limit.
+function validateNewPassword(a,b){
+  if(typeof a!=='string'||typeof b!=='string')return 'Password non valida';
+  const n=Array.from(a).length;
+  if(n<12||n>256||/[\u0000-\u001f\u007f-\u009f]/u.test(a))return 'La password deve contenere da 12 a 256 caratteri, senza caratteri di controllo';
+  return a===b?'':'Le password non coincidono';
+}
+// pmgr:auth-ui:end
+
+const Auth={
+  username:'',role:'',csrf:'',expires:0,locked:true,epoch:0,requests:new Set(),overlay:false,previous:null,setup:null,step:null,
+  roleLabel(role){return {reader:'Lettore',operator:'Operatore',admin:'Amministratore'}[role]||'Sconosciuto';},
+  accept(d){
+    if(!d||typeof d.username!=='string'||!/^[a-z][a-z0-9._-]{1,31}$/.test(d.username)||!roleRank(d.role)||typeof d.csrf!=='string'||!d.csrf||d.csrf.length>256||!Number.isSafeInteger(d.expires)||d.expires<=0)throw new Error('Risposta di autenticazione non valida');
+    this.username=d.username;this.role=d.role;this.csrf=d.csrf;this.expires=d.expires;this.locked=false;this.epoch++;
+    const button=document.getElementById('user-button');
+    button.textContent=`${this.username} · ${this.roleLabel(this.role)}`;button.title=button.textContent;
+  },
+  clear(){this.username='';this.role='';this.csrf='';this.expires=0;this.locked=true;this.epoch++;},
+  stop(){
+    AutoRefreshUI.stop();Ceph.stop();clearInterval(App.connTimer);App.connTimer=null;
+    clearTimeout(Balance.timer);Balance.timer=null;
+    for(const request of this.requests)request.abort();this.requests.clear();
+  },
+  lock(){
+    this.stop();this.clear();ClusterMgr.closeMenu(false);
+    if(this.step)closeModal('mauth-step');
+    if(document.getElementById('mauth-account').classList.contains('open'))closeModal('mauth-account');
+    _syncModals();
+  },
+  screen(title,html,overlay=false){
+    this.overlay=overlay;
+    const screen=document.getElementById('auth-screen');screen.hidden=false;
+    screen.classList.toggle('auth-overlay',overlay);screen.setAttribute('role',overlay?'dialog':'main');
+    if(overlay)screen.setAttribute('aria-modal','true');else screen.removeAttribute('aria-modal');
+    document.body.classList.toggle('auth-pending',!overlay);
+    document.getElementById('auth-title').textContent=title;document.getElementById('auth-body').innerHTML=html;
+    _syncModals();
+    (screen.querySelector('input:not([type=hidden])')||screen.querySelector('button')||screen).focus();
+  },
+  reveal(){
+    document.getElementById('auth-screen').hidden=true;document.getElementById('auth-body').replaceChildren();
+    document.body.classList.remove('auth-pending');this.setup=null;_syncModals();
+    const top=_modalStack.at(-1);(top?document.getElementById(top.id).querySelector(FOCUSABLE):document.getElementById(_IS_CONSOLE?'con-term':'content'))?.focus();
+  },
+  showLogin(message='',overlay=false){
+    this.setup=null;
+    this.screen(overlay?'Sessione scaduta':'Accedi',`
+      <p class="auth-note" id="auth-login-help">${esc(message||'Inserisci le credenziali e il codice dell’app di autenticazione.')}</p>
+      <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.login(this)">
+        <div class="fg"><label class="fl" for="auth-username">Nome utente</label><input class="inp" id="auth-username" name="username" autocomplete="username" minlength="2" maxlength="32" pattern="[a-z][a-z0-9._\\-]{1,31}" value="${esc(overlay?this.previous?.username:'')}" required></div>
+        <div class="fg"><label class="fl" for="auth-login-password">Password</label><input class="inp" id="auth-login-password" name="password" type="password" autocomplete="current-password" required></div>
+        <div class="fg"><label class="fl" for="auth-login-code">Codice a 6 cifre</label><input class="inp" id="auth-login-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+        <p class="auth-error" data-error role="alert"></p>
+        <div class="mf"><button type="submit" class="btn ba">Accedi</button></div>
+      </form>`,overlay);
+  },
+  expired(){
+    if(this.locked)return;
+    this.previous={username:this.username,role:this.role};this.lock();
+    this.showLogin('Sessione scaduta. Accedi di nuovo, poi ripeti l’azione desiderata.',true);
+  },
+  errorText(e){
+    if(e.status!==429)return e.message;
+    const seconds=Number.isFinite(e.retryAfter)&&e.retryAfter>0?Math.ceil(e.retryAfter):900;
+    return `Troppi tentativi. Riprova tra ${seconds} secondi.`;
+  },
+  async form(form,fn){
+    if(form.dataset.busy)return;
+    form.dataset.busy='true';const button=form.querySelector('[type=submit]'),error=form.querySelector('[data-error]');
+    button.disabled=true;error.textContent='';
+    try{await fn();}catch(e){error.textContent=this.errorText(e);}
+    finally{delete form.dataset.busy;button.disabled=false;}
+  },
+  async login(form){
+    if(!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const overlay=this.overlay;
+      const body=JSON.stringify({username:form.elements.username.value,password:form.elements.password.value,code:form.elements.code.value});
+      form.elements.password.value='';form.elements.code.value='';
+      const d=await api('/auth/login',{method:'POST',body,quiet:true});this.accept(d);
+      // A different identity/role must never inherit another account's DOM, closures or caches.
+      if(overlay&&(this.previous?.username!==this.username||this.previous?.role!==this.role)){location.reload();return;}
+      this.reveal();
+      if(overlay){_tc.clear();Palette.data=null;toast('Accesso riuscito. Ripeti l’azione desiderata.','ok');}
+      else await App.boot();
+    });
+  },
+  async init(){
+    try{
+      const d=await api('/auth/me',{quiet:true});this.accept(d);this.reveal();await App.boot();
+    }catch(e){
+      if(e.status===401){
+        // Current /me has no setup flag: query the public status before exposing the wizard.
+        try{if((await api('/auth/setup',{quiet:true})).open===true){this.showSetup();return;}}
+        catch(statusError){this.bootError(statusError);return;}
+        this.showLogin();return;
+      }
+      this.bootError(e);
+    }
+  },
+  bootError(e){
+    this.lock();this.screen('Accesso non disponibile',`<p class="auth-error" role="alert">${esc(this.errorText(e))}</p><button type="button" class="btn bg2" onclick="App.init()">Riprova</button>`);
+  },
+  showSetup(message=''){
+    this.setup=null;
+    this.screen('Configura l’amministratore',`
+      <p class="auth-note">Passo 1 di 3 · Codice monouso</p>
+      <p class="auth-note">Lo trovi nel journal del servizio: <code>journalctl -u proxmox-manager</code></p>
+      <p class="auth-note">${esc(message)}</p>
+      <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.setupKey(this)">
+        <div class="fg"><label class="fl" for="auth-setup-code">Codice di configurazione</label><input class="inp" id="auth-setup-code" name="code" autocomplete="off" maxlength="128" required></div>
+        <p class="auth-error" data-error role="alert"></p><div class="mf"><button type="submit" class="btn ba">Continua</button></div>
+      </form>`);
+  },
+  async setupKey(form){
+    if(!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const code=form.elements.code.value;form.elements.code.value='';
+      try{
+        const d=await api('/auth/setup/totp',{method:'POST',body:JSON.stringify({code}),quiet:true});
+        if(typeof d.secret!=='string'||!/^[A-Z2-7]{16,128}$/.test(d.secret)||typeof d.uri!=='string'||!d.uri.startsWith('otpauth://totp/')||d.uri.length>2048)throw new Error('Risposta di configurazione non valida');
+        this.setup={code,secret:d.secret,uri:d.uri};this.setupSecret();
+      }catch(e){if(e.status===410){this.showLogin(e.message);return;}throw e;}
+    });
+  },
+  setupSecret(){
+    this.screen('Collega l’app di autenticazione',`
+      <p class="auth-note">Passo 2 di 3 · Conserva la chiave in un luogo sicuro.</p>
+      <p class="auth-note">Non viene mostrato un QR code: inserisci manualmente la chiave nell’app di autenticazione.</p>
+      <p class="fl" id="auth-key-label">Chiave TOTP</p><code class="auth-secret" aria-labelledby="auth-key-label">${esc(this.setup.secret.match(/.{1,4}/g).join(' '))}</code>
+      <button type="button" class="btn bg2" onclick="Auth.copy('secret')">Copia chiave</button>
+      <p class="fl" id="auth-uri-label">URI otpauth</p><code class="auth-secret" aria-labelledby="auth-uri-label">${esc(this.setup.uri)}</code>
+      <button type="button" class="btn bg2" onclick="Auth.copy('uri')">Copia URI</button>
+      <div class="mf"><button type="button" class="btn ba" onclick="Auth.setupAccount()">Ho inserito la chiave, continua</button></div>`);
+  },
+  async copy(field){
+    if(!this.setup||!['secret','uri'].includes(field))return;
+    try{await navigator.clipboard.writeText(this.setup[field]);toast('Copiato','ok');}
+    catch(e){toast('Copia non disponibile: seleziona e copia il testo manualmente.','err');}
+  },
+  setupAccount(){
+    if(!this.setup)return;
+    this.screen('Crea il primo account',`
+      <p class="auth-note">Passo 3 di 3 · Amministratore</p>
+      <form class="auth-form" method="post" onsubmit="event.preventDefault();Auth.completeSetup(this)">
+        <div class="fg"><label class="fl" for="auth-setup-user">Nome utente</label><input class="inp" id="auth-setup-user" name="username" autocomplete="username" minlength="2" maxlength="32" pattern="[a-z][a-z0-9._\\-]{1,31}" required></div>
+        <div class="fg"><label class="fl" for="auth-setup-password">Password</label><input class="inp" id="auth-setup-password" name="password" type="password" autocomplete="new-password" aria-describedby="auth-setup-help" required></div>
+        <div class="fg"><label class="fl" for="auth-setup-repeat">Ripeti password</label><input class="inp" id="auth-setup-repeat" name="repeat" type="password" autocomplete="new-password" required></div>
+        <p class="auth-note" id="auth-setup-help">Da 12 a 256 caratteri, senza caratteri di controllo.</p>
+        <div class="fg"><label class="fl" for="auth-setup-totp">Primo codice a 6 cifre dell’app</label><input class="inp" id="auth-setup-totp" name="totp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+        <p class="auth-error" data-error role="alert"></p>
+        <div class="mf"><button type="button" class="btn bg2" onclick="Auth.setupSecret()">Rivedi chiave</button><button type="submit" class="btn ba">Crea account</button></div>
+      </form>`);
+  },
+  async completeSetup(form){
+    if(!this.setup||!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const error=validateNewPassword(form.elements.password.value,form.elements.repeat.value);if(error)throw new Error(error);
+      const body=JSON.stringify({code:this.setup.code,username:form.elements.username.value,password:form.elements.password.value,totp:form.elements.totp.value});
+      form.elements.password.value='';form.elements.repeat.value='';form.elements.totp.value='';
+      try{await api('/auth/setup/complete',{method:'POST',body,quiet:true});this.showLogin('Account creato. Accedi con la password e un nuovo codice dell’app (attendi il prossimo codice).');}
+      catch(e){if(e.status===410){this.showLogin(e.message);return;}throw e;}
+    });
+  },
+  promptStep(){
+    // Serialize challenges: two requests must never share a one-use TOTP code.
+    if(this.step)return Promise.reject(new Error('Un’altra conferma di autenticazione è già aperta. Ripeti l’azione.'));
+    if(this.locked)return Promise.reject(new Error('Sessione scaduta. Accedi e ripeti l’azione.'));
+    return new Promise((resolve,reject)=>{this.step={resolve,reject};document.getElementById('auth-step-code').value='';openModal('mauth-step');});
+  },
+  submitStep(form){
+    if(!this.step||!form.reportValidity())return;
+    const code=form.elements.code.value, pending=this.step;this.step=null;closeModal('mauth-step');pending.resolve(code);
+  },
+  modalClosed(id){
+    if(id==='mauth-step'){
+      document.getElementById('auth-step-code').value='';
+      if(this.step){const pending=this.step;this.step=null;pending.reject(new Error('Azione annullata: codice di autenticazione non fornito.'));}
+    }
+    if(id==='mauth-account')document.querySelector('#mauth-account form').reset();
+  },
+  account(){
+    if(this.locked)return;
+    document.querySelector('#mauth-account form').reset();document.querySelector('#mauth-account [data-error]').textContent='';
+    document.getElementById('auth-account-name').value=this.username;
+    document.getElementById('auth-account-user').textContent=`${this.username} · ${this.roleLabel(this.role)}`;
+    document.getElementById('auth-expiry').textContent='Scadenza sessione: '+new Date(this.expires*1000).toLocaleString('it-IT')+' (salvo scadenza per inattività).';
+    openModal('mauth-account');
+  },
+  async password(form){
+    if(!form.reportValidity())return;
+    await this.form(form,async()=>{
+      const error=validateNewPassword(form.elements.new.value,form.elements.repeat.value);if(error)throw new Error(error);
+      const body=JSON.stringify({old:form.elements.old.value,new:form.elements.new.value,code:form.elements.code.value});form.reset();
+      await api('/auth/password',{method:'POST',body,quiet:true});closeModal('mauth-account');toast('Password cambiata. Le altre sessioni sono state chiuse.','ok');
+    });
+  },
+  async logout(){
+    if(this.loggingOut)return;this.loggingOut=true;
+    try{
+      await api('/auth/logout',{method:'POST',quiet:true});this.lock();_tc.clear();Palette.data=null;this.previous=null;
+      this.showLogin('Disconnessione riuscita.');
+      // Reload discards all page data, module-private caches and pending work, including console state.
+      location.reload();
+    }catch(e){toast(this.errorText(e),'err');}
+    finally{this.loggingOut=false;}
+  }
+};
+
 async function api(path, opts={}) {
-  const NO_CLUSTER_ROUTES=['/clusters','/config','/version','/update-status','/update-check'];
+  const publicAuth=['/auth/me','/auth/login','/auth/setup','/auth/setup/totp','/auth/setup/complete'].includes(path);
+  if(!publicAuth&&Auth.locked)throw new Error('Accesso richiesto. Accedi e ripeti l’azione.');
+  const NO_CLUSTER_ROUTES=['/auth/','/users','/audit','/clusters','/config','/version','/update-status','/update-check'];
   const needsCluster=!NO_CLUSTER_ROUTES.some(p=>path.startsWith(p));
   let fullPath='/api'+path;
   if(needsCluster&&!new URLSearchParams(path.split('?')[1]||'').has('cluster')){
-    const sep=path.includes('?')?'&':'?';
-    const cidx=(typeof ClusterMgr!=='undefined')?(ClusterMgr.current??0):0;
-    fullPath+=sep+'cluster='+cidx;
+    fullPath+=(path.includes('?')?'&':'?')+'cluster='+(ClusterMgr.current??0);
   }
-  // quiet: il chiamante gestisce l'errore in pagina, niente toast
-  const {quiet=false,timeoutMs=0,...fetchOpts}=opts;
-  let r, timer;
+  // Preserve existing operation budgets; auth requests always have a bounded wait.
+  const {quiet=false,timeoutMs=path.startsWith('/auth/')?30000:0,...fetchOpts}=opts;
+  const epoch=Auth.epoch;
+  const headers=new Headers(fetchOpts.headers);headers.set('Content-Type','application/json');
+  if((fetchOpts.method||'GET').toUpperCase()!=='GET'&&Auth.csrf)headers.set('X-CSRF-Token',Auth.csrf);
+  const stale=()=>!publicAuth&&(Auth.locked||epoch!==Auth.epoch);
+  const send=async()=>{
+    if(stale())throw new Error('Sessione cambiata. Ripeti l’azione.');
+    const ac=new AbortController(), external=fetchOpts.signal, abort=()=>ac.abort();
+    let timer;
+    if(external?.aborted)ac.abort();else external?.addEventListener('abort',abort,{once:true});
+    if(timeoutMs)timer=setTimeout(abort,timeoutMs);
+    if(!publicAuth)Auth.requests.add(ac);
+    try{
+      const response=await fetch(fullPath,{...fetchOpts,headers,signal:ac.signal,credentials:'same-origin',cache:'no-store'});
+      const body=await response.json().catch(()=>({}));
+      if(stale())throw new Error('Sessione cambiata. Ripeti l’azione.');
+      return {response,body};
+    }catch(e){
+      if(stale())throw new Error('Sessione scaduta. Accedi e ripeti l’azione.');
+      if(e.name==='AbortError')throw new Error('Richiesta interrotta o tempo scaduto: ripeti l’azione.');
+      throw new Error('Proxy non raggiungibile');
+    }finally{clearTimeout(timer);Auth.requests.delete(ac);external?.removeEventListener('abort',abort);}
+  };
   try{
-    if(timeoutMs){const ac=new AbortController();fetchOpts.signal=ac.signal;timer=setTimeout(()=>ac.abort(),timeoutMs);}
-    r = await fetch(fullPath, {headers:{'Content-Type':'application/json'}, ...fetchOpts});
-    clearTimeout(timer);
-  }catch(netErr){
-    clearTimeout(timer);
-    const e=new Error(netErr&&netErr.name==='AbortError'?'Tempo scaduto: nessuna risposta dal proxy':'Proxy non raggiungibile');
-    if(!quiet) toast(e.message,'err');
-    throw e;
-  }
-  const d = await r.json().catch(()=>({}));
-  if(!r.ok) { const e=new Error(d.error||r.statusText||`HTTP ${r.status}`); e.body=d; e.status=r.status; if(!quiet) toast(e.message,'err'); throw e; }
-  return d;
+    let {response:r,body:d}=await send();
+    if(classifyApiError(r.status,d)==='step_up'){
+      const code=await Auth.promptStep();
+      if(stale())throw new Error('Sessione cambiata. Ripeti l’azione.');
+      headers.set('X-TOTP-Code',code);
+      ({response:r,body:d}=await send()); // Exactly one retry, with the original URL, method and body.
+    }
+    if(!r.ok){
+      const kind=classifyApiError(r.status,d);
+      if(!publicAuth&&r.status===401)Auth.expired();
+      const message=kind==='role'?`Il tuo ruolo (${Auth.roleLabel(Auth.role)}) non permette questa azione`:typeof d?.error==='string'?d.error:r.statusText||`HTTP ${r.status}`;
+      const e=new Error(message);e.body=d;e.status=r.status;
+      const retry=r.headers.get('Retry-After');
+      e.retryAfter=retry&&/^\d+$/.test(retry)?Number(retry):retry?Math.max(0,(Date.parse(retry)-Date.now())/1000):Number(d?.retry_after);
+      if(kind==='role')toast(message,'err');
+      throw e;
+    }
+    return d;
+  }catch(e){if(!quiet)toast(Auth.errorText(e),'err');throw e;}
 }
 
 // Librerie incorporate caricate al primo uso: la pagina /console non scarica Chart.js né SheetJS,
@@ -1878,27 +2188,29 @@ function toast(msg,type='info'){
 const FOCUSABLE='button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const _modalStack=[];
 function _syncModals(){
-  const top=_modalStack.length?_modalStack[_modalStack.length-1].id:null;
+  const top=!Auth.locked&&_modalStack.length?_modalStack[_modalStack.length-1].id:null;
   document.querySelectorAll('.ov').forEach(o=>{o.inert=(o.id!==top);});
-  for(const id of ['topbar','sidebar','main','skip-link']){const el=document.getElementById(id);if(el)el.inert=_modalStack.length>0;}
+  for(const id of ['topbar','sidebar','main','skip-link','con-wrap']){const el=document.getElementById(id);if(el)el.inert=Auth.locked||_modalStack.length>0;}
 }
 function openModal(id){
+  if(Auth.locked)return;
   const el=document.getElementById(id); if(!el)return;
   const i=_modalStack.findIndex(m=>m.id===id); if(i>=0)_modalStack.splice(i,1);
   _modalStack.push({id,opener:document.activeElement});
   el.classList.add('open'); _syncModals();
   // focus iniziale sul primo controllo, a meno che il chiamante non lo sposti subito dopo
   setTimeout(()=>{
-    if(el.contains(document.activeElement)&&document.activeElement!==el)return;
+    if(Auth.locked||_modalStack.at(-1)?.id!==id||el.contains(document.activeElement)&&document.activeElement!==el)return;
     (el.querySelector(FOCUSABLE)||el.querySelector('.modal'))?.focus();
   },0);
 }
 function closeModal(id){
+  Auth.modalClosed(id);
   const el=document.getElementById(id); if(el)el.classList.remove('open');
   if(id==='mov'){Dmesg.reset();if(location.hash.startsWith('#/vm/'))Route.replace('#/'+App.cur);}
   const i=_modalStack.findIndex(m=>m.id===id); if(i<0)return;
   const [m]=_modalStack.splice(i,1); _syncModals();
-  if(m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
+  if(!Auth.locked&&m.opener&&m.opener.isConnected&&typeof m.opener.focus==='function')m.opener.focus();
 }
 
 // Riga di errore con "Riprova" per tabelle che non hanno caricato. retry = codice JS statico.
@@ -1959,6 +2271,16 @@ const VM_ACTIONS={
 // Tastiera: Esc chiude il modal in cima (o il selettore nodi); Invio/Spazio attivano intestazioni
 // ordinabili e elementi role=button; frecce spostano tra le tab.
 document.addEventListener('keydown',e=>{
+  if(e.key==='Tab'){
+    const area=Auth.locked?document.getElementById('auth-screen'):_modalStack.length?document.getElementById(_modalStack.at(-1).id):null;
+    if(area){
+      const controls=[...area.querySelectorAll(FOCUSABLE)].filter(el=>!el.closest('[hidden]')&&el.getClientRects().length);
+      const first=controls[0],last=controls.at(-1);
+      if(!first){e.preventDefault();area.focus();return;}
+      if(!area.contains(document.activeElement)||e.shiftKey&&document.activeElement===first||!e.shiftKey&&document.activeElement===last){e.preventDefault();(e.shiftKey?last:first).focus();}
+    }
+  }
+  if(Auth.locked)return;
   if(e.key==='Escape'){
     if(_modalStack.length){e.preventDefault();closeModal(_modalStack[_modalStack.length-1].id);return;}
     if(Drawer.isOpen()){e.preventDefault();Drawer.set(false);return;}
@@ -2003,7 +2325,7 @@ const Drawer={
     open=open&&Drawer.mq.matches;
     sb.classList.toggle('open',open);
     btn.setAttribute('aria-expanded',open); btn.setAttribute('aria-label',open?'Chiudi menu':'Apri menu');
-    if(!_modalStack.length) main.inert=open;
+    if(!_modalStack.length) main.inert=Auth.locked||open;
     if(open) (sb.querySelector('.ni.active')||sb.querySelector('.ni'))?.focus();
     else if(was) btn.focus();
   },
@@ -2205,16 +2527,14 @@ const ClusterMgr={
     return c ? (c.has_console_credentials === true) : false;
   },
   async load(preserveCurrent=false){
-    try{
-      const data=await fetch('/api/clusters',{headers:{'Content-Type':'application/json'}}).then(r=>r.json());
-      this.clusters=Array.isArray(data)?data:[];
-      const sel=document.getElementById('cluster-select');
-      sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
-      const def=this.clusters.find(c=>c.default);
-      this.current=preserveCurrent&&this.clusters.some(c=>c.idx===this.current)?this.current:(def?def.idx:0);
-      sel.value=this.current;
-      sel.style.display=this.clusters.length>1?'':'none';
-    }catch(e){}
+    const data=await api('/clusters',{quiet:true});
+    this.clusters=Array.isArray(data)?data:[];
+    const sel=document.getElementById('cluster-select');
+    sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
+    const def=this.clusters.find(c=>c.default);
+    this.current=preserveCurrent&&this.clusters.some(c=>c.idx===this.current)?this.current:(def?def.idx:0);
+    sel.value=this.current;
+    sel.style.display=this.clusters.length>1?'':'none';
   },
   switchTo(idx){
     const selected=Number(idx);
@@ -2324,16 +2644,16 @@ const ClusterMgr={
     try{
       let savedIdx;
       if(editIdx<0){
-        const res=await fetch('/api/clusters',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        const res=await api('/clusters',{method:'POST',body:JSON.stringify(body)});
         savedIdx=res.idx??this.clusters.length;
         toast('Cluster aggiunto','ok');
       }else{
-        await fetch(`/api/clusters/${editIdx}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await api(`/clusters/${editIdx}`,{method:'PUT',body:JSON.stringify(body)});
         savedIdx=editIdx;
         toast('Cluster aggiornato','ok');
       }
       if(isDef){
-        await fetch(`/api/clusters/${savedIdx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await api(`/clusters/${savedIdx}/default`,{method:'PUT'});
       }
       this.hideForm();
       await this.renderList();
@@ -2349,7 +2669,7 @@ const ClusterMgr={
       level:'danger', typed:c?.label, okLabel:'Elimina cluster'
     },async()=>{
       try{
-        await fetch(`/api/clusters/${idx}`,{method:'DELETE',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+        await api(`/clusters/${idx}`,{method:'DELETE'});
         await this.renderList();
         await ReportSettingsUI.load();
         toast('Cluster eliminato','ok');
@@ -2358,7 +2678,7 @@ const ClusterMgr={
   },
   async setDefault(idx){
     try{
-      await fetch(`/api/clusters/${idx}/default`,{method:'PUT',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      await api(`/clusters/${idx}/default`,{method:'PUT'});
       await this.renderList();
       await ReportSettingsUI.load();
       toast('Default aggiornato','ok');
@@ -2368,7 +2688,7 @@ const ClusterMgr={
     const res=document.getElementById('ctres');
     if(res)res.innerHTML='<span class="td">Test...</span>';
     try{
-      await fetch(`/api/clusters/${idx}/test`,{method:'POST',headers:{'Content-Type':'application/json'}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||r.statusText);return d;});
+      await api(`/clusters/${idx}/test`,{method:'POST'});
       if(res)res.innerHTML='<span class="tg">Connessione OK</span>';
       toast(`${this.clusters[idx]?.label||'Cluster'}: OK`,'ok');
     }catch(e){
@@ -2382,7 +2702,7 @@ const ClusterMgr={
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
 const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',reports:'Report',settings:'Impostazioni'};
-// Indirizzi nell'hash (niente localStorage): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
+// Indirizzi nell'hash (memoria della navigazione): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
   parse(h){
@@ -2396,6 +2716,7 @@ const Route={
   push(h){if(location.hash!==h)history.pushState(null,'',h);},
   replace(h){if(location.hash!==h)history.replaceState(null,'',h);},
   apply(){
+    if(Auth.locked||_IS_CONSOLE)return;
     const r=Route.parse(location.hash)||{page:'dashboard'};
     const dirty=SettingsGuard.dirtyForm();
     if(dirty){
@@ -2437,14 +2758,15 @@ const AutoRefreshUI={
     catch(e){toast(e.message,'err');}
     finally{this.saving=false;this.sync();}
   },
-  init(){this.started=true;document.addEventListener('visibilitychange',()=>{if(!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});this.reset();},
+  init(){if(!this.bound){this.bound=true;document.addEventListener('visibilitychange',()=>{if(this.started&&!Auth.locked&&!document.hidden&&this.seconds&&Date.now()-this.last>=this.seconds*1000)this.tick();});}this.started=true;this.reset();},
   mark(){this.last=Date.now();const b=document.getElementById('refresh-btn');const t='Ultimo aggiornamento '+new Date(this.last).toLocaleTimeString('it-IT');b.title=t;},
-  reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
+  stop(){this.started=false;clearTimeout(this.timer);this.timer=null;this.generation++;this.busy=false;},
+  reset(){clearTimeout(this.timer);this.timer=null;this.generation++;if(!Auth.locked&&this.started&&this.seconds){this.last=Date.now();this.timer=setTimeout(()=>this.tick(),this.seconds*1000);}},
   state(page=App.cur){const el=document.activeElement, area=document.getElementById('page-'+page);return {page,hidden:document.hidden,modalOpen:_modalStack.length>0||!!document.querySelector('#mov.open,.ov.sheet.open'),busy:this.busy,blocked:page==='groups'&&Groups.busy===true,unsaved:SettingsGuard.isDirty(),typing:!!(area&&el&&area.contains(el)&&el.matches('input,select,textarea')),now:Date.now(),busySince:this.busySince};},
-  canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
+  canApply(page,generation=this.generation,cluster=ClusterMgr.current){const state=this.state(page);state.busy=false;return !Auth.locked&&generation===this.generation&&cluster===ClusterMgr.current&&App.cur===page&&AutoRefresh.shouldRun(state);},
   async tick(){
     clearTimeout(this.timer);this.timer=null;
-    if(!this.started||!this.seconds)return;
+    if(Auth.locked||!this.started||!this.seconds)return;
     const generation=this.generation, page=App.cur;
     this.timer=setTimeout(()=>this.tick(),this.seconds*1000);
     if(AutoRefresh.shouldRun(this.state())){
@@ -2456,13 +2778,26 @@ const AutoRefreshUI={
   }
 };
 const App={
-  cur:'dashboard',
-  init(){
-    UpdateUI.load();
-    document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
-    ClusterMgr.load().then(async()=>{await Settings.load();Route.apply();AutoRefreshUI.init();App.checkConn();setInterval(App.checkConn,30000);});
+  cur:'dashboard',bound:false,connTimer:null,
+  async init(){await Auth.init();},
+  async boot(){
+    try{
+      if(Auth.locked)return;
+      if(_IS_CONSOLE){await ConsolePage.init();return;}
+      const epoch=Auth.epoch;
+      if(!this.bound){
+        this.bound=true;Palette.init();Provision.bind();Drawer.init();
+        document.querySelectorAll('.ni').forEach(el=>el.addEventListener('click',()=>{App.nav(el.dataset.page);if(Drawer.isOpen())Drawer.set(false);}));
+      }
+      UpdateUI.load();
+      await ClusterMgr.load();if(Auth.locked||epoch!==Auth.epoch)return;
+      await Settings.load();if(Auth.locked||epoch!==Auth.epoch)return;
+      Reports.init();Route.apply();AutoRefreshUI.init();App.checkConn();
+      clearInterval(this.connTimer);this.connTimer=setInterval(()=>App.checkConn(),30000);
+    }catch(e){if(!Auth.locked)Auth.bootError(e);}
   },
   nav(p,opts={}){
+    if(Auth.locked)return;
     const dirty=SettingsGuard.dirtyForm();
     if(dirty){
       if(p==='settings'&&opts.settingsTab===dirty.tab)return;
@@ -2484,6 +2819,7 @@ const App={
     document.getElementById('crumb-sep').style.display=one&&ClusterMgr.currentLabel()?'':'none';
   },
   refresh(){
+    if(Auth.locked)return;
     AutoRefreshUI.mark();
     App.crumb();
     const p=App.cur;
@@ -2502,7 +2838,7 @@ const App={
     if(p==='settings')  Settings.load();
   },
   async checkConn(){
-    if(document.hidden)return; // scheda in background: niente sondaggio ogni 30s
+    if(Auth.locked||document.hidden)return; // scheda in background: niente sondaggio ogni 30s
     const dot=document.getElementById('cdot'), lbl=document.getElementById('clbl');
     // quiet: lo stato è già nel pallino; un cluster offline non deve produrre un toast ogni 30s
     try{await api('/nodes',{quiet:true});dot.className='ok';lbl.textContent='Connesso';lbl.title='';}
@@ -2664,6 +3000,7 @@ const Palette={
     });
   },
   open(){
+    if(Auth.locked)return;
     // non si sovrappone a conferme o altri dialoghi aperti
     if(_modalStack.length&&!Palette.isOpen())return;
     const q=document.getElementById('pal-q'); q.value=''; Palette.sel=0;
@@ -2764,7 +3101,7 @@ const Palette={
 // ════════════════════════════════════════════════════════════════════════════
 // CEPH: osservatorio meteo. Sola lettura. La pagina esiste solo nei cluster dove Ceph risponde.
 // `/api/ceph/summary` alimenta la panoramica, `/api/ceph` la pagina (aggiornata ogni 5 s con la pagina aperta;
-// la curva dell'I/O tiene 10 minuti in memoria del browser, nessun localStorage). Ogni testo esterno passa da esc().
+// la curva dell'I/O tiene 10 minuti in memoria del browser, senza persistenza). Ogni testo esterno passa da esc().
 // ════════════════════════════════════════════════════════════════════════════
 const Ceph={
   focus:null,       // null | {k:'g',v:chiave gruppo} | {k:'p',v:nome pool}: evidenzia gli OSD scelti, gli altri si attenuano
@@ -2950,7 +3287,7 @@ const Ceph={
     await Ceph.tick(seq,idx);
   },
   async tick(seq,idx){
-    if(seq!==Ceph.seq)return;
+    if(Auth.locked||seq!==Ceph.seq)return;
     if(!document.hidden){
       try{
         const o=await api('/ceph',{quiet:true,timeoutMs:9000});
@@ -3913,6 +4250,7 @@ const Balance={
     }
   },
   poll(){
+    if(Auth.locked)return;
     clearTimeout(Balance.timer);
     Balance.timer=setTimeout(async()=>{
       const r=Balance.run; if(!r)return;
@@ -7067,9 +7405,12 @@ const Console = {
 
 const ConsolePage = {
   async init() {
+    if(Auth.locked)return;
     document.body.style.cssText = 'margin:0;padding:0;overflow:hidden;width:100%;height:100vh;';
 
-    document.body.innerHTML = `
+    document.body.classList.add('console-page');
+    const host=document.createElement('div');
+    host.innerHTML = `
         <div id="con-wrap" style="
             position:fixed;top:0;left:0;right:0;bottom:0;
             display:flex;flex-direction:column;
@@ -7087,6 +7428,7 @@ const ConsolePage = {
                 ">CONSOLE</span>
                 <span id="con-sub" style="font-size:12px;color:var(--text3)"></span>
                 <div style="flex:1"></div>
+                <button type="button" class="btn bg2 sm" onclick="location.reload()">Riconnetti</button>
                 <button onclick="window.close()" style="
                     background:transparent;border:1px solid var(--border2);
                     color:var(--text2);padding:3px 10px;border-radius:8px;
@@ -7099,6 +7441,7 @@ const ConsolePage = {
                 width:100%;overflow:hidden;background:var(--bg);
             "></div>
         </div>`;
+    document.getElementById('con-wrap')?.remove();document.body.append(host.firstElementChild);
 
     const p     = new URLSearchParams(window.location.search);
     const node  = p.get('node')    || '';
@@ -7139,15 +7482,10 @@ const ConsolePage = {
     term.writeln('\x1b[33mConnessione console seriale...\x1b[0m');
 
     try {
-        const res = await fetch(
-            `/api/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(vmid)}/termproxy?cluster=${encodeURIComponent(cidx)}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+        const data = await api(
+            `/nodes/${encodeURIComponent(node)}/qemu/${encodeURIComponent(vmid)}/termproxy?cluster=${encodeURIComponent(cidx)}`,
+            {method:'POST',quiet:true}
         );
-        if (!res.ok) {
-            const e = await res.json().catch(() => ({}));
-            throw new Error(e.error || `HTTP ${res.status}`);
-        }
-        const data   = await res.json();
         const ticket = data.ticket;
         const port   = data.port;
 
@@ -7223,17 +7561,9 @@ const ConsolePage = {
 
 // INIT
 document.addEventListener('DOMContentLoaded', () => {
-    if (_IS_CONSOLE) {
-        ConsolePage.init();
-        return;
-    }
     A11y.init();
-    Palette.init();
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!_modalStack.length&&App.cur==='vms'&&VMs.hasPick())VMs.clearPick();});
-    Provision.bind();
-    Drawer.init();
+    document.addEventListener('keydown',e=>{if(!Auth.locked&&e.key==='Escape'&&!_modalStack.length&&App.cur==='vms'&&VMs.hasPick())VMs.clearPick();});
     App.init();
-    Reports.init();
 });
 </script>
 </body>
