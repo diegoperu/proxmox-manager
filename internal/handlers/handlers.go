@@ -25,11 +25,17 @@ import (
 )
 
 type Handler struct {
-	hist *history.Store // daily inventory snapshots (nil in tests)
+	hist            *history.Store // daily inventory snapshots (nil in tests)
+	taskAttribution func([]string) (map[string]string, error)
 }
 
 // SetHistory gives the reports access to the daily inventory snapshots.
 func (h *Handler) SetHistory(s *history.Store) { h.hist = s }
+
+// SetTaskAttribution installs the audit lookup before serving requests.
+func (h *Handler) SetTaskAttribution(lookup func(upids []string) (map[string]string, error)) {
+	h.taskAttribution = lookup
+}
 
 func chiParam(r *http.Request, k string) string { return chi.URLParam(r, k) }
 
@@ -1116,7 +1122,78 @@ func (h *Handler) GetClusterTasks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, 502)
 		return
 	}
+	h.writeClusterTasks(w, data)
+}
+
+// writeClusterTasks keeps unknown Proxmox fields and numeric precision intact.
+func (h *Handler) writeClusterTasks(w http.ResponseWriter, data json.RawMessage) {
+	var tasks []map[string]json.RawMessage
+	if json.Unmarshal(data, &tasks) != nil || tasks == nil {
+		writeError(w, errors.New("elenco dei task Proxmox non valido"), http.StatusBadGateway)
+		return
+	}
+	for _, task := range tasks {
+		if task == nil {
+			writeError(w, errors.New("task Proxmox non valido"), http.StatusBadGateway)
+			return
+		}
+	}
+	if h.taskAttribution != nil {
+		users, err := h.taskUsers(tasks)
+		if err != nil {
+			// No lookup error or task content in logs: either may contain sensitive data.
+			log.Print("tasks: attribuzione dal registro non disponibile")
+		} else {
+			for _, task := range tasks {
+				var upid string
+				if json.Unmarshal(task["upid"], &upid) == nil && users[upid] != "" {
+					task["pmgr_user"], _ = json.Marshal(users[upid])
+				}
+			}
+			writeJSON(w, tasks)
+			return
+		}
+	}
+
 	writeJSON(w, data)
+}
+
+// taskUsers bounds each store call and only exposes attribution after every batch succeeds.
+func (h *Handler) taskUsers(tasks []map[string]json.RawMessage) (map[string]string, error) {
+	users := make(map[string]string)
+	upids := make([]string, 0, 1000)
+	seen := make(map[string]bool)
+	flush := func() error {
+		if len(upids) == 0 {
+			return nil
+		}
+		found, err := h.taskAttribution(upids)
+		if err != nil {
+			return err
+		}
+		for upid, user := range found {
+			users[upid] = user
+		}
+		upids = upids[:0]
+		return nil
+	}
+	for _, task := range tasks {
+		var upid string
+		if json.Unmarshal(task["upid"], &upid) != nil || upid == "" || seen[upid] {
+			continue
+		}
+		seen[upid] = true
+		upids = append(upids, upid)
+		if len(upids) == 1000 {
+			if err := flush(); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := flush(); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 var validUsername = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)

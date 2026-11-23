@@ -155,14 +155,27 @@ func (u usersAPI) reset(w http.ResponseWriter, r *http.Request) {
 
 func (u usersAPI) audit(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	limit, _ := strconv.Atoi(q.Get("limit"))
-	before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
-	user := q.Get("user")
-	if user != "" && !auth.ValidUsername(user) {
-		jsonError(w, http.StatusBadRequest, map[string]any{"error": "utente non valido"})
+	f := auth.AuditFilter{User: q.Get("user"), Q: q.Get("q"), Since: q.Get("since"), Until: q.Get("until"), Outcome: q.Get("outcome")}
+	var err error
+	if q.Has("limit") {
+		f.Limit, err = strconv.Atoi(q.Get("limit"))
+		if err != nil || f.Limit < 1 || f.Limit > 500 {
+			jsonError(w, 400, map[string]any{"error": "limite non valido"})
+			return
+		}
+	}
+	if q.Has("before") {
+		f.Before, err = strconv.ParseInt(q.Get("before"), 10, 64)
+		if err != nil || f.Before < 0 {
+			jsonError(w, 400, map[string]any{"error": "cursore non valido"})
+			return
+		}
+	}
+	if err := f.Validate(); err != nil {
+		jsonError(w, 400, map[string]any{"error": err.Error()})
 		return
 	}
-	rows, err := u.store.ListAudit(limit, before, user)
+	rows, err := u.store.ListAudit(f)
 	if err != nil {
 		u.fail(w, err)
 		return

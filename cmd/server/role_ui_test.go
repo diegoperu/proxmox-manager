@@ -27,7 +27,7 @@ for(let user=0;user<3;user++){
  }
  for(const page of ['dashboard','nodes','vms','gpu','groups','ceph','balance','cluster','reports','settings'])assert(RoleUI.canPage(page));
  for(const page of ['provision','batch'])assert.equal(RoleUI.canPage(page),user>=1);
- assert.equal(RoleUI.canPage('users'),user===2);
+ assert.equal(RoleUI.canPage('users'),user===2);assert.equal(RoleUI.canPage('audit'),user===2);
  const fields={disabled:false};RoleUI.readonly({querySelector:()=>fields});assert.equal(fields.disabled,user!==2);
 }
 for(const role of ['',null,'owner','toString']){
@@ -127,6 +127,7 @@ func TestWriteControlsDeclareRole(t *testing.T) {
 		`html:not(.role-operator):not(.role-admin) [data-min-role="operator"]`,
 		`html:not(.role-admin) [data-min-role="admin"]`,
 		`data-page="users" data-min-role="admin"`,
+		`data-page="audit" data-min-role="admin"`,
 		`RoleUI.mark(b,'operator');b.onclick=()=>Dmesg.load()`,
 		`RoleUI.mark(b,'admin');b.onclick=action.run`,
 		`RoleUI.mark(btn,minRole)`,
@@ -165,17 +166,18 @@ global.document={getElementById:get,querySelectorAll:()=>[]};
 global.closeModal=()=>{};
 `+source+`
 App.refresh=()=>{};
-assert.deepEqual(Route.parse('#/users'),{page:'users'});assert.equal(Route.parse('#/unknown'),null);
+assert.deepEqual(Route.parse('#/audit'),{page:'audit'});assert.deepEqual(Route.parse('#/users'),{page:'users'});assert.equal(Route.parse('#/unknown'),null);
 for(const role of ['reader','operator','admin']){
  Auth.role=role;location.hash='#/users';Route.apply();
  assert.equal(App.cur,role==='admin'?'users':'dashboard');assert.equal(location.hash,'#/'+App.cur);
+ location.hash='#/audit';Route.apply();assert.equal(App.cur,role==='admin'?'audit':'dashboard');assert.equal(location.hash,'#/'+App.cur);
  // Read pages remain accessible, including settings tabs and simulations.
  for(const page of ['vms','groups','balance','cluster','settings','gpu','reports']){App.nav(page);assert.equal(App.cur,page);}
  // Direct read access is retained for the two workflows whose navigation is hidden from readers.
  for(const page of ['provision','batch']){App.nav(page);assert.equal(App.cur,page);}
  const pages=Palette.base().filter(it=>it.group==='Pagine');
  for(const label of ['Nuova VM','Batch'])assert.equal(pages.some(it=>it.label===label),role!=='reader');
- assert.equal(pages.some(it=>it.label==='Utenti'),role==='admin');
+ assert.equal(pages.some(it=>it.label==='Utenti'),role==='admin');assert.equal(pages.some(it=>it.label==='Registro'),role==='admin');
 }
 let ran=false;Auth.role='reader';Palette.shown=[{minRole:'admin',run(){ran=true;}}];Palette.run(0);assert(!ran);
 Auth.role='admin';Palette.run(0);assert(ran);

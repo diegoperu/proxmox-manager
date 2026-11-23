@@ -238,7 +238,7 @@ func TestAuthorizationFlow(t *testing.T) {
 		t.Fatalf("demoted operator still acts: %+v", rp)
 	}
 	// Every write is in the action log, with user, route and target, never the generated password.
-	rows, err := store.ListAudit(100, 0, "")
+	rows, err := store.ListAudit(auth.AuditFilter{Limit: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestUnknownRuleIsRefusedAndUPIDIsLogged(t *testing.T) {
 	if rp := call(router, "POST", "/api/zz-task", adm, true, "", "{}"); rp.code != http.StatusOK {
 		t.Fatalf("task route: %+v", rp)
 	}
-	rows, _ := store.ListAudit(10, 0, "capo")
+	rows, _ := store.ListAudit(auth.AuditFilter{Limit: 10, User: "capo"})
 	if len(rows) == 0 || rows[0].UPID != "UPID:n1:0001:0002:6B00193D:qmstop:101:pmgr@pve!manager:" {
 		t.Fatalf("UPID not logged: %+v", rows)
 	}

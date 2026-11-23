@@ -1000,6 +1000,14 @@ html:not(.role-operator):not(.role-admin) [data-min-role="operator"],
 html:not(.role-admin) [data-min-role="admin"],
 html.role-admin .role-readonly{display:none!important}
 .role-fields{border:0;padding:0;margin:0;min-width:0}
+.audit-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px;align-items:end}
+.audit-filters label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.audit-filters .inp{width:100%;min-width:0}
+.audit-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#audit-table{min-width:960px}
+#audit-table td{white-space:normal;overflow-wrap:anywhere}
+.audit-target{max-width:260px}
+.audit-upid{max-width:220px}
 .users-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 #users-table{min-width:680px}
 #users-credentials-body code{display:block;font-family:var(--mono);overflow-wrap:anywhere;user-select:all;margin:8px 0}
@@ -1078,6 +1086,8 @@ html.role-admin .role-readonly{display:none!important}
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
     </button>
     <div class="nav-sec">Configurazione</div>
+    <button type="button" class="ni" data-page="audit" data-min-role="admin"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18H6zM9 7h6M9 12h6M9 17h6"/></svg>Registro</button>
+
     <button type="button" class="ni" data-page="users" data-min-role="admin"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Utenti</button>
     <button type="button" class="ni" data-page="settings">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>Impostazioni
@@ -1606,6 +1616,26 @@ html.role-admin .role-readonly{display:none!important}
     </div>
 
     <!-- ██ SETTINGS ██ -->
+    <div class="page" id="page-audit" data-min-role="admin">
+      <div class="panel"><div class="panel-h"><h2>Registro delle azioni</h2></div>
+        <div class="panel-b">
+          <form id="audit-filters" onsubmit="event.preventDefault();Audit.load()">
+            <div class="audit-filters">
+              <label for="audit-user">Utente<select class="inp" id="audit-user" name="user"><option value="">Tutti gli utenti</option></select></label>
+              <label for="audit-q">Azione o bersaglio<input class="inp" id="audit-q" name="q" type="search" maxlength="64" placeholder="Cerca nel registro"></label>
+              <label for="audit-since">Dal<input class="inp" id="audit-since" name="since" type="date" aria-describedby="audit-period-note"></label>
+              <label for="audit-until">Fino al<input class="inp" id="audit-until" name="until" type="date" aria-describedby="audit-period-note"></label>
+              <label for="audit-outcome">Esito<select class="inp" id="audit-outcome" name="outcome"><option value="">Tutti gli esiti</option><option value="ok">ok</option><option value="error">errore</option></select></label>
+            </div>
+            <p class="hint" id="audit-period-note">Date incluse, nel fuso del server. Registro di tutti i cluster.</p>
+            <div class="audit-actions"><button type="submit" class="btn ba sm" id="audit-apply">Applica filtri</button><button type="button" class="btn bg2 sm" id="audit-export" disabled onclick="Audit.exportCSV()">Esporta CSV delle righe caricate</button></div>
+          </form>
+          <p class="hint" id="audit-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="tw" tabindex="0" role="region" aria-label="Registro delle azioni, scorri per tutte le colonne"><table id="audit-table"><caption class="sr">Azioni dalla più recente</caption><thead><tr><th scope="col">Ora locale</th><th scope="col">Utente</th><th scope="col">Indirizzo</th><th scope="col">Azione</th><th scope="col">Bersaglio</th><th scope="col">Esito</th><th scope="col">UPID</th><th scope="col"><span class="sr">Copia UPID</span></th></tr></thead><tbody id="audit-body"></tbody></table></div>
+        <div class="panel-b"><button type="button" class="btn bg2" id="audit-more" hidden onclick="Audit.load(true)">Carica altri</button></div>
+      </div>
+    </div>
     <div class="page" id="page-users">
       <div class="panel"><div class="panel-h"><h2>Account del manager</h2><button type="button" class="btn ba sm" data-min-role="admin" onclick="Users.newUser()">Nuovo utente</button></div>
       <div class="tw"><table id="users-table"><caption class="sr">Utenti del manager</caption><thead><tr><th scope="col">Nome</th><th scope="col">Ruolo</th><th scope="col">Stato</th><th scope="col">Creato</th><th scope="col">Azioni</th></tr></thead><tbody id="users-body"></tbody></table></div></div>
@@ -1934,7 +1964,7 @@ const RoleUI={
     const fields=form.querySelector('fieldset');
     if(fields)fields.disabled=!canDo(Auth.role,'admin');
   },
-  pageRole(page){return page==='users'?'admin':['provision','batch'].includes(page)?'operator':'reader';},
+  pageRole(page){return ['users','audit'].includes(page)?'admin':['provision','batch'].includes(page)?'operator':'reader';},
   canPage(page){return canDo(Auth.role,this.pageRole(page));}
 };
 
@@ -2750,6 +2780,193 @@ const ClusterMgr={
   }
 };
 
+// pmgr:audit-format:begin
+const AUDIT_LABELS={
+  "GET /":"Pagina iniziale",
+  "GET /nodes":"Pagina nodi",
+  "GET /vms":"Pagina VM",
+  "GET /batch":"Pagina batch",
+  "GET /cluster":"Pagina cluster",
+  "GET /provision":"Pagina nuova VM",
+  "GET /reports":"Pagina report",
+  "GET /settings":"Pagina impostazioni",
+  "GET /console":"Pagina console",
+  "GET /static/*":"Risorsa statica",
+  "POST /api/auth/login":"Accesso",
+  "POST /api/auth/logout":"Uscita",
+  "GET /api/auth/me":"Sessione",
+  "GET /api/auth/setup":"Stato configurazione iniziale",
+  "POST /api/auth/setup/totp":"Configurazione TOTP",
+  "POST /api/auth/setup/complete":"Primo amministratore",
+  "POST /api/auth/password":"Cambio password",
+  "GET /api/users":"Elenco utenti",
+  "POST /api/users":"Creazione utente",
+  "PUT /api/users/{name}":"Modifica utente",
+  "POST /api/users/{name}/reset":"Reimpostazione credenziali",
+  "GET /api/audit":"Consultazione registro",
+  "GET /api/config":"Lettura impostazioni",
+  "GET /api/clusters":"Elenco cluster",
+  "GET /api/version":"Versione manager",
+  "GET /api/update-status":"Stato aggiornamenti",
+  "GET /api/clusters/{idx}/network-settings":"Lettura reti del cluster",
+  "GET /api/clusters/{idx}/report-settings":"Lettura impostazioni report",
+  "GET /api/dashboard":"Panoramica",
+  "GET /api/nodes":"Elenco nodi",
+  "GET /api/nodes/{node}/status":"Stato nodo",
+  "GET /api/nodes/{node}/rrd":"Metriche nodo",
+  "GET /api/nodes/{node}/storage":"Storage nodo",
+  "GET /api/vms":"Elenco VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/status":"Stato VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/rrd":"Metriche VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/fsinfo":"Dischi VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/osinfo":"Sistema operativo VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/netinfo":"Rete VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/gpu/plan":"Piano GPU della VM",
+  "GET /api/templates":"Elenco template",
+  "GET /api/nextid":"Prossimo VMID",
+  "GET /api/groups":"Elenco gruppi",
+  "GET /api/storage":"Elenco storage",
+  "GET /api/pools":"Elenco pool",
+  "GET /api/tasks":"Attività Proxmox",
+  "GET /api/metrics":"Metriche cluster",
+  "GET /api/top":"Classifica utilizzo",
+  "GET /api/ceph/summary":"Riepilogo Ceph",
+  "GET /api/ceph":"Stato Ceph",
+  "GET /api/gpus":"Elenco GPU",
+  "GET /api/gpu-usage":"Uso GPU",
+  "GET /api/reports/{model}":"Generazione report",
+  "GET /api/provision/advice":"Consiglio creazione VM",
+  "GET /api/provision/job":"Stato creazione VM",
+  "GET /api/balance":"Piano bilanciamento",
+  "GET /api/balance/task":"Stato migrazione",
+  "GET /api/balance/job":"Stato spostamento a freddo",
+  "POST /api/nodes/{node}/qemu/{vmid}/action/{action}":"Azione sulla VM",
+  "POST /api/nodes/{node}/qemu/{vmid}/snapshot":"Snapshot della VM",
+  "POST /api/nodes/{node}/qemu/{vmid}/dmesg":"Lettura dmesg della VM",
+  "POST /api/nodes/{node}/qemu/{vmid}/adduser":"Aggiunta utente nella VM",
+  "POST /api/nodes/{node}/qemu/{vmid}/adddisk":"Aggiunta disco alla VM",
+  "POST /api/nodes/{node}/qemu/{vmid}/setup-disk":"Configurazione disco della VM",
+  "POST /api/nodes/{node}/qemu/{vmid}/termproxy":"Apertura console VM",
+  "GET /api/nodes/{node}/qemu/{vmid}/termproxy-ws":"Connessione console VM",
+  "POST /api/nodes/{node}/lxc/{vmid}/action/{action}":"Azione sul container",
+  "POST /api/nodes/{node}/lxc/{vmid}/snapshot":"Snapshot del container",
+  "POST /api/batch":"Azioni batch",
+  "PUT /api/nodes/{node}/{kind}/{vmid}/groups":"Modifica gruppi",
+  "POST /api/provision/job":"Creazione VM",
+  "POST /api/update-check":"Controllo aggiornamenti",
+  "DELETE /api/nodes/{node}/qemu/{vmid}":"Eliminazione VM",
+  "DELETE /api/nodes/{node}/lxc/{vmid}":"Eliminazione container",
+  "POST /api/nodes/{node}/cmd/{cmd}":"Comando al nodo",
+  "POST /api/nodes/{node}/qemu/{vmid}/migrate":"Migrazione VM",
+  "POST /api/balance/step":"Passo di bilanciamento",
+  "POST /api/balance/job/decide":"Conferma stop forzato",
+  "POST /api/nodes/{node}/qemu/{vmid}/gpu":"Assegnazione GPU",
+  "DELETE /api/nodes/{node}/qemu/{vmid}/gpu/{slot}":"Rimozione GPU",
+  "PUT /api/gpu-models":"Modifica modelli GPU",
+  "POST /api/config":"Modifica impostazioni",
+  "POST /api/config/test":"Test connessione Proxmox",
+  "POST /api/clusters":"Aggiunta cluster",
+  "PUT /api/clusters/{idx}":"Modifica cluster",
+  "DELETE /api/clusters/{idx}":"Eliminazione cluster",
+  "POST /api/clusters/{idx}/test":"Test connessione cluster",
+  "PUT /api/clusters/{idx}/default":"Cluster predefinito",
+  "PUT /api/clusters/{idx}/network-settings":"Modifica reti del cluster",
+  "PUT /api/clusters/{idx}/report-settings":"Modifica impostazioni report",
+  "POST /api/clusters/{idx}/report-settings/price-check":"Controllo listini",
+  login:'Accesso',logout:'Uscita',setup:'Configurazione iniziale',password:'Cambio password'
+};
+function auditLabel(key){return Object.hasOwn(AUDIT_LABELS,key)?AUDIT_LABELS[key]:String(key??'');}
+function auditTarget(target,clusters){
+  const labels={node:'Nodo',vmid:'VMID',action:'Azione',cmd:'Comando',name:'Utente',kind:'Tipo',slot:'Slot'};
+  return String(target??'').split(/\s+/).filter(Boolean).map(part=>{
+    const at=part.indexOf('=');if(at<1)return part;
+    const key=part.slice(0,at),value=part.slice(at+1);
+    if(key==='cluster'||key==='idx'){
+      const c=/^\d+$/.test(value)?clusters?.[Number(value)]:null;
+      return 'Cluster '+(typeof c?.label==='string'&&c.label?c.label:value);
+    }
+    return (Object.hasOwn(labels,key)?labels[key]+': ':key+'=')+value;
+  }).join(' · ')||'—';
+}
+function taskUser(task){
+  if(typeof task.pmgr_user==='string'&&task.pmgr_user)return task.pmgr_user+' tramite il manager';
+  const user=String(task.user??'');
+  return /^pmgr@pve!(manager|local)$/.test(user)?'manager (utente non registrato)':user;
+}
+// pmgr:audit-format:end
+
+// pmgr:audit-ui:begin
+const Audit={
+  rows:[],filters:null,seq:0,busy:false,more:false,
+  async load(append=false){
+    if(Auth.locked||!canDo(Auth.role,'admin')||append&&(this.busy||!this.more))return;
+    if(!append&&!document.getElementById('audit-filters').reportValidity())return;
+    const seq=++this.seq,epoch=Auth.epoch;
+    const body=document.getElementById('audit-body'),status=document.getElementById('audit-status');
+    if(!append){
+      const form=document.getElementById('audit-filters');
+      this.filters=new URLSearchParams();
+      for(const name of ['user','q','since','until','outcome']){
+        const value=form.elements[name].value;if(value)this.filters.set(name,value);
+      }
+      this.rows=[];this.more=false;body.innerHTML='<tr><td colspan="8" class="empty">Caricamento…</td></tr>';
+    }
+    this.busy=true;status.textContent='';this.controls();
+    const params=new URLSearchParams(this.filters);params.set('limit','100');
+    if(append)params.set('before',String(this.rows.at(-1).id));
+    try{
+      const [rows,users]=await Promise.all([
+        api('/audit?'+params,{quiet:true,timeoutMs:15000}),
+        append?Promise.resolve(null):api('/users',{quiet:true,timeoutMs:15000})
+      ]);
+      if(seq!==this.seq||epoch!==Auth.epoch||Auth.locked)return;
+      if(!Array.isArray(rows)||!rows.every(r=>r&&Number.isSafeInteger(r.id)&&r.id>0&&Number.isSafeInteger(r.time)&&r.time>0&&r.time<=8640000000000&&Number.isInteger(r.status)&&['user','ip','action','target','upid'].every(k=>typeof r[k]==='string')))throw new Error('Registro ricevuto non valido');
+      if(users){
+        if(!Array.isArray(users)||!users.every(u=>u&&Users.validName(u.username)))throw new Error('Elenco utenti non valido');
+        const select=document.getElementById('audit-user'),selected=select.value;
+        select.innerHTML='<option value="">Tutti gli utenti</option>'+users.map(u=>`<option value="${esc(u.username)}">${esc(u.username)}</option>`).join('');
+        if(selected&&!users.some(u=>u.username===selected)){
+          const option=document.createElement('option');option.value=selected;option.textContent=selected;select.append(option);
+        }
+        select.value=selected;
+      }
+      this.rows=append?this.rows.concat(rows):rows;this.more=rows.length===100;this.paint();
+      status.textContent=this.rows.length+' righe caricate';
+    }catch(e){
+      if(seq!==this.seq||epoch!==Auth.epoch||Auth.locked)return;
+      status.textContent=Auth.errorText(e);
+      if(!append)body.innerHTML=errRow(8,Auth.errorText(e),'Audit.load()');
+    }finally{if(seq===this.seq){this.busy=false;this.controls();}}
+  },
+  controls(){
+    document.getElementById('audit-apply').disabled=this.busy;
+    const more=document.getElementById('audit-more');more.hidden=!this.more;more.disabled=this.busy;
+    document.getElementById('audit-export').disabled=this.busy||!this.rows.length;
+  },
+  paint(){
+    document.getElementById('audit-body').innerHTML=this.rows.map((r,i)=>`<tr>
+      <td><time datetime="${esc(new Date(r.time*1000).toISOString())}">${esc(new Date(r.time*1000).toLocaleString('it-IT'))}</time></td>
+      <td>${esc(r.user||'—')}</td><td class="tm">${esc(r.ip||'—')}</td>
+      <td>${esc(auditLabel(r.action))}</td><td class="audit-target">${esc(auditTarget(r.target,ClusterMgr.clusters))}</td>
+      <td><span class="badge ${r.status>=400?'bs':'br'}">${r.status>=400?'errore':'ok'} (${esc(r.status)})</span></td>
+      <td class="audit-upid">${r.upid?`<span class="tm" id="audit-upid-${i}" title="${esc(r.upid)}">${esc(r.upid.length>32?r.upid.slice(0,29)+'…':r.upid)}</span>`:'—'}</td>
+      <td>${r.upid?`<button type="button" class="btn bg2 sm" onclick="Audit.copy(${i})" aria-label="${esc('Copia UPID della riga '+r.id)}">Copia</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Nessuna azione per i filtri scelti.</td></tr>';
+  },
+  async copy(index){
+    if(Auth.locked||!canDo(Auth.role,'admin')||!Number.isInteger(index)||!this.rows[index]?.upid)return;
+    const upid=this.rows[index].upid;
+    try{await navigator.clipboard.writeText(upid);toast('UPID copiato','ok');}
+    catch(e){const el=document.getElementById('audit-upid-'+index);if(el&&this.rows[index]?.upid===upid)el.textContent=upid;toast('Copia non disponibile: seleziona il testo e copialo manualmente.','err');}
+  },
+  exportCSV(){
+    if(Auth.locked||!canDo(Auth.role,'admin')||this.busy||!this.rows.length)return;
+    const rows=[['Ora locale','Utente','Indirizzo','Azione','Bersaglio','Esito','Stato','UPID'],
+      ...this.rows.map(r=>[new Date(r.time*1000).toLocaleString('it-IT'),r.user,r.ip,auditLabel(r.action),auditTarget(r.target,ClusterMgr.clusters),r.status>=400?'errore':'ok',r.status,r.upid])];
+    Reports.download(new Blob(['\uFEFF'+rptCsv(rows)],{type:'text/csv;charset=utf-8'}),'registro.csv');
+  }
+};
+// pmgr:audit-ui:end
+
 // pmgr:users-ui:begin
 const Users={
   seq:0,busy:false,
@@ -2859,7 +3076,7 @@ const Users={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',reports:'Report',settings:'Impostazioni',users:'Utenti'};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',reports:'Report',settings:'Impostazioni',users:'Utenti',audit:'Registro'};
 // Indirizzi nell'hash (memoria della navigazione): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
@@ -2957,7 +3174,7 @@ const App={
   },
   nav(p,opts={}){
     if(Auth.locked)return;
-    if(p==='users'&&!RoleUI.canPage(p))p='dashboard';
+    if(['users','audit'].includes(p)&&!RoleUI.canPage(p))p='dashboard';
     const dirty=SettingsGuard.dirtyForm();
     if(dirty){
       if(p==='settings'&&opts.settingsTab===dirty.tab)return;
@@ -2997,6 +3214,7 @@ const App={
     else                Gpu.probe();
     if(p==='settings')  Settings.load();
     if(p==='users')     Users.load();
+    if(p==='audit')     Audit.load();
   },
   async checkConn(){
     if(Auth.locked||document.hidden)return; // scheda in background: niente sondaggio ogni 30s
@@ -4347,7 +4565,7 @@ const Balance={
       const n=Balance.notice; if(!n)return'';
       return`<div class="bal-run ${n.bad?'bad':''}" id="bal-run" role="status"><div>${esc(n.text)}</div><div class="bal-act" style="margin-left:auto"><button type="button" class="btn bg2 sm" onclick="Balance.notice=null;Balance.paint()">Chiudi</button></div></div>`;
     }
-    if(!r.job)return`<div class="bal-run" id="bal-run" role="status"><div class="spin"></div><div>Migrazione in corso: <b>${esc(r.name)}</b> ${esc(r.from)} → ${esc(r.to)}. ${r.running?'La VM resta accesa.':''} Non chiudere la pagina: il passo successivo si abilita alla fine.</div></div>`;
+    if(!r.job)return`<div class="bal-run" id="bal-run" role="status"><div class="spin"></div><div>Migrazione in corso: <b>${esc(r.name)}</b> ${esc(r.from)} → ${esc(r.to)}. ${r.author?esc(r.author)+'. ':''}${r.running?'La VM resta accesa.':''} Non chiudere la pagina: il passo successivo si abilita alla fine.</div></div>`;
     if(r.phase==='need_force'){
       const by=r.decideBy?new Date(r.decideBy*1000).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'';
       return`<div class="bal-run ask" id="bal-run" role="alert"><div><b>${esc(r.name)}</b> non si e' spenta entro 3 minuti. Forzare lo stop (come staccare la corrente: i dati non salvati nella VM si perdono)? ${by?`Senza risposta entro le ${esc(by)} lo spostamento si annulla e la VM resta accesa.`:''}</div>
@@ -4436,6 +4654,7 @@ const Balance={
         if(++r.errs>=40){Balance.run=null;toast(`Stato della migrazione di ${r.name} non leggibile: controlla l'attivita' del cluster`,'err');Balance.load(true);return;}
         Balance.poll();return;
       }
+      const author=taskUser(t);if(r.author!==author){r.author=author;Balance.repaintRun();}
       if(t.status!=='stopped'){Balance.poll();return;}
       Balance.run=null; _tc.clear();
       toast(t.ok?`${r.name} spostata su ${r.to}`:`Migrazione di ${r.name} non riuscita: ${t.exitstatus||'errore'}`,t.ok?'ok':'err');
@@ -4775,7 +4994,8 @@ const Dashboard={
       const cls=running?'run':failed?'err':'';
       const label=Dashboard.TASK_LABELS[t.type]||String(t.type||'Operazione');
       const what=t.id?`${/^\d+$/.test(String(t.id))?'VM ':''}${t.id} · `:'';
-      const detail=failed?String(t.status).replace(/^ERROR:\s*/,'').slice(0,120):`${what}${t.node||''}${t.user?' · '+t.user:''}`;
+      const author=taskUser(t);
+      const detail=(failed?String(t.status).replace(/^ERROR:\s*/,'').slice(0,120):`${what}${t.node||''}`)+(author?' · '+author:'');
       return`<div class="task"><span class="sl ${cls}" aria-hidden="true"></span>
         <div><b>${esc(label)}${failed?' <span class="sr">non riuscito</span>':''}</b><small${failed?' class="e"':''}>${failed?esc(what)+esc(detail):esc(detail)}</small></div>
         <time>${running?'in corso':esc(Dashboard.hhmm(t.starttime))}</time></div>`;

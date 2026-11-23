@@ -76,6 +76,8 @@ type taskInfo struct {
 	Status     string `json:"status"`     // running | stopped
 	ExitStatus string `json:"exitstatus"` // OK or the error text when stopped
 	OK         bool   `json:"ok"`
+	User       string `json:"user,omitempty"`
+	PmgrUser   string `json:"pmgr_user,omitempty"`
 }
 
 func readTask(c interface {
@@ -88,11 +90,12 @@ func readTask(c interface {
 	var t struct {
 		Status     string `json:"status"`
 		ExitStatus string `json:"exitstatus"`
+		User       string `json:"user"`
 	}
 	if json.Unmarshal(raw, &t) != nil {
 		return taskInfo{}, errors.New("stato del task non valido")
 	}
-	out := taskInfo{Status: "running"}
+	out := taskInfo{Status: "running", User: t.User}
 	if t.Status == "stopped" {
 		out.Status = "stopped"
 		out.ExitStatus = clampText(t.ExitStatus, 200)
@@ -277,6 +280,14 @@ func (h *Handler) GetBalanceTask(w http.ResponseWriter, r *http.Request) {
 		log.Printf("balance task: %v", err)
 		writeError(w, errors.New("stato della migrazione non disponibile"), http.StatusBadGateway)
 		return
+	}
+	if h.taskAttribution != nil {
+		users, err := h.taskAttribution([]string{upid})
+		if err != nil {
+			log.Print("balance task: attribuzione dal registro non disponibile")
+		} else {
+			t.PmgrUser = users[upid]
+		}
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, t)
