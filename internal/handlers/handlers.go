@@ -306,6 +306,18 @@ func (h *Handler) GetNodeRRD(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) NodeCommand(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
 	cmd := chi.URLParam(r, "cmd")
+	if !nodeNamePattern.MatchString(node) {
+		writeError(w, errBadTarget, 400)
+		return
+	}
+	if !nodeCommands[cmd] {
+		writeError(w, errBadAction, 400)
+		return
+	}
+	if err := noParams(w, r); err != nil {
+		writeError(w, err, 400)
+		return
+	}
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)
@@ -560,13 +572,21 @@ func (h *Handler) GetVMFSInfo(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) VMAction(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
-	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
+	vmid, okID := validVMID(chi.URLParam(r, "vmid"))
 	action := chi.URLParam(r, "action")
-	body := bodyMap(r)
-	params := url.Values{}
-	for k, v := range body {
-		params.Set(k, v)
+	if !nodeNamePattern.MatchString(node) || !okID {
+		writeError(w, errBadTarget, 400)
+		return
 	}
+	if !vmActions[action] {
+		writeError(w, errBadAction, 400)
+		return
+	}
+	if err := noParams(w, r); err != nil {
+		writeError(w, err, 400)
+		return
+	}
+	params := url.Values{}
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)
@@ -779,8 +799,8 @@ type BatchResult struct {
 }
 
 func (h *Handler) BatchAction(w http.ResponseWriter, r *http.Request) {
-	var req BatchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, err := decodeBatch(w, r)
+	if err != nil {
 		writeError(w, err, 400)
 		return
 	}
@@ -801,6 +821,10 @@ func (h *Handler) BatchAction(w http.ResponseWriter, r *http.Request) {
 		kind := "qemu"
 		if vm.Type == "lxc" {
 			kind = "lxc"
+		}
+		if kind == "lxc" && !lxcActions[req.Action] {
+			results = append(results, BatchResult{Node: vm.Node, VMID: vm.VMID, Error: "azione non disponibile per i container"})
+			continue
 		}
 		run := func() (json.RawMessage, error) {
 			if kind == "lxc" {
@@ -830,13 +854,21 @@ func (h *Handler) BatchAction(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ContainerAction(w http.ResponseWriter, r *http.Request) {
 	node := chi.URLParam(r, "node")
-	vmid, _ := strconv.Atoi(chi.URLParam(r, "vmid"))
+	vmid, okID := validVMID(chi.URLParam(r, "vmid"))
 	action := chi.URLParam(r, "action")
-	body := bodyMap(r)
-	params := url.Values{}
-	for k, v := range body {
-		params.Set(k, v)
+	if !nodeNamePattern.MatchString(node) || !okID {
+		writeError(w, errBadTarget, 400)
+		return
 	}
+	if !lxcActions[action] {
+		writeError(w, errBadAction, 400)
+		return
+	}
+	if err := noParams(w, r); err != nil {
+		writeError(w, err, 400)
+		return
+	}
+	params := url.Values{}
 	client, err := h.getClientFor(clusterIdx(r))
 	if err != nil {
 		writeError(w, err, 400)

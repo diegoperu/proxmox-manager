@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/netip"
 	"os"
 	"path"
 	"strings"
@@ -60,9 +61,16 @@ func main() {
 			if err := accounts.PruneSessions(); err != nil {
 				log.Printf("accounts: prune sessions: %v", err)
 			}
+			if err := accounts.PruneAudit(); err != nil {
+				log.Printf("accounts: prune action log: %v", err)
+			}
 		}
 	}()
-	authH := &auth.Handlers{Store: accounts, Proxies: proxies}
+	authH := &auth.Handlers{Store: accounts, Proxies: proxies, Audit: func(r *http.Request, user, event, outcome string) {
+		if err := accounts.AddAudit(auth.AuditEntry{User: user, IP: auth.ClientIP(r, proxies), Action: event, Detail: outcome}); err != nil {
+			log.Printf("accounts: action log: %v", err)
+		}
+	}}
 
 	h := handlers.New()
 
@@ -80,9 +88,79 @@ func main() {
 	handlers.StartVMUse(context.Background(), hist)
 	handlers.StartUpdateCheck(context.Background())
 
+	r := buildRouter(h, authH, accounts, proxies)
+
+	log.Printf("ProxmoxManager → http://localhost%s", cfg.ListenAddr)
+	log.Fatal(http.ListenAndServe(cfg.ListenAddr, r))
+}
+
+// staticTypes is the allowlist of served extensions: anything else under /static/ is a 404.
+// Types are explicit because Go's built-in MIME table has no woff2.
+var staticTypes = map[string]string{
+	".js":    "text/javascript; charset=utf-8",
+	".css":   "text/css; charset=utf-8",
+	".woff2": "font/woff2",
+	".png":   "image/png",
+}
+
+func staticHandler() http.Handler {
+	sub, err := fs.Sub(staticFiles, "web/static")
+	if err != nil {
+		log.Fatalf("static: %v", err)
+	}
+	files := http.StripPrefix("/static/", http.FileServer(http.FS(sub)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ct, ok := staticTypes[strings.ToLower(path.Ext(r.URL.Path))]
+		if !ok || strings.HasSuffix(r.URL.Path, "/") { // no directory listings, no unknown types
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", ct)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		files.ServeHTTP(w, r)
+	})
+}
+
+// injectRootClasses puts the saved theme and density on <html> so the first paint
+// already uses them (no localStorage: the preferences live in config.json). Only
+// values accepted by config.ValidTheme / config.ValidDensity are ever written into
+// the page; an empty value adds no class (theme: follow the OS, density: comfortable).
+func injectRootClasses(page []byte, theme, density string) []byte {
+	var classes []string
+	if theme != "" && config.ValidTheme(theme) {
+		classes = append(classes, theme)
+	}
+	if density != "" && config.ValidDensity(density) {
+		classes = append(classes, density)
+	}
+	if len(classes) == 0 {
+		return page
+	}
+	return bytes.Replace(page, []byte(`<html lang="it">`), []byte(`<html lang="it" class="`+strings.Join(classes, " ")+`">`), 1)
+}
+
+func serveIndex(w http.ResponseWriter, r *http.Request) {
+	b, err := fs.ReadFile(staticFiles, "web/templates/index.html")
+	if err != nil {
+		http.Error(w, "not found", 500)
+		return
+	}
+	cfg := config.Get()
+	b = injectRootClasses(b, cfg.Theme, cfg.Density)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "no-cache") // the page varies with the saved theme and density
+	w.Write(b)
+}
+
+// buildRouter registers every route. Authorization runs as a middleware on all of them (authz.go): each
+// route must have a rule in routeAccess, or it is refused.
+func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store, proxies []netip.Prefix) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(authorize(r, accounts, proxies))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"http://localhost:*", "http://127.0.0.1:*"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -90,7 +168,7 @@ func main() {
 	}))
 
 	// Vendored libraries and fonts (read-only, embedded)
-	r.Handle("/static/*", staticHandler())
+	r.Get("/static/*", staticHandler().ServeHTTP)
 
 	// SPA pages
 	for _, path := range []string{"/", "/nodes", "/vms", "/batch", "/cluster", "/provision", "/reports", "/settings", "/console"} {
@@ -100,7 +178,7 @@ func main() {
 	// API
 	r.Route("/api", func(r chi.Router) {
 		r.Use(apiGuard)
-		// Accounts (voce 20, step 2). Route protection comes with step 3.
+		// Accounts (voce 20). Every route below is protected by authorize (routeAccess in authz.go).
 		r.Post("/auth/login", authH.Login)
 		r.Post("/auth/logout", authH.Logout)
 		r.Get("/auth/me", authH.Me)
@@ -108,6 +186,12 @@ func main() {
 		r.Get("/auth/setup", authH.SetupStatus)
 		r.Post("/auth/setup/totp", authH.SetupTOTP)
 		r.Post("/auth/setup/complete", authH.SetupComplete)
+		users := usersAPI{store: accounts}
+		r.Get("/users", users.list)
+		r.Post("/users", users.create)
+		r.Put("/users/{name}", users.update)
+		r.Post("/users/{name}/reset", users.reset)
+		r.Get("/audit", users.audit)
 		r.Get("/config", h.GetConfig)
 		r.Post("/config", h.SaveConfig)
 		r.Post("/config/test", h.TestConnection)
@@ -188,67 +272,5 @@ func main() {
 		r.Post("/balance/job/decide", h.PostBalanceJobDecide)
 		r.Get("/ceph", h.GetCeph())
 	})
-
-	log.Printf("ProxmoxManager → http://localhost%s", cfg.ListenAddr)
-	log.Fatal(http.ListenAndServe(cfg.ListenAddr, r))
-}
-
-// staticTypes is the allowlist of served extensions: anything else under /static/ is a 404.
-// Types are explicit because Go's built-in MIME table has no woff2.
-var staticTypes = map[string]string{
-	".js":    "text/javascript; charset=utf-8",
-	".css":   "text/css; charset=utf-8",
-	".woff2": "font/woff2",
-	".png":   "image/png",
-}
-
-func staticHandler() http.Handler {
-	sub, err := fs.Sub(staticFiles, "web/static")
-	if err != nil {
-		log.Fatalf("static: %v", err)
-	}
-	files := http.StripPrefix("/static/", http.FileServer(http.FS(sub)))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ct, ok := staticTypes[strings.ToLower(path.Ext(r.URL.Path))]
-		if !ok || strings.HasSuffix(r.URL.Path, "/") { // no directory listings, no unknown types
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", ct)
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		files.ServeHTTP(w, r)
-	})
-}
-
-// injectRootClasses puts the saved theme and density on <html> so the first paint
-// already uses them (no localStorage: the preferences live in config.json). Only
-// values accepted by config.ValidTheme / config.ValidDensity are ever written into
-// the page; an empty value adds no class (theme: follow the OS, density: comfortable).
-func injectRootClasses(page []byte, theme, density string) []byte {
-	var classes []string
-	if theme != "" && config.ValidTheme(theme) {
-		classes = append(classes, theme)
-	}
-	if density != "" && config.ValidDensity(density) {
-		classes = append(classes, density)
-	}
-	if len(classes) == 0 {
-		return page
-	}
-	return bytes.Replace(page, []byte(`<html lang="it">`), []byte(`<html lang="it" class="`+strings.Join(classes, " ")+`">`), 1)
-}
-
-func serveIndex(w http.ResponseWriter, r *http.Request) {
-	b, err := fs.ReadFile(staticFiles, "web/templates/index.html")
-	if err != nil {
-		http.Error(w, "not found", 500)
-		return
-	}
-	cfg := config.Get()
-	b = injectRootClasses(b, cfg.Theme, cfg.Density)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "no-cache") // the page varies with the saved theme and density
-	w.Write(b)
+	return r
 }
