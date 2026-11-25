@@ -147,6 +147,30 @@ vera** (ne' su Magi): `ufw`/`firewalld` reali e `reboot` non sono coperti.
 5. Gli helper: dopo ogni modifica agli helper nel repository, copiare
    `internal/handlers/guestscripts/{adduser,disk,dmesg}.sh` in `helpers/` e rigenerare gli snippet Rocky.
 
+### Preparare un nodo appena installato (D156)
+
+`bin/pmgr-node-prepare.sh` si esegue come root su PVE 9 / Debian 13 trixie, prima dell'ingresso nel cluster.
+Senza argomenti controlla soltanto: uscita 0 se conforme, 3 se servono modifiche, 1 per errori, 2 per uso errato.
+
+```bash
+bin/pmgr-node-prepare.sh --ceph squid                   # anteprima
+bin/pmgr-node-prepare.sh --apply --ceph squid --upgrade # applicazione e aggiornamento
+```
+
+Imposta Debian e Proxmox no-subscription in deb822, commenta le sorgenti legacy e disabilita solo gli stanzas
+enterprise. `--ceph squid|tentacle` deve corrispondere alla release del cluster: una release no-subscription
+diversa gia' abilitata causa un rifiuto prima di qualsiasi scrittura. Il default `none` non aggiunge Ceph.
+Installa un helper e un hook apt per togliere l'avviso di sottoscrizione; `--keep-nag` salta questa parte e
+conserva eventuali file gia' installati. Le sostituzioni sono atomiche, con originali in
+`/root/pmgr-backup/node-prepare-YYYYmmdd-HHMMSS/` (0700, percorsi relativi conservati).
+`--upgrade` richiede `--apply`: esegue `apt-get update` e `dist-upgrade` non interattivo, conserva le
+configurazioni locali e segnala l'eventuale riavvio. Non riavvia e non modifica HA, corosync, `/etc/pve`,
+rete, utenti o SSH.
+
+Test offline: `tests/test_node_prepare.sh`, immagine locale `docker.io/library/debian:13`, rete disabilitata
+e repository montato in sola lettura. I soli hook dello script sono `PMGR_ROOT` (prefisso dei path dati)
+e `PMGR_TEST=1` (salta il controllo root, senza saltare i controlli Debian/PVE o i permessi dei file).
+
 ## Limiti noti
 
 - **Checksum:** Ubuntu e Debian sono configurati (`SHA256SUMS` / `SHA512SUMS`, il file di checksum e' cercato per nome);
