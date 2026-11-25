@@ -1499,3 +1499,21 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A se possibile.
 **Risposta utente**: A, stessa macchina (2026-11-23): manager su `127.0.0.1:8080`, `trusted_proxies: ["127.0.0.1"]`.
 
+### D148 — Procedura standard per un nodo nuovo o un cluster nuovo
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: dove scriviamo la procedura e dove stanno gli strumenti che servono?
+**Perché conta**: oggi i passi sono sparsi: README degli script dei template (`SUPPORT-FILES/pmgr-scripts/`, fuori da git: "Preparazione di un cluster"), `tools/pmgr-sync/README.md` (accesso per la sincronizzazione), `pmgr-calcolo-install.sh`, README del repository (account e token Proxmox), registro di `CLAUDE.md`. Chi deve aggiungere un nodo non ha una lista unica, e una parte degli strumenti esiste solo sulla postazione.
+**Opzioni**: A) `docs/ONBOARDING.md` nel repository con due liste (cluster nuovo, nodo nuovo), e **gli strumenti dei template spostati nel repository** (`tools/pmgr-scripts/`): oggi non contengono segreti (password e chiavi stanno in `/etc/pmgr` sui nodi), quindi la vecchia regola "mai nel repository" non ha piu' motivo; B) documento nel repository, strumenti fuori come oggi; C) tutto fuori dal repository.
+**Suggerimento**: A: una sola fonte, versionata e firmata con le release; e' anche il prerequisito perche' il manager possa consegnare gli script ai nodi (D149).
+**Risposta utente**:
+
+### D149 — Quanto dell'onboarding puo' fare il manager
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: fin dove il manager gestisce l'aggiunta di un nodo o di un cluster?
+**Perché conta**: alcuni passi richiedono root sul nodo una sola volta (creare utente e token Proxmox, abilitare il contenuto Snippets su `local`, creare l'utente `pmgr-sync`); dare al manager un accesso root ai nodi lo renderebbe il punto piu' pericoloso di tutta l'infrastruttura.
+**Opzioni**: A) **il manager prepara e verifica, non esegue come root**: pagina "Preparazione dei nodi" che controlla ogni nodo via API (storage con Snippets, snippet presenti, template, rete, permessi del token) e mostra i comandi esatti e gia' compilati per i passi da root (`pveum`, `pvesm set`, `pmgr-sync-setup.sh`); dopo quei passi la copia di script e snippet la fa il manager con l'accesso ristretto `pmgr-sync` (voce 13: comando forzato, solo scrittura in due cartelle); B) come A ma il manager esegue anche i passi da root via SSH con una chiave root (sconsigliato); C) solo documentazione.
+**Suggerimento**: A: automatizza tutto cio' che si puo' fare senza privilegi alti, il resto lo rende un copia-incolla verificato; si unisce alla voce 13.
+**Risposta utente**:
+

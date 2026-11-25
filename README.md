@@ -214,7 +214,7 @@ The manager talks to every cluster with **one dedicated service account per clus
 | VMs | `VM.Audit` `VM.PowerMgmt` `VM.Snapshot` `VM.Migrate` `VM.Clone` `VM.Allocate` | lists, power actions, snapshots, migrations and balance, New VM, deletion |
 | VM configuration | `VM.Config.Disk` `VM.Config.CPU` `VM.Config.Memory` `VM.Config.Network` `VM.Config.Cloudinit` `VM.Config.Options` `VM.Config.HWType` | disks, cores/RAM, cloud-init, group tags, GPU assignment |
 | Guest agent | `VM.GuestAgent.Audit` `VM.GuestAgent.Unrestricted` | IP, OS and disk info; add user, disk setup, kernel log, GPU usage |
-| Storage | `Datastore.Audit` `Datastore.AllocateSpace` | free space, snippets, new disks |
+| Storage | `Datastore.Audit` `Datastore.AllocateSpace` | free space, snippets, new disks. **`Datastore.AllocateSpace` is also what lets the token list snippets and ISO files**: Proxmox hides non-disk volumes from a storage listing without it, and the New VM precheck then sees the cloud-init snippets only on some nodes (observed on the clusters, 2026-11-25) |
 | Other | `Pool.Audit` `Mapping.Audit` `Mapping.Use` `SDN.Audit` `SDN.Use` | pools, PCI mappings of the GPUs, network bridges of new VMs |
 
 Deliberately left out: everything that changes users, permissions, realms and the cluster configuration, `Sys.Console` (node shell), `VM.Console` (the serial console uses its own credentials, see [Security — Console credentials](#security--console-credentials)), `VM.Backup`, `VM.Snapshot.Rollback`, `VM.GuestAgent.File*`. Proxmox 8 has `VM.Monitor` instead of the `VM.GuestAgent.*` privileges.
