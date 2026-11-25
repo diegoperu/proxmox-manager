@@ -1600,3 +1600,12 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A.
 **Risposta utente**: A (2026-11-25).
 
+### D160 — Pulizia dei file non piu' usati sui nodi
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: come togliere dai nodi gli snippet e gli script "in piu'" (non piu' consegnati dal manager)?
+**Perché conta**: il comando ristretto dei nodi non permette di cancellare (protezione voluta); uno snippet citato dal `cicustom` di una VM o di un template viene riletto da Proxmox a ogni avvio: se manca, la VM non parte, anche se e' stata creata mesi prima.
+**Opzioni**: A) il manager classifica i file in piu' (snippet in uso, con l'elenco delle VM e dei template che li citano, da non toccare; snippet non usati e script in piu', rimovibili) leggendo via API il `cicustom` di tutte le VM e i template del cluster, e mostra comandi da root gia' compilati: copia di sicurezza `tar` in `/root/pmgr-backup/` e poi `rm` dei soli file elencati, per nome esatto, solo nelle due cartelle; nessuna cancellazione dal manager, comando ristretto invariato (stessa regola di D149); B) aggiungere la cancellazione al comando ristretto (sconsigliato: chi controlla il manager potrebbe togliere gli snippet e impedire l'avvio delle VM). Fuori dalla portata del manager (non li vede) un elenco da pulire a mano: copie vecchie in `/root` del nodo 1 di CALCOLO (`old-scripts-backup-*`, `rsync_snippets.sh`, `/root/pmgr-scripts`), su Magi la chiave sorgente di `pmgr-sync` del nodo 1 e `/var/lib/pmgr-sync/sync.conf`, la chiave di sviluppo; restano necessari `/etc/pmgr/cluster.conf`, `ssh_keys.pub` e `template-password`.
+**Suggerimento**: A.
+**Risposta utente**: A, da realizzare dopo lo step 8 (2026-11-25).
+
