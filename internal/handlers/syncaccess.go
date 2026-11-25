@@ -278,7 +278,17 @@ type syncAccessEntry struct {
 	sync.Mutex
 	at    time.Time
 	value syncAccessResult
+	key   string // label and manager addresses the value was computed with
 	valid bool
+}
+
+// syncCacheKey changes when anything that shapes the answer changes in config.json.
+func syncCacheKey(cl config.ClusterConfig) string {
+	from := []string{}
+	if cl.Network != nil {
+		from = cl.Network.ManagerFrom
+	}
+	return cl.Label + "\x00" + strings.Join(from, ",")
 }
 
 var syncAccessEntries sync.Map
@@ -310,7 +320,7 @@ func (h *Handler) GetSyncAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer e.Unlock()
-	if r.URL.Query().Get("fresh") != "1" && e.valid && time.Since(e.at) < 30*time.Second && e.value.Cluster == cl.Label {
+	if r.URL.Query().Get("fresh") != "1" && e.valid && time.Since(e.at) < 30*time.Second && e.key == syncCacheKey(cl) {
 		writeJSON(w, e.value)
 		return
 	}
@@ -319,7 +329,7 @@ func (h *Handler) GetSyncAccess(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("impossibile leggere i nodi del cluster"), http.StatusBadGateway)
 		return
 	}
-	e.value, e.at, e.valid = res, time.Now(), true
+	e.value, e.at, e.key, e.valid = res, time.Now(), syncCacheKey(cl), true
 	writeJSON(w, res)
 }
 

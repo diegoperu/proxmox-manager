@@ -59,7 +59,11 @@ func (f *fake) run(ctx context.Context, name string, args, env []string, maxOut 
 		if !ok {
 			return Result{Exit: 1}, nil
 		}
-		return Result{Stdout: []byte("# " + host + ":22 SSH-2.0-OpenSSH\n" + host + " ssh-rsa AAAAB3Nza\n" + host + " ssh-ed25519 " + k + "\n")}, nil
+		out := host + " ssh-rsa AAAAB3Nza\n"
+		if k != "" {
+			out += host + " ssh-ed25519 " + k + "\n"
+		}
+		return Result{Stdout: []byte(out), Stderr: []byte("# " + host + ":22 SSH-2.0-OpenSSH_9.9\n")}, nil
 	case "ssh":
 		return f.ssh, f.sshErr
 	}
@@ -167,6 +171,13 @@ func TestScanParsesOnlyTheEd25519KeyOfThatHost(t *testing.T) {
 	f.hostKey["192.0.2.11"] = "!!notbase64"
 	if _, _, err := s.Scan(context.Background(), "192.0.2.11"); !errors.Is(err, ErrNoHostKey) {
 		t.Fatalf("bad key accepted: %v", err)
+	}
+	f.hostKey["192.0.2.12"] = "" // answers, but only with an RSA key
+	if _, _, err := s.Scan(context.Background(), "192.0.2.12"); !errors.Is(err, ErrNoHostKey) {
+		t.Fatalf("rsa-only host: %v", err)
+	}
+	if _, _, err := s.Scan(context.Background(), "192.0.2.13"); !errors.Is(err, ErrUnreachable) { // nothing answers
+		t.Fatalf("silent host: %v", err)
 	}
 	for _, bad := range []string{"", "node-1", "192.0.2.1;id", "-oProxyCommand=x", "0.0.0.0", "192.0.2.010", "::ffff:192.0.2.1"} {
 		before := len(f.calls)

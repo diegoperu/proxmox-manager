@@ -41,6 +41,7 @@ const assert=require('node:assert/strict');
 const controls=new Map();
 global.document={getElementById(id){if(!controls.has(id))controls.set(id,{disabled:false,hidden:false,textContent:'',innerHTML:'',replaceChildren(){this.innerHTML='';}});return controls.get(id);}};
 global.ClusterMgr={current:0};global.App={cur:'nodeprep'};global.Auth={locked:false,epoch:1};
+const accessLoads=[];global.SyncAccess={load:async fresh=>accessLoads.push(fresh),leave(){}};
 const check={id:'online',status:'ok',title:'Nodo',detail:'In linea',commands:[]};
 const report={cluster:'Mock',generated_at:1700000000,summary:{ok:1,warn:0,fail:0,unknown:0},cluster_checks:[],nodes:[{node:'node-1',online:true,version:'8.2.4',checks:[check]}],partial:[]};
 for(const bad of [null,{}, {...report,generated_at:NaN},{...report,summary:{...report.summary,fail:-1}},
@@ -56,6 +57,7 @@ global.api=(path,options)=>new Promise((resolve,reject)=>{assert.equal(options.q
 (async()=>{
  let first=NodePrep.load();assert.equal(pending[0].path,'/clusters/0/node-readiness');
  let second=NodePrep.load(true);assert.equal(pending[1].path,'/clusters/0/node-readiness?fresh=1');
+ assert.deepEqual(accessLoads,[false,true],'refresh checks SSH access with the same freshness');
  pending[0].resolve(report);await first;assert.equal(painted.length,0);assert(document.getElementById('np-recheck').disabled);
  pending[1].resolve(report);await second;assert.equal(painted.length,1);assert(!NodePrep.onlyProblems);assert(!document.getElementById('np-recheck').disabled);
  first=NodePrep.load();ClusterMgr.current=1;second=NodePrep.load();
@@ -64,10 +66,10 @@ global.api=(path,options)=>new Promise((resolve,reject)=>{assert.equal(options.q
  pending[2].reject(new Error('old error'));await first;assert.equal(NodePrep.d.cluster,'Second');assert.equal(painted.length,2);
  first=NodePrep.load();NodePrep.leave();App.cur='nodes';pending[4].resolve(report);await first;assert.equal(painted.length,2);
  App.cur='nodeprep';first=NodePrep.load();pending[5].reject({status:429,message:'busy'});await first;
- assert.equal(document.getElementById('np-body').innerHTML,"Un controllo e' gia' in corso, riprova tra qualche secondo");
+ assert.equal(document.getElementById('np-cluster').innerHTML,"Un controllo e' gia' in corso, riprova tra qualche secondo");
  assert(!document.getElementById('np-recheck').disabled);assert(document.getElementById('np-only').disabled);
  first=NodePrep.load(true);pending[6].reject(new Error('Unavailable'));await first;
- assert.equal(document.getElementById('np-body').innerHTML,'Unavailable');
+ assert.equal(document.getElementById('np-cluster').innerHTML,'Unavailable');
  first=NodePrep.load();Auth.epoch++;pending[7].resolve(report);await first;assert.equal(painted.length,2);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 `)

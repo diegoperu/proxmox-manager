@@ -247,7 +247,7 @@ def route(path, query=None):
         return [dict(storage=n, type=t, content=c, shared=sh) for n, t, c, sh in (("ceph-vm", "rbd", "images,rootdir", 1), ("datacloud-ssd", "rbd", "images,rootdir", 1), ("datacloud-hdd", "rbd", "images,rootdir", 1), ("local", "dir", "snippets,iso,backup", 0), ("local-lvm", "lvmthin", "images,rootdir", 0))]
     if p == "/cluster/status":
         return [dict(type="cluster", name="polimi-deib", nodes=4, quorate=1, version=7)] + \
-               [dict(type="node", name=n, online=1 if b["status"] == "online" else 0, id=f"node/{n}") for n, b in NODES.items()]
+               [dict(type="node", name=n, ip=f"192.0.2.{11 + i}", online=1 if b["status"] == "online" else 0, id=f"node/{n}") for i, (n, b) in enumerate(NODES.items())]
     if p.startswith("/cluster/ceph/"): return ceph_route(p[len("/cluster/ceph/"):])
     if p == "/cluster/mapping/pci": return [dict(id="gpu-a100", map=[f"node={n},path=0000:02:00,id=10de:20f1" for n in NODES]), dict(id="gpu-3090", map=["node=datacloud-node-1,path=0000:01:00"])]
     if p == "/cluster/tasks": return tasks()

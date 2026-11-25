@@ -714,6 +714,21 @@ td.spk{width:130px}
 .np-command button{flex-shrink:0}
 .np-clipboard{position:fixed;top:0;left:0;opacity:0;pointer-events:none}
 #np-partial{margin-bottom:12px;overflow-wrap:anywhere}
+.sa-summary{padding:var(--card-pad);font-size:13px;color:var(--text2);overflow-wrap:anywhere}
+.sa-summary p,.sa-summary details{margin-top:8px}
+.sa-summary summary{cursor:pointer}
+.sa-mono{font-family:var(--mono);overflow-wrap:anywhere}
+.sa-nodes{list-style:none;padding:0;margin:0}
+.sa-node{padding:14px var(--card-pad);border-top:1px solid var(--border);font-size:13px;overflow-wrap:anywhere}
+.sa-node-head,.sa-actions{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.sa-node-head strong{margin-right:auto}
+.sa-node p{margin-top:6px;color:var(--text2)}
+.sa-actions{margin-top:10px}
+.sa-scan{margin-top:12px;padding:12px;border:1px solid var(--border2);border-radius:8px}
+.sa-node .sa-danger{color:var(--red);font-weight:600}
+.ns-manager{display:flex;gap:10px;align-items:end;margin:10px 0}
+.ns-manager label{flex:1;min-width:0}
+@media(max-width:650px){.ns-manager{align-items:start;flex-direction:column}.ns-manager label{width:100%}}
 .nc .rb{min-width:0}
 .rb .track .range{left:0}
 .ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:var(--gap);margin-bottom:20px}
@@ -1221,7 +1236,12 @@ html.role-admin .role-readonly{display:none!important}
         <label class="bal-opt"><input type="checkbox" class="chk" id="np-only" onchange="NodePrep.filter(this.checked)"> Mostra solo i nodi con problemi</label>
       </div>
       <p class="cnote" id="np-partial" hidden></p>
-      <div id="np-body"></div>
+      <div id="np-body">
+        <h2 class="sec">Cluster</h2><div class="panel" id="np-cluster"></div>
+        <h2 class="sec" id="np-sync-heading">Accesso per la sincronizzazione</h2>
+        <section class="panel" id="np-sync" aria-labelledby="np-sync-heading" aria-busy="false"></section>
+        <h2 class="sec">Nodi</h2><div id="np-nodes"></div>
+      </div>
       <p class="cnote">Prossimamente: procedure guidate per aggiungere e rimuovere un nodo (per ora: docs/ONBOARDING.md)</p>
     </div>
 
@@ -4726,7 +4746,7 @@ const NodePrepHelpers={
 /* pmgr:nodeprep:end */
 const NodePrep={
   seq:0,idx:null,d:null,onlyProblems:false,filterChosen:false,
-  leave(){this.seq++;},
+  leave(){this.seq++;SyncAccess.leave();},
   current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&epoch===Auth.epoch;},
   // Reject malformed reports at the API boundary rather than presenting them as healthy.
   validate(d){
@@ -4744,10 +4764,11 @@ const NodePrep={
     const idx=ClusterMgr.current,seq=++this.seq,epoch=Auth.epoch;
     if(this.idx!==idx){this.idx=idx;this.filterChosen=false;}
     this.d=null;
-    const body=document.getElementById('np-body'),cond=document.getElementById('np-cond');
+    const body=document.getElementById('np-cluster'),cond=document.getElementById('np-cond');
     cond.textContent='Controllo dei nodi in corso…';
-    body.replaceChildren();document.getElementById('np-partial').hidden=true;
+    body.textContent='Caricamento…';document.getElementById('np-nodes').replaceChildren();document.getElementById('np-partial').hidden=true;
     document.getElementById('np-recheck').disabled=true;document.getElementById('np-only').disabled=true;
+    const access=SyncAccess.load(fresh);
     try{
       const d=this.validate(await api('/clusters/'+idx+'/node-readiness'+(fresh?'?fresh=1':''),{quiet:true,timeoutMs:120000}));
       if(!this.current(seq,idx,epoch))return;
@@ -4759,6 +4780,7 @@ const NodePrep={
       cond.textContent='Controlli non disponibili';
       body.innerHTML=errBox(e.status===429?"Un controllo e' gia' in corso, riprova tra qualche secondo":e.message,'NodePrep.load(true)');
     }finally{
+      await access;
       if(this.current(seq,idx,epoch)){
         document.getElementById('np-recheck').disabled=false;document.getElementById('np-only').disabled=!this.d;
       }
@@ -4774,17 +4796,18 @@ const NodePrep={
       row.innerHTML=`<div class="np-check-head"><h3>${esc(c.title)}</h3><span class="np-state ${c.status}"><span aria-hidden="true">${glyph}</span> ${word}</span></div><p>${esc(c.detail)}</p>`;
       if(c.commands.length){
         const label=document.createElement('p');label.textContent='Da eseguire come root su un nodo del cluster:';row.append(label);
-        for(const command of c.commands){
-          const block=document.createElement('div'),pre=document.createElement('pre'),code=document.createElement('code'),button=document.createElement('button');
-          block.className='np-command';code.textContent=command;pre.append(code);
-          button.type='button';button.className='btn bg2 sm';button.textContent='Copia';
-          button.setAttribute('aria-label','Copia comando: '+c.title);button.addEventListener('click',()=>this.copy(command,button));
-          block.append(pre,button);row.append(block);
-        }
+        for(const command of c.commands)row.append(this.command(command,c.title));
       }
       fragment.append(row);
     }
     return fragment;
+  },
+  command(command,label){
+    const block=document.createElement('div'),pre=document.createElement('pre'),code=document.createElement('code'),button=document.createElement('button');
+    block.className='np-command';code.textContent=command;pre.append(code);
+    button.type='button';button.className='btn bg2 sm';button.textContent='Copia';
+    button.setAttribute('aria-label','Copia comando: '+label);button.addEventListener('click',()=>this.copy(command,button));
+    block.append(pre,button);return block;
   },
   async copy(command,button){
     button.disabled=true;
@@ -4809,8 +4832,7 @@ const NodePrep={
     document.getElementById('np-cond').innerHTML=`<svg class="cond-ico ${state.level}" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${Dashboard.ICONS[state.level]}</svg><div><h2>${esc(state.text)}</h2><p>${esc(d.cluster)} · ${d.nodes.length} nodi · controllato alle ${esc(time)}</p></div>`;
     const partial=document.getElementById('np-partial');partial.hidden=!d.partial.length;
     partial.textContent="Non tutto e' stato leggibile: "+NodePrepHelpers.partialWords(d.partial);
-    const body=document.getElementById('np-body');body.innerHTML='<h2 class="sec">Cluster</h2><div class="panel" id="np-cluster"></div><h2 class="sec">Nodi</h2><div id="np-nodes"></div>';
-    document.getElementById('np-cluster').append(this.checks(d.cluster_checks));this.paintNodes();
+    const cluster=document.getElementById('np-cluster');cluster.replaceChildren();cluster.append(this.checks(d.cluster_checks));this.paintNodes();
   },
   paintNodes(){
     if(!this.d)return;
@@ -4824,6 +4846,174 @@ const NodePrep={
       panel.append(this.checks(n.checks));body.append(panel);
     }
     if(!body.children.length)body.innerHTML=`<div class="panel"><div class="empty">${this.onlyProblems?'Nessun nodo con problemi. Togli il filtro per vedere tutti i nodi.':'Nessun nodo disponibile.'}</div></div>`;
+  }
+};
+
+/* pmgr:syncaccess:begin */
+const SyncAccessHelpers={
+  stateWord(state){
+    const words={ok:['accesso attivo','ok'],not_pinned:['impronta da confermare','warn'],
+      auth_refused:['chiave del manager non ancora autorizzata','warn'],gate_denied:['comando ristretto rifiuta','fail'],
+      host_key_changed:['CHIAVE DEL NODO CAMBIATA','fail'],unreachable:['non raggiungibile','fail'],
+      offline:['nodo spento','warn'],no_address:['indirizzo sconosciuto','warn'],error:['errore','fail']};
+    const [word,level]=Object.hasOwn(words,state)?words[state]:words.error;
+    return {word,level};
+  },
+  shortFingerprint(fp){return typeof fp==='string'&&fp?fp.length>23?fp.slice(0,19)+'…'+fp.slice(-4):fp:'—';},
+  summaryText(result){
+    const count=v=>Number.isSafeInteger(v)&&v>=0?v:0,s=result?.summary||{};
+    return `${count(s.ok)} accessi attivi · ${count(s.todo)} da preparare · ${count(s.problem)} con problemi`;
+  }
+};
+/* pmgr:syncaccess:end */
+const SyncAccess={
+  seq:0,idx:null,d:null,busy:false,scans:new Map(),messages:new Map(),
+  leave(){this.seq++;this.d=null;this.scans.clear();this.messages.clear();},
+  current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&epoch===Auth.epoch;},
+  fingerprint(fp){return typeof fp==='string'&&/^SHA256:[A-Za-z0-9+/]{43}$/.test(fp);},
+  nodeName(node){return typeof node==='string'&&/^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/.test(node);},
+  validate(d){
+    const object=v=>v&&typeof v==='object'&&!Array.isArray(v),text=(v,max=65536)=>typeof v==='string'&&v.length<=max;
+    const count=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000,fp=v=>v===''||this.fingerprint(v);
+    if(!object(d)||!text(d.cluster,256)||!Number.isSafeInteger(d.generated_at)||d.generated_at<=0||
+      !text(d.manager_key,1024)||!fp(d.manager_fingerprint)||!text(d.verify_command,1024)||
+      !Array.isArray(d.manager_from)||d.manager_from.length>4||!d.manager_from.every(v=>text(v,15))||
+      !object(d.setup)||typeof d.setup.ready!=='boolean'||!text(d.setup.reason)||!text(d.setup.note)||
+      !Array.isArray(d.setup.commands)||d.setup.commands.length>16||!d.setup.commands.every(v=>text(v))||
+      !object(d.summary)||!['ok','todo','problem'].every(k=>count(d.summary[k]))||
+      !Array.isArray(d.nodes)||d.nodes.length>256||!d.nodes.every(n=>object(n)&&this.nodeName(n.node)&&text(n.address,45)&&
+        typeof n.online==='boolean'&&typeof n.pinned==='boolean'&&fp(n.fingerprint)&&text(n.message)&&count(n.files)&&
+        ['ok','not_pinned','auth_refused','gate_denied','host_key_changed','unreachable','offline','no_address','error'].includes(n.state)&&
+        (n.same_as_others===null||typeof n.same_as_others==='boolean'))||new Set(d.nodes.map(n=>n.node)).size!==d.nodes.length)
+      throw new Error("Risposta dell'accesso per la sincronizzazione non valida.");
+    return d;
+  },
+  validateScan(d,node,address){
+    if(!d||d.node!==node||d.address!==address||!this.fingerprint(d.fingerprint)||
+      !(d.pinned_fingerprint===''||this.fingerprint(d.pinned_fingerprint))||
+      typeof d.verify_command!=='string'||!d.verify_command||d.verify_command.length>1024)
+      throw new Error("Risposta dell'impronta non valida.");
+    return d;
+  },
+  async load(fresh=false,keep=false){
+    const idx=ClusterMgr.current,seq=++this.seq,epoch=Auth.epoch,body=document.getElementById('np-sync'),previous=keep&&this.idx===idx?this.d:null;
+    if(!keep||this.idx!==idx){this.scans.clear();this.messages.clear();}
+    this.idx=idx;this.d=null;this.busy=false;
+    body.setAttribute('aria-busy','true');body.innerHTML='<div class="empty" role="status">Controllo accesso per la sincronizzazione…</div>';
+    try{
+      const d=this.validate(await api('/clusters/'+idx+'/sync-access'+(fresh?'?fresh=1':''),{quiet:true,timeoutMs:120000}));
+      if(!this.current(seq,idx,epoch))return;
+      this.d=d;
+      // Never offer a scanned key for a node whose address changed while the report was refreshed.
+      for(const [node,scan] of this.scans)if(!d.nodes.some(n=>n.node===node&&n.address===scan.address))this.scans.delete(node);
+      this.paint();
+    }catch(e){
+      if(!this.current(seq,idx,epoch))return;
+      const message=e.status===429?"Controllo gia' in corso: riprova tra qualche secondo.":e.message;
+      if(previous){
+        // Keep scan results and action errors visible even when the follow-up status request fails.
+        this.d=previous;this.paint();
+        const error=document.createElement('div');error.innerHTML=errBox('Stato non aggiornato: '+message,'SyncAccess.load(true)');body.append(error);
+      }else body.innerHTML=errBox(message,'SyncAccess.load(true)');
+    }finally{if(this.current(seq,idx,epoch))body.setAttribute('aria-busy','false');}
+  },
+  actionButton(label,callback,disabled=false){
+    const button=document.createElement('button');button.type='button';button.className='btn bg2 sm';button.textContent=label;
+    button.setAttribute('data-min-role','admin');button.disabled=this.busy||disabled;button.addEventListener('click',callback);return button;
+  },
+  paint(){
+    const d=this.d;if(!d)return;
+    const body=document.getElementById('np-sync'),info=document.createElement('div');body.replaceChildren();info.className='sa-summary';
+    info.innerHTML=`<p role="status">${esc(SyncAccessHelpers.summaryText(d))}</p><p>Impronta della chiave del manager: <span class="sa-mono">${esc(d.manager_fingerprint||'non disponibile')}</span></p>`;
+    if(d.manager_key){
+      const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Chiave pubblica del manager';
+      details.append(summary,NodePrep.command(d.manager_key,'chiave pubblica del manager'));info.append(details);
+    }
+    const from=document.createElement('p');
+    from.textContent=d.manager_from.length?'Indirizzo del manager visto dai nodi: '+d.manager_from.join(', '):d.setup.reason;
+    info.append(from);
+    if(!d.manager_from.length){
+      const link=document.createElement('a');link.href='#/settings/infra';link.textContent='Imposta l’indirizzo in Infrastruttura';info.append(link);
+    }else if(!d.setup.ready){const reason=document.createElement('p');reason.textContent=d.setup.reason;info.append(reason);}
+    if(d.setup.ready){
+      const label=document.createElement('p');label.textContent='Da eseguire come root su ogni nodo:';info.append(label);
+      for(const command of d.setup.commands)info.append(NodePrep.command(command,'preparazione accesso per la sincronizzazione'));
+      const note=document.createElement('p');note.textContent=d.setup.note;info.append(note);
+    }
+    body.append(info);
+    const list=document.createElement('ul');list.className='sa-nodes';list.setAttribute('aria-label','Accesso per nodo');
+    for(const n of d.nodes)list.append(this.nodeRow(n));
+    if(!d.nodes.length){const empty=document.createElement('li');empty.className='empty';empty.textContent='Nessun nodo disponibile.';list.append(empty);}
+    body.append(list);
+  },
+  nodeRow(n){
+    const row=document.createElement('li'),state=SyncAccessHelpers.stateWord(n.state),glyph={ok:'✓',warn:'!',fail:'✕'}[state.level];
+    row.className='sa-node';
+    row.innerHTML=`<div class="sa-node-head"><strong>${esc(n.node)}</strong><span class="sa-mono">${esc(n.address||'indirizzo sconosciuto')}</span><span class="np-state ${state.level}"><span aria-hidden="true">${glyph}</span> ${esc(state.word)}</span></div>
+      <p>Impronta confermata: <span class="sa-mono" title="${esc(n.fingerprint)}">${esc(SyncAccessHelpers.shortFingerprint(n.fingerprint))}</span>${n.state==='ok'?' · '+esc(n.files)+' file'+(n.same_as_others===null?'':n.same_as_others?' · uguale agli altri':' · diverso dagli altri'):''}</p>`;
+    const message=document.createElement('p');message.textContent=n.message;
+    if(n.state==='host_key_changed')message.className='sa-danger';row.append(message);
+    const actions=document.createElement('div');actions.className='sa-actions';
+    actions.append(this.actionButton('Leggi impronta',()=>this.scan(n.node),!n.address));
+    if(n.pinned)actions.append(this.actionButton('Dimentica impronta',()=>this.forget(n.node)));
+    row.append(actions);
+    const scan=this.scans.get(n.node);
+    if(scan){
+      const box=document.createElement('div');box.className='sa-scan';box.setAttribute('data-min-role','admin');
+      const fp=document.createElement('p');fp.className='sa-mono';fp.textContent='Impronta ricevuta: '+scan.fingerprint;box.append(fp);
+      if(scan.pinned_fingerprint&&scan.pinned_fingerprint!==scan.fingerprint){
+        const changed=document.createElement('p');changed.className='sa-danger';
+        changed.textContent='Questa impronta è diversa da quella confermata in precedenza: '+scan.pinned_fingerprint;box.append(changed);
+      }
+      box.append(NodePrep.command(scan.verify_command,'verifica impronta di '+n.node));
+      const compare=document.createElement('p');compare.textContent='Confronta questa impronta con quella stampata dal comando sul nodo: confermala solo se sono identiche.';box.append(compare);
+      box.append(this.actionButton('Conferma impronta',()=>this.pin(n.node)));row.append(box);
+    }
+    if(this.messages.has(n.node)){
+      const error=document.createElement('p');error.className='sa-danger';error.setAttribute('role','alert');error.textContent=this.messages.get(n.node);row.append(error);
+    }
+    return row;
+  },
+  target(node){return this.d?.nodes.find(n=>n.node===node);},
+  allowed(){return !this.busy&&this.idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&canDo(Auth.role,'admin');},
+  async scan(node){
+    const target=this.target(node);if(!this.allowed()||!target?.address)return;
+    await this.perform(node,'/scan',{method:'POST',body:JSON.stringify({node})},data=>{
+      this.scans.set(node,this.validateScan(data,node,target.address));
+    });
+  },
+  pin(node){
+    const scan=this.scans.get(node);if(!this.allowed()||!scan||!this.target(node))return;
+    const seq=this.seq,idx=this.idx,epoch=Auth.epoch;
+    askConfirm({minRole:'admin',title:`Confermare l'impronta di ${node}?`,level:'warn',okLabel:'Conferma impronta',
+      lines:[scan.fingerprint,'Conferma solo dopo aver confrontato l’impronta sul nodo.']},()=>{
+      if(!this.current(seq,idx,epoch)||!this.allowed())return;
+      return this.perform(node,'/pin',{method:'POST',body:JSON.stringify({node,fingerprint:scan.fingerprint})},()=>this.scans.delete(node));
+    });
+  },
+  forget(node){
+    const target=this.target(node);if(!this.allowed()||!target?.pinned)return;
+    const seq=this.seq,idx=this.idx,epoch=Auth.epoch;
+    askConfirm({minRole:'admin',title:`Dimenticare l'impronta di ${node}?`,level:'danger',okLabel:'Dimentica impronta',
+      lines:[target.fingerprint],consequence:'L’accesso resterà bloccato fino alla conferma di una nuova impronta.'},()=>{
+      if(!this.current(seq,idx,epoch)||!this.allowed())return;
+      return this.perform(node,'/pin/'+encodeURIComponent(node),{method:'DELETE'},()=>this.scans.delete(node));
+    });
+  },
+  async perform(node,path,options,accept){
+    if(!this.allowed())return;
+    const seq=this.seq,idx=this.idx,epoch=Auth.epoch;
+    this.busy=true;this.messages.delete(node);this.scans.delete(node);this.paint();
+    try{
+      const data=await api('/clusters/'+idx+'/sync-access'+path,{...options,quiet:true,timeoutMs:120000});
+      if(!this.current(seq,idx,epoch))return;
+      accept(data);
+    }catch(e){
+      if(!this.current(seq,idx,epoch))return;
+      this.messages.set(node,e.message);
+    }finally{
+      if(this.current(seq,idx,epoch)){this.busy=false;await this.load(true,true);}
+    }
   }
 };
 
@@ -7225,7 +7415,7 @@ const NetworkSettingsUI={
     try{return JSON.stringify(validateNetwork(value));}catch(e){return JSON.stringify(value);}
   },
   read(validate=true){
-    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim()};
+    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim(),manager_from:[...document.querySelectorAll('#ns-manager-from [data-manager-from]')].map(row=>row.querySelector('input').value.trim())};
     return validate?validateNetwork(value):value;
   },
   isDirty(){return this.baseline!==null&&this.baseline!==this.serialize(this.read(false));},
@@ -7234,6 +7424,7 @@ const NetworkSettingsUI={
     const dirty=this.isDirty();
     document.getElementById('ns-savebar').hidden=!dirty;document.getElementById('ns-form').classList.toggle('has-unsaved',dirty);
     document.getElementById('ns-add').disabled=document.querySelectorAll('#ns-networks [data-network]').length>=16;
+    document.getElementById('ns-manager-add').disabled=document.querySelectorAll('#ns-manager-from [data-manager-from]').length>=4;
     if(!dirty)this.saveError('');
   },
   syncActions(){for(const id of ['ns-save','ns-cancel']){const button=document.getElementById(id);if(button)button.disabled=this.saving||this.reloading;}},
@@ -7254,6 +7445,9 @@ const NetworkSettingsUI={
   row(value={}){
     return `<div class="ns-network" data-network><label class="rs-field"><span>Rete IPv4 (CIDR)</span><input class="inp" data-key="cidr" maxlength="20" placeholder="10.75.4.0/24" value="${esc(value.cidr??'')}" spellcheck="false" autocomplete="off"></label><label class="rs-field"><span>Gateway</span><input class="inp" data-key="gateway" maxlength="45" placeholder="10.75.4.254" value="${esc(value.gateway??'')}" spellcheck="false" autocomplete="off"></label><button data-min-role="admin" type="button" class="btn bg2 sm" data-remove>Rimuovi rete</button></div>`;
   },
+  managerRow(value=''){
+    return `<div class="ns-manager" data-manager-from><label class="rs-field"><span>Indirizzo IPv4 del manager</span><input class="inp" maxlength="15" value="${esc(value)}" placeholder="es. 192.0.2.10" aria-describedby="ns-manager-help" spellcheck="false" autocomplete="off"></label><button data-min-role="admin" type="button" class="btn bg2 sm" data-manager-remove>Rimuovi indirizzo</button></div>`;
+  },
   render(settings){
     document.getElementById('ns-editor').innerHTML=`<form id="ns-form" novalidate><fieldset class="role-fields">
       <details class="rs-section" open><summary>Rete delle VM nuove</summary>
@@ -7262,6 +7456,11 @@ const NetworkSettingsUI={
         <button data-min-role="admin" type="button" class="btn bg2 sm" id="ns-add" data-add>Aggiungi rete</button>
         <div class="rs-grid"><label class="rs-field"><span>DNS (fino a 3, separati da spazi)</span><input class="inp" id="ns-dns" maxlength="137" value="${esc(settings.dns.join(' '))}" placeholder="es. 1.1.1.1 9.9.9.9" spellcheck="false" autocomplete="off"></label>
         <label class="rs-field"><span>Dominio di ricerca (opzionale)</span><input class="inp" id="ns-search" maxlength="253" value="${esc(settings.search_domain)}" placeholder="es. example.org" spellcheck="false" autocomplete="off"></label></div>
+      </details>
+      <details class="rs-section" open><summary>Indirizzo del manager visto dai nodi</summary>
+        <p class="hint" id="ns-manager-help">L'indirizzo da cui i nodi vedono arrivare il manager (se c'e' un router in mezzo, quello del router). Serve al comando di preparazione dei nodi.</p>
+        <div id="ns-manager-from">${(settings.manager_from??[]).map(value=>this.managerRow(value)).join('')}</div>
+        <button data-min-role="admin" type="button" class="btn bg2 sm" id="ns-manager-add" data-manager-add>Aggiungi indirizzo (fino a 4)</button>
       </details>
       <div class="rs-savebar" id="ns-savebar" role="region" aria-label="Salvataggio delle impostazioni di rete" hidden>
         <span class="rs-savebar-status" role="status">Modifiche non salvate</span>
@@ -7278,6 +7477,12 @@ const NetworkSettingsUI={
   click(e){
     const button=e.target.closest('button');if(!button)return;
     if(button.hasAttribute('data-cancel')){this.cancel();return;}
+    if(button.hasAttribute('data-manager-remove')){button.closest('[data-manager-from]').remove();this.updateDirty();document.getElementById('ns-manager-add').focus();return;}
+    if(button.hasAttribute('data-manager-add')){
+      const rows=document.getElementById('ns-manager-from');
+      if(rows.querySelectorAll('[data-manager-from]').length>=4)return;
+      rows.insertAdjacentHTML('beforeend',this.managerRow());this.updateDirty();rows.lastElementChild.querySelector('input').focus();return;
+    }
     if(button.hasAttribute('data-remove')){button.closest('[data-network]').remove();this.updateDirty();document.getElementById('ns-add').focus();return;}
     if(button.hasAttribute('data-add')){
       const rows=document.getElementById('ns-networks');

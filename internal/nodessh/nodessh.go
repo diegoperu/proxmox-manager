@@ -274,6 +274,10 @@ func (s *Store) Scan(ctx context.Context, host string) (b64, fingerprint string,
 			return f[2], Fingerprint(blob), nil
 		}
 	}
+	// ssh-keyscan prints "# <host>:22 SSH-2.0-..." on stderr when the SSH server answered; without it nothing answered.
+	if !strings.Contains(string(res.Stderr), "# "+host+":") && !strings.Contains(string(res.Stdout), "# "+host+":") {
+		return "", "", ErrUnreachable
+	}
 	return "", "", ErrNoHostKey
 }
 
