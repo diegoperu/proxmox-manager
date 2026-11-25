@@ -175,10 +175,7 @@ func readinessPermissions(c readinessAPI, storages []string, token string) (read
 		}
 		for _, p := range privileges {
 			if data[actual][p] != 1 && !(strings.HasPrefix(p, "VM.GuestAgent.") && data[actual]["VM.Monitor"] == 1) {
-				item := p
-				if path != "/" {
-					item += " (" + actual + ")"
-				}
+				item := p + " (" + actual + ")"
 				missing = append(missing, item)
 			}
 		}
@@ -188,7 +185,7 @@ func readinessPermissions(c readinessAPI, storages []string, token string) (read
 		check.Detail = "Privilegi mancanti: " + strings.Join(missing, ", ") + "."
 		for _, m := range missing {
 			if strings.HasPrefix(m, "Datastore.AllocateSpace") {
-				check.Detail += " senza questo privilegio Proxmox nasconde snippet e ISO negli elenchi dello storage"
+				check.Detail += " Senza questo privilegio Proxmox nasconde snippet e ISO negli elenchi dello storage."
 				break
 			}
 		}

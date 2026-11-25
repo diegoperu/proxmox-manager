@@ -8,12 +8,19 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 18006
 rnd = random.Random(42)
 NOW = int(time.time())
 GB = 1024 ** 3
+READINESS_SCENARIO = os.environ.get("READINESS_SCENARIO", "ok")
+READINESS_PRIVILEGES = (
+    "Sys.Audit Sys.PowerMgmt VM.Audit VM.PowerMgmt VM.Snapshot VM.Migrate VM.Clone VM.Allocate "
+    "VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Cloudinit VM.Config.Options "
+    "VM.Config.HWType VM.GuestAgent.Audit VM.GuestAgent.Unrestricted Datastore.Audit Datastore.AllocateSpace "
+    "Pool.Audit Mapping.Audit Mapping.Use SDN.Audit SDN.Use"
+).split()
 
 NODES = {
     "datacloud-node-1": dict(maxmem=256 * GB, cores=32, status="online", mem=0.58, cpu=0.31, disk=0.46),
     "datacloud-node-2": dict(maxmem=384 * GB, cores=48, status="online", mem=0.63, cpu=0.44, disk=0.52),
     "datacloud-node-3": dict(maxmem=256 * GB, cores=32, status="online", mem=0.92, cpu=0.37, disk=0.71),
-    "datacloud-node-4": dict(maxmem=256 * GB, cores=32, status="offline", mem=0, cpu=0, disk=0),
+    "datacloud-node-4": dict(maxmem=256 * GB, cores=32, status="online", mem=0.25, cpu=0.05, disk=0.2),
 }
 # processori diversi come nel cluster reale: le VM con cpu=host si spostano a caldo solo tra node-1 e node-3
 # flag CPU (accorciati): una VM con cpu=host va a caldo solo verso un nodo che li ha tutti
@@ -226,9 +233,15 @@ def ceph_route(rest):
     return None
 
 
-def route(path):
+def route(path, query=None):
     p = path.rstrip("/")
     segs = p.split("/")
+    if p == "/access/permissions":
+        target = (query or {}).get("path", ["/"])[0]
+        privileges = {name: 1 for name in READINESS_PRIVILEGES}
+        if READINESS_SCENARIO == "problems":
+            privileges.pop("Datastore.AllocateSpace")
+        return {target: privileges}
     if p == "/cluster/resources": return resources()
     if p == "/storage":  # cluster storage configuration (Settings: storage classes)
         return [dict(storage=n, type=t, content=c, shared=sh) for n, t, c, sh in (("ceph-vm", "rbd", "images,rootdir", 1), ("datacloud-ssd", "rbd", "images,rootdir", 1), ("datacloud-hdd", "rbd", "images,rootdir", 1), ("local", "dir", "snippets,iso,backup", 0), ("local-lvm", "lvmthin", "images,rootdir", 0))]
@@ -250,6 +263,9 @@ def route(path):
         rest = "/".join(segs[3:])
         if rest.startswith("ceph/"): return ceph_route(rest[len("ceph/"):])
         b = NODES[node]
+        if rest == "time":
+            offset = 45 if READINESS_SCENARIO == "problems" and node == "datacloud-node-3" else 0
+            return dict(time=int(time.time()) + offset, timezone="Europe/Rome")
         if rest == "rrddata": return rrd(node, "day")
         if rest == "status":
             return dict(cpu=b["cpu"], memory=dict(used=int(b["maxmem"] * b["mem"]), total=b["maxmem"]), uptime=86400 * 12,
@@ -264,15 +280,20 @@ def route(path):
             from urllib.parse import unquote
             up = unquote(rest[len("tasks/"):-len("/status")]); MIG_TASKS[up] = MIG_TASKS.get(up, 0) + 1
             return dict(status="running") if MIG_TASKS[up] <= 2 else dict(status="stopped", exitstatus="OK")
-        if rest.startswith("storage/") and rest.endswith("/content"):  # snippet di cloud-init: ci sono sui nodi 1 e 2, non sul 3
-            if node in ("datacloud-node-1", "datacloud-node-2") and rest == "storage/local/content":
+        if rest.startswith("storage/") and rest.endswith("/content"):  # scenario problemi: file snippet assente sul nodo 2
+            if rest == "storage/local/content" and not (READINESS_SCENARIO == "problems" and node == "datacloud-node-2"):
                 return [dict(volid="local:snippets/vendor.yaml", content="snippets", format="snippet", size=1200)]
             return []
         if rest == "qemu": return [x for x in VMS if x["node"] == node and x["type"] == "qemu"]
         if rest == "lxc": return [x for x in VMS if x["node"] == node and x["type"] == "lxc"]
         if rest == "storage":
-            return [dict(storage="local-lvm", type="lvmthin", total=900 * GB, used=int(900 * GB * b["disk"]), avail=900 * GB, active=1, content="images,rootdir")]
-        if rest == "network": return [dict(iface="vmbr0", type="bridge", active=1, address="10.75.4.%d" % (10 + len(node)))]
+            content = "iso,backup" if READINESS_SCENARIO == "problems" and node == "datacloud-node-1" else "snippets,iso,backup"
+            return [dict(storage="local-lvm", type="lvmthin", total=900 * GB, used=int(900 * GB * b["disk"]), avail=900 * GB, active=1, content="images,rootdir"),
+                    dict(storage="local", type="dir", total=100 * GB, used=10 * GB, avail=90 * GB, active=1, enabled=1, content=content),
+                    dict(storage="ceph-vm", type="rbd", total=5000 * GB, used=1000 * GB, avail=4000 * GB, active=1, enabled=1, shared=1, content="images,rootdir")]
+        if rest == "network":
+            if READINESS_SCENARIO == "problems" and node == "datacloud-node-3": return []
+            return [dict(iface="vmbr0", type="bridge", active=1, address="10.75.4.%d" % (10 + len(node)))]
         seg = segs[3:]
         if len(seg) >= 3 and seg[0] in ("qemu", "lxc"):
             v = next((x for x in VMS if x["vmid"] == int(seg[1])), None)
@@ -291,6 +312,7 @@ def route(path):
                     cfg["template"] = 1
                     cfg["virtio0"] = f"ceph-vm:base-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"
                     cfg["cicustom"] = "vendor=local:snippets/vendor.yaml"  # file che sta sul nodo e il clone non copia
+                    cfg["net0"] = "virtio=02:00:00:00:00:01,bridge=vmbr0"
                 if seg[0] == "qemu" and not v.get("template"): cfg["virtio0"] = f"ceph-vm:vm-{v['vmid']}-disk-0,size={v['maxdisk'] // GB}G"; cfg["virtio1"] = f"ceph-vm:vm-{v['vmid']}-disk-1,size=20G"; cfg["ide2"] = f"ceph-vm:vm-{v['vmid']}-cloudinit,media=cdrom"
                 if v.get("mem_mb"): cfg["memory"] = v["mem_mb"]
                 if v.get("maxcpu"): cfg["cores"] = v["maxcpu"]
@@ -381,7 +403,7 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
             return
-        data = route(path[len("/api2/json"):])
+        data = route(path[len("/api2/json"):], parse_qs(urlparse(self.path).query))
         if data == "ERR500":  # cluster senza Ceph, come HOSTING
             body = json.dumps({"data": None, "message": "binary not installed: /usr/bin/ceph-mon\n"}).encode()
             self.send_response(500); self.send_header("Content-Type", "application/json")
