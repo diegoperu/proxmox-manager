@@ -45,6 +45,8 @@ func TestEveryRouteHasAnAccessRule(t *testing.T) {
 // The roles of D136 on representative routes.
 func TestRoleTableMatchesD136(t *testing.T) {
 	want := map[string]access{
+		"GET /api/clusters/{idx}/node-add": reader, "GET /api/clusters/{idx}/node-removal": reader,
+		"DELETE /api/clusters/{idx}/sync-access/pin/{node}": adminTOTP,
 		"GET /api/vms": reader, "POST /api/nodes/{node}/qemu/{vmid}/action/{action}": operator,
 		"GET /api/nodes/{node}/qemu/{vmid}/termproxy-ws": operator, "POST /api/batch": operator,
 		"POST /api/provision/job": operator, "DELETE /api/nodes/{node}/qemu/{vmid}": adminTOTP,

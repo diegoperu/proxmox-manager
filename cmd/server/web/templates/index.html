@@ -694,6 +694,16 @@ td.spk{width:130px}
 .nc-s{flex-basis:100%;font-size:12px;color:var(--text3);margin-top:-8px}
 .nc-m{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .nc-chk{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0}
+.ns-warning{padding:var(--card-pad);margin-bottom:16px;border:1px solid var(--red);border-radius:var(--r-card);color:var(--red);font-size:13px;overflow-wrap:anywhere}
+.ns-steps{list-style:none;padding:0;margin:0}
+.ns-steps .np-check{border:0}
+.ns-steps ul{padding-left:20px;margin-top:8px;font-size:13px;color:var(--text2)}
+.ns-steps details{margin-top:8px;font-size:13px;color:var(--text2)}
+.ns-steps summary{cursor:pointer}
+.ns-steps a,.ns-facts a{color:var(--accent)}
+.ns-facts{padding:var(--card-pad);overflow-wrap:anywhere;font-size:13px}
+.ns-facts p{margin-top:6px}
+#nr-select{max-width:100%;min-width:0}
 /* Preparazione nodi: testo e comandi restano leggibili anche su schermi stretti. */
 #page-nodeprep .cond p{font-size:13px}
 #page-nodeprep .cond>div{min-width:0;overflow-wrap:anywhere}
@@ -1124,6 +1134,8 @@ html.role-admin .role-readonly{display:none!important}
     <button type="button" class="ni" data-page="nodeprep">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 12 3 3 5-6"/></svg>Preparazione nodi
     </button>
+    <button type="button" class="ni" data-page="nodeadd"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 7v10M7 12h10"/></svg>Aggiungi nodo</button>
+    <button type="button" class="ni" data-page="noderemove"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 12h10"/></svg>Rimuovi nodo</button>
     <div class="nav-sec">Analisi</div>
     <button type="button" class="ni" data-page="reports">
       <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Report
@@ -1249,7 +1261,22 @@ html.role-admin .role-readonly{display:none!important}
         <section class="panel" id="np-delivery" aria-labelledby="np-delivery-heading" aria-busy="false"></section>
         <h2 class="sec">Nodi</h2><div id="np-nodes"></div>
       </div>
-      <p class="cnote">Prossimamente: procedure guidate per aggiungere e rimuovere un nodo (per ora: docs/ONBOARDING.md)</p>
+      <p class="cnote"><a href="#/nodeadd">Aggiungi nodo</a> · <a href="#/noderemove">Rimuovi nodo</a></p>
+    </div>
+
+    <div class="page" id="page-nodeadd">
+      <p class="cnote">Il manager legge i controlli e mostra i comandi. Eseguili manualmente come root sul nodo indicato.</p>
+      <div class="toolbar"><button type="button" class="btn bg2 sm" id="na-recheck">Ricontrolla</button></div>
+      <div id="na-body" aria-live="polite" aria-busy="false"></div>
+    </div>
+    <div class="page" id="page-noderemove">
+      <p class="ns-warning" role="note">La rimozione di un nodo e' definitiva. Segui i passi nell'ordine: ogni passo si sblocca quando il precedente e' fatto.</p>
+      <div class="toolbar">
+        <label for="nr-select">Nodo da rimuovere</label><select class="inp" id="nr-select"><option value="">Scegli un nodo</option></select>
+        <button type="button" class="btn bg2 sm" id="nr-check" disabled>Controlla</button>
+        <button type="button" class="btn bg2 sm" id="nr-recheck" hidden>Ricontrolla</button>
+      </div>
+      <div id="nr-body" aria-live="polite" aria-busy="false"></div>
     </div>
 
     <!-- ██ NODES ██ -->
@@ -3142,7 +3169,7 @@ const Users={
 // ════════════════════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════════════════════
-const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',nodeprep:'Preparazione nodi',reports:'Report',settings:'Impostazioni',users:'Utenti',audit:'Registro'};
+const PMETA={dashboard:'Panoramica',nodes:'Nodi',vms:'VM & Container',provision:'Nuova VM',batch:'Batch',cluster:'Cluster',ceph:'Ceph',gpu:'GPU',groups:'Gruppi',balance:'Bilanciamento',nodeprep:'Preparazione nodi',nodeadd:'Aggiungi nodo',noderemove:'Rimuovi nodo',reports:'Report',settings:'Impostazioni',users:'Utenti',audit:'Registro'};
 // Indirizzi nell'hash (memoria della navigazione): #/vms, #/nodes, ... e #/vm/<nodo>/<vmid>/<qemu|lxc> per il pannello di una VM.
 // Ogni valore letto dall'hash e' validato a whitelist prima di essere usato.
 const Route={
@@ -3252,6 +3279,8 @@ const App={
     document.getElementById('ptitle').textContent=PMETA[p]||p;
     if(p!=='ceph')Ceph.stop();
     if(App.cur==='nodeprep'&&p!=='nodeprep')NodePrep.leave();
+    if(App.cur==='nodeadd'&&p!=='nodeadd')NodeAdd.leave();
+    if(App.cur==='noderemove'&&p!=='noderemove')NodeRemove.leave();
     App.cur=p; if(!opts.silent)Route.push(p==='settings'?Settings.hash(Settings.tab):'#/'+p);
     App.refresh();
     AutoRefreshUI.reset();
@@ -3278,6 +3307,8 @@ const App={
     if(p==='groups')    Groups.load();
     if(p==='balance')   Balance.load();
     if(p==='nodeprep')  NodePrep.load();
+    if(p==='nodeadd')   NodeAdd.load();
+    if(p==='noderemove')NodeRemove.load();
     if(p==='gpu')       Gpu.load();
     else                Gpu.probe();
     if(p==='settings')  Settings.load();
@@ -3474,6 +3505,7 @@ const Palette={
       provision:'provisioning clone template cloud-init crea nuova',batch:'operazioni di massa azioni multiple',cluster:'gestione nodi riavvio spegnimento',ceph:'ceph storage osd pool rbd salute capacita meteo',gpu:'gpu scheda video nvidia assegna passthrough pci mapping',
       balance:'bilanciamento pareggio carico ram migrazione sposta vm nodo simulazione spegni nodo',
       nodeprep:'nodo nuovo snippet onboarding preparazione',
+      nodeadd:'nuovo nodo onboarding aggiungere ingresso cluster',noderemove:'togliere nodo delnode rimuovere rimozione cluster',
       groups:'gruppo gruppi tag etichetta progetto laboratorio proprietario',
       reports:'report esporta excel storico grafici',settings:'impostazioni aspetto tema densita compatta token cluster'};
     const items=Object.entries(PMETA).filter(([k])=>RoleUI.canPage(k)&&(k!=='ceph'||Ceph.isAvail())&&(k!=='gpu'||Gpu.isAvail())).map(([k,l])=>({group:'Pagine',label:l,sub:'',kw:KW[k]||'',minRole:RoleUI.pageRole(k),run:()=>App.nav(k)}));
@@ -4854,6 +4886,183 @@ const NodePrep={
       panel.append(this.checks(n.checks));body.append(panel);
     }
     if(!body.children.length)body.innerHTML=`<div class="panel"><div class="empty">${this.onlyProblems?'Nessun nodo con problemi. Togli il filtro per vedere tutti i nodi.':'Nessun nodo disponibile.'}</div></div>`;
+  }
+};
+
+/* pmgr:nodesteps:begin */
+const NodeSteps={
+  stateWord(status){
+    const words={ok:'fatto',todo:'da fare',blocked:'in attesa del passo precedente',unknown:'non verificabile'};
+    return Object.hasOwn(words,status)?words[status]:'non verificabile';
+  },
+  firstOpenStep(steps){return Array.isArray(steps)?steps.findIndex(s=>s.status!=='ok'):-1;},
+  visibleCommands(steps,index){
+    if(!Array.isArray(steps)||index!==this.firstOpenStep(steps))return [];
+    return Array.isArray(steps[index]?.commands)?steps[index].commands:[];
+  }
+};
+/* pmgr:nodesteps:end */
+const NodeStepsView={
+  text(v,max=65536){return typeof v==='string'&&v.length<=max;},
+  validateSteps(steps){
+    if(!Array.isArray(steps)||steps.length>16||!steps.every(s=>s&&this.text(s.id,64)&&this.text(s.title,256)&&this.text(s.detail)&&
+      ['ok','todo','blocked','unknown'].includes(s.status)&&['ok','todo','unknown'].includes(s.check_status)&&
+      Array.isArray(s.items)&&s.items.length<=10000&&s.items.every(v=>this.text(v))&&
+      Array.isArray(s.commands)&&s.commands.length<=32768&&s.commands.every(v=>this.text(v))&&
+      (s.link===undefined||['#/balance','#/cluster','#/nodeprep'].includes(s.link))))throw new Error('Passi non validi.');
+    return steps;
+  },
+  render(steps,ordered,removed=false){
+    const list=document.createElement('ol');list.className='ns-steps';
+    steps.forEach((step,index)=>{
+      const row=document.createElement('li'),head=document.createElement('div'),title=document.createElement('h2'),state=document.createElement('span'),detail=document.createElement('p');
+      row.className='panel np-check';head.className='np-check-head';
+      title.textContent=(removed?11:index+1)+'. '+step.title;
+      const level=step.status==='ok'?'ok':step.status==='todo'?'warn':'';
+      state.className='np-state '+level;
+      const glyph=({ok:'✓',todo:'!',blocked:'◷',unknown:'?'})[step.status]||'?';
+      state.textContent=glyph+' '+NodeSteps.stateWord(step.status);head.append(title,state);
+      detail.textContent=step.detail;row.append(head,detail);
+      if(step.items.length){
+        const items=document.createElement('ul');for(const item of step.items){const li=document.createElement('li');li.textContent=item;items.append(li);}row.append(items);
+      }
+      if(step.link){const link=document.createElement('a');link.href=step.link;link.textContent=({'#/balance':'Apri Bilanciamento','#/cluster':'Apri Cluster','#/nodeprep':'Apri Preparazione nodi'})[step.link];row.append(link);}
+      const commands=ordered?NodeSteps.visibleCommands(steps,index):step.commands;
+      for(const command of commands)row.append(NodePrep.command(command,step.title));
+      if(ordered&&step.commands.length&&!commands.length&&step.status!=='ok'){
+        const later=document.createElement('details'),summary=document.createElement('summary');
+        summary.textContent='Comandi disponibili dopo i passi precedenti';later.append(summary);row.append(later);
+      }
+      if(!ordered&&step.id==='storage_sync'){
+        for(const [id,label] of [['np-nodes','Storage e snippet'],['np-sync-heading','Accesso per la sincronizzazione'],['np-delivery-heading','Sincronizza script e snippet']]){
+          const line=document.createElement('p'),link=document.createElement('a');link.href='#/nodeprep';link.textContent=label;
+          link.addEventListener('click',event=>{event.preventDefault();App.nav('nodeprep');document.getElementById(id)?.scrollIntoView({block:'start'});});line.append(link);row.append(line);
+        }
+      }
+      list.append(row);
+    });
+    return list;
+  }
+};
+const NodeAdd={
+  seq:0,idx:null,bound:false,
+  leave(){this.seq++;},
+  current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeadd'&&!Auth.locked&&epoch===Auth.epoch;},
+  validate(d){
+    const text=NodeStepsView.text;
+    if(!d||!text(d.cluster)||!d.facts||!text(d.facts.version)||typeof d.facts.versions_match!=='boolean'||
+      !['unknown','none','reef','squid','tentacle'].includes(d.facts.ceph_release)||!Array.isArray(d.facts.addresses)||d.facts.addresses.length>256||!d.facts.addresses.every(v=>text(v,45))||
+      !Array.isArray(d.facts.versions)||d.facts.versions.length>256||!d.facts.versions.every(v=>v&&text(v.node,64)&&text(v.version,32)&&text(v.address,45))||
+      !Array.isArray(d.facts.issues)||d.facts.issues.length>1024||!d.facts.issues.every(v=>text(v))||
+      !Array.isArray(d.new_nodes)||d.new_nodes.length>256||!d.new_nodes.every(n=>n&&text(n.node,64)&&['todo','unknown'].includes(n.state)&&text(n.detail))||
+      !/^[a-f0-9]{64}$/.test(d.script_sha256))throw new Error('Risposta aggiunta nodo non valida.');
+    NodeStepsView.validateSteps(d.steps);return d;
+  },
+  async load(){
+    if(!this.bound){this.bound=true;document.getElementById('na-recheck').addEventListener('click',()=>this.load());}
+    const idx=ClusterMgr.current,seq=++this.seq,epoch=Auth.epoch,body=document.getElementById('na-body'),button=document.getElementById('na-recheck');this.idx=idx;
+    body.textContent='Lettura del cluster e dei controlli…';body.setAttribute('aria-busy','true');button.disabled=true;
+    try{
+      const d=this.validate(await api('/clusters/'+idx+'/node-add',{quiet:true,timeoutMs:180000}));
+      if(!this.current(seq,idx,epoch))return;
+      this.paint(d);
+    }catch(e){if(this.current(seq,idx,epoch))body.textContent=e.status===429?"Un controllo e' gia' in corso: riprova tra qualche secondo.":e.message;}
+    finally{if(this.current(seq,idx,epoch)){button.disabled=false;body.setAttribute('aria-busy','false');}}
+  },
+  paint(d){
+    const body=document.getElementById('na-body');body.replaceChildren();
+    const facts=document.createElement('section'),title=document.createElement('h2');facts.className='panel ns-facts';title.textContent='Cluster '+d.cluster;facts.append(title);
+    for(const line of ['Proxmox: '+(d.facts.version||'versione comune non verificabile'),'Ceph: '+({none:'non configurato',unknown:'non verificabile'}[d.facts.ceph_release]||d.facts.ceph_release),
+      'Indirizzi per pvecm add: '+(d.facts.addresses.join(', ')||'nessuno disponibile'),...d.facts.versions.map(v=>v.node+': Proxmox '+(v.version||'non verificabile')+' · '+(v.address||'indirizzo non disponibile')),...d.facts.issues]){
+      const p=document.createElement('p');p.textContent=line;facts.append(p);
+    }
+    body.append(facts,NodeStepsView.render(d.steps,false));
+    const pending=document.createElement('section'),heading=document.createElement('h2');pending.className='panel ns-facts';heading.textContent='Nodi in aggiunta';pending.append(heading);
+    if(!d.new_nodes.length){const p=document.createElement('p');p.textContent='Tutti i nodi presenti superano i controlli di preparazione.';pending.append(p);}
+    for(const n of d.new_nodes){const p=document.createElement('p');p.textContent=n.node+' · '+NodeSteps.stateWord(n.state)+': '+n.detail;pending.append(p);}
+    const link=document.createElement('a');link.href='#/nodeprep';link.textContent='Apri Preparazione nodi';pending.append(link);body.append(pending);
+  }
+};
+const NodeRemove={
+  seq:0,idx:null,d:null,gone:false,busy:false,bound:false,
+  leave(){this.seq++;this.busy=false;},
+  current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='noderemove'&&!Auth.locked&&epoch===Auth.epoch;},
+  nodeName(v){return typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/.test(v);},
+  validate(d,node){
+    if(!d||!NodeStepsView.text(d.cluster)||d.node!==node||!this.nodeName(d.node)||!NodeStepsView.text(d.address,45)||typeof d.pinned!=='boolean'||typeof d.pin_known!=='boolean')throw new Error('Risposta rimozione nodo non valida.');
+    NodeStepsView.validateSteps(d.steps);
+    if(d.steps.map(s=>s.id).join(',')!=='guests,ha,replication,storage,pci_mapping,ceph_osd,ceph_services,power_off,quorum,delnode,cleanup')throw new Error('Ordine dei passi non valido.');
+    let locked=false;
+    for(const step of d.steps){if(locked&&step.status!=='blocked'||!locked&&step.status!==step.check_status)throw new Error('Blocco dei passi non valido.');if(step.check_status!=='ok')locked=true;}
+    return d;
+  },
+  controls(){
+    const select=document.getElementById('nr-select');select.disabled=this.busy||this.gone;
+    document.getElementById('nr-check').disabled=this.busy||this.gone||!this.nodeName(select.value);
+    const recheck=document.getElementById('nr-recheck');recheck.hidden=!this.d||this.gone;recheck.disabled=this.busy;
+    document.getElementById('nr-body').setAttribute('aria-busy',String(this.busy));
+  },
+  async load(){
+    if(!this.bound){
+      this.bound=true;document.getElementById('nr-check').addEventListener('click',()=>this.check());document.getElementById('nr-recheck').addEventListener('click',()=>this.check());
+      document.getElementById('nr-select').addEventListener('change',()=>{this.seq++;this.d=null;this.gone=false;document.getElementById('nr-body').replaceChildren();this.controls();});
+    }
+    const idx=ClusterMgr.current,seq=++this.seq,epoch=Auth.epoch,body=document.getElementById('nr-body'),select=document.getElementById('nr-select');
+    this.idx=idx;this.d=null;this.gone=false;this.busy=true;select.replaceChildren();select.value='';body.textContent='Lettura dei nodi…';this.controls();
+    try{
+      const nodes=await api('/nodes?cluster='+idx,{quiet:true,timeoutMs:120000});
+      if(!this.current(seq,idx,epoch))return;
+      if(!Array.isArray(nodes)||nodes.length>256||!nodes.every(n=>n&&this.nodeName(n.node)))throw new Error('Elenco nodi non valido.');
+      const option=document.createElement('option');option.value='';option.textContent='Scegli un nodo';select.append(option);
+      for(const name of [...new Set(nodes.map(n=>n.node))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}))){const o=document.createElement('option');o.value=name;o.textContent=name;select.append(o);}
+      body.textContent=nodes.length?'Scegli il nodo e premi Controlla.':'Nessun nodo nel cluster.';
+    }catch(e){if(this.current(seq,idx,epoch))body.textContent=e.message;}
+    finally{if(this.current(seq,idx,epoch)){this.busy=false;this.controls();}}
+  },
+  async check(){
+    const node=document.getElementById('nr-select').value;if(this.busy||this.gone||!this.nodeName(node))return;
+    const idx=this.idx,seq=++this.seq,epoch=Auth.epoch,previous=this.d,body=document.getElementById('nr-body');
+    this.busy=true;body.textContent='Controlli di rimozione in corso…';this.controls();
+    try{
+      const d=this.validate(await api('/clusters/'+idx+'/node-removal?node='+encodeURIComponent(node),{quiet:true,timeoutMs:180000}),node);
+      if(!this.current(seq,idx,epoch))return;
+      this.d=d;this.paint();
+    }catch(e){
+      if(!this.current(seq,idx,epoch))return;
+      // Only a report that actually reached delnode may turn a 404 into success.
+      if(e.status===404&&e.body?.reason==='node_not_member'&&e.body.cluster===previous?.cluster&&previous?.node===node&&previous.steps[NodeSteps.firstOpenStep(previous.steps)]?.id==='delnode'){
+        this.d=previous;this.gone=true;this.paint();
+      }else{this.d=null;body.textContent=e.status===429?"Un controllo e' gia' in corso: riprova tra qualche secondo.":e.message;}
+    }finally{if(this.current(seq,idx,epoch)){this.busy=false;if(this.gone)this.paint();this.controls();}}
+  },
+  paint(){
+    const body=document.getElementById('nr-body');body.replaceChildren();if(!this.d)return;
+    const heading=document.createElement('h2');heading.className='sec';heading.textContent=this.gone?'Nodo rimosso dal cluster':this.d.node+' · '+this.d.cluster;body.append(heading);
+    const steps=this.gone?[{...this.d.steps[10],status:'todo',check_status:'todo'}]:this.d.steps;
+    body.append(NodeStepsView.render(steps,true,this.gone));
+    if(this.gone){
+      const pin=document.createElement('div');pin.className='panel ns-facts';
+      if(!this.d.pin_known){pin.textContent="Impronta SSH non verificabile: controlla il file delle impronte del manager.";}
+      else if(!this.d.pinned){pin.textContent='Nessuna impronta SSH da dimenticare.';}
+      else{
+        const p=document.createElement('p');p.textContent="Dimentica l'impronta SSH nel manager (amministratore con TOTP).";pin.append(p);
+        if(canDo(Auth.role,'admin')){const button=document.createElement('button');button.type='button';button.className='btn bd sm';button.textContent='Dimentica impronta SSH';button.setAttribute('data-min-role','admin');button.disabled=this.busy;button.addEventListener('click',()=>this.forget());pin.append(button);}
+      }
+      body.append(pin);
+    }
+  },
+  forget(){
+    if(this.busy||!this.gone||!this.d?.pinned||!canDo(Auth.role,'admin')||App.cur!=='noderemove'||Auth.locked)return;
+    const seq=this.seq,idx=this.idx,epoch=Auth.epoch,node=this.d.node,address=this.d.address;
+    askConfirm({minRole:'admin',title:"Dimenticare l'impronta di "+node+'?',level:'danger',okLabel:'Dimentica impronta',lines:[node,address],consequence:"L'accesso resterà bloccato fino alla conferma di una nuova impronta."},async()=>{
+      if(!this.current(seq,idx,epoch)||this.busy||!this.gone||!canDo(Auth.role,'admin'))return;
+      this.busy=true;this.controls();this.paint();
+      try{
+        await api('/clusters/'+idx+'/sync-access/pin/'+encodeURIComponent(node)+'?address='+encodeURIComponent(address),{method:'DELETE',quiet:true,timeoutMs:120000});
+        if(this.current(seq,idx,epoch))this.d.pinned=false;
+      }catch(e){if(this.current(seq,idx,epoch))toast(e.message,'err');}
+      finally{if(this.current(seq,idx,epoch)){this.busy=false;this.paint();this.controls();}}
+    });
   }
 };
 
