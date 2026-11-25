@@ -203,6 +203,7 @@ func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store
 
 		r.Get("/clusters", h.GetClusters)
 		r.Get("/clusters/{idx}/network-settings", h.GetNetworkSettings)
+		r.Get("/clusters/{idx}/node-readiness", h.GetNodeReadiness)
 		r.Put("/clusters/{idx}/network-settings", h.PutNetworkSettings)
 		r.Get("/clusters/{idx}/report-settings", h.GetReportSettings)
 		r.Put("/clusters/{idx}/report-settings", h.PutReportSettings)

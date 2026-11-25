@@ -54,7 +54,8 @@ var routeAccess = map[string]access{
 	// Reading: every role.
 	"GET /api/config": reader, "GET /api/clusters": reader, "GET /api/version": reader, "GET /api/update-status": reader,
 	"GET /api/clusters/{idx}/network-settings": reader, "GET /api/clusters/{idx}/report-settings": reader,
-	"GET /api/dashboard": reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
+	"GET /api/clusters/{idx}/node-readiness": reader,
+	"GET /api/dashboard":                     reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
 	"GET /api/nodes/{node}/rrd": reader, "GET /api/nodes/{node}/storage": reader, "GET /api/vms": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/status": reader, "GET /api/nodes/{node}/qemu/{vmid}/rrd": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/fsinfo": reader, "GET /api/nodes/{node}/qemu/{vmid}/osinfo": reader,

@@ -2,12 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
 func TestAuditFormatters(t *testing.T) {
 	keys := []string{}
 	for key := range routeAccess {
+		// The authorization middleware records state-changing requests, not GETs.
+		if strings.HasPrefix(key, "GET ") {
+			continue
+		}
 		keys = append(keys, key)
 	}
 	encoded, err := json.Marshal(keys)
