@@ -159,6 +159,9 @@ func (c *Client) Delete(path string) (json.RawMessage, error) {
 // ── Cluster ──────────────────────────────────────────────────────────────────
 
 func (c *Client) GetClusterStatus() (json.RawMessage, error) { return c.Get("/cluster/status") }
+func (c *Client) GetPermissions(path string) (json.RawMessage, error) {
+	return c.Get("/access/permissions?path=" + url.QueryEscape(path))
+}
 func (c *Client) GetClusterResources(resType string) (json.RawMessage, error) {
 	path := "/cluster/resources"
 	if resType != "" {
@@ -172,6 +175,9 @@ func (c *Client) GetNextVMID() (json.RawMessage, error)      { return c.Get("/cl
 // ── Nodes ─────────────────────────────────────────────────────────────────────
 
 func (c *Client) GetNodes() (json.RawMessage, error) { return c.Get("/nodes") }
+func (c *Client) GetNodeTime(node string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + node + "/time")
+}
 func (c *Client) GetNodeStatus(node string) (json.RawMessage, error) {
 	return c.Get("/nodes/" + node + "/status")
 }
