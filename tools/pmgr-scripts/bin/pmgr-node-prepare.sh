@@ -429,7 +429,9 @@ if [ "$APPLY" = 0 ]; then
 fi
 for index in "${!FILES[@]}"; do
   atomic_write "${FILES[$index]}" "${MODES[$index]}" "${CONTENTS[$index]}"
+  printf '[fatto] %s\n' "${FILES[$index]#"$ROOT"}"
 done
+if [ -n "$BACKUP" ]; then printf 'Copie di sicurezza dei file sostituiti: %s\n' "${BACKUP#"$ROOT"}"; fi
 if [ "$UPGRADE" = 1 ]; then
   apt-get update || die 'apt-get update fallito'
   DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::=--force-confdef \
@@ -439,6 +441,11 @@ fi
 if [ "$KEEP_NAG" = 0 ] && [ -z "$OTHER_NAG" ]; then
   "$ROOT/usr/local/libexec/pmgr/pmgr-remove-nag.sh" || die 'patch nag fallita'
 fi
-build_plan
-[ "${#FILES[@]}" = 0 ] || die 'verifica finale fallita'
+# Final check without repeating the whole list: one line if everything is as planned, the files otherwise.
+build_plan >/dev/null
+if [ "${#FILES[@]}" != 0 ]; then
+  for index in "${!FILES[@]}"; do printf 'ancora diverso: %s\n' "${FILES[$index]#"$ROOT"}" >&2; done
+  die 'verifica finale fallita'
+fi
+printf 'Verifica finale: tutto a posto\n'
 reboot_status
