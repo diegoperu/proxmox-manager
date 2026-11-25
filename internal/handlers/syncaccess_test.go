@@ -32,6 +32,9 @@ type fakeSSH struct {
 	errs    map[string]error
 	listed  []string
 	noKey   bool
+	pushed  []string
+	pushErr error
+	onPush  func(host, dir, remote string)
 }
 
 func (f *fakeSSH) EnsureKey(context.Context) (nodessh.PublicKey, error) {
@@ -73,6 +76,19 @@ func (f *fakeSSH) Unpin(h string) (bool, error) {
 	delete(f.pinned, h)
 	return ok, nil
 }
+func (f *fakeSSH) Push(_ context.Context, h, dir, remote string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.pushErr != nil {
+		return f.pushErr
+	}
+	f.pushed = append(f.pushed, h+" "+remote)
+	if f.onPush != nil {
+		f.onPush(h, dir, remote)
+	}
+	return nil
+}
+
 func (f *fakeSSH) List(_ context.Context, h string) (nodessh.Listing, error) {
 	f.mu.Lock()
 	f.listed = append(f.listed, h)

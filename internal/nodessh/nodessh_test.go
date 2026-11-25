@@ -66,6 +66,8 @@ func (f *fake) run(ctx context.Context, name string, args, env []string, maxOut 
 		return Result{Stdout: []byte(out), Stderr: []byte("# " + host + ":22 SSH-2.0-OpenSSH_9.9\n")}, nil
 	case "ssh":
 		return f.ssh, f.sshErr
+	case "rsync":
+		return Result{}, nil
 	}
 	return Result{}, errors.New("unexpected program " + name)
 }
@@ -394,4 +396,72 @@ func TestEnsureKeyWithRealSSHKeygen(t *testing.T) {
 	if err != nil || !strings.Contains(string(out), k.Fingerprint) {
 		t.Fatalf("fingerprint differs from ssh-keygen: %q vs %s", out, k.Fingerprint)
 	}
+}
+
+func TestPushUsesTheGateSafely(t *testing.T) {
+	s, f, dir := newStore(t)
+	ctx := context.Background()
+	if _, err := s.EnsureKey(ctx); err != nil {
+		t.Fatal(err)
+	}
+	local := t.TempDir()
+	if err := s.Push(ctx, "192.0.2.10", local, "snippets"); !errors.Is(err, ErrNotPinned) || f.count("rsync") != 0 {
+		t.Fatalf("unpinned push: %v", err)
+	}
+	for _, h := range []string{"192.0.2.10", "2001:db8::10"} {
+		if err := s.Pin(ctx, h, fpOf(f.hostKey[h])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Push(ctx, "192.0.2.10", local, "snippets"); err != nil {
+		t.Fatal(err)
+	}
+	var c call
+	for _, x := range f.calls {
+		if x.name == "rsync" {
+			c = x
+		}
+	}
+	n := len(c.args)
+	if c.args[n-3] != "--" || c.args[n-2] != local+"/" || c.args[n-1] != "pmgr-sync@192.0.2.10:snippets/" {
+		t.Fatalf("rsync tail %q", c.args[n-3:])
+	}
+	e := ""
+	for i, a := range c.args {
+		if a == "-e" {
+			e = c.args[i+1]
+		}
+		if a == "--delete" || strings.HasPrefix(a, "--delete") || a == "--sender" {
+			t.Fatalf("forbidden rsync option %q", a)
+		}
+	}
+	abs, _ := filepath.Abs(dir)
+	for _, want := range []string{"ssh -F /dev/null", "-i " + filepath.Join(abs, keyFile), "UserKnownHostsFile=" + filepath.Join(abs, knownFile), "StrictHostKeyChecking=yes", "IdentityAgent=none"} {
+		if !strings.Contains(e, want) {
+			t.Fatalf("-e lacks %q: %s", want, e)
+		}
+	}
+	if strings.Contains(e, "pmgr-sync@") || strings.Contains(e, " -- ") {
+		t.Fatalf("-e must not carry the destination: %s", e)
+	}
+	if err := s.Push(ctx, "2001:db8::10", local, "pmgr-scripts"); err != nil {
+		t.Fatal(err)
+	}
+	last := f.calls[len(f.calls)-1].args
+	if last[len(last)-1] != "pmgr-sync@[2001:db8::10]:pmgr-scripts/" {
+		t.Fatalf("ipv6 destination %q", last[len(last)-1])
+	}
+	before := f.count("rsync")
+	for _, bad := range []struct{ host, dir, remote string }{
+		{"192.0.2.10", local, "etc"}, {"192.0.2.10", local, "../snippets"}, {"192.0.2.10", "relative/dir", "snippets"},
+		{"192.0.2.10", local + "/with space", "snippets"}, {"192.0.2.10", local + "/x'y", "snippets"}, {"node-1", local, "snippets"},
+	} {
+		if err := s.Push(ctx, bad.host, bad.dir, bad.remote); err == nil {
+			t.Fatalf("accepted %+v", bad)
+		}
+	}
+	if f.count("rsync") != before {
+		t.Fatal("a refused push started rsync")
+	}
+	f.ssh = Result{}
 }

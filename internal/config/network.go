@@ -17,6 +17,9 @@ type NetworkSettings struct {
 	// from= restriction of the manager's key on the nodes; a router in between means its address, not the
 	// manager's own.
 	ManagerFrom []string `json:"manager_from"`
+	// SnippetProfile: cloud-init snippets the manager delivers to the nodes of this cluster (D90): "standard" or
+	// "hosting" (key-only SSH, firewall, hardening). Empty is read as "standard".
+	SnippetProfile string `json:"snippet_profile"`
 }
 
 type VMNetwork struct {
@@ -131,7 +134,14 @@ func ValidNetworkSettings(n *NetworkSettings) error {
 	if !ok {
 		return errors.New("dominio di ricerca non valido (lettere, cifre e trattini separati da punti)")
 	}
-	n.Networks, n.DNS, n.SearchDomain, n.ManagerFrom = networks, dns, domain, from
+	profile := n.SnippetProfile
+	if profile == "" {
+		profile = "standard"
+	}
+	if profile != "standard" && profile != "hosting" {
+		return errors.New("profilo degli snippet non valido (standard o hosting)")
+	}
+	n.Networks, n.DNS, n.SearchDomain, n.ManagerFrom, n.SnippetProfile = networks, dns, domain, from, profile
 	return nil
 }
 

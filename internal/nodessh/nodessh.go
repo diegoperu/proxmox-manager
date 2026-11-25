@@ -404,9 +404,9 @@ func (l Listing) Digest() string {
 	return base64.RawStdEncoding.EncodeToString(sum[:12])
 }
 
-// sshArgs pins every option that matters, so neither a user ssh_config nor an agent can change the behaviour.
-func (s *Store) sshArgs(host string, remote ...string) []string {
-	args := []string{
+// sshOptions pins every option that matters, so neither a user ssh_config nor an agent can change the behaviour.
+func (s *Store) sshOptions() []string {
+	return []string{
 		"-F", "/dev/null",
 		"-i", filepath.Join(s.dir, keyFile),
 		"-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none",
@@ -418,8 +418,11 @@ func (s *Store) sshArgs(host string, remote ...string) []string {
 		"-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes",
 		"-o", "PermitLocalCommand=no", "-o", "ControlMaster=no", "-o", "ControlPath=none",
 		"-o", "LogLevel=ERROR", "-o", "Port=22", "-T",
-		"--", syncUser + "@" + host,
 	}
+}
+
+func (s *Store) sshArgs(host string, remote ...string) []string {
+	args := append(s.sshOptions(), "--", syncUser+"@"+host)
 	return append(args, remote...)
 }
 
@@ -464,4 +467,63 @@ func (s *Store) List(ctx context.Context, host string) (Listing, error) {
 		return Listing{}, classify(res)
 	}
 	return ParseListing(res.Stdout), nil
+}
+
+// ── rsync push through the gate ──
+
+// plainPath: rsync splits its -e command on spaces (no shell), so every path in it must be free of spaces and quotes.
+var plainPath = regexp.MustCompile(`^/[A-Za-z0-9._/-]{1,400}$`)
+
+// RemoteDirs: the only two folders the node gate accepts.
+var RemoteDirs = map[string]bool{"snippets": true, "pmgr-scripts": true}
+
+// Push copies the content of localDir into remote ("snippets" or "pmgr-scripts") on a node whose key has been
+// confirmed. Never --delete; checksums decide what is copied; the gate on the node refuses anything else.
+func (s *Store) Push(ctx context.Context, host, localDir, remote string) error {
+	if !ValidAddress(host) {
+		return ErrBadAddress
+	}
+	if !RemoteDirs[remote] {
+		return errors.New("cartella di destinazione non ammessa")
+	}
+	absDir, err := filepath.Abs(s.dir)
+	if err != nil || !plainPath.MatchString(absDir) || !plainPath.MatchString(localDir) || strings.Contains(absDir+localDir, "..") {
+		return ErrUnsafeDirectory
+	}
+	if _, ok, err := s.Pinned(host); err != nil {
+		return err
+	} else if !ok {
+		return ErrNotPinned
+	}
+	if err := privateKeyOK(filepath.Join(s.dir, keyFile)); err != nil {
+		return ErrUnsafeDirectory
+	}
+	opts := s.sshOptions()
+	for i, o := range opts { // absolute paths: rsync starts ssh from its own working directory
+		if strings.HasPrefix(o, "UserKnownHostsFile=") {
+			opts[i] = "UserKnownHostsFile=" + filepath.Join(absDir, knownFile)
+		}
+		if i > 0 && opts[i-1] == "-i" {
+			opts[i] = filepath.Join(absDir, keyFile)
+		}
+	}
+	dest := host
+	if strings.Contains(host, ":") {
+		dest = "[" + host + "]"
+	}
+	args := []string{"-rltOEc", "--no-owner", "--no-group", "--timeout=60", "-e", "ssh " + strings.Join(opts, " "),
+		"--", strings.TrimSuffix(localDir, "/") + "/", syncUser + "@" + dest + ":" + remote + "/"}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	res, err := s.run(ctx, "rsync", args, s.env(), 256<<10)
+	if err != nil {
+		return ErrUnreachable
+	}
+	if res.Exit != 0 {
+		if e := classify(res); !errors.Is(e, ErrSSH) {
+			return e
+		}
+		return fmt.Errorf("%w: rsync uscito con %d", ErrSSH, res.Exit)
+	}
+	return nil
 }

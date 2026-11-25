@@ -2929,6 +2929,7 @@ const AUDIT_LABELS={
   "POST /api/clusters/{idx}/sync-access/scan":"Lettura impronta SSH di un nodo",
   "POST /api/clusters/{idx}/sync-access/pin":"Conferma impronta SSH di un nodo",
   "DELETE /api/clusters/{idx}/sync-access/pin/{node}":"Rimozione impronta SSH di un nodo",
+  "POST /api/clusters/{idx}/sync-run":"Sincronizzazione di snippet e script sui nodi",
   "PUT /api/clusters/{idx}/report-settings":"Modifica impostazioni report",
   "POST /api/clusters/{idx}/report-settings/price-check":"Controllo listini",
   login:'Accesso',logout:'Uscita',setup:'Configurazione iniziale',password:'Cambio password'
@@ -6123,7 +6124,9 @@ function validateNetwork(settings){
   });
   const domain=validSearchDomain(search);
   if(domain===null)throw new Error('dominio di ricerca non valido (lettere, cifre e trattini separati da punti)');
-  return {networks:normalized,dns:addresses,search_domain:domain,manager_from:managerFrom};
+  const profile=settings?.snippet_profile??'';
+  if(profile!==''&&profile!=='standard'&&profile!=='hosting')throw new Error('profilo degli snippet non valido (standard o hosting)');
+  return {networks:normalized,dns:addresses,search_domain:domain,manager_from:managerFrom,snippet_profile:profile||'standard'};
 }
 function findNetwork(settings,ipOrCidr){
   const ip=typeof ipOrCidr==='string'&&ipOrCidr.includes('/')?parseCIDR(ipOrCidr)?.ip:parseIPv4(ipOrCidr);

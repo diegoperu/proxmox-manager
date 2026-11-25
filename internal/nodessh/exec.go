@@ -27,7 +27,7 @@ func (c *capped) Write(p []byte) (int, error) {
 }
 
 // allowedPrograms: the only executables this package may start.
-var allowedPrograms = map[string]bool{"ssh": true, "ssh-keyscan": true, "ssh-keygen": true}
+var allowedPrograms = map[string]bool{"ssh": true, "ssh-keyscan": true, "ssh-keygen": true, "rsync": true}
 
 // execRunner starts the program without a shell. stdin is empty, the environment is exactly env.
 func execRunner(ctx context.Context, name string, args, env []string, maxOut int) (Result, error) {

@@ -18,6 +18,8 @@ import (
 	"proxmox-manager/internal/handlers"
 	"proxmox-manager/internal/history"
 	"proxmox-manager/internal/nodessh"
+	"proxmox-manager/internal/snippetsync"
+	pmgrscripts "proxmox-manager/tools/pmgr-scripts"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -79,6 +81,7 @@ func main() {
 	h := handlers.New()
 	h.SetTaskAttribution(accounts.AuditByUPID)
 	h.SetNodeSSH(nodessh.New(config.Get().SSHDirectory()))
+	h.SetSnippetBuilder(snippetsync.NewBuilder(pmgrscripts.FS))
 
 	// Daily inventory snapshot for the reports (D28): counts and assignments only.
 	hist, err := history.New(cfg.DBPath)
@@ -210,6 +213,8 @@ func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store
 		r.Post("/clusters/{idx}/sync-access/scan", h.PostSyncScan)
 		r.Post("/clusters/{idx}/sync-access/pin", h.PostSyncPin)
 		r.Delete("/clusters/{idx}/sync-access/pin/{node}", h.DeleteSyncPin)
+		r.Get("/clusters/{idx}/sync-plan", h.GetSyncPlan)
+		r.Post("/clusters/{idx}/sync-run", h.PostSyncRun)
 		r.Put("/clusters/{idx}/network-settings", h.PutNetworkSettings)
 		r.Get("/clusters/{idx}/report-settings", h.GetReportSettings)
 		r.Put("/clusters/{idx}/report-settings", h.PutReportSettings)
