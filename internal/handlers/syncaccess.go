@@ -36,6 +36,7 @@ type nodeSSH interface {
 	Pin(ctx context.Context, host, confirmed string) error
 	Unpin(host string) (bool, error)
 	List(ctx context.Context, host string) (nodessh.Listing, error)
+	Push(ctx context.Context, host, localDir, remote string) error
 }
 
 // SetNodeSSH installs the SSH store (nil = the endpoints answer 503).
@@ -188,7 +189,7 @@ func buildSyncAccess(ctx context.Context, c clusterStatusAPI, ssh nodeSSH, cl co
 			}()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			res.Nodes[i] = checkSyncNode(ctx, ssh, n, key.Line != "")
+			res.Nodes[i], _ = checkSyncNode(ctx, ssh, n, key.Line != "")
 		}(i, n)
 	}
 	wg.Wait()
@@ -206,35 +207,35 @@ func buildSyncAccess(ctx context.Context, c clusterStatusAPI, ssh nodeSSH, cl co
 	return res, nil
 }
 
-func checkSyncNode(ctx context.Context, ssh nodeSSH, n syncNode, haveKey bool) syncNodeState {
+func checkSyncNode(ctx context.Context, ssh nodeSSH, n syncNode, haveKey bool) (syncNodeState, nodessh.Listing) {
 	st := syncNodeState{Node: n.Name, Address: n.Address, Online: n.Online}
 	if n.Address == "" {
 		st.State, st.Message = "no_address", "Proxmox non riporta l'indirizzo del nodo."
-		return st
+		return st, nodessh.Listing{}
 	}
 	fp, ok, err := ssh.Pinned(n.Address)
 	if err != nil {
 		st.State, st.Message = "error", "File delle impronte non leggibile (dettagli nel log del server)."
 		log.Printf("nodessh: pinned keys: %v", err)
-		return st
+		return st, nodessh.Listing{}
 	}
 	st.Pinned, st.Fingerprint = ok, fp
 	switch {
 	case !n.Online:
 		st.State, st.Message = "offline", "Nodo non in linea."
-		return st
+		return st, nodessh.Listing{}
 	case !ok:
 		st.State, st.Message = syncStateOf(nodessh.ErrNotPinned)
-		return st
+		return st, nodessh.Listing{}
 	case !haveKey:
 		st.State, st.Message = "error", "Chiave del manager non disponibile."
-		return st
+		return st, nodessh.Listing{}
 	}
 	listing, err := ssh.List(ctx, n.Address)
 	if err != nil {
 		st.State, st.Message = syncStateOf(err)
 		log.Printf("nodessh: pmgr-list on node %s (%s): %s", n.Name, n.Address, st.State)
-		return st
+		return st, nodessh.Listing{}
 	}
 	st.State = "ok"
 	st.Files, st.Truncated, st.Invalid, st.Digest = len(listing.Entries), listing.Truncated, listing.Invalid, listing.Digest()
@@ -242,7 +243,7 @@ func checkSyncNode(ctx context.Context, ssh nodeSSH, n syncNode, haveKey bool) s
 	if st.Invalid > 0 || st.Truncated {
 		st.Message += " Alcune righe dell'elenco non sono valide o l'elenco e' troncato."
 	}
-	return st
+	return st, listing
 }
 
 // markSameAsOthers compares the file lists of the reachable nodes with the most common one.

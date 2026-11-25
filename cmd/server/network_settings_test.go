@@ -83,6 +83,9 @@ func TestNetworkSettingsValidationParity(t *testing.T) {
 	for _, domain := range []string{"", "EXAMPLE.Org", "a", "node-1.example", "-bad.example", "bad-.example", "a..b", "bad.example.", "è.it", "a_b", "a\nb", strings.Repeat("a", 64), strings.Repeat("a.", 127)} {
 		cases = append(cases, config.NetworkSettings{SearchDomain: domain})
 	}
+	for _, profile := range []string{"", "standard", "hosting", "Hosting", "x"} {
+		cases = append(cases, config.NetworkSettings{SnippetProfile: profile})
+	}
 	for _, from := range [][]string{nil, {"192.0.2.254"}, {"::ffff:198.51.100.7"}, {"0.0.0.0"}, {"224.0.0.1"}, {"255.255.255.255"},
 		{"2001:db8::1"}, {"010.0.0.1"}, {"192.0.2.1", "192.0.2.1"}, {"192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"},
 		{"192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4", "192.0.2.5"}, {"x"}, {""}} {

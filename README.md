@@ -210,7 +210,9 @@ To copy scripts and cloud-init snippets to the nodes (onboarding, see `docs/ONBO
 2. run, as root on every node, the two commands the page compiles (`pmgr-sync-setup.sh --role dest` with the manager key and that address);
 3. for each node, an administrator reads the host key fingerprint, compares it with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` run on the node, and confirms it (TOTP).
 
-The access then shows "accesso attivo" with the files present on the node. Needs `openssh-client` on the manager machine.
+The access then shows "accesso attivo" with the files present on the node. Needs `openssh-client` and `rsync` on the manager machine.
+
+**Delivering snippets and scripts.** The section "Snippet e script sui nodi" compares every node with what the manager would deliver: the cloud-init snippets rendered for the cluster profile (**Impostazioni → Infrastruttura → Profilo degli snippet**: `standard`, or `hosting` for key-only SSH, firewall and hardening) and the template tooling, both taken from the files built into the release binary. An administrator chooses the nodes and confirms with the TOTP code; files are copied (never deleted) and each node is checked again.
 
 ## Creating the Proxmox service account and API tokens
 

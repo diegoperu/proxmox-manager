@@ -59,6 +59,8 @@ var routeAccess = map[string]access{
 	// confirming or forgetting one asks the TOTP code again (D152, D153).
 	"GET /api/clusters/{idx}/sync-access": reader, "POST /api/clusters/{idx}/sync-access/scan": admin,
 	"POST /api/clusters/{idx}/sync-access/pin": adminTOTP, "DELETE /api/clusters/{idx}/sync-access/pin/{node}": adminTOTP,
+	// Delivery of snippets and scripts to the nodes (step 4): preview for everyone, copy by administrators with TOTP.
+	"GET /api/clusters/{idx}/sync-plan": reader, "POST /api/clusters/{idx}/sync-run": adminTOTP,
 	"GET /api/dashboard": reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
 	"GET /api/nodes/{node}/rrd": reader, "GET /api/nodes/{node}/storage": reader, "GET /api/vms": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/status": reader, "GET /api/nodes/{node}/qemu/{vmid}/rrd": reader,

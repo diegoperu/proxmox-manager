@@ -27,7 +27,8 @@ import (
 type Handler struct {
 	hist            *history.Store // daily inventory snapshots (nil in tests)
 	taskAttribution func([]string) (map[string]string, error)
-	ssh             nodeSSH // manager SSH access to the nodes (onboarding step 3); nil = not configured
+	ssh             nodeSSH       // manager SSH access to the nodes (onboarding step 3); nil = not configured
+	snippets        bundleBuilder // expected content of the nodes (onboarding step 4); nil = not configured
 }
 
 // SetHistory gives the reports access to the daily inventory snapshots.

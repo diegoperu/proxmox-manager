@@ -40,7 +40,7 @@ func (h *Handler) GetNetworkSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	settings := cfg.Clusters[idx].Network
 	if settings == nil {
-		settings = &config.NetworkSettings{Networks: []config.VMNetwork{}, DNS: []string{}, ManagerFrom: []string{}}
+		settings = &config.NetworkSettings{Networks: []config.VMNetwork{}, DNS: []string{}, ManagerFrom: []string{}, SnippetProfile: "standard"}
 	}
 	writeJSON(w, settings)
 }

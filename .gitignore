@@ -7,6 +7,13 @@ proxmox-manager
 *.db-shm
 *.db-wal
 
+# Segreti del servizio: chiave che cifra i segreti TOTP, chiave SSH del manager e impronte dei nodi
+auth.key
+/ssh/
+# binari del deploy (precedente e in costruzione)
+proxmox-manager.prev
+proxmox-manager.new
+
 # Report di test con evidenze della VM (non pubblicare)
 test-reports/
 
