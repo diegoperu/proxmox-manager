@@ -1,0 +1,11 @@
+[Unit]
+Description=Impone SSH a sola chiave (ProxmoxManager, hosting)
+Before=ssh.service sshd.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pmgr-ssh-enforce
+
+[Install]
+WantedBy=multi-user.target

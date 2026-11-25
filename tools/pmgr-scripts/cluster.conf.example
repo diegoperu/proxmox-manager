@@ -1,0 +1,30 @@
+# cluster.conf - configurazione di QUESTO cluster per gli script dei template.
+# Va in /etc/pmgr/cluster.conf (root, 0600). NON si sincronizza: ogni cluster ha il suo.
+# Formato: CHIAVE=valore, una per riga, nessun apice, nessun codice (il file non viene eseguito).
+# Se manca una chiave obbligatoria gli script si fermano senza toccare niente.
+
+# --- obbligatorie ---
+# VMID dei template = VMID_BASE + SLOT della release (os.d/*.conf). Con 1000: 1001..1007.
+# Nessuna VM esistente con quel VMID che non sia un template "*-cloudinit-template" viene toccata.
+VMID_BASE=1000
+# Storage dei dischi (EFI e disco del sistema). Deve essere attivo e accettare "images".
+STORAGE=vm-storage
+BRIDGE=vmbr0
+# Fino a tre server DNS, separati da spazio.
+NAMESERVER=192.0.2.53 198.51.100.53
+SEARCH_DOMAIN=example.test
+# Utente creato da cloud-init nei template.
+CI_USER=tecnico
+# Chiavi pubbliche ssh da mettere nei template (file di testo, una chiave per riga).
+SSH_KEYS_FILE=/etc/pmgr/ssh_keys.pub
+# Password del template: UNA riga, 8-128 caratteri, file di root con permessi 0600. Mai nel repository.
+PASSWORD_FILE=/etc/pmgr/template-password
+
+# --- facoltative (valori predefiniti) ---
+# CI_STORAGE=vm-storage        # storage del disco cloud-init (predefinito: STORAGE)
+# SNIPPETS_STORAGE=local          # storage che contiene gli snippet; deve avere il contenuto "snippets"
+# SNIPPETS_DIR=/var/lib/vz/snippets
+# IMAGES_DIR=/var/lib/vz/pmgr-images   # immagini scaricate (centinaia di MB ciascuna)
+# CPU_TYPE=host
+# DISK_SIZE=32G
+# MEMORY_MB=1024

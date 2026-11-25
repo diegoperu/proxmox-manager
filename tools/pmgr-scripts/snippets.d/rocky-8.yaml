@@ -1,0 +1,95 @@
+runcmd:
+    - sudo dnf update -y
+    - sudo dnf -y install epel-release
+    - sudo dnf makecache
+    - sudo dnf install -y qemu-guest-agent htop sysstat lsof iotop fail2ban nano wget curl net-tools firewalld openssh-server dnf-automatic dnf-utils parted
+# pmgr:extra-tools-begin
+    - sudo dnf install -y tcpdump iptraf nethogs iftop arpwatch nmon cifs-utils
+# pmgr:extra-tools-end
+#
+# ProxmoxManager: guest-exec + helper etichettati (SELinux enforcing)
+#
+# semanage (policycoreutils-python-utils) e' gia' presente su molte immagini: no-op se c'e'
+    - sudo dnf install -y policycoreutils-python-utils
+# sblocca guest-exec / guest-exec-status in BLACKLIST_RPC (le altre voci restano); il restart
+# dell'agent qui sotto applica la modifica
+    - sudo sed -i -E "/^BLACKLIST_RPC=/{s/,guest-exec-status//g;s/,guest-exec//g;s/=guest-exec-status,/=/;s/=guest-exec,/=/;s/=guest-exec-status\$/=/;s/=guest-exec\$/=/}" /etc/sysconfig/qemu-ga
+# solo se SELinux e' attivo: boolean + etichetta degli helper
+    - 'if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != Disabled ]; then setsebool -P virt_qemu_ga_run_unconfined on; fi'
+    - 'if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != Disabled ]; then semanage fcontext -a -t virt_qemu_ga_unconfined_exec_t "/usr/local/libexec/pmgr(/.*)?" || semanage fcontext -m -t virt_qemu_ga_unconfined_exec_t "/usr/local/libexec/pmgr(/.*)?"; restorecon -R /usr/local/libexec/pmgr; fi'
+    - sudo systemctl restart qemu-guest-agent
+    - sudo systemctl enable --now dnf-automatic.timer
+#
+# SSH
+#
+# pmgr:ssh-password-begin
+    - |
+      grep -qiE '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/' /etc/ssh/sshd_config || sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config
+      mkdir -p /etc/ssh/sshd_config.d
+      cat > /etc/ssh/sshd_config.d/00-pmgr-ssh.conf <<'EOF'
+      # Gestito da ProxmoxManager (snippet cloud-init): SSH con password abilitato, come su Ubuntu e Debian.
+      # In sshd vince il primo valore trovato: questo file e' letto prima degli altri di sshd_config.d.
+      PasswordAuthentication yes
+      PermitRootLogin no
+      EOF
+# pmgr:ssh-password-end
+    - sudo systemctl restart sshd
+    - sudo systemctl enable sshd
+#
+# Firewall
+#
+# enable at boot
+#    - sudo systemctl start firewalld
+#    - sudo systemctl enable firewalld
+
+# defaults
+#    - sudo firewall-cmd --set-default-zone=drop
+#    - sudo systemctl restart firewalld
+# exceptions
+#    - sudo firewall-cmd --zone=drop --add-service=ssh --permanent
+#    - sudo systemctl restart firewalld
+#
+# Fail2ban
+#
+
+    - |
+      cat > /etc/fail2ban/jail.d/50-pmgr.local <<'EOF'
+      # Gestito da ProxmoxManager (snippet cloud-init): vale sopra le impostazioni della distribuzione.
+      # sshd: 5 tentativi falliti in 15 minuti = ban di 1 ora; a ogni recidiva il ban raddoppia (1h 2h 4h ... 64h).
+      [DEFAULT]
+      bantime = 1h
+      findtime = 15m
+      maxretry = 5
+      bantime.increment = true
+      bantime.multipliers = 1 2 4 8 16 32 64
+      bantime.maxtime = 1w
+
+      [sshd]
+      enabled = true
+      backend = systemd
+      EOF
+    - |
+      cat > /etc/fail2ban/fail2ban.d/50-pmgr.local <<'EOF'
+      # Il ban progressivo conta le recidive nel database: deve ricordarle almeno quanto dura il ban massimo.
+      [Definition]
+      dbpurgeage = 4w
+      EOF
+    - |
+      mkdir -p /etc/systemd/system/fail2ban.service.d
+      cat > /etc/systemd/system/fail2ban.service.d/50-pmgr.conf <<'EOF'
+      # Gestito da ProxmoxManager: fail2ban deve ripartire da solo se qualcuno lo uccide (es. "pkill -f python").
+      # Un arresto voluto con "systemctl stop fail2ban" resta fermo.
+      [Unit]
+      StartLimitIntervalSec=0
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      # l'unit di Debian ha RestartPreventExitStatus=0 255 e fail2ban ucciso con TERM esce con 255: senza azzerarla non riparte mai
+      RestartPreventExitStatus=
+      EOF
+      systemctl daemon-reload
+    - sudo systemctl enable fail2ban
+    - sudo systemctl restart fail2ban
+
+    - reboot
