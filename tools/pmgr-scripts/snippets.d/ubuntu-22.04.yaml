@@ -1,0 +1,95 @@
+#cloud-config
+
+runcmd:
+    - apt update
+    - apt install -y qemu-guest-agent htop sysstat lsof iotop fail2ban nano wget curl net-tools ufw openssh-server unattended-upgrades parted
+# pmgr:extra-tools-begin
+    - apt install -y tcpdump iptraf nethogs iftop acct arpwatch nmon nfs-common cifs-utils
+# pmgr:extra-tools-end
+    - systemctl restart qemu-guest-agent
+#
+# SSH
+#
+    - sed -i -e '/^Port/s/^.*$/Port 22/' /etc/ssh/sshd_config
+    - sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin no/' /etc/ssh/sshd_config
+# deprecated from last revision of ubuntu 22.04
+# pmgr:ssh-password-begin
+    - sed -i -e '/^#PasswordAuthentication/s/^.*$/PasswordAuthentication yes/' /etc/ssh/sshd_config
+# pmgr:ssh-password-end
+# pmgr:ssh-password-begin
+    - sed -i -e '/^ChallengeResponseAuthentication/s/^.*$/ChallengeResponseAuthentication yes/' /etc/ssh/sshd_config
+# pmgr:ssh-password-end
+    - sed -i -e '/^PubkeyAuthentication/s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+# pmgr:ssh-password-begin
+    - sed -i -e '/^KbdInteractiveAuthentication/s/^.*$/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
+# pmgr:ssh-password-end
+# pmgr:ssh-password-begin
+    - |
+      grep -qiE '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/' /etc/ssh/sshd_config || sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config
+      mkdir -p /etc/ssh/sshd_config.d
+      cat > /etc/ssh/sshd_config.d/00-pmgr-ssh.conf <<'EOF'
+      # Gestito da ProxmoxManager (snippet cloud-init): SSH con password abilitato, come su Ubuntu e Debian.
+      # In sshd vince il primo valore trovato: questo file e' letto prima degli altri di sshd_config.d.
+      PasswordAuthentication yes
+      PermitRootLogin no
+      EOF
+# pmgr:ssh-password-end
+    - sudo systemctl restart ssh
+    - sudo systemctl enable ssh
+#
+# Firewall
+#
+
+# defaults
+    - sudo ufw default deny incoming
+    - sudo ufw default allow outgoing
+
+# exceptions
+    - sudo ufw allow ssh
+# enable at boot
+    - sudo ufw enable
+#
+# Fail2ban
+#
+
+    - |
+      cat > /etc/fail2ban/jail.d/50-pmgr.local <<'EOF'
+      # Gestito da ProxmoxManager (snippet cloud-init): vale sopra le impostazioni della distribuzione.
+      # sshd: 5 tentativi falliti in 15 minuti = ban di 1 ora; a ogni recidiva il ban raddoppia (1h 2h 4h ... 64h).
+      [DEFAULT]
+      bantime = 1h
+      findtime = 15m
+      maxretry = 5
+      bantime.increment = true
+      bantime.multipliers = 1 2 4 8 16 32 64
+      bantime.maxtime = 1w
+
+      [sshd]
+      enabled = true
+      backend = systemd
+      EOF
+    - |
+      cat > /etc/fail2ban/fail2ban.d/50-pmgr.local <<'EOF'
+      # Il ban progressivo conta le recidive nel database: deve ricordarle almeno quanto dura il ban massimo.
+      [Definition]
+      dbpurgeage = 4w
+      EOF
+    - |
+      mkdir -p /etc/systemd/system/fail2ban.service.d
+      cat > /etc/systemd/system/fail2ban.service.d/50-pmgr.conf <<'EOF'
+      # Gestito da ProxmoxManager: fail2ban deve ripartire da solo se qualcuno lo uccide (es. "pkill -f python").
+      # Un arresto voluto con "systemctl stop fail2ban" resta fermo.
+      [Unit]
+      StartLimitIntervalSec=0
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      # l'unit di Debian ha RestartPreventExitStatus=0 255 e fail2ban ucciso con TERM esce con 255: senza azzerarla non riparte mai
+      RestartPreventExitStatus=
+      EOF
+      systemctl daemon-reload
+    - sudo systemctl enable fail2ban
+    - sudo systemctl restart fail2ban
+
+    - reboot

@@ -1,0 +1,12 @@
+# Gestito da ProxmoxManager (profilo hosting): chi viene bannato piu' volte resta fuori una settimana DALLA SOLA SSH.
+# recidive legge il registro di fail2ban stesso: 3 ban (qualunque jail) in un giorno = ban di una settimana sulla porta ssh.
+# Le porte dei siti dei clienti (80, 443) restano raggiungibili: dietro un NAT un solo indirizzo e' di molte persone.
+# L'azione di ban (per porta, non per tutte) e' in 61-pmgr-recidive-action.local: la prende dalla jail sshd.
+[recidive]
+enabled = true
+backend = auto
+logpath = /var/log/fail2ban.log
+findtime = 1d
+maxretry = 3
+bantime = 1w
+port = ssh
