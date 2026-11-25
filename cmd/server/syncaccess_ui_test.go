@@ -189,6 +189,7 @@ const ui=SyncAccess;
 func TestSyncAccessAndReadinessLoadIndependently(t *testing.T) {
 	source := settingsJS(t, "/* pmgr:nodeprep:begin */", "/* pmgr:nodeprep:end */") + syncAccessUISource(t)
 	runSettingsJS(t, source+syncAccessHarness+`
+const planLoads=[];global.SyncPlan={load:()=>new Promise(resolve=>planLoads.push(resolve)),leave(){}};
 const pending=[];global.api=(path,options)=>new Promise((resolve,reject)=>pending.push({path,resolve,reject}));
 global.errBox=(message,retry)=>{assert(['NodePrep.load(true)','SyncAccess.load(true)'].includes(retry));return esc(message);};
 NodePrep.paint=function(){get('np-cluster').textContent='Controlli pronti';};
@@ -197,13 +198,14 @@ const flush=()=>new Promise(setImmediate);
 (async()=>{
  const first=NodePrep.load();assert.deepEqual(pending.map(p=>p.path),['/clusters/0/sync-access','/clusters/0/node-readiness']);
  pending[0].resolve(report);await flush();assert.equal(SyncAccess.d,report);assert(get('np-sync').children.length);
- const content=get('np-sync').children;pending[1].reject(new Error('readiness unavailable'));await first;
+ const content=get('np-sync').children;pending[1].reject(new Error('readiness unavailable'));await flush();
+ assert(get('np-recheck').disabled,'recheck also waits for the sync plan');planLoads[0]();await first;
  assert.equal(get('np-cluster').innerHTML,'readiness unavailable');assert.equal(get('np-sync').children,content);
  assert(!get('np-recheck').disabled);assert(get('np-only').disabled);
  const second=NodePrep.load(true);assert.deepEqual(pending.slice(2).map(p=>p.path),['/clusters/0/sync-access?fresh=1','/clusters/0/node-readiness?fresh=1']);
  pending[3].resolve(ready);await flush();assert.equal(get('np-cluster').textContent,'Controlli pronti');
  assert(get('np-recheck').disabled,'recheck waits for both reports');
- pending[2].reject({status:429,message:'busy'});await second;
+ pending[2].reject({status:429,message:'busy'});planLoads[1]();await second;
  assert(get('np-sync').innerHTML.includes(esc("Controllo gia' in corso")));assert.equal(get('np-cluster').textContent,'Controlli pronti');
  assert(!get('np-recheck').disabled);assert(!get('np-only').disabled);
 })().catch(error=>{console.error(error);process.exitCode=1;});

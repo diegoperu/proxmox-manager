@@ -726,6 +726,11 @@ td.spk{width:130px}
 .sa-actions{margin-top:10px}
 .sa-scan{margin-top:12px;padding:12px;border:1px solid var(--border2);border-radius:8px}
 .sa-node .sa-danger{color:var(--red);font-weight:600}
+.sp-paths{margin-top:10px}
+.sp-paths summary{cursor:pointer}
+.sp-paths ul{padding-left:20px;margin-top:6px}
+.sp-paths code{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:12px}
+.sp-select{display:inline-flex;align-items:center;gap:8px}
 .ns-manager{display:flex;gap:10px;align-items:end;margin:10px 0}
 .ns-manager label{flex:1;min-width:0}
 @media(max-width:650px){.ns-manager{align-items:start;flex-direction:column}.ns-manager label{width:100%}}
@@ -1240,6 +1245,8 @@ html.role-admin .role-readonly{display:none!important}
         <h2 class="sec">Cluster</h2><div class="panel" id="np-cluster"></div>
         <h2 class="sec" id="np-sync-heading">Accesso per la sincronizzazione</h2>
         <section class="panel" id="np-sync" aria-labelledby="np-sync-heading" aria-busy="false"></section>
+        <h2 class="sec" id="np-delivery-heading">Snippet e script sui nodi</h2>
+        <section class="panel" id="np-delivery" aria-labelledby="np-delivery-heading" aria-busy="false"></section>
         <h2 class="sec">Nodi</h2><div id="np-nodes"></div>
       </div>
       <p class="cnote">Prossimamente: procedure guidate per aggiungere e rimuovere un nodo (per ora: docs/ONBOARDING.md)</p>
@@ -4747,7 +4754,7 @@ const NodePrepHelpers={
 /* pmgr:nodeprep:end */
 const NodePrep={
   seq:0,idx:null,d:null,onlyProblems:false,filterChosen:false,
-  leave(){this.seq++;SyncAccess.leave();},
+  leave(){this.seq++;SyncAccess.leave();SyncPlan.leave();},
   current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&epoch===Auth.epoch;},
   // Reject malformed reports at the API boundary rather than presenting them as healthy.
   validate(d){
@@ -4769,7 +4776,7 @@ const NodePrep={
     cond.textContent='Controllo dei nodi in corso…';
     body.textContent='Caricamento…';document.getElementById('np-nodes').replaceChildren();document.getElementById('np-partial').hidden=true;
     document.getElementById('np-recheck').disabled=true;document.getElementById('np-only').disabled=true;
-    const access=SyncAccess.load(fresh);
+    const reports=Promise.all([SyncAccess.load(fresh),SyncPlan.load()]);
     try{
       const d=this.validate(await api('/clusters/'+idx+'/node-readiness'+(fresh?'?fresh=1':''),{quiet:true,timeoutMs:120000}));
       if(!this.current(seq,idx,epoch))return;
@@ -4781,7 +4788,7 @@ const NodePrep={
       cond.textContent='Controlli non disponibili';
       body.innerHTML=errBox(e.status===429?"Un controllo e' gia' in corso, riprova tra qualche secondo":e.message,'NodePrep.load(true)');
     }finally{
-      await access;
+      await reports;
       if(this.current(seq,idx,epoch)){
         document.getElementById('np-recheck').disabled=false;document.getElementById('np-only').disabled=!this.d;
       }
@@ -5015,6 +5022,157 @@ const SyncAccess={
     }finally{
       if(this.current(seq,idx,epoch)){this.busy=false;await this.load(true,true);}
     }
+  }
+};
+
+/* pmgr:syncplan:begin */
+const SyncPlanHelpers={
+  nodeLevel(node){
+    return !node?.ready?{word:node?.message||'non pronto',level:'unknown'}:
+      node.aligned?{word:'allineato',level:'ok'}:{word:'da sincronizzare',level:'warn'};
+  },
+  defaultSelection(plan){return (plan?.nodes||[]).filter(n=>n.ready&&!n.aligned).map(n=>n.node);},
+  confirmLines(plan,selected){
+    const names=new Set(selected);
+    return (plan?.nodes||[]).filter(n=>names.has(n.node)&&n.ready&&!n.aligned)
+      .map(n=>`${n.node}: ${n.missing_count} mancanti · ${n.different_count} diversi · ${n.extra_count} extra (non vengono cancellati)`);
+  }
+};
+/* pmgr:syncplan:end */
+const SyncPlan={
+  seq:0,idx:null,epoch:null,d:null,selected:new Set(),busy:false,loading:false,results:[],message:'',error:'',
+  leave(){this.seq++;this.epoch=null;this.d=null;this.selected.clear();this.busy=false;this.loading=false;this.results=[];this.message='';this.error='';},
+  current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&epoch===Auth.epoch;},
+  validate(d){
+    const object=v=>v&&typeof v==='object'&&!Array.isArray(v),text=(v,max=65536)=>typeof v==='string'&&v.length<=max;
+    const count=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000;
+    const paths=(v,total)=>v===null?total===0:Array.isArray(v)&&v.length===Math.min(total,100)&&v.every(p=>text(p,4096));
+    if(!object(d)||!text(d.cluster,256)||!['standard','hosting'].includes(d.profile)||
+      typeof d.digest!=='string'||!/^[0-9a-f]{24}$/.test(d.digest)||typeof d.bundle_digest!=='string'||!/^[0-9a-f]{24}$/.test(d.bundle_digest)||
+      !count(d.snippets)||!count(d.scripts)||!object(d.summary)||!['aligned','to_sync','not_ready'].every(k=>count(d.summary[k]))||
+      !Array.isArray(d.nodes)||d.nodes.length>256||!d.nodes.every(n=>object(n)&&SyncAccess.nodeName(n.node)&&text(n.address,45)&&
+        ['ok','not_pinned','auth_refused','gate_denied','host_key_changed','unreachable','offline','no_address','error'].includes(n.state)&&
+        text(n.message)&&typeof n.ready==='boolean'&&typeof n.aligned==='boolean'&&count(n.same)&&
+        ['missing','different','extra'].every(k=>count(n[k+'_count'])&&paths(n[k],n[k+'_count']))&&
+        (!n.ready?!n.aligned:n.aligned===(n.missing_count+n.different_count===0)))||
+      new Set(d.nodes.map(n=>n.node)).size!==d.nodes.length||
+      d.summary.aligned!==d.nodes.filter(n=>n.ready&&n.aligned).length||
+      d.summary.to_sync!==d.nodes.filter(n=>n.ready&&!n.aligned).length||d.summary.not_ready!==d.nodes.filter(n=>!n.ready).length)
+      throw new Error('Risposta degli snippet e script non valida.');
+    return d;
+  },
+  validateResults(d,nodes){
+    if(!d||typeof d.ok!=='boolean'||!Array.isArray(d.results)||d.results.length!==nodes.length||
+      !d.results.every(n=>n&&nodes.includes(n.node)&&typeof n.ok==='boolean'&&Number.isSafeInteger(n.copied)&&n.copied>=0&&
+        n.copied<=1000000&&typeof n.message==='string'&&n.message.length<=65536)||
+      new Set(d.results.map(n=>n.node)).size!==nodes.length||d.ok!==d.results.every(n=>n.ok))
+      throw new Error('Risposta della sincronizzazione non valida. Ricontrolla lo stato dei nodi.');
+    return d.results;
+  },
+  async load(keep=false){
+    const idx=ClusterMgr.current,epoch=Auth.epoch;
+    if(this.busy&&this.idx===idx&&this.epoch===epoch)return;
+    if(this.idx!==idx||this.epoch!==epoch)this.leave();
+    const seq=++this.seq;
+    if(!keep||this.idx!==idx){this.results=[];this.message='';}
+    this.idx=idx;this.epoch=epoch;this.d=null;this.selected.clear();this.error='';this.loading=true;this.paint();
+    try{
+      const d=this.validate(await api('/clusters/'+idx+'/sync-plan',{quiet:true,timeoutMs:120000}));
+      if(!this.current(seq,idx,epoch))return;
+      this.d=d;this.selected=new Set(SyncPlanHelpers.defaultSelection(d));
+    }catch(e){
+      if(!this.current(seq,idx,epoch))return;
+      this.error=e.status===429?"Operazione gia' in corso: riprova tra qualche secondo.":e.message;
+    }finally{if(this.current(seq,idx,epoch)){this.loading=false;this.paint();}}
+  },
+  paint(){
+    const body=document.getElementById('np-delivery');body.replaceChildren();body.setAttribute('aria-busy',String(this.busy||this.loading));
+    if(this.message||this.results.length){
+      const result=document.createElement('div');result.className='sa-summary';
+      if(this.message){const message=document.createElement('p');message.setAttribute('role','alert');message.textContent=this.message;result.append(message);}
+      for(const n of this.results){
+        const row=document.createElement('p');row.className='np-state '+(n.ok?'ok':'fail');
+        row.textContent=`${n.ok?'✓ ok':'✕ non ok'} · ${n.node}: ${n.message}`;result.append(row);
+      }
+      body.append(result);
+    }
+    if(this.loading||this.busy){
+      const status=document.createElement('div');status.className='sa-summary';status.setAttribute('role','status');
+      status.textContent=this.busy?'Sincronizzazione in corso…':'Controllo snippet e script…';body.append(status);
+    }
+    if(this.error){const error=document.createElement('div');error.innerHTML=errBox(this.error,'SyncPlan.load()');body.append(error);}
+    const d=this.d;if(!d)return;
+    const info=document.createElement('div'),heading=document.createElement('p'),summary=document.createElement('p');info.className='sa-summary';
+    heading.textContent=`Profilo ${d.profile} · ${d.snippets} snippet e ${d.scripts} script attesi`;
+    summary.setAttribute('role','status');summary.textContent=`${d.summary.aligned} allineati · ${d.summary.to_sync} da sincronizzare · ${d.summary.not_ready} non pronti`;
+    info.append(heading,summary);body.append(info);
+    const list=document.createElement('ul');list.className='sa-nodes';list.setAttribute('aria-label','Snippet e script per nodo');
+    for(const node of d.nodes)list.append(this.nodeRow(node));
+    if(!d.nodes.length){const empty=document.createElement('li');empty.className='empty';empty.textContent='Nessun nodo disponibile.';list.append(empty);}
+    body.append(list);
+    const actions=document.createElement('div'),button=document.createElement('button');actions.className='sa-summary';
+    button.id='sp-run';button.type='button';button.className='btn ba';button.setAttribute('data-min-role','admin');
+    button.addEventListener('click',()=>this.confirm());actions.append(button);body.append(actions);this.updateButton();
+  },
+  nodeRow(n){
+    const row=document.createElement('li'),head=document.createElement('div'),name=document.createElement('strong'),state=document.createElement('span');
+    const {word,level}=SyncPlanHelpers.nodeLevel(n),glyph={ok:'✓',warn:'!',unknown:'?'}[level];
+    row.className='sa-node';head.className='sa-node-head';name.textContent=n.node;state.className='np-state '+level;
+    const symbol=document.createElement('span');symbol.setAttribute('aria-hidden','true');symbol.textContent=glyph;
+    state.append(symbol);const label=document.createElement('span');label.textContent=' '+word;state.append(label);head.append(name,state);row.append(head);
+    if(n.ready){const counts=document.createElement('p');counts.textContent=`${n.missing_count} mancanti · ${n.different_count} diversi · ${n.extra_count} extra (non vengono cancellati)`;row.append(counts);}
+    if(n.missing_count+n.different_count+n.extra_count){
+      const details=document.createElement('details'),summary=document.createElement('summary');details.className='sp-paths';summary.textContent='Percorsi dei file';details.append(summary);
+      for(const [key,word] of [['missing','Mancanti'],['different','Diversi'],['extra','Extra (non vengono cancellati)']]){
+        if(!n[key+'_count'])continue;
+        const title=document.createElement('p'),list=document.createElement('ul');title.textContent=word;details.append(title);
+        for(const path of n[key]||[]){const item=document.createElement('li'),code=document.createElement('code');code.textContent=path;item.append(code);list.append(item);}
+        const remaining=n[key+'_count']-(n[key]||[]).length;
+        if(remaining>0){const more=document.createElement('li');more.textContent='e altri '+remaining;list.append(more);}
+        details.append(list);
+      }
+      row.append(details);
+    }
+    if(n.ready&&!n.aligned){
+      const label=document.createElement('label'),input=document.createElement('input'),text=document.createElement('span');label.className='sp-select sa-actions';
+      label.setAttribute('data-min-role','admin');input.setAttribute('data-min-role','admin');input.type='checkbox';input.className='chk';
+      input.checked=this.selected.has(n.node);input.disabled=this.busy||!canDo(Auth.role,'admin');
+      input.setAttribute('aria-label','Sincronizza '+n.node);text.textContent='Seleziona per sincronizzare';
+      input.addEventListener('change',()=>{
+        if(!this.allowed()||!this.d?.nodes.includes(n))return;
+        input.checked?this.selected.add(n.node):this.selected.delete(n.node);this.updateButton();
+      });label.append(input,text);row.append(label);
+    }
+    return row;
+  },
+  allowed(){return !this.busy&&!this.loading&&!!this.d&&this.idx===ClusterMgr.current&&this.epoch===Auth.epoch&&App.cur==='nodeprep'&&!Auth.locked&&canDo(Auth.role,'admin');},
+  updateButton(){
+    const button=document.getElementById('sp-run');if(!button)return;
+    button.textContent=`Sincronizza ${this.selected.size} nodi`;button.disabled=!this.selected.size||!this.allowed();
+  },
+  confirm(){
+    if(!this.allowed()||!this.selected.size)return;
+    const plan=this.d,nodes=SyncPlanHelpers.defaultSelection(plan).filter(n=>this.selected.has(n)),seq=this.seq,idx=this.idx,epoch=Auth.epoch;
+    if(!nodes.length)return;
+    if(nodes.length>64){this.message='Seleziona al massimo 64 nodi per volta.';this.paint();return;}
+    askConfirm({minRole:'admin',level:'danger',title:'Sincronizzare snippet e script?',okLabel:`Sincronizza ${nodes.length} nodi`,
+      lines:SyncPlanHelpers.confirmLines(plan,nodes),
+      consequence:'Gli snippet sono eseguiti come root nelle VM create da ora in poi su questi nodi. Nessun file viene cancellato.'},async()=>{
+      if(!this.current(seq,idx,epoch)||!this.allowed()||this.d!==plan)return;
+      this.busy=true;this.results=[];this.message='';this.paint();
+      try{
+        const result=await api('/clusters/'+idx+'/sync-run',{method:'POST',body:JSON.stringify({nodes,digest:plan.digest}),quiet:true,timeoutMs:600000});
+        if(!this.current(seq,idx,epoch))return;
+        this.results=this.validateResults(result,nodes);
+      }catch(e){
+        if(!this.current(seq,idx,epoch))return;
+        this.message=e.status===429?"Operazione gia' in corso: riprova tra qualche secondo.":e.message;
+        // plan_changed means nothing was copied. Keep the server explanation visible across the fresh read.
+        if(e.status===409&&e.body?.reason==='plan_changed')this.selected.clear();
+      }finally{
+        if(this.current(seq,idx,epoch)){this.busy=false;await Promise.all([this.load(true),SyncAccess.load(true)]);}
+      }
+    });
   }
 };
 
@@ -7418,7 +7576,7 @@ const NetworkSettingsUI={
     try{return JSON.stringify(validateNetwork(value));}catch(e){return JSON.stringify(value);}
   },
   read(validate=true){
-    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim(),manager_from:[...document.querySelectorAll('#ns-manager-from [data-manager-from]')].map(row=>row.querySelector('input').value.trim())};
+    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim(),manager_from:[...document.querySelectorAll('#ns-manager-from [data-manager-from]')].map(row=>row.querySelector('input').value.trim()),snippet_profile:document.getElementById('ns-profile').value};
     return validate?validateNetwork(value):value;
   },
   isDirty(){return this.baseline!==null&&this.baseline!==this.serialize(this.read(false));},
@@ -7465,6 +7623,15 @@ const NetworkSettingsUI={
         <div id="ns-manager-from">${(settings.manager_from??[]).map(value=>this.managerRow(value)).join('')}</div>
         <button data-min-role="admin" type="button" class="btn bg2 sm" id="ns-manager-add" data-manager-add>Aggiungi indirizzo (fino a 4)</button>
       </details>
+      <details class="rs-section" open><summary id="ns-profile-heading">Profilo degli snippet</summary>
+        <input type="hidden" id="ns-profile" value="${esc(settings.snippet_profile||'standard')}">
+        <p class="role-readonly">Profilo: ${settings.snippet_profile==='hosting'?'Hosting':'Standard'}</p>
+        <div class="seg" id="ns-profile-seg" role="group" aria-labelledby="ns-profile-heading" aria-describedby="ns-profile-help">
+          <button data-min-role="admin" type="button" data-profile="standard" class="${settings.snippet_profile!=='hosting'?'on':''}" aria-pressed="${settings.snippet_profile!=='hosting'}">Standard</button>
+          <button data-min-role="admin" type="button" data-profile="hosting" class="${settings.snippet_profile==='hosting'?'on':''}" aria-pressed="${settings.snippet_profile==='hosting'}">Hosting</button>
+        </div>
+        <p class="hint" id="ns-profile-help">Hosting: SSH solo con chiave, firewall e irrigidimento nelle VM nuove. Vale per tutti i nodi del cluster.</p>
+      </details>
       <div class="rs-savebar" id="ns-savebar" role="region" aria-label="Salvataggio delle impostazioni di rete" hidden>
         <span class="rs-savebar-status" role="status">Modifiche non salvate</span>
         <div class="rs-savebar-actions"><button data-min-role="admin" type="button" class="btn bg2" id="ns-cancel" data-cancel>Annulla</button><button data-min-role="admin" type="submit" class="btn ba" id="ns-save">Salva</button></div>
@@ -7479,6 +7646,15 @@ const NetworkSettingsUI={
   },
   click(e){
     const button=e.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-profile')){
+      const profile=button.dataset.profile;
+      if(!canDo(Auth.role,'admin')||!['standard','hosting'].includes(profile))return;
+      document.getElementById('ns-profile').value=profile;
+      for(const pick of document.querySelectorAll('#ns-profile-seg button')){
+        const on=pick.dataset.profile===profile;pick.classList.toggle('on',on);pick.setAttribute('aria-pressed',on);
+      }
+      this.updateDirty();return;
+    }
     if(button.hasAttribute('data-cancel')){this.cancel();return;}
     if(button.hasAttribute('data-manager-remove')){button.closest('[data-manager-from]').remove();this.updateDirty();document.getElementById('ns-manager-add').focus();return;}
     if(button.hasAttribute('data-manager-add')){

@@ -3,7 +3,8 @@ package main
 import "testing"
 
 func TestNetworkSettingsUnsavedChanges(t *testing.T) {
-	source := settingsJS(t, "// pmgr:network:begin", "// pmgr:network:end") +
+	source := authUISource(t, "// pmgr:auth-ui:begin", "// pmgr:auth-ui:end") +
+		settingsJS(t, "// pmgr:network:begin", "// pmgr:network:end") +
 		settingsJS(t, "// pmgr:network-settings:begin", "// pmgr:network-settings:end") +
 		settingsJS(t, "// pmgr:settings-guard:begin", "// pmgr:settings-guard:end") +
 		settingsJS(t, "const ClusterMgr={", "\n};") +
@@ -19,7 +20,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
 global.Auth={locked:false,role:'admin'};global.RoleUI={readonly(){},canPage:()=>true};global._IS_CONSOLE=false;
-global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:selector==='#ns-manager-from [data-manager-from]'?get('ns-manager-from').children:[],querySelector:()=>null};
+global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:selector==='#ns-manager-from [data-manager-from]'?get('ns-manager-from').children:selector==='#ns-profile-seg button'?profilePicks:[],querySelector:()=>null};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings/infra'};
 global.history={pushState(a,b,h){location.hash=h;},replaceState(a,b,h){location.hash=h;}};
@@ -34,6 +35,8 @@ global.Provision={resetNetwork(){}};
 global.UpdateUI={load(){}};
 `+source+`
 const ui=NetworkSettingsUI;
+const profilePicks=['standard','hosting'].map(profile=>({...element(),dataset:{profile}}));
+const profileButton=profile=>({target:{closest:()=>({hasAttribute:a=>a==='data-profile',dataset:{profile}})}});
 const empty=()=>({networks:[],dns:[],search_domain:''});
 function row(value){
  const controls={cidr:{value:value.cidr,focus(){}},gateway:{value:value.gateway}};
@@ -45,6 +48,7 @@ ui.render=settings=>{
  const root={...element(),children:settings.networks.map(row),querySelectorAll(){return this.children;},insertAdjacentHTML(position,markup){this.children.push(row({cidr:'',gateway:''}));this.lastElementChild=this.children.at(-1);}};
  nodes.set('ns-networks',root);get('ns-dns').value=settings.dns.join(' ');get('ns-search').value=settings.search_domain;get('ns-save-error').textContent='';
  nodes.set('ns-manager-from',{...element(),children:(settings.manager_from??[]).map(managerRow),querySelectorAll(){return this.children;},insertAdjacentHTML(){this.children.push(managerRow(''));this.lastElementChild=this.children.at(-1);}});
+ get('ns-profile').value=settings.snippet_profile||'standard';
  render(settings);
 };
 const edit=(id,value)=>{get(id).value=value;get('ns-form').events.input();};
@@ -59,6 +63,23 @@ let saved=empty();global.api=async()=>structuredClone(saved);
  assert.equal(get('ns-heading').innerHTML,'Infrastruttura · &lt;Cluster &amp; &quot;test&quot;&gt;');
  assert(get('ns-editor').innerHTML.includes('<details class="rs-section" open>'));
  assert(get('ns-editor').innerHTML.includes('role="alert"'));
+ assert(get('ns-editor').innerHTML.includes('Profilo degli snippet'));
+ assert(get('ns-editor').innerHTML.includes('data-profile="standard" class="on" aria-pressed="true"'));
+ assert(get('ns-editor').innerHTML.includes('<p class="role-readonly">Profilo: Standard</p>'));
+ assert(get('ns-editor').innerHTML.includes('Hosting: SSH solo con chiave, firewall e irrigidimento nelle VM nuove. Vale per tutti i nodi del cluster.'));
+ for(const role of ['reader','operator']){Auth.role=role;ui.click(profileButton('hosting'));assert.equal(get('ns-profile').value,'standard');assert(!ui.isDirty());}
+ Auth.role='admin';ui.click(profileButton('unexpected'));assert(!ui.isDirty());
+ ui.click(profileButton('hosting'));assert(ui.isDirty());assert.equal(ui.read().snippet_profile,'hosting');
+ assert(ui.guardLeave(()=>{}));assert.equal(confirmation.options.level,'warn');
+ ui.click(profileButton('standard'));assert(!ui.isDirty());
+ ui.click(profileButton('hosting'));let profileWrites=0;
+ global.api=async(path,options)=>{profileWrites++;assert.equal(options.method,'PUT');saved=JSON.parse(options.body);return {status:'ok'};};
+ await ui.save();assert.equal(profileWrites,1);assert.equal(saved.snippet_profile,'hosting');assert(!ui.isDirty());
+ ui.click(profileButton('standard'));assert(ui.isDirty());global.api=async()=>structuredClone(saved);await ui.cancel();
+ assert.equal(get('ns-profile').value,'hosting');assert(!ui.isDirty());
+ assert(get('ns-editor').innerHTML.includes('data-profile="hosting" class="on" aria-pressed="true"'));
+ assert(get('ns-editor').innerHTML.includes('<p class="role-readonly">Profilo: Hosting</p>'));
+ ui.render(empty());
  assert(!ui.row({cidr:'<script>',gateway:'" onfocus="bad'}).includes('<script>'));
  assert(ui.row({gateway:'" onfocus="bad'}).includes('&quot; onfocus=&quot;bad'));
  assert(ui.managerRow('" onfocus="bad').includes('&quot; onfocus=&quot;bad'));
