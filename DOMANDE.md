@@ -1499,3 +1499,87 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A se possibile.
 **Risposta utente**: A, stessa macchina (2026-11-23): manager su `127.0.0.1:8080`, `trusted_proxies: ["127.0.0.1"]`.
 
+### D148 — Procedura standard per un nodo nuovo o un cluster nuovo
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: dove scriviamo la procedura e dove stanno gli strumenti che servono?
+**Perché conta**: oggi i passi sono sparsi: README degli script dei template (`SUPPORT-FILES/pmgr-scripts/`, fuori da git: "Preparazione di un cluster"), `tools/pmgr-sync/README.md` (accesso per la sincronizzazione), `pmgr-calcolo-install.sh`, README del repository (account e token Proxmox), registro di `CLAUDE.md`. Chi deve aggiungere un nodo non ha una lista unica, e una parte degli strumenti esiste solo sulla postazione.
+**Opzioni**: A) `docs/ONBOARDING.md` nel repository con due liste (cluster nuovo, nodo nuovo), e **gli strumenti dei template spostati nel repository** (`tools/pmgr-scripts/`): oggi non contengono segreti (password e chiavi stanno in `/etc/pmgr` sui nodi), quindi la vecchia regola "mai nel repository" non ha piu' motivo; B) documento nel repository, strumenti fuori come oggi; C) tutto fuori dal repository.
+**Suggerimento**: A: una sola fonte, versionata e firmata con le release; e' anche il prerequisito perche' il manager possa consegnare gli script ai nodi (D149).
+**Risposta utente**: A (2026-11-25). Attenzione emersa nel design: il repository e' **pubblico** e alcuni file del tooling contengono indirizzi e nomi interni (vedi D155).
+
+### D149 — Quanto dell'onboarding puo' fare il manager
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: fin dove il manager gestisce l'aggiunta di un nodo o di un cluster?
+**Perché conta**: alcuni passi richiedono root sul nodo una sola volta (creare utente e token Proxmox, abilitare il contenuto Snippets su `local`, creare l'utente `pmgr-sync`); dare al manager un accesso root ai nodi lo renderebbe il punto piu' pericoloso di tutta l'infrastruttura.
+**Opzioni**: A) **il manager prepara e verifica, non esegue come root**: pagina "Preparazione dei nodi" che controlla ogni nodo via API (storage con Snippets, snippet presenti, template, rete, permessi del token) e mostra i comandi esatti e gia' compilati per i passi da root (`pveum`, `pvesm set`, `pmgr-sync-setup.sh`); dopo quei passi la copia di script e snippet la fa il manager con l'accesso ristretto `pmgr-sync` (voce 13: comando forzato, solo scrittura in due cartelle); B) come A ma il manager esegue anche i passi da root via SSH con una chiave root (sconsigliato); C) solo documentazione.
+**Suggerimento**: A: automatizza tutto cio' che si puo' fare senza privilegi alti, il resto lo rende un copia-incolla verificato; si unisce alla voce 13.
+**Risposta utente**: A (2026-11-25): il manager prepara, verifica e sincronizza; i passi da root restano comandi compilati da incollare.
+
+### D150 — Chi e' la "sorgente" di script e snippet
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: da dove partono script e snippet verso i nodi?
+**Perché conta**: oggi la sorgente e' un nodo (CALCOLO: il nodo 1 con il vecchio `rsync` da root; Magi: il nodo 1 con `pmgr-snippets-sync`). D94/D97/D98 avevano previsto il manager che comanda il nodo sorgente via SSH. Con gli strumenti nel repository (D148) e le release firmate c'e' una strada piu' semplice.
+**Opzioni**: A) **il manager e' la sorgente**: gli strumenti sono incorporati nel binario firmato, il manager genera gli snippet per ogni cluster (profilo standard/hosting, chiavi dei template) e li consegna direttamente a ogni nodo con l'accesso ristretto `pmgr-sync` (solo scrittura in due cartelle, mai lettura ne' cancellazione); nessun nodo e' piu' "speciale"; B) come previsto da D94: il manager comanda via SSH il nodo sorgente, che resta l'unico a tenere gli script e li spinge agli altri; C) restare a oggi (sincronizzazione a mano dal nodo 1).
+**Suggerimento**: A: una sola sorgente verificabile (la release firmata), un nodo nuovo si prepara come tutti gli altri, sparisce il rischio "unica copia sul nodo 1". Sostituisce D94/D98 (D97 resta: sorgente nel repository).
+**Risposta utente**: come suggerito (2026-11-25).
+
+### D151 — Dove stanno profilo e chiavi dei template di ogni cluster
+**Stato**: RISPOSTA
+**Bloccante**: si' (con D150 A)
+**Domanda**: per generare gli snippet il manager deve conoscere, per ogni cluster, il profilo (standard/hosting) e le chiavi pubbliche che i template mettono nell'utente della VM. Oggi stanno in `/etc/pmgr/cluster.conf` e `/etc/pmgr/ssh_keys.pub` sui nodi.
+**Opzioni**: A) nel manager, scheda **Infrastruttura** del cluster (chiavi pubbliche validate una per una, profilo); `/etc/pmgr` sui nodi resta solo per la creazione dei template (voce 14, ancora da root); B) il manager le legge dal nodo (servirebbe una lettura via SSH, che oggi il gate non permette).
+**Suggerimento**: A: sono dati pubblici (chiavi pubbliche), modificabili da amministratore con conferma TOTP e registrati.
+**Risposta utente**: come suggerito (2026-11-25).
+
+### D152 — Fiducia nella chiave host dei nodi
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: come il manager si assicura di parlare con il nodo vero quando apre la prima connessione SSH?
+**Opzioni**: A) al primo contatto la pagina mostra l'impronta della chiave host ricevuta e il comando da eseguire sul nodo per confrontarla (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`); solo dopo la conferma dell'amministratore (con TOTP) l'impronta viene salvata e da li' in poi e' fissa (un cambio blocca la sincronizzazione e lo segnala); B) fiducia al primo contatto senza conferma (come oggi con `accept-new`).
+**Suggerimento**: A.
+**Risposta utente**: come suggerito (2026-11-25).
+
+### D153 — Chi puo' preparare i nodi e sincronizzare (chiude D95)
+**Stato**: RISPOSTA
+**Bloccante**: no (assunzione provvisoria = suggerimento)
+**Domanda**: quale ruolo puo' vedere lo stato di preparazione dei nodi e quale puo' sincronizzare?
+**Opzioni**: A) stato e controlli: tutti i ruoli (sola lettura); comandi da root e anteprima: amministratore; **sincronizzazione e conferma delle chiavi host: amministratore con codice TOTP**; B) tutto solo amministratore.
+**Suggerimento**: A.
+**Risposta utente**: come suggerito (2026-11-25).
+
+### D154 — Lo script di preparazione dei nodi come allegato firmato della release
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: come arriva `pmgr-sync-setup.sh` su un nodo nuovo, dove va eseguito da root?
+**Opzioni**: A) diventa un allegato di ogni release, coperto da `SHA256SUMS` e dalla firma; i comandi mostrati dal manager lo scaricano e verificano la firma con OpenSSL prima di eseguirlo (stesso schema di `deploy/install.sh`); B) la pagina mostra il testo dello script da copiare; C) lo si copia a mano dal repository.
+**Suggerimento**: A.
+**Risposta utente**: come suggerito (2026-11-25).
+
+### D155 — Cosa del tooling NON va nel repository pubblico
+**Stato**: RISPOSTA
+**Bloccante**: si' (prima di spostare gli strumenti, D148)
+**Domanda**: il repository e' pubblico. Nel tooling ci sono file con indirizzi IP interni, nomi di nodi e di VM: `CALCOLO-ROLLOUT.md`, `MAGI-TEST-PLAN.md` (diari operativi), `cluster.conf.example`, `bin/pmgr-calcolo-install.sh`, `tests/test_rollout_run.sh` (9 indirizzi diversi in tutto).
+**Opzioni**: A) i due diari operativi restano fuori (in `SUPPORT-FILES/`, come oggi); gli altri tre file si rendono generici (indirizzi e nomi di esempio, valori reali solo in `/etc/pmgr` sui nodi o nelle impostazioni del manager); un test automatico blocca l'ingresso nel repository di indirizzi `10.75.*`, `131.175.*` e nomi `datacloud-*`; B) rendere il repository privato; C) spostare tutto cosi' com'e' (sconsigliato).
+**Suggerimento**: A.
+**Risposta utente**: come suggerito (2026-11-25).
+
+### D156 — Preparazione post-installazione di un nodo (repository, aggiornamento, avviso di sottoscrizione)
+**Stato**: RISPOSTA
+**Bloccante**: si' (per lo step dello script di preparazione)
+**Domanda**: l'utente chiede che la procedura comprenda quello che fa `community-scripts/ProxmoxVE` `tools/pve/post-pve-install.sh`. Letto (688 righe, interattivo con `whiptail`): su Proxmox 9 riscrive le sorgenti apt in formato deb822 (Debian trixie, security, updates), disattiva o cancella `pve-enterprise` e `ceph enterprise`, aggiunge `pve-no-subscription`, aggiunge Ceph no-subscription scegliendo **`ceph-tentacle` se la versione di Proxmox e' >= 9.2, altrimenti `ceph-squid`**, aggiunge `pve-test` disattivato, toglie l'avviso di sottoscrizione modificando `proxmoxlib.js` con un hook `DPkg::Post-Invoke`, propone di attivare o **disattivare HA e corosync**, poi `apt update` + `dist-upgrade`, e ricorda il riavvio.
+**Perché conta**: (1) eseguire da root uno script scaricato al momento da un repository di terzi e' un rischio di catena di fornitura su ogni nodo; (2) la scelta automatica di `ceph-tentacle` su un nodo nuovo di un cluster che gira `ceph-squid` mescolerebbe due versioni di Ceph nello stesso cluster; (3) le domande su HA e corosync, se risposte male su un nodo di un cluster, lo staccano dal quorum.
+**Opzioni**: A) **script nostro** `pmgr-node-prepare.sh`, non interattivo, idempotente, firmato con la release (come D154): stesse sorgenti deb822, enterprise disattivato, no-subscription attivo, **repository Ceph della stessa release gia' in uso nel cluster** (il manager la legge e la passa come argomento: `--ceph squid`), `pve-test` non aggiunto, avviso di sottoscrizione tolto con lo stesso hook (opzione `--no-nag`, attiva di default), **HA e corosync mai toccati**, `--upgrade` per aggiornare (prima dell'ingresso nel cluster), nessun riavvio automatico, `--check` per vedere cosa cambierebbe; B) eseguire lo script della community cosi' com'e'; C) scaricarne una copia fissata e verificata e lanciarla.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-25).
+
+### D157 — Pagine "Aggiungi nodo" e "Rimuovi nodo"
+**Stato**: RISPOSTA
+**Bloccante**: no (assunzione provvisoria = suggerimento)
+**Domanda**: come sono fatte le due pagine richieste?
+**Opzioni**: A) due procedure guidate a passi, ciascun passo con: spiegazione breve, **controllo automatico via API** (verde/rosso con il motivo) e **comandi gia' compilati** per i passi da root. **Aggiungi nodo**: (1) prerequisiti (stessa versione maggiore di Proxmox, rete di management/cluster/Ceph, ora sincronizzata, nome risolvibile); (2) `pmgr-node-prepare.sh` (D156); (3) ingresso nel cluster (`pvecm add`, nodo senza guest); (4) Ceph se serve (`pveceph install` con la release del cluster, MON/MGR/OSD); (5) storage e contenuto Snippets; (6) `pmgr-sync-setup.sh` e conferma dell'impronta (D152); (7) sincronizzazione di script e snippet; (8) mapping PCI delle GPU del nodo; (9) controllo finale nella pagina di preparazione. **Rimuovi nodo** (ordine di Proxmox): (1) svuotare il nodo dalle VM (il manager propone e, con conferma, esegue lo svuotamento del Bilanciamento); (2) togliere il nodo da HA, replica, restrizioni degli storage e mapping PCI; (3) Ceph: OSD `out`, attesa di `HEALTH_OK`, stop e distruzione degli OSD, rimozione di MON/MGR/MDS controllando che ne restino abbastanza, rimozione dalla mappa CRUSH; (4) spegnimento del nodo (e il nodo non deve tornare in rete con la stessa identita'); (5) `pvecm delnode` da un altro nodo; (6) pulizia (`/etc/pve/nodes/<nodo>`, `pvecm updatecerts`); (7) nel manager: impronta SSH dimenticata, nodo tolto dalla sincronizzazione. Ogni passo di rimozione si sblocca solo se il controllo del passo precedente e' verde. B) solo documentazione.
+**Suggerimento**: A, con le due procedure anche in `docs/ONBOARDING.md` per chi lavora senza il manager.
+**Risposta utente**: A (2026-11-25).
+
