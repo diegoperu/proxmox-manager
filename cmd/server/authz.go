@@ -62,7 +62,8 @@ var routeAccess = map[string]access{
 	"POST /api/clusters/{idx}/sync-access/pin": adminTOTP, "DELETE /api/clusters/{idx}/sync-access/pin/{node}": adminTOTP,
 	// Delivery of snippets and scripts to the nodes (step 4): preview for everyone, copy by administrators with TOTP.
 	"GET /api/clusters/{idx}/sync-plan": reader, "POST /api/clusters/{idx}/sync-run": adminTOTP,
-	"GET /api/dashboard": reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
+	"GET /api/clusters/{idx}/node-cleanup": reader,
+	"GET /api/dashboard":                   reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
 	"GET /api/nodes/{node}/rrd": reader, "GET /api/nodes/{node}/storage": reader, "GET /api/vms": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/status": reader, "GET /api/nodes/{node}/qemu/{vmid}/rrd": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/fsinfo": reader, "GET /api/nodes/{node}/qemu/{vmid}/osinfo": reader,

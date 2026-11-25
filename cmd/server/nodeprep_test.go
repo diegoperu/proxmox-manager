@@ -43,6 +43,7 @@ global.document={getElementById(id){if(!controls.has(id))controls.set(id,{disabl
 global.ClusterMgr={current:0};global.App={cur:'nodeprep'};global.Auth={locked:false,epoch:1};
 const accessLoads=[];global.SyncAccess={load:async fresh=>accessLoads.push(fresh),leave(){}};
 const planLoads=[];global.SyncPlan={load:async()=>planLoads.push(true),leave(){}};
+const cleanupLoads=[];global.NodeCleanup={load:async()=>cleanupLoads.push(true),leave(){}};
 const check={id:'online',status:'ok',title:'Nodo',detail:'In linea',commands:[]};
 const report={cluster:'Mock',generated_at:1700000000,summary:{ok:1,warn:0,fail:0,unknown:0},cluster_checks:[],nodes:[{node:'node-1',online:true,version:'8.2.4',checks:[check]}],partial:[]};
 for(const bad of [null,{}, {...report,generated_at:NaN},{...report,summary:{...report.summary,fail:-1}},

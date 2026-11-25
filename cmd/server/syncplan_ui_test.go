@@ -22,6 +22,7 @@ const plan={cluster:'Mock',profile:'standard',bundle_digest:'b'.repeat(24),diges
  nodes:[pendingNode,alignedNode,blockedNode],summary:{aligned:1,to_sync:1,not_ready:1}};
 const done={ok:true,results:[{node:pendingNode.node,ok:true,copied:2,message:'Copiati e verificati.'}]};
 const accessRefreshes=[];SyncAccess.load=async fresh=>accessRefreshes.push(fresh);
+global.NodeCleanup={load:async()=>{}};
 global.errBox=(message,retry)=>{assert(['SyncAccess.load(true)','SyncPlan.load()','NodePrep.load(true)'].includes(retry));return esc(message);};
 const ui=SyncPlan;
 const reset=()=>{ui.leave();ui.idx=ClusterMgr.current;ui.epoch=Auth.epoch;ui.d=structuredClone(plan);ui.selected=new Set(SyncPlanHelpers.defaultSelection(ui.d));};

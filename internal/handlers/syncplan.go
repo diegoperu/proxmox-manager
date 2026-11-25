@@ -54,6 +54,7 @@ type syncNodePlan struct {
 	NDifferent int      `json:"different_count"`
 	NExtra     int      `json:"extra_count"`
 	todo       []string // missing + different, not truncated
+	extra      []string // complete extras for the read-only cleanup report
 }
 
 type syncPlanSummary struct {
@@ -155,6 +156,7 @@ func planNode(ctx context.Context, ssh nodeSSH, bundle *snippetsync.Bundle, n sy
 	p.Ready, p.Aligned, p.Same = true, plan.Aligned(), plan.Same
 	p.NMissing, p.NDifferent, p.NExtra = len(plan.Missing), len(plan.Different), len(plan.Extra)
 	p.Missing, p.Different, p.Extra = clip(plan.Missing), clip(plan.Different), clip(plan.Extra)
+	p.extra = plan.Extra
 	p.todo = append(append([]string{}, plan.Missing...), plan.Different...)
 	if p.Aligned {
 		p.Message = "Allineato."

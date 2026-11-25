@@ -1259,6 +1259,8 @@ html.role-admin .role-readonly{display:none!important}
         <section class="panel" id="np-sync" aria-labelledby="np-sync-heading" aria-busy="false"></section>
         <h2 class="sec" id="np-delivery-heading">Snippet e script sui nodi</h2>
         <section class="panel" id="np-delivery" aria-labelledby="np-delivery-heading" aria-busy="false"></section>
+        <h2 class="sec" id="np-cleanup-heading">Pulizia dei file in piu'</h2>
+        <section class="panel" id="np-cleanup" aria-labelledby="np-cleanup-heading" aria-busy="false"></section>
         <h2 class="sec">Nodi</h2><div id="np-nodes"></div>
       </div>
       <p class="cnote"><a href="#/nodeadd">Aggiungi nodo</a> · <a href="#/noderemove">Rimuovi nodo</a></p>
@@ -4786,7 +4788,7 @@ const NodePrepHelpers={
 /* pmgr:nodeprep:end */
 const NodePrep={
   seq:0,idx:null,d:null,onlyProblems:false,filterChosen:false,
-  leave(){this.seq++;SyncAccess.leave();SyncPlan.leave();},
+  leave(){this.seq++;SyncAccess.leave();SyncPlan.leave();NodeCleanup.leave();},
   current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&epoch===Auth.epoch;},
   // Reject malformed reports at the API boundary rather than presenting them as healthy.
   validate(d){
@@ -4804,11 +4806,15 @@ const NodePrep={
     const idx=ClusterMgr.current,seq=++this.seq,epoch=Auth.epoch;
     if(this.idx!==idx){this.idx=idx;this.filterChosen=false;}
     this.d=null;
+    NodeCleanup.leave();document.getElementById('np-cleanup').textContent='Controllo dei file in piu’…';
     const body=document.getElementById('np-cluster'),cond=document.getElementById('np-cond');
     cond.textContent='Controllo dei nodi in corso…';
     body.textContent='Caricamento…';document.getElementById('np-nodes').replaceChildren();document.getElementById('np-partial').hidden=true;
     document.getElementById('np-recheck').disabled=true;document.getElementById('np-only').disabled=true;
-    const reports=Promise.all([SyncAccess.load(fresh),SyncPlan.load()]);
+    // Plan and cleanup share a server lock: read them in order, preserving the page context.
+    const reports=Promise.all([SyncAccess.load(fresh),SyncPlan.load().then(()=>{
+      if(this.current(seq,idx,epoch))return NodeCleanup.load();
+    })]);
     try{
       const d=this.validate(await api('/clusters/'+idx+'/node-readiness'+(fresh?'?fresh=1':''),{quiet:true,timeoutMs:120000}));
       if(!this.current(seq,idx,epoch))return;
@@ -5379,9 +5385,102 @@ const SyncPlan={
         // plan_changed means nothing was copied. Keep the server explanation visible across the fresh read.
         if(e.status===409&&e.body?.reason==='plan_changed')this.selected.clear();
       }finally{
-        if(this.current(seq,idx,epoch)){this.busy=false;await Promise.all([this.load(true),SyncAccess.load(true)]);}
+        if(this.current(seq,idx,epoch)){
+          this.busy=false;
+          await Promise.all([this.load(true).then(()=>{
+            if(this.idx===idx&&this.current(this.seq,idx,epoch))return NodeCleanup.load();
+          }),SyncAccess.load(true)]);
+        }
       }
     });
+  }
+};
+
+/* pmgr:cleanup:begin */
+const CleanupHelpers={
+  classWord(value){
+    return value==='removable'?'rimovibile':value==='in_use'?'IN USO: non cancellare':'non verificabile: non cancellare';
+  },
+  nodeSummary(node){
+    if(node?.state!=='ok')return node?.message||'Nodo non pronto.';
+    if(!node?.files?.length)return "nessun file in piu'";
+    return `${node.removable} rimovibili · ${node.in_use} in uso · ${node.unknown} non verificabili`;
+  }
+};
+/* pmgr:cleanup:end */
+const NodeCleanup={
+  seq:0,d:null,
+  leave(){this.seq++;this.d=null;},
+  current(seq,idx,epoch){return seq===this.seq&&idx===ClusterMgr.current&&App.cur==='nodeprep'&&!Auth.locked&&epoch===Auth.epoch;},
+  validate(d){
+    const text=(v,max=131072)=>typeof v==='string'&&v.length<=max;
+    const count=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000;
+    if(!d||!text(d.cluster,256)||!Number.isSafeInteger(d.generated_at)||d.generated_at<=0||d.generated_at>8640000000000||
+      !d.references||typeof d.references.known!=='boolean'||!count(d.references.guests_read)||d.references.guests_read>2000||!count(d.references.configs_failed)||
+      !Array.isArray(d.nodes)||d.nodes.length>256||!d.nodes.every(n=>n&&SyncAccess.nodeName(n.node)&&
+        ['ok','not_pinned','auth_refused','gate_denied','host_key_changed','unreachable','offline','no_address','error'].includes(n.state)&&
+        text(n.message)&&text(n.command)&&text(n.undo)&&['removable','in_use','unknown'].every(k=>count(n[k]))&&
+        Array.isArray(n.files)&&n.files.length<=10000&&n.files.every(f=>f&&text(f.path,4096)&&
+          ['removable','in_use','unknown'].includes(f.class)&&Array.isArray(f.used_by)&&f.used_by.length<=20&&f.used_by.every(v=>text(v,512))&&
+          count(f.used_by_count)&&f.used_by.length===Math.min(20,f.used_by_count))&&
+        ['removable','in_use','unknown'].every(k=>n[k]===n.files.filter(f=>f.class===k).length)&&
+        (n.state==='ok'||(!n.files.length&&!n.command&&!n.undo))&&
+        (n.removable>0?!!n.command&&!!n.undo:!n.command&&!n.undo))||
+      new Set(d.nodes.map(n=>n.node)).size!==d.nodes.length||
+      !Array.isArray(d.manual)||d.manual.length>32||!d.manual.every(v=>text(v,4096)))throw new Error('Risposta della pulizia non valida.');
+    return d;
+  },
+  async load(){
+    const seq=++this.seq,idx=ClusterMgr.current,epoch=Auth.epoch,body=document.getElementById('np-cleanup');
+    this.d=null;body.textContent='Controllo dei file in piu’…';body.setAttribute('aria-busy','true');
+    try{
+      const d=this.validate(await api('/clusters/'+idx+'/node-cleanup',{quiet:true,timeoutMs:180000}));
+      if(!this.current(seq,idx,epoch))return;
+      this.d=d;this.paint();
+    }catch(e){
+      if(!this.current(seq,idx,epoch))return;
+      body.replaceChildren();const message=document.createElement('p'),retry=document.createElement('button');message.className='sa-summary';
+      message.setAttribute('role','alert');message.textContent=e.status===429?"Operazione gia' in corso: riprova tra qualche secondo.":e.message;
+      retry.type='button';retry.className='btn bg2 sm';retry.textContent='Ricontrolla la pulizia';retry.addEventListener('click',()=>this.load());body.append(message,retry);
+    }finally{if(this.current(seq,idx,epoch))body.setAttribute('aria-busy','false');}
+  },
+  paint(){
+    const body=document.getElementById('np-cleanup'),d=this.d;body.replaceChildren();if(!d)return;
+    const info=document.createElement('div'),header=document.createElement('p');info.className='sa-summary';
+    header.textContent=`${d.references.guests_read} configurazioni di VM e template lette · ${d.references.configs_failed} non verificate`;
+    info.append(header);
+    if(!d.references.known){
+      const warning=document.createElement('p');warning.className='ns-warning';warning.setAttribute('role','alert');
+      warning.textContent="Riferimenti non verificabili: ora gli snippet non possono essere rimossi. Ricontrolla quando tutte le configurazioni sono leggibili (massimo 2000 guest).";info.append(warning);
+    }
+    const note=document.createElement('p');note.textContent="Proxmox rilegge gli snippet a ogni avvio: cancellare uno snippet in uso impedisce l'avvio delle VM che lo citano. Il manager mostra i comandi; eseguili a mano sul nodo indicato.";info.append(note);body.append(info);
+    const nodes=document.createElement('ul');nodes.className='sa-nodes';nodes.setAttribute('aria-label','Pulizia per nodo');
+    for(const n of d.nodes){
+      const row=document.createElement('li'),head=document.createElement('strong'),summary=document.createElement('p');row.className='sa-node';
+      head.textContent=n.node;summary.textContent=CleanupHelpers.nodeSummary(n);row.append(head,summary);
+      if(n.state==='ok'&&n.message){const message=document.createElement('p');message.textContent=n.message;row.append(message);}
+      const files=document.createElement('ul');files.className='sp-paths';
+      for(const f of n.files){
+        const item=document.createElement('li'),path=document.createElement('code'),state=document.createElement('span');path.textContent=f.path;
+        state.className='np-state '+(f.class==='removable'?'ok':f.class==='in_use'?'fail':'unknown');
+        state.textContent=' '+(f.class==='removable'?'✓':f.class==='in_use'?'✕':'?')+' '+CleanupHelpers.classWord(f.class);item.append(path,state);
+        if(f.used_by.length){
+          const users=document.createElement('p');users.textContent='VM e template: '+f.used_by.join(', ')+(f.used_by_count>f.used_by.length?` · e altri ${f.used_by_count-f.used_by.length}`:'');item.append(users);
+        }
+        files.append(item);
+      }
+      if(n.files.length)row.append(files);
+      if(n.command){
+        const label=document.createElement('p');label.textContent=`Da eseguire come root su ${n.node}: copia di sicurezza, poi cancellazione dei soli file rimovibili`;
+        row.append(label,NodePrep.command(n.command,'pulizia su '+n.node));
+        const undo=document.createElement('details'),title=document.createElement('summary');title.textContent='Annulla: ripristina la copia di sicurezza';undo.append(title,NodePrep.command(n.undo,'ripristino su '+n.node));row.append(undo);
+      }
+      nodes.append(row);
+    }
+    if(!d.nodes.length){const empty=document.createElement('li');empty.className='empty';empty.textContent='Nessun nodo disponibile.';nodes.append(empty);}body.append(nodes);
+    const manual=document.createElement('div'),title=document.createElement('p'),checklist=document.createElement('ul');manual.className='sa-summary';
+    title.textContent='Controlli manuali fuori dalle due cartelle';checklist.className='sa-nodes';
+    for(const text of d.manual){const item=document.createElement('li');item.textContent='☐ '+text;checklist.append(item);}manual.append(title,checklist);body.append(manual);
   }
 };
 
