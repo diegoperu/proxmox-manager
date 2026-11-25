@@ -19,7 +19,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
 global.Auth={locked:false,role:'admin'};global.RoleUI={readonly(){},canPage:()=>true};global._IS_CONSOLE=false;
-global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:[],querySelector:()=>null};
+global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:selector==='#ns-manager-from [data-manager-from]'?get('ns-manager-from').children:[],querySelector:()=>null};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings/infra'};
 global.history={pushState(a,b,h){location.hash=h;},replaceState(a,b,h){location.hash=h;}};
@@ -40,9 +40,11 @@ function row(value){
  return {controls,querySelector:selector=>selector==='input'?controls.cidr:controls[/data-key="([^"]+)"/.exec(selector)[1]],remove(){const root=get('ns-networks');root.children=root.children.filter(child=>child!==this);}};
 }
 const render=ui.render.bind(ui);
+function managerRow(value){const input={value,focus(){}};return {querySelector:()=>input,remove(){const root=get('ns-manager-from');root.children=root.children.filter(child=>child!==this);}};}
 ui.render=settings=>{
  const root={...element(),children:settings.networks.map(row),querySelectorAll(){return this.children;},insertAdjacentHTML(position,markup){this.children.push(row({cidr:'',gateway:''}));this.lastElementChild=this.children.at(-1);}};
  nodes.set('ns-networks',root);get('ns-dns').value=settings.dns.join(' ');get('ns-search').value=settings.search_domain;get('ns-save-error').textContent='';
+ nodes.set('ns-manager-from',{...element(),children:(settings.manager_from??[]).map(managerRow),querySelectorAll(){return this.children;},insertAdjacentHTML(){this.children.push(managerRow(''));this.lastElementChild=this.children.at(-1);}});
  render(settings);
 };
 const edit=(id,value)=>{get(id).value=value;get('ns-form').events.input();};
@@ -59,6 +61,23 @@ let saved=empty();global.api=async()=>structuredClone(saved);
  assert(get('ns-editor').innerHTML.includes('role="alert"'));
  assert(!ui.row({cidr:'<script>',gateway:'" onfocus="bad'}).includes('<script>'));
  assert(ui.row({gateway:'" onfocus="bad'}).includes('&quot; onfocus=&quot;bad'));
+ assert(ui.managerRow('" onfocus="bad').includes('&quot; onfocus=&quot;bad'));
+ ui.click(button('data-manager-add'));assert(ui.isDirty(),'empty manager row is dirty');
+ let managerWrites=0;global.api=async(path,options)=>{managerWrites++;saved=JSON.parse(options.body);return {status:'ok'};};
+ await ui.save();assert.equal(managerWrites,0);assert.equal(get('ns-save-error').textContent,'indirizzo del manager 1: indirizzo IPv4 non valido');
+ get('ns-manager-from').children[0].querySelector('input').value='192.0.2.10';get('ns-form').events.input();await ui.save();
+ assert.equal(managerWrites,1);assert.deepEqual(saved.manager_from,['192.0.2.10']);assert(!ui.isDirty());
+ get('ns-manager-from').children[0].querySelector('input').value='192.0.2.20';assert(ui.isDirty());
+ assert(ui.guardLeave(()=>{}));assert.equal(confirmation.options.level,'warn');
+ ui.render({...empty(),manager_from:['192.0.2.10']});assert(!ui.isDirty());
+ ui.click(button('data-manager-remove',get('ns-manager-from').children[0]));assert(ui.isDirty(),'removing an address is dirty');
+ ui.render(empty());for(let i=0;i<4;i++)ui.click(button('data-manager-add'));
+ assert(get('ns-manager-add').disabled);ui.click(button('data-manager-add'));assert.equal(get('ns-manager-from').children.length,4);
+ for(const child of get('ns-manager-from').children)child.querySelector('input').value='192.0.2.10';
+ await ui.save();assert.equal(get('ns-save-error').textContent,'indirizzo del manager 2: indirizzo ripetuto');
+ get('ns-manager-from').children[1].querySelector('input').value='2001:db8::1';
+ await ui.save();assert.equal(get('ns-save-error').textContent,'indirizzo del manager 2: indirizzo IPv4 non valido');
+ ui.render(empty());
  edit('ns-dns','1.1.1.1');assert(ui.isDirty());assert(!get('ns-savebar').hidden);
  edit('ns-dns','');assert(!ui.isDirty());assert(get('ns-savebar').hidden);
  ui.render({...empty(),dns:['2001:db8::1'],search_domain:'example.org'});

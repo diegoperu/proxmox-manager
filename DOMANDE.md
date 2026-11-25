@@ -1583,3 +1583,20 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A, con le due procedure anche in `docs/ONBOARDING.md` per chi lavora senza il manager.
 **Risposta utente**: A (2026-11-25).
 
+### D158 — Indirizzo del manager visto dai nodi (vincolo from=)
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: la chiave del manager sui nodi vale solo dall'indirizzo del manager; quale indirizzo, e dove si imposta?
+**Perché conta**: i nodi possono vedere il manager attraverso un router (Magi vede la postazione come 10.75.132.254): un indirizzo sbagliato blocca l'accesso, uno troppo largo lo apre a una rete.
+**Opzioni**: A) campo per cluster in Impostazioni, Infrastruttura (fino a 4 IPv4); B) un valore globale.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-25).
+
+### D159 — Chiavi ammesse sui nodi durante il passaggio al manager
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: il comando di preparazione riscrive le chiavi ammesse per `pmgr-sync`; tiene anche la chiave del nodo sorgente di oggi?
+**Opzioni**: A) solo la chiave del manager (D150: il manager e' l'unica sorgente); sui cluster che usano ancora `pmgr-snippets-sync` (Magi) il comando si lancia solo quando il manager sapra' sincronizzare (step 4); B) manager + nodo sorgente per una transizione.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-25).
+

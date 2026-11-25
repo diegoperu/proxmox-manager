@@ -17,6 +17,7 @@ import (
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/handlers"
 	"proxmox-manager/internal/history"
+	"proxmox-manager/internal/nodessh"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -77,6 +78,7 @@ func main() {
 
 	h := handlers.New()
 	h.SetTaskAttribution(accounts.AuditByUPID)
+	h.SetNodeSSH(nodessh.New(config.Get().SSHDirectory()))
 
 	// Daily inventory snapshot for the reports (D28): counts and assignments only.
 	hist, err := history.New(cfg.DBPath)
@@ -204,6 +206,10 @@ func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store
 		r.Get("/clusters", h.GetClusters)
 		r.Get("/clusters/{idx}/network-settings", h.GetNetworkSettings)
 		r.Get("/clusters/{idx}/node-readiness", h.GetNodeReadiness)
+		r.Get("/clusters/{idx}/sync-access", h.GetSyncAccess)
+		r.Post("/clusters/{idx}/sync-access/scan", h.PostSyncScan)
+		r.Post("/clusters/{idx}/sync-access/pin", h.PostSyncPin)
+		r.Delete("/clusters/{idx}/sync-access/pin/{node}", h.DeleteSyncPin)
 		r.Put("/clusters/{idx}/network-settings", h.PutNetworkSettings)
 		r.Get("/clusters/{idx}/report-settings", h.GetReportSettings)
 		r.Put("/clusters/{idx}/report-settings", h.PutReportSettings)

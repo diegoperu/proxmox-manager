@@ -202,6 +202,16 @@ No IP addresses, no guest content, no processes. VMIDs are reused by Proxmox, so
 
 ---
 
+## Manager SSH access to the nodes
+
+To copy scripts and cloud-init snippets to the nodes (onboarding, see `docs/ONBOARDING.md`) the manager logs in to each node as `pmgr-sync`, an account restricted by a forced command to listing and writing two folders. The manager key and the node host keys it trusts are in `ssh_dir` (default `ssh/` next to `config.json`, mode 0700; back it up with the configuration). In **Operazioni → Preparazione nodi**:
+
+1. set **Impostazioni → Infrastruttura → Indirizzo del manager visto dai nodi** (the address the nodes see: a router's if there is one in between);
+2. run, as root on every node, the two commands the page compiles (`pmgr-sync-setup.sh --role dest` with the manager key and that address);
+3. for each node, an administrator reads the host key fingerprint, compares it with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` run on the node, and confirms it (TOTP).
+
+The access then shows "accesso attivo" with the files present on the node. Needs `openssh-client` on the manager machine.
+
 ## Creating the Proxmox service account and API tokens
 
 The manager talks to every cluster with **one dedicated service account per cluster**, `pmgr@pve`, through API tokens; who did what is recorded by the manager itself (action log with the Proxmox task UPID). Do **not** use `root@pam` or the built-in `Administrator` role: it also grants `Permissions.Modify`, `User.Modify`, `Realm.Allocate`, `Group.Allocate`, `Sys.Modify` and `Sys.Incoming`, so a stolen token could create users, grant itself rights and change the cluster configuration. No other built-in role fits either (`PVEVMAdmin` lacks node and storage access, `PVEAdmin` includes `User.Modify`, only `Administrator` has `Sys.PowerMgmt`).
