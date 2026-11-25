@@ -55,7 +55,11 @@ var routeAccess = map[string]access{
 	"GET /api/config": reader, "GET /api/clusters": reader, "GET /api/version": reader, "GET /api/update-status": reader,
 	"GET /api/clusters/{idx}/network-settings": reader, "GET /api/clusters/{idx}/report-settings": reader,
 	"GET /api/clusters/{idx}/node-readiness": reader,
-	"GET /api/dashboard":                     reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
+	// Manager SSH access to the nodes: status for everyone, reading a host key for administrators,
+	// confirming or forgetting one asks the TOTP code again (D152, D153).
+	"GET /api/clusters/{idx}/sync-access": reader, "POST /api/clusters/{idx}/sync-access/scan": admin,
+	"POST /api/clusters/{idx}/sync-access/pin": adminTOTP, "DELETE /api/clusters/{idx}/sync-access/pin/{node}": adminTOTP,
+	"GET /api/dashboard": reader, "GET /api/nodes": reader, "GET /api/nodes/{node}/status": reader,
 	"GET /api/nodes/{node}/rrd": reader, "GET /api/nodes/{node}/storage": reader, "GET /api/vms": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/status": reader, "GET /api/nodes/{node}/qemu/{vmid}/rrd": reader,
 	"GET /api/nodes/{node}/qemu/{vmid}/fsinfo": reader, "GET /api/nodes/{node}/qemu/{vmid}/osinfo": reader,

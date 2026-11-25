@@ -2906,6 +2906,9 @@ const AUDIT_LABELS={
   "POST /api/clusters/{idx}/test":"Test connessione cluster",
   "PUT /api/clusters/{idx}/default":"Cluster predefinito",
   "PUT /api/clusters/{idx}/network-settings":"Modifica reti del cluster",
+  "POST /api/clusters/{idx}/sync-access/scan":"Lettura impronta SSH di un nodo",
+  "POST /api/clusters/{idx}/sync-access/pin":"Conferma impronta SSH di un nodo",
+  "DELETE /api/clusters/{idx}/sync-access/pin/{node}":"Rimozione impronta SSH di un nodo",
   "PUT /api/clusters/{idx}/report-settings":"Modifica impostazioni report",
   "POST /api/clusters/{idx}/report-settings/price-check":"Controllo listini",
   login:'Accesso',logout:'Uscita',setup:'Configurazione iniziale',password:'Cambio password'
@@ -5918,9 +5921,19 @@ function validateNetwork(settings){
     if(seen.has(ip))throw new Error('DNS '+(i+1)+': indirizzo ripetuto');
     seen.add(ip);return ip;
   });
+  const from=settings?.manager_from??[];
+  if(!Array.isArray(from))throw new Error('impostazioni non valide: oggetto JSON con soli campi previsti richiesto');
+  if(from.length>4)throw new Error('indirizzo del manager: al massimo 4 indirizzi');
+  const fromSeen=new Set(),managerFrom=from.map((value,i)=>{
+    const text=normalizeNetworkIP(value),v=parseIPv4(text);
+    // Same rule as Go validManagerFrom: IPv4 host, not 0.0.0.0, multicast or broadcast.
+    if(v===null||v===0||(v>=0xE0000000&&v<=0xEFFFFFFF)||v===0xFFFFFFFF)throw new Error('indirizzo del manager '+(i+1)+': indirizzo IPv4 non valido');
+    if(fromSeen.has(text))throw new Error('indirizzo del manager '+(i+1)+': indirizzo ripetuto');
+    fromSeen.add(text);return text;
+  });
   const domain=validSearchDomain(search);
   if(domain===null)throw new Error('dominio di ricerca non valido (lettere, cifre e trattini separati da punti)');
-  return {networks:normalized,dns:addresses,search_domain:domain};
+  return {networks:normalized,dns:addresses,search_domain:domain,manager_from:managerFrom};
 }
 function findNetwork(settings,ipOrCidr){
   const ip=typeof ipOrCidr==='string'&&ipOrCidr.includes('/')?parseCIDR(ipOrCidr)?.ip:parseIPv4(ipOrCidr);

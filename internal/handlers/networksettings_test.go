@@ -20,7 +20,7 @@ func TestNetworkSettingsAPI(t *testing.T) {
 	r.Put("/api/clusters/{idx}", h.UpdateCluster)
 	path := "/api/clusters/0/network-settings"
 	w := reportRequest(r, "GET", path, "")
-	if w.Code != 200 || w.Body.String() != `{"networks":[],"dns":[],"search_domain":""}`+"\n" {
+	if w.Code != 200 || w.Body.String() != `{"networks":[],"dns":[],"search_domain":"","manager_from":[]}`+"\n" {
 		t.Fatalf("empty %d %s", w.Code, w.Body)
 	}
 	body := `{"networks":[{"cidr":"10.75.4.0/24","gateway":"10.75.4.254"}],"dns":["2001:0DB8::1"],"search_domain":"EXAMPLE.COM"}`

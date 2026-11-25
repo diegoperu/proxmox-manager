@@ -13,6 +13,10 @@ type NetworkSettings struct {
 	Networks     []VMNetwork `json:"networks"`
 	DNS          []string    `json:"dns"`
 	SearchDomain string      `json:"search_domain"`
+	// ManagerFrom: IPv4 addresses the cluster nodes see the manager connecting from (D158). They go into the
+	// from= restriction of the manager's key on the nodes; a router in between means its address, not the
+	// manager's own.
+	ManagerFrom []string `json:"manager_from"`
 }
 
 type VMNetwork struct {
@@ -119,12 +123,38 @@ func ValidNetworkSettings(n *NetworkSettings) error {
 		seen[ip.String()] = true
 		dns = append(dns, ip.String())
 	}
+	from, err := validManagerFrom(n.ManagerFrom)
+	if err != nil {
+		return err
+	}
 	domain, ok := ValidSearchDomain(n.SearchDomain)
 	if !ok {
 		return errors.New("dominio di ricerca non valido (lettere, cifre e trattini separati da punti)")
 	}
-	n.Networks, n.DNS, n.SearchDomain = networks, dns, domain
+	n.Networks, n.DNS, n.SearchDomain, n.ManagerFrom = networks, dns, domain, from
 	return nil
+}
+
+// validManagerFrom accepts up to 4 distinct IPv4 host addresses (the from= list of pmgr-sync-setup.sh is IPv4).
+func validManagerFrom(list []string) ([]string, error) {
+	if len(list) > 4 {
+		return nil, errors.New("indirizzo del manager: al massimo 4 indirizzi")
+	}
+	out := make([]string, 0, len(list))
+	seen := map[string]bool{}
+	for i, value := range list {
+		ip := net.ParseIP(value)
+		if ip == nil || ip.To4() == nil || ip.IsUnspecified() || ip.IsMulticast() || ip.Equal(net.IPv4bcast) {
+			return nil, fmt.Errorf("indirizzo del manager %d: indirizzo IPv4 non valido", i+1)
+		}
+		s := ip.To4().String()
+		if seen[s] {
+			return nil, fmt.Errorf("indirizzo del manager %d: indirizzo ripetuto", i+1)
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 func copyNetwork(n *NetworkSettings) *NetworkSettings {
@@ -134,6 +164,7 @@ func copyNetwork(n *NetworkSettings) *NetworkSettings {
 	c := *n
 	c.Networks = append([]VMNetwork{}, n.Networks...)
 	c.DNS = append([]string{}, n.DNS...)
+	c.ManagerFrom = append([]string{}, n.ManagerFrom...)
 	return &c
 }
 

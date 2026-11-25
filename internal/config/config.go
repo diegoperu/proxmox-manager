@@ -49,6 +49,9 @@ type Config struct {
 	// GPUModels: corrections of the name shown and of the video memory of a card model (D62 A), keyed by the
 	// model string Proxmox reports. Valid for every cluster; the built-in table is the default.
 	GPUModels map[string]GPUModel `json:"gpu_models,omitempty"`
+	// SSHDir holds the manager's SSH key for the nodes (pmgr-sync) and the pinned node host keys (onboarding
+	// step 3). Created with mode 0700 on first use; relative paths are relative to the working directory.
+	SSHDir string `json:"ssh_dir,omitempty"`
 }
 
 // GPUModel is one correction: an empty Name keeps the model's own name, MemoryGB 0 keeps the default size.
@@ -373,6 +376,14 @@ func SetGPUModel(key string, m GPUModel) error {
 		return err
 	}
 	return nil
+}
+
+// SSHDirectory returns the directory of the manager's SSH key and pinned host keys (default "ssh").
+func (c Config) SSHDirectory() string {
+	if c.SSHDir == "" {
+		return "ssh"
+	}
+	return c.SSHDir
 }
 
 // AuthKeyFile returns the path of the TOTP encryption key (default auth.key).
