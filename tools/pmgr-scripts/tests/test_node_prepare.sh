@@ -257,6 +257,44 @@ run --apply --ceph tentacle --keep-nag
 check 'Ceph diverso ma disabilitato: consentito' test "$RC" = 0
 check 'Ceph diverso disabilitato: conservato' grep -q '^ http://download.proxmox.com/debian/ceph-squid$' "$PMGR_ROOT/etc/apt/sources.list.d/ceph.sources"
 
+fresh diff
+snapshot >"$WORK/before"
+run
+check 'anteprima: differenza mostrata' grep -qF -- '--- attuale /etc/apt/sources.list.d/debian.sources' "$WORK/out"
+check 'anteprima: riga nuova visibile' grep -qF -- '+Components: main contrib non-free-firmware' "$WORK/out"
+check 'anteprima con differenza: nessuna scrittura' unchanged
+
+fresh nosub
+cat >"$PMGR_ROOT/etc/apt/sources.list.d/pve-install-repo.sources" <<'EOF'
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: trixie
+Components: pve-no-subscription
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+EOF
+run --apply --keep-nag
+check 'no-subscription gia presente: uscita 0' test "$RC" = 0
+check 'no-subscription gia presente: nessun doppione' test ! -e "$PMGR_ROOT/etc/apt/sources.list.d/proxmox.sources"
+check 'no-subscription gia presente: segnalato' grep -qF 'pve-no-subscription gia attivo in /etc/apt/sources.list.d/pve-install-repo.sources' "$WORK/out"
+snapshot >"$WORK/before"
+run --apply --keep-nag
+check 'no-subscription gia presente: idempotente' unchanged
+sed -i 's/^Components: pve-no-subscription$/Components: pve-no-subscription\nEnabled: no/' "$PMGR_ROOT/etc/apt/sources.list.d/pve-install-repo.sources"
+run --apply --keep-nag
+check 'no-subscription disabilitato altrove: crea proxmox.sources' test -f "$PMGR_ROOT/etc/apt/sources.list.d/proxmox.sources"
+
+fresh community-nag
+printf 'DPkg::Post-Invoke { "/usr/local/bin/pve-remove-nag.sh"; };\n' >"$PMGR_ROOT/etc/apt/apt.conf.d/no-nag-script"
+run --apply
+check 'aggancio della community: uscita 0' test "$RC" = 0
+check 'aggancio della community: il mio helper non installato' test ! -e "$PMGR_ROOT/usr/local/libexec/pmgr/pmgr-remove-nag.sh"
+check 'aggancio della community: il mio hook non installato' test ! -e "$PMGR_ROOT/etc/apt/apt.conf.d/90pmgr-no-nag"
+check 'aggancio della community: segnalato' grep -qF '(/etc/apt/apt.conf.d/no-nag-script)' "$WORK/out"
+check 'aggancio della community: avviso comunque tolto' grep -q NoMoreNagging "$PMGR_ROOT/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
+snapshot >"$WORK/before"
+run --apply
+check 'aggancio della community: idempotente' unchanged
+
 fresh continued-ceph
 cat >>"$PMGR_ROOT/etc/apt/sources.list.d/ceph.sources" <<'EOF'
 
