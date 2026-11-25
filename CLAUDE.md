@@ -791,7 +791,7 @@ Domande D64-D67 in `DOMANDE.md` (fino a dove arriva il disco: collegato o anche 
 7. Revisione di sicurezza, installazione sulla macchina, passaggio (D143) — [Modello suggerito: Opus — ragionamento: alto — motivo: messa in servizio di un sistema con login]
 8. Pulsante "Aggiorna" con verifica della firma (voce 24 parte 3) — [Modello suggerito: Opus — ragionamento: medio — motivo: esecuzione di codice scaricato]
 
-## Onboarding di nodi e cluster gestito dal manager (approvato 2026-11-25, D148-D155; D156-D157 aperte)
+## Onboarding di nodi e cluster gestito dal manager (approvato 2026-11-25, D148-D157)
 
 **Richiesta utente:** una procedura standard per aggiungere un nodo o creare un cluster, con script e configurazioni di supporto, gestita dal manager. **D148 A** (procedura unica `docs/ONBOARDING.md` e strumenti dei template nel repository), **D149 A** (il manager prepara, verifica e sincronizza; i passi da root restano comandi compilati da incollare). Riprende la voce 13 (D69-D99) con un modello piu' semplice. Domande D150-D155.
 

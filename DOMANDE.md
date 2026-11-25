@@ -1567,19 +1567,19 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: come suggerito (2026-11-25).
 
 ### D156 — Preparazione post-installazione di un nodo (repository, aggiornamento, avviso di sottoscrizione)
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: si' (per lo step dello script di preparazione)
 **Domanda**: l'utente chiede che la procedura comprenda quello che fa `community-scripts/ProxmoxVE` `tools/pve/post-pve-install.sh`. Letto (688 righe, interattivo con `whiptail`): su Proxmox 9 riscrive le sorgenti apt in formato deb822 (Debian trixie, security, updates), disattiva o cancella `pve-enterprise` e `ceph enterprise`, aggiunge `pve-no-subscription`, aggiunge Ceph no-subscription scegliendo **`ceph-tentacle` se la versione di Proxmox e' >= 9.2, altrimenti `ceph-squid`**, aggiunge `pve-test` disattivato, toglie l'avviso di sottoscrizione modificando `proxmoxlib.js` con un hook `DPkg::Post-Invoke`, propone di attivare o **disattivare HA e corosync**, poi `apt update` + `dist-upgrade`, e ricorda il riavvio.
 **Perché conta**: (1) eseguire da root uno script scaricato al momento da un repository di terzi e' un rischio di catena di fornitura su ogni nodo; (2) la scelta automatica di `ceph-tentacle` su un nodo nuovo di un cluster che gira `ceph-squid` mescolerebbe due versioni di Ceph nello stesso cluster; (3) le domande su HA e corosync, se risposte male su un nodo di un cluster, lo staccano dal quorum.
 **Opzioni**: A) **script nostro** `pmgr-node-prepare.sh`, non interattivo, idempotente, firmato con la release (come D154): stesse sorgenti deb822, enterprise disattivato, no-subscription attivo, **repository Ceph della stessa release gia' in uso nel cluster** (il manager la legge e la passa come argomento: `--ceph squid`), `pve-test` non aggiunto, avviso di sottoscrizione tolto con lo stesso hook (opzione `--no-nag`, attiva di default), **HA e corosync mai toccati**, `--upgrade` per aggiornare (prima dell'ingresso nel cluster), nessun riavvio automatico, `--check` per vedere cosa cambierebbe; B) eseguire lo script della community cosi' com'e'; C) scaricarne una copia fissata e verificata e lanciarla.
 **Suggerimento**: A.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-25).
 
 ### D157 — Pagine "Aggiungi nodo" e "Rimuovi nodo"
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no (assunzione provvisoria = suggerimento)
 **Domanda**: come sono fatte le due pagine richieste?
 **Opzioni**: A) due procedure guidate a passi, ciascun passo con: spiegazione breve, **controllo automatico via API** (verde/rosso con il motivo) e **comandi gia' compilati** per i passi da root. **Aggiungi nodo**: (1) prerequisiti (stessa versione maggiore di Proxmox, rete di management/cluster/Ceph, ora sincronizzata, nome risolvibile); (2) `pmgr-node-prepare.sh` (D156); (3) ingresso nel cluster (`pvecm add`, nodo senza guest); (4) Ceph se serve (`pveceph install` con la release del cluster, MON/MGR/OSD); (5) storage e contenuto Snippets; (6) `pmgr-sync-setup.sh` e conferma dell'impronta (D152); (7) sincronizzazione di script e snippet; (8) mapping PCI delle GPU del nodo; (9) controllo finale nella pagina di preparazione. **Rimuovi nodo** (ordine di Proxmox): (1) svuotare il nodo dalle VM (il manager propone e, con conferma, esegue lo svuotamento del Bilanciamento); (2) togliere il nodo da HA, replica, restrizioni degli storage e mapping PCI; (3) Ceph: OSD `out`, attesa di `HEALTH_OK`, stop e distruzione degli OSD, rimozione di MON/MGR/MDS controllando che ne restino abbastanza, rimozione dalla mappa CRUSH; (4) spegnimento del nodo (e il nodo non deve tornare in rete con la stessa identita'); (5) `pvecm delnode` da un altro nodo; (6) pulizia (`/etc/pve/nodes/<nodo>`, `pvecm updatecerts`); (7) nel manager: impronta SSH dimenticata, nodo tolto dalla sincronizzazione. Ogni passo di rimozione si sblocca solo se il controllo del passo precedente e' verde. B) solo documentazione.
 **Suggerimento**: A, con le due procedure anche in `docs/ONBOARDING.md` per chi lavora senza il manager.
-**Risposta utente**:
+**Risposta utente**: A (2026-11-25).
 
