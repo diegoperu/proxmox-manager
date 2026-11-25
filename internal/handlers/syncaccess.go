@@ -468,7 +468,7 @@ func (h *Handler) DeleteSyncPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("nodo non valido"), http.StatusBadRequest)
 		return
 	}
-	addr, ok := h.syncTarget(w, r, node)
+	addr, ok := h.syncForgetTarget(w, r, node)
 	if !ok {
 		return
 	}
@@ -481,4 +481,63 @@ func (h *Handler) DeleteSyncPin(w http.ResponseWriter, r *http.Request) {
 	forgetSyncAccess()
 	log.Printf("nodessh: host key of node %s (%s) forgotten (was pinned: %v)", node, addr, found)
 	writeJSON(w, map[string]any{"ok": true, "removed": found})
+}
+
+// After delnode the node no longer appears in cluster/status. An administrator
+// may still forget its local pin using the address captured by the removal page.
+// This fallback never scans, connects to, or writes to the supplied address.
+// The existing administrator, CSRF and TOTP guards remain on the DELETE route.
+func (h *Handler) syncForgetTarget(w http.ResponseWriter, r *http.Request, node string) (string, bool) {
+	fallback := r.URL.Query().Get("address")
+	if fallback == "" {
+		return h.syncTarget(w, r, node)
+	}
+	if !nodessh.ValidAddress(fallback) {
+		writeError(w, errors.New("indirizzo del nodo non valido"), http.StatusBadRequest)
+		return "", false
+	}
+	idx, ok := networkSettingsIndex(w, r)
+	if !ok {
+		return "", false
+	}
+	if h.ssh == nil {
+		writeError(w, errors.New("accesso SSH non configurato"), http.StatusServiceUnavailable)
+		return "", false
+	}
+	client, err := h.getClientFor(idx)
+	if err != nil {
+		writeError(w, errors.New("cluster non configurato"), http.StatusBadRequest)
+		return "", false
+	}
+	addr, err := syncForgetAddress(client, node, fallback)
+	if errors.Is(err, errSyncForgetChanged) {
+		writeError(w, errSyncForgetChanged, http.StatusConflict)
+		return "", false
+	}
+	if err != nil {
+		writeError(w, errors.New("impossibile leggere i nodi del cluster"), http.StatusBadGateway)
+		return "", false
+	}
+	return addr, true
+}
+
+var errSyncForgetChanged = errors.New("l'indirizzo del nodo e' cambiato: ricontrolla")
+
+func syncForgetAddress(c clusterStatusAPI, node, fallback string) (string, error) {
+	if !nodeNamePattern.MatchString(node) || !nodessh.ValidAddress(fallback) {
+		return "", errors.New("nodo o indirizzo non valido")
+	}
+	nodes, err := stepClusterNodes(c)
+	if err != nil {
+		return "", errors.New("impossibile leggere i nodi del cluster")
+	}
+	for _, n := range nodes {
+		if n.Name == node {
+			if n.Address != fallback {
+				return "", errSyncForgetChanged
+			}
+			return n.Address, nil
+		}
+	}
+	return fallback, nil
 }

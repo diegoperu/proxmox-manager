@@ -233,6 +233,21 @@ func (c *Client) GetMigratePrecheck(node string, vmid int) (json.RawMessage, err
 // GetHAResources lists the guests managed by HA (read only).
 func (c *Client) GetHAResources() (json.RawMessage, error) { return c.Get("/cluster/ha/resources") }
 
+// Node onboarding only reads these endpoints; commands are displayed for a person to run.
+func (c *Client) GetReplication() (json.RawMessage, error) { return c.Get("/cluster/replication") }
+func (c *Client) GetHARules() (json.RawMessage, error)     { return c.Get("/cluster/ha/rules") }
+func (c *Client) GetHAGroups() (json.RawMessage, error) {
+	raw, err := c.Get("/cluster/ha/groups")
+	// Proxmox 9 removed groups in favour of node-affinity rules.
+	if err != nil && (strings.HasPrefix(err.Error(), "proxmox 404 on /cluster/ha/groups:") || strings.HasPrefix(err.Error(), "proxmox 500 on /cluster/ha/groups:")) {
+		return json.RawMessage(`[]`), nil
+	}
+	return raw, err
+}
+func (c *Client) GetNodeAPTVersions(node string) (json.RawMessage, error) {
+	return c.Get("/nodes/" + url.PathEscape(node) + "/apt/versions")
+}
+
 // LXCMigrate migrates a container; Proxmox moves a running container only in restart mode (short downtime).
 func (c *Client) LXCMigrate(node string, vmid int, target string, restart bool) (json.RawMessage, error) {
 	v := url.Values{"target": {target}}
