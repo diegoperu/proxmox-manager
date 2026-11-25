@@ -101,6 +101,11 @@ type actor struct {
 // +-1 step around the current time is valid, so a 30-second boundary crossed during the test must not leave
 // the next code behind the window (that made the test fail now and then).
 func (a *actor) code() string {
+	// Never compute a code in the last 2 s of a 30 s window: the server could check it in the next window and,
+	// with the code one step behind, refuse it (intermittent failure seen about once in 25 runs).
+	for time.Now().Unix()%30 >= 28 {
+		time.Sleep(100 * time.Millisecond)
+	}
 	if cur := time.Now().Unix() / 30; a.step < cur-1 {
 		a.step = cur - 1
 	}
