@@ -1500,20 +1500,69 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Risposta utente**: A, stessa macchina (2026-11-23): manager su `127.0.0.1:8080`, `trusted_proxies: ["127.0.0.1"]`.
 
 ### D148 — Procedura standard per un nodo nuovo o un cluster nuovo
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: dove scriviamo la procedura e dove stanno gli strumenti che servono?
 **Perché conta**: oggi i passi sono sparsi: README degli script dei template (`SUPPORT-FILES/pmgr-scripts/`, fuori da git: "Preparazione di un cluster"), `tools/pmgr-sync/README.md` (accesso per la sincronizzazione), `pmgr-calcolo-install.sh`, README del repository (account e token Proxmox), registro di `CLAUDE.md`. Chi deve aggiungere un nodo non ha una lista unica, e una parte degli strumenti esiste solo sulla postazione.
 **Opzioni**: A) `docs/ONBOARDING.md` nel repository con due liste (cluster nuovo, nodo nuovo), e **gli strumenti dei template spostati nel repository** (`tools/pmgr-scripts/`): oggi non contengono segreti (password e chiavi stanno in `/etc/pmgr` sui nodi), quindi la vecchia regola "mai nel repository" non ha piu' motivo; B) documento nel repository, strumenti fuori come oggi; C) tutto fuori dal repository.
 **Suggerimento**: A: una sola fonte, versionata e firmata con le release; e' anche il prerequisito perche' il manager possa consegnare gli script ai nodi (D149).
-**Risposta utente**:
+**Risposta utente**: A (2026-11-25). Attenzione emersa nel design: il repository e' **pubblico** e alcuni file del tooling contengono indirizzi e nomi interni (vedi D155).
 
 ### D149 — Quanto dell'onboarding puo' fare il manager
-**Stato**: APERTA
+**Stato**: RISPOSTA
 **Bloccante**: no
 **Domanda**: fin dove il manager gestisce l'aggiunta di un nodo o di un cluster?
 **Perché conta**: alcuni passi richiedono root sul nodo una sola volta (creare utente e token Proxmox, abilitare il contenuto Snippets su `local`, creare l'utente `pmgr-sync`); dare al manager un accesso root ai nodi lo renderebbe il punto piu' pericoloso di tutta l'infrastruttura.
 **Opzioni**: A) **il manager prepara e verifica, non esegue come root**: pagina "Preparazione dei nodi" che controlla ogni nodo via API (storage con Snippets, snippet presenti, template, rete, permessi del token) e mostra i comandi esatti e gia' compilati per i passi da root (`pveum`, `pvesm set`, `pmgr-sync-setup.sh`); dopo quei passi la copia di script e snippet la fa il manager con l'accesso ristretto `pmgr-sync` (voce 13: comando forzato, solo scrittura in due cartelle); B) come A ma il manager esegue anche i passi da root via SSH con una chiave root (sconsigliato); C) solo documentazione.
 **Suggerimento**: A: automatizza tutto cio' che si puo' fare senza privilegi alti, il resto lo rende un copia-incolla verificato; si unisce alla voce 13.
+**Risposta utente**: A (2026-11-25): il manager prepara, verifica e sincronizza; i passi da root restano comandi compilati da incollare.
+
+### D150 — Chi e' la "sorgente" di script e snippet
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: da dove partono script e snippet verso i nodi?
+**Perché conta**: oggi la sorgente e' un nodo (CALCOLO: il nodo 1 con il vecchio `rsync` da root; Magi: il nodo 1 con `pmgr-snippets-sync`). D94/D97/D98 avevano previsto il manager che comanda il nodo sorgente via SSH. Con gli strumenti nel repository (D148) e le release firmate c'e' una strada piu' semplice.
+**Opzioni**: A) **il manager e' la sorgente**: gli strumenti sono incorporati nel binario firmato, il manager genera gli snippet per ogni cluster (profilo standard/hosting, chiavi dei template) e li consegna direttamente a ogni nodo con l'accesso ristretto `pmgr-sync` (solo scrittura in due cartelle, mai lettura ne' cancellazione); nessun nodo e' piu' "speciale"; B) come previsto da D94: il manager comanda via SSH il nodo sorgente, che resta l'unico a tenere gli script e li spinge agli altri; C) restare a oggi (sincronizzazione a mano dal nodo 1).
+**Suggerimento**: A: una sola sorgente verificabile (la release firmata), un nodo nuovo si prepara come tutti gli altri, sparisce il rischio "unica copia sul nodo 1". Sostituisce D94/D98 (D97 resta: sorgente nel repository).
+**Risposta utente**:
+
+### D151 — Dove stanno profilo e chiavi dei template di ogni cluster
+**Stato**: APERTA
+**Bloccante**: si' (con D150 A)
+**Domanda**: per generare gli snippet il manager deve conoscere, per ogni cluster, il profilo (standard/hosting) e le chiavi pubbliche che i template mettono nell'utente della VM. Oggi stanno in `/etc/pmgr/cluster.conf` e `/etc/pmgr/ssh_keys.pub` sui nodi.
+**Opzioni**: A) nel manager, scheda **Infrastruttura** del cluster (chiavi pubbliche validate una per una, profilo); `/etc/pmgr` sui nodi resta solo per la creazione dei template (voce 14, ancora da root); B) il manager le legge dal nodo (servirebbe una lettura via SSH, che oggi il gate non permette).
+**Suggerimento**: A: sono dati pubblici (chiavi pubbliche), modificabili da amministratore con conferma TOTP e registrati.
+**Risposta utente**:
+
+### D152 — Fiducia nella chiave host dei nodi
+**Stato**: APERTA
+**Bloccante**: si'
+**Domanda**: come il manager si assicura di parlare con il nodo vero quando apre la prima connessione SSH?
+**Opzioni**: A) al primo contatto la pagina mostra l'impronta della chiave host ricevuta e il comando da eseguire sul nodo per confrontarla (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`); solo dopo la conferma dell'amministratore (con TOTP) l'impronta viene salvata e da li' in poi e' fissa (un cambio blocca la sincronizzazione e lo segnala); B) fiducia al primo contatto senza conferma (come oggi con `accept-new`).
+**Suggerimento**: A.
+**Risposta utente**:
+
+### D153 — Chi puo' preparare i nodi e sincronizzare (chiude D95)
+**Stato**: APERTA
+**Bloccante**: no (assunzione provvisoria = suggerimento)
+**Domanda**: quale ruolo puo' vedere lo stato di preparazione dei nodi e quale puo' sincronizzare?
+**Opzioni**: A) stato e controlli: tutti i ruoli (sola lettura); comandi da root e anteprima: amministratore; **sincronizzazione e conferma delle chiavi host: amministratore con codice TOTP**; B) tutto solo amministratore.
+**Suggerimento**: A.
+**Risposta utente**:
+
+### D154 — Lo script di preparazione dei nodi come allegato firmato della release
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: come arriva `pmgr-sync-setup.sh` su un nodo nuovo, dove va eseguito da root?
+**Opzioni**: A) diventa un allegato di ogni release, coperto da `SHA256SUMS` e dalla firma; i comandi mostrati dal manager lo scaricano e verificano la firma con OpenSSL prima di eseguirlo (stesso schema di `deploy/install.sh`); B) la pagina mostra il testo dello script da copiare; C) lo si copia a mano dal repository.
+**Suggerimento**: A.
+**Risposta utente**:
+
+### D155 — Cosa del tooling NON va nel repository pubblico
+**Stato**: APERTA
+**Bloccante**: si' (prima di spostare gli strumenti, D148)
+**Domanda**: il repository e' pubblico. Nel tooling ci sono file con indirizzi IP interni, nomi di nodi e di VM: `CALCOLO-ROLLOUT.md`, `MAGI-TEST-PLAN.md` (diari operativi), `cluster.conf.example`, `bin/pmgr-calcolo-install.sh`, `tests/test_rollout_run.sh` (9 indirizzi diversi in tutto).
+**Opzioni**: A) i due diari operativi restano fuori (in `SUPPORT-FILES/`, come oggi); gli altri tre file si rendono generici (indirizzi e nomi di esempio, valori reali solo in `/etc/pmgr` sui nodi o nelle impostazioni del manager); un test automatico blocca l'ingresso nel repository di indirizzi `10.75.*`, `131.175.*` e nomi `datacloud-*`; B) rendere il repository privato; C) spostare tutto cosi' com'e' (sconsigliato).
+**Suggerimento**: A.
 **Risposta utente**:
 
