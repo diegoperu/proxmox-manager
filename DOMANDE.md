@@ -1556,7 +1556,7 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Domanda**: come arriva `pmgr-sync-setup.sh` su un nodo nuovo, dove va eseguito da root?
 **Opzioni**: A) diventa un allegato di ogni release, coperto da `SHA256SUMS` e dalla firma; i comandi mostrati dal manager lo scaricano e verificano la firma con OpenSSL prima di eseguirlo (stesso schema di `deploy/install.sh`); B) la pagina mostra il testo dello script da copiare; C) lo si copia a mano dal repository.
 **Suggerimento**: A.
-**Risposta utente**: come suggerito (2026-11-25).
+**Risposta utente**: come suggerito (2026-11-25). **Realizzazione (step 5)**: lo script e' allegato a ogni release, dentro `SHA256SUMS` (firma offline e attestazione); il comando mostrato dal manager pero' non verifica la firma sul nodo: confronta lo SHA-256 del file con quello incluso nel binario del manager (a sua volta firmato) e solo se coincide lo esegue (`sha256sum --check --strict - && bash ...`). Stessa garanzia, comando piu' semplice, nessuna chiave da portare sul nodo; il download viene dal commit esatto del manager su GitHub.
 
 ### D155 — Cosa del tooling NON va nel repository pubblico
 **Stato**: RISPOSTA

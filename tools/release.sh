@@ -80,9 +80,11 @@ if ! gh run watch "$run_id" --repo "$REPO" --exit-status; then
 fi
 
 step "Downloading and verifying the assets"
-gh release download "$tag" --repo "$REPO" --dir "$work/dl" --pattern "$ASSET" --pattern SHA256SUMS
+gh release download "$tag" --repo "$REPO" --dir "$work/dl" --pattern "$ASSET" --pattern pmgr-sync-setup.sh --pattern SHA256SUMS
 (cd "$work/dl" && sha256sum -c SHA256SUMS)
 gh attestation verify "$work/dl/$ASSET" --repo "$REPO"
+gh attestation verify "$work/dl/pmgr-sync-setup.sh" --repo "$REPO"
+cmp "$work/dl/pmgr-sync-setup.sh" tools/pmgr-sync/pmgr-sync-setup.sh || die "the released pmgr-sync-setup.sh differs from the one in the repository"
 
 step "Signing SHA256SUMS with the offline key"
 "$work/release-sign" sign -key "$KEY" -in "$work/dl/SHA256SUMS" -out "$work/dl/SHA256SUMS.sig"

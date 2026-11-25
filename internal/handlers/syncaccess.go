@@ -10,6 +10,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,8 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"proxmox-manager/internal/buildinfo"
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/nodessh"
+	pmgrsync "proxmox-manager/tools/pmgr-sync"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -97,10 +101,11 @@ type syncNodeState struct {
 }
 
 type syncSetup struct {
-	Ready    bool     `json:"ready"`
-	Reason   string   `json:"reason"`
-	Commands []string `json:"commands"`
-	Note     string   `json:"note"`
+	Ready        bool     `json:"ready"`
+	Reason       string   `json:"reason"`
+	Commands     []string `json:"commands"`
+	Note         string   `json:"note"`
+	ScriptSHA256 string   `json:"script_sha256"`
 }
 
 type syncSummary struct {
@@ -138,11 +143,22 @@ func syncStateOf(err error) (state, message string) {
 	return "error", "Errore SSH (dettagli nel log del server)."
 }
 
+// setupScriptPath is where the commands put the script on the node.
+const setupScriptPath = "/root/pmgr-sync-setup.sh"
+
+// setupScriptSHA256 is the hash of the setup script embedded in this (signed) binary.
+var setupScriptSHA256 = func() string {
+	sum := sha256.Sum256(pmgrsync.SetupScript)
+	return hex.EncodeToString(sum[:])
+}()
+
 // setupCommands compiles the root commands that authorise the manager key on a node. Every value is validated:
-// the key by nodessh (fixed format), the addresses by config.ValidNetworkSettings (IPv4).
-func setupCommands(key nodessh.PublicKey, from []string) syncSetup {
-	s := syncSetup{Commands: []string{},
-		Note: "Da eseguire come root su OGNI nodo, con pmgr-sync-setup.sh di tools/pmgr-sync (dal passo 5 arrivera' come allegato firmato della release). " +
+// the key by nodessh (fixed format), the addresses by config.ValidNetworkSettings (IPv4), the commit by buildinfo.
+// The command that runs the script first checks its SHA-256 against the one embedded in this binary, so a file
+// that is not exactly this version never runs, whatever was downloaded or copied.
+func setupCommands(key nodessh.PublicKey, from []string, build buildinfo.BuildInfo) syncSetup {
+	s := syncSetup{Commands: []string{}, ScriptSHA256: setupScriptSHA256,
+		Note: "Da eseguire come root su OGNI nodo. L'ultimo comando controlla che lo script sia esattamente quello di questa versione del manager (SHA-256) e solo allora lo esegue. " +
 			"Il comando riscrive le chiavi ammesse per pmgr-sync: dopo, solo il manager puo' scrivere su quel nodo (D159)."}
 	if key.Line == "" {
 		s.Reason = "Chiave del manager non disponibile."
@@ -153,9 +169,17 @@ func setupCommands(key nodessh.PublicKey, from []string) syncSetup {
 		return s
 	}
 	s.Ready = true
+	if build.Known && !build.Dirty {
+		s.Commands = append(s.Commands, "curl -fsSL --proto '=https' --tlsv1.2 -o "+setupScriptPath+
+			" https://raw.githubusercontent.com/"+updateRepo+"/"+build.Commit+"/tools/pmgr-sync/pmgr-sync-setup.sh")
+	} else {
+		s.Note += " Questa versione del manager non e' una build di un commit pubblicato: copia a mano tools/pmgr-sync/pmgr-sync-setup.sh della stessa versione in " +
+			setupScriptPath + " (e' anche allegato a ogni release)."
+	}
 	s.Commands = append(s.Commands,
 		"printf '%s\\n' '"+key.Line+"' > /root/pmgr-manager.pub",
-		"bash pmgr-sync-setup.sh --role dest --source-pubkey /root/pmgr-manager.pub --source-from "+strings.Join(from, ","))
+		"echo '"+setupScriptSHA256+"  "+setupScriptPath+"' | sha256sum --check --strict - && bash "+setupScriptPath+
+			" --role dest --source-pubkey /root/pmgr-manager.pub --source-from "+strings.Join(from, ","))
 	return s
 }
 
@@ -170,7 +194,7 @@ func buildSyncAccess(ctx context.Context, c clusterStatusAPI, ssh nodeSSH, cl co
 	if cl.Network != nil {
 		res.ManagerFrom = append(res.ManagerFrom, cl.Network.ManagerFrom...)
 	}
-	res.Setup = setupCommands(key, res.ManagerFrom)
+	res.Setup = setupCommands(key, res.ManagerFrom, buildinfo.Info())
 	nodes, err := clusterNodes(c)
 	if err != nil {
 		return res, err

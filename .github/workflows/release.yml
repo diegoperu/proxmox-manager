@@ -72,13 +72,18 @@ jobs:
           if ldd proxmox-manager-linux-amd64 >/dev/null 2>&1; then
             echo "::error::the binary is not static"; exit 1
           fi
-          sha256sum proxmox-manager-linux-amd64 > SHA256SUMS
+          # The node setup script (onboarding, D154) ships with every release, covered by the same checksums, the
+          # attestation and the offline signature of SHA256SUMS.
+          cp ../tools/pmgr-sync/pmgr-sync-setup.sh .
+          sha256sum proxmox-manager-linux-amd64 pmgr-sync-setup.sh > SHA256SUMS
           cat SHA256SUMS
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: dist/proxmox-manager-linux-amd64
+          subject-path: |
+            dist/proxmox-manager-linux-amd64
+            dist/pmgr-sync-setup.sh
 
       - name: Create the release
         env:
@@ -87,5 +92,5 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "$TAG" \
-            dist/proxmox-manager-linux-amd64 dist/SHA256SUMS \
+            dist/proxmox-manager-linux-amd64 dist/pmgr-sync-setup.sh dist/SHA256SUMS \
             --title "$TAG" --generate-notes --verify-tag
