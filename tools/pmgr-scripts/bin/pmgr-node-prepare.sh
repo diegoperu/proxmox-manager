@@ -190,6 +190,8 @@ deb822() {
       disabled=(tolower(fields["enabled"]) ~ /^(no|false|0)$/)
       if (mode == "enterprise") {
         if (enterprise) print "yes"
+      } else if (mode == "nosub") {
+        if (!disabled && (" " fields["components"] " ") ~ / pve-no-subscription /) print "yes"
       } else if (mode == "conflict") {
         if (!disabled && (" " fields["components"] " ") ~ / no-subscription /) {
           count=split(fields["uris"], urls, /[ \t]+/)
@@ -217,7 +219,7 @@ deb822() {
       }
       n=0
     }
-    /^[ \t\r]*$/ { flush(); if (mode != "conflict" && mode != "enterprise") print; next }
+    /^[ \t\r]*$/ { flush(); if (mode != "conflict" && mode != "enterprise" && mode != "nosub") print; next }
     { lines[++n]=$0 }
     END { flush() }
   ' "$file"
@@ -226,7 +228,7 @@ deb822() {
 preflight() {
   local command_name codename version resolved file
   init_root
-  for command_name in awk sed grep stat cmp mktemp realpath flock cp mv chmod chown mkdir date sort uname cat tail; do
+  for command_name in awk sed grep stat cmp diff head mktemp realpath flock cp mv chmod chown mkdir date sort uname cat tail; do
     command -v "$command_name" >/dev/null 2>&1 || die "comando mancante: $command_name"
   done
   resolved=$(realpath -e -- "$ROOT/etc/os-release") || die 'manca /etc/os-release'
@@ -266,7 +268,29 @@ plan_file() {
     fi
   fi
   printf 'da cambiare: %s (contenuto o permessi %s root)\n' "${file#"$ROOT"}" "$mode"
+  [ "$APPLY" = 1 ] || show_diff "$file" "$content"
   FILES+=("$file"); MODES+=("$mode"); CONTENTS+=("$content")
+}
+
+# In sola lettura mostra cosa cambierebbe (prime 80 righe della differenza, rientrate).
+show_diff() {
+  local file="$1" content="$2" current=/dev/null
+  [ -e "$file" ] && current="$file"
+  { diff -u --label "attuale ${file#"$ROOT"}" --label "nuovo" -- "$current" <(printf '%s' "$content") || true; } |
+    head -n 80 | sed 's/^/    /' || true
+}
+
+# Aggancio apt di un altro strumento (es. post-pve-install.sh della community) che toglie gia' l'avviso.
+other_nag_hook() {
+  local file
+  for file in "$ROOT/etc/apt/apt.conf.d/"*; do
+    [ -f "$file" ] || continue
+    [ "${file##*/}" != 90pmgr-no-nag ] || continue
+    if grep -qE 'remove-nag|NoMoreNagging' -- "$file"; then
+      printf '%s' "${file#"$ROOT"}"
+      return
+    fi
+  done
 }
 
 ceph_source() {
@@ -274,7 +298,7 @@ ceph_source() {
 }
 
 build_plan() {
-  FILES=() MODES=() CONTENTS=()
+  FILES=() MODES=() CONTENTS=() OTHER_NAG=
   local file content retained nag="$ROOT/usr/local/libexec/pmgr/pmgr-remove-nag.sh"
   local hook="$ROOT/etc/apt/apt.conf.d/90pmgr-no-nag"
   content=$(cat <<'DEBIAN'
@@ -300,7 +324,17 @@ Components: pve-no-subscription
 Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 PROXMOX
 )
-  plan_file "$ROOT/etc/apt/sources.list.d/proxmox.sources" 644 "$content"$'\n'
+  local nosub_elsewhere=''
+  for file in "$ROOT/etc/apt/sources.list.d/"*.sources; do
+    [ -f "$file" ] || continue
+    [ "${file##*/}" != proxmox.sources ] || continue
+    if [ -n "$(deb822 nosub "$file")" ]; then nosub_elsewhere="${file#"$ROOT"}"; break; fi
+  done
+  if [ -n "$nosub_elsewhere" ]; then
+    printf 'ok: pve-no-subscription gia attivo in %s, non creo proxmox.sources (sarebbe un doppione)\n' "$nosub_elsewhere"
+  else
+    plan_file "$ROOT/etc/apt/sources.list.d/proxmox.sources" 644 "$content"$'\n'
+  fi
   for file in "$ROOT/etc/apt/sources.list" "$ROOT/etc/apt/sources.list.d/"*.list; do
     [ -f "$file" ] || continue
     content=$(sed '/^[[:space:]]*deb\(-src\)\?[[:space:]]/s/^/# pmgr-disabled: /' -- "$file" && printf '.')
@@ -337,9 +371,14 @@ PROXMOX
     done
     return
   fi
-  content=$(print_nag_helper)
-  plan_file "$nag" 755 "$content"$'\n'
-  plan_file "$hook" 644 'DPkg::Post-Invoke { "/usr/local/libexec/pmgr/pmgr-remove-nag.sh || true"; };'$'\n'
+  OTHER_NAG=$(other_nag_hook)
+  if [ -n "$OTHER_NAG" ]; then
+    printf 'ok: un altro aggancio apt toglie gia l avviso (%s), non installo il mio\n' "$OTHER_NAG"
+  else
+    content=$(print_nag_helper)
+    plan_file "$nag" 755 "$content"$'\n'
+    plan_file "$hook" 644 'DPkg::Post-Invoke { "/usr/local/libexec/pmgr/pmgr-remove-nag.sh || true"; };'$'\n'
+  fi
   file="$ROOT/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js"
   safe_path "$file"
   if [ -s "$file" ]; then
@@ -397,7 +436,7 @@ if [ "$UPGRADE" = 1 ]; then
     -o Dpkg::Options::=--force-confold dist-upgrade || die 'apt-get dist-upgrade fallito'
   log_change 'aggiornamento pacchetti completato'
 fi
-if [ "$KEEP_NAG" = 0 ]; then
+if [ "$KEEP_NAG" = 0 ] && [ -z "$OTHER_NAG" ]; then
   "$ROOT/usr/local/libexec/pmgr/pmgr-remove-nag.sh" || die 'patch nag fallita'
 fi
 build_plan
