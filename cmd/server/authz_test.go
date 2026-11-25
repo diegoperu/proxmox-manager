@@ -46,6 +46,7 @@ func TestEveryRouteHasAnAccessRule(t *testing.T) {
 func TestRoleTableMatchesD136(t *testing.T) {
 	want := map[string]access{
 		"GET /api/clusters/{idx}/node-add": reader, "GET /api/clusters/{idx}/node-removal": reader,
+		"GET /api/clusters/{idx}/node-cleanup":              reader,
 		"DELETE /api/clusters/{idx}/sync-access/pin/{node}": adminTOTP,
 		"GET /api/vms": reader, "POST /api/nodes/{node}/qemu/{vmid}/action/{action}": operator,
 		"GET /api/nodes/{node}/qemu/{vmid}/termproxy-ws": operator, "POST /api/batch": operator,

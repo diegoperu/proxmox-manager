@@ -190,6 +190,7 @@ func TestSyncAccessAndReadinessLoadIndependently(t *testing.T) {
 	source := settingsJS(t, "/* pmgr:nodeprep:begin */", "/* pmgr:nodeprep:end */") + syncAccessUISource(t)
 	runSettingsJS(t, source+syncAccessHarness+`
 const planLoads=[];global.SyncPlan={load:()=>new Promise(resolve=>planLoads.push(resolve)),leave(){}};
+global.NodeCleanup={load:async()=>{},leave(){}};
 const pending=[];global.api=(path,options)=>new Promise((resolve,reject)=>pending.push({path,resolve,reject}));
 global.errBox=(message,retry)=>{assert(['NodePrep.load(true)','SyncAccess.load(true)'].includes(retry));return esc(message);};
 NodePrep.paint=function(){get('np-cluster').textContent='Controlli pronti';};

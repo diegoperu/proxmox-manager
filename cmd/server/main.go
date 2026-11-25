@@ -216,6 +216,7 @@ func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store
 		r.Post("/clusters/{idx}/sync-access/pin", h.PostSyncPin)
 		r.Delete("/clusters/{idx}/sync-access/pin/{node}", h.DeleteSyncPin)
 		r.Get("/clusters/{idx}/sync-plan", h.GetSyncPlan)
+		r.Get("/clusters/{idx}/node-cleanup", h.GetNodeCleanup)
 		r.Post("/clusters/{idx}/sync-run", h.PostSyncRun)
 		r.Put("/clusters/{idx}/network-settings", h.PutNetworkSettings)
 		r.Get("/clusters/{idx}/report-settings", h.GetReportSettings)
