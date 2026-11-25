@@ -2,15 +2,21 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"proxmox-manager/internal/buildinfo"
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/nodessh"
 
@@ -163,8 +169,9 @@ func TestBuildSyncAccessStates(t *testing.T) {
 	if res.Summary.OK != 3 || res.Summary.Todo != 5 || res.Summary.Problem != 0 {
 		t.Fatalf("summary %+v", res.Summary)
 	}
-	if !res.Setup.Ready || len(res.Setup.Commands) != 2 || !strings.Contains(res.Setup.Commands[0], testKeyLine) ||
-		!strings.HasSuffix(res.Setup.Commands[1], "--source-from 192.0.2.254") {
+	last := res.Setup.Commands[len(res.Setup.Commands)-1]
+	if !res.Setup.Ready || res.Setup.ScriptSHA256 != setupScriptSHA256 || !strings.Contains(strings.Join(res.Setup.Commands, "\n"), testKeyLine) ||
+		!strings.HasSuffix(last, "--source-from 192.0.2.254") {
 		t.Fatalf("setup %+v", res.Setup)
 	}
 	raw, _ := json.Marshal(res)
@@ -174,15 +181,62 @@ func TestBuildSyncAccessStates(t *testing.T) {
 }
 
 func TestSetupCommandsNeedAddressAndKey(t *testing.T) {
-	if s := setupCommands(nodessh.PublicKey{Line: testKeyLine}, nil); s.Ready || len(s.Commands) != 0 || !strings.Contains(s.Reason, "Infrastruttura") {
+	published := buildinfo.BuildInfo{Commit: strings.Repeat("a", 40), Known: true}
+	if s := setupCommands(nodessh.PublicKey{Line: testKeyLine}, nil, published); s.Ready || len(s.Commands) != 0 || !strings.Contains(s.Reason, "Infrastruttura") {
 		t.Fatalf("%+v", s)
 	}
-	if s := setupCommands(nodessh.PublicKey{}, []string{"192.0.2.1"}); s.Ready || len(s.Commands) != 0 {
+	if s := setupCommands(nodessh.PublicKey{}, []string{"192.0.2.1"}, published); s.Ready || len(s.Commands) != 0 {
 		t.Fatalf("%+v", s)
 	}
-	s := setupCommands(nodessh.PublicKey{Line: testKeyLine}, []string{"192.0.2.1", "192.0.2.2"})
-	if !strings.HasSuffix(s.Commands[1], "--source-from 192.0.2.1,192.0.2.2") {
-		t.Fatalf("%+v", s)
+	s := setupCommands(nodessh.PublicKey{Line: testKeyLine}, []string{"192.0.2.1", "192.0.2.2"}, published)
+	if len(s.Commands) != 3 || !strings.HasPrefix(s.Commands[0], "curl -fsSL --proto '=https'") ||
+		!strings.HasSuffix(s.Commands[0], "/diegoperu/proxmox-manager/"+published.Commit+"/tools/pmgr-sync/pmgr-sync-setup.sh") {
+		t.Fatalf("download %+v", s.Commands)
+	}
+	run := s.Commands[2]
+	if !strings.HasPrefix(run, "echo '"+setupScriptSHA256+"  /root/pmgr-sync-setup.sh' | sha256sum --check --strict - && bash /root/pmgr-sync-setup.sh ") ||
+		!strings.HasSuffix(run, "--source-from 192.0.2.1,192.0.2.2") {
+		t.Fatalf("run %q", run)
+	}
+	// not a published commit (dirty or unknown): no download, the check still guards the run
+	for _, b := range []buildinfo.BuildInfo{{Commit: published.Commit, Known: true, Dirty: true}, {}} {
+		s := setupCommands(nodessh.PublicKey{Line: testKeyLine}, []string{"192.0.2.1"}, b)
+		if len(s.Commands) != 2 || strings.HasPrefix(s.Commands[0], "curl") || !strings.Contains(s.Commands[1], "sha256sum --check") || !strings.Contains(s.Note, "copia a mano") {
+			t.Fatalf("%+v", s)
+		}
+	}
+}
+
+// The embedded hash is the hash of the script in the repository, and the check really refuses a changed file.
+func TestSetupScriptCheckRefusesAnotherFile(t *testing.T) {
+	orig, err := os.ReadFile(filepath.Join("..", "..", "tools", "pmgr-sync", "pmgr-sync-setup.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(orig)
+	if hex.EncodeToString(sum[:]) != setupScriptSHA256 {
+		t.Fatal("embedded hash differs from the repository script")
+	}
+	if _, err := exec.LookPath("sha256sum"); err != nil {
+		t.Skip("sha256sum not installed")
+	}
+	dir := t.TempDir()
+	check := func(content []byte) error {
+		path := filepath.Join(dir, "pmgr-sync-setup.sh")
+		if err := os.WriteFile(path, content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command("sha256sum", "--check", "--strict", "-")
+		cmd.Stdin = strings.NewReader(setupScriptSHA256 + "  " + path + "\n")
+		return cmd.Run()
+	}
+	if err := check(orig); err != nil {
+		t.Fatalf("original refused: %v", err)
+	}
+	changed := append([]byte{}, orig...)
+	changed[len(changed)/2] ^= 1
+	if err := check(changed); err == nil {
+		t.Fatal("a changed script passed the check")
 	}
 }
 
