@@ -139,6 +139,10 @@ cp -a "$PMGR_ROOT/etc" "$WORK/original-etc"
 cp "$PMGR_ROOT/usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js" "$WORK/original.js"
 run --apply
 check 'apply: uscita 0' test "$RC" = 0
+check 'apply: riga [fatto] per file scritto' grep -qx '\[fatto\] /etc/apt/sources.list.d/debian.sources' "$WORK/out"
+check 'apply: dove sono le copie di sicurezza' grep -q '^Copie di sicurezza dei file sostituiti: /root/pmgr-backup/node-prepare-' "$WORK/out"
+check 'apply: verifica finale in una riga' grep -qx 'Verifica finale: tutto a posto' "$WORK/out"
+check 'apply: elenco non ripetuto dopo la scrittura' test "$(grep -c '/etc/apt/sources.list.d/debian.sources' "$WORK/out")" = 2
 cat >"$WORK/expected-debian" <<'EOF'
 Types: deb
 URIs: http://deb.debian.org/debian
