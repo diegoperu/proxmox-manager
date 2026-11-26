@@ -1681,3 +1681,48 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 
 **Realizzato (2026-11-26)**: vincoli nel Bilanciamento, nella Nuova VM e nella migrazione manuale, controllo in Preparazione nodi, etichetta nella pagina (dettaglio nel registro di `CLAUDE.md`).
 
+### D169 — Configuratore di template: scopo e perimetro (idea del 2026-11-26)
+**Stato**: APERTA
+**Bloccante**: no (nessun codice finche' non si discute)
+**Domanda**: il manager deve poter creare template nuovi a partire da una release di base (Ubuntu, Debian, Rocky, x86 o ARM) con un elenco di pacchetti e poche configurazioni incluse, per clonare VM gia' pronte per un compito (es. "server web", "nodo di calcolo con CUDA", "strumenti di rete")?
+**Perché conta**: oggi i template sono 8 sistemi "nudi" e ogni VM nuova installa i pacchetti al primo avvio (minuti di attesa, e cloud-init che installa in ogni clone). Un template con i pacchetti gia' dentro riduce i tempi, ma aggiunge un oggetto da mantenere (aggiornarlo, rigenerarlo) e un nuovo modo di far girare codice come root nelle VM future.
+**Opzioni**: A) "profili di pacchetti" dichiarativi: il manager prepara un template come oggi (immagine ufficiale + snippet) piu' un elenco di pacchetti scelto da cataloghi chiusi e preinstallato una volta sola; B) solo un elenco di pacchetti da aggiungere al cloud-init di ogni clone (nessun template nuovo, piu' lento ma niente da mantenere); C) fuori dal manager, solo negli script.
+**Suggerimento**: A, in piccolo: pochi profili definiti nel repository (firmati con la release), pacchetti a elenco chiuso per famiglia, un template per profilo e sistema operativo, ricreato con gli strumenti esistenti.
+**Risposta utente**: (vuoto)
+
+### D170 — Configuratore di template: come si costruisce il template
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: l'immagine nuova nasce (a) da un template esistente, avviando una VM, installando i pacchetti e ritrasformandola in template (come fanno gli strumenti per le immagini "golden"), oppure (b) da un'immagine cloud ufficiale personalizzata offline (`virt-customize`/`virt-sysprep`) senza avviare niente?
+**Perché conta**: (a) funziona ovunque ma serve una VM in esecuzione sul cluster, rete, tempo, e va "pulita" (machine-id, chiavi SSH, cloud-init) prima di diventare template; (b) e' riproducibile e non esegue nulla nel cluster ma richiede `libguestfs-tools` sul nodo e funziona male per ARM da x86.
+**Opzioni**: A) avvio di una VM temporanea con cloud-init, installazione, pulizia con `cloud-init clean`, spegnimento, trasformazione in template; B) personalizzazione offline dell'immagine; C) entrambe, per famiglia.
+**Suggerimento**: A: e' la via gia' usata dagli strumenti attuali (immagine + snippet), si limita ad aggiungere i pacchetti allo snippet del passo di creazione e a un passo di pulizia.
+**Risposta utente**: (vuoto)
+
+### D171 — Configuratore di template: da dove vengono i pacchetti
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: l'utente sceglie pacchetti da un catalogo definito nel repository (per famiglia: nomi `apt`/`dnf` validati), o puo' scrivere nomi liberi, repository esterni e script di post-installazione?
+**Perché conta**: i pacchetti vengono installati come root e finiscono in tutte le VM clonate: un nome libero o un repository esterno e' una porta per codice non verificato (catena di fornitura), uno script libero e' esecuzione arbitraria come root da una pagina web.
+**Opzioni**: A) solo catalogo chiuso nel repository, con profili predefiniti (e nomi aggiungibili solo con una modifica del repository); B) nomi di pacchetti liberi ma validati a whitelist di caratteri, solo dai repository gia' configurati nell'immagine; C) anche repository e script.
+**Suggerimento**: A, eventualmente B per l'amministratore con TOTP; mai C dalla pagina.
+**Risposta utente**: (vuoto)
+
+### D172 — Configuratore di template: aggiornamento dei template
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: un template con pacchetti dentro invecchia (aggiornamenti di sicurezza non installati): chi lo ricrea e quando?
+**Perché conta**: un clone di un template vecchio parte con pacchetti da aggiornare (gli snippet fanno gia' l'aggiornamento al primo avvio, ma e' lento e ripetuto in ogni clone); la voce 14 (aggiornamento template dal manager) e' gia' in roadmap.
+**Opzioni**: A) ricreazione a richiesta dalla pagina (come "Ricrea template" della voce 14), con la data di creazione ben visibile e un avviso oltre N giorni; B) ricreazione programmata; C) mai automatica, solo a mano dagli script.
+**Suggerimento**: A, con l'avviso dell'eta' del template nella pagina Nuova VM.
+**Risposta utente**: (vuoto)
+
+### D173 — Configuratore di template: pagina e permessi
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: dove vive il configuratore e chi lo usa?
+**Perché conta**: creare un template e' una scrittura sul cluster con effetti su tutte le VM future (come l'invio degli snippet): serve il ruolo amministratore, la conferma TOTP e il registro delle azioni, e il nodo deve avere gli strumenti consegnati.
+**Opzioni**: A) pagina "Template" sotto Operazioni (elenco dei template con eta', profilo e architettura, pulsanti Nuovo e Ricrea; solo amministratori); B) dentro Preparazione nodi; C) solo da riga di comando sul nodo.
+**Suggerimento**: A, riusando l'esecuzione sul nodo gia' prevista dalla voce 14 (comandi compilati da incollare da root finche' non c'e' un esecutore dedicato).
+**Risposta utente**: (vuoto)
+
