@@ -7915,27 +7915,67 @@ const ClusterTLSUI={
     el.append(NodePrep.command("openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d '=' | sed 's/^/SHA256:/'",'impronta della CA sul nodo'));
     if(error){const e=this.p(error,'sa-danger');e.setAttribute('role','alert');el.append(e);}
     const form=document.createElement('div');form.setAttribute('data-min-role','admin');
-    const label=document.createElement('label');label.className='fl';label.htmlFor='tls-pem';label.textContent='Certificato della CA (PEM)';
-    const area=document.createElement('textarea');area.id='tls-pem';area.className='inp';area.rows=6;area.spellcheck=false;area.autocomplete='off';
-    area.placeholder='-----BEGIN CERTIFICATE-----';area.style.width='100%';area.style.fontFamily='var(--mono)';
-    const save=document.createElement('button');save.type='button';save.className='btn ba sm';save.textContent=st.configured?'Verifica e sostituisci la CA':'Verifica e salva';
-    save.addEventListener('click',()=>this.save(idx,area.value));
-    const actions=document.createElement('div');actions.className='toolbar';actions.append(save);
+    // Metodo consigliato: CA letta via API, impronta letta sul nodo, confronto fatto dal manager (e rifatto dal server).
+    const read=document.createElement('button');read.type='button';read.className='btn ba sm';read.textContent='Leggi la CA dal cluster';
+    const box=document.createElement('div');box.id='tls-candidate';
+    read.addEventListener('click',()=>this.candidate(idx,box,read));
+    const bar=document.createElement('div');bar.className='toolbar';bar.append(read);
     if(st.configured){
       const del=document.createElement('button');del.type='button';del.className='btn bg2 sm';del.textContent='Togli la CA';
-      del.addEventListener('click',()=>this.remove(idx));actions.append(del);
+      del.addEventListener('click',()=>this.remove(idx));bar.append(del);
     }
-    form.append(label,area,actions,this.p('Il manager salva la CA solo se il certificato presentato ora dal cluster e\' firmato da lei. Serve il codice TOTP.','hint'));
+    form.append(bar,box);
+    // Alternativa: certificato incollato a mano (non invia il token: serve se la CA e' stata ruotata).
+    const manual=document.createElement('details'),sum=document.createElement('summary');sum.textContent='Oppure incolla il certificato della CA a mano';
+    const label=document.createElement('label');label.className='fl';label.htmlFor='tls-pem';label.textContent='Certificato della CA (PEM), output di: cat /etc/pve/pve-root-ca.pem';
+    const area=document.createElement('textarea');area.id='tls-pem';area.className='inp';area.rows=6;area.spellcheck=false;area.autocomplete='off';
+    area.placeholder='-----BEGIN CERTIFICATE-----';area.style.width='100%';area.style.fontFamily='var(--mono)';
+    const save=document.createElement('button');save.type='button';save.className='btn bg2 sm';save.textContent='Verifica e salva il certificato';
+    save.addEventListener('click',()=>this.save(idx,{pem:area.value}));
+    manual.append(sum,label,area,save);
+    form.append(manual,this.p('Il manager salva la CA solo dopo averla verificata sul cluster. Serve il codice TOTP.','hint'));
     el.append(form);
   },
-  async save(idx,pem){
+  async save(idx,body){
     if(this.busy)return;this.busy=true;
     try{
-      const st=await api(`/clusters/${idx}/tls`,{method:'PUT',body:JSON.stringify({pem}),quiet:true,timeoutMs:30000});
+      const st=await api(`/clusters/${idx}/tls`,{method:'PUT',body:JSON.stringify(body),quiet:true,timeoutMs:30000});
       toast('CA del cluster salvata: connessioni verificate','ok');if(idx===ClusterMgr.current)this.render(st,idx);
     }catch(e){
       try{const st=await api(`/clusters/${idx}/tls`,{quiet:true,timeoutMs:20000});if(idx===ClusterMgr.current)this.render(st,idx,e.message);}catch(_){toast(e.message,'err');}
     }finally{this.busy=false;}
+  },
+  /* pmgr:tlsfp:begin */
+  // Riga SHA256:... dall'output incollato (anche con il prompt); confronto con l'impronta ricevuta dal cluster.
+  fingerprintOf(text){const m=String(text??'').match(/SHA256:[A-Za-z0-9+/]{43}/);return m?m[0]:'';},
+  compare(received,pasted){const fp=this.fingerprintOf(pasted);if(!fp)return 'empty';return fp===received?'match':'mismatch';},
+  /* pmgr:tlsfp:end */
+  async candidate(idx,box,button){
+    button.disabled=true;box.replaceChildren(this.p('Lettura della CA dal cluster…'));
+    try{
+      const c=await api(`/clusters/${idx}/tls/candidate`,{quiet:true,timeoutMs:20000});
+      if(idx!==ClusterMgr.current)return;
+      box.replaceChildren();
+      box.append(this.p('CA ricevuta dal cluster (nodo '+c.node+'): '+c.subject+' · valida fino al '+c.not_after));
+      box.append(this.p('Impronta ricevuta: '+c.fingerprint,'sa-mono'));
+      box.append(this.p('Esegui sul nodo, da root (SSH o Nodo → Shell nella GUI di Proxmox), poi incolla qui sotto il risultato:'));
+      box.append(NodePrep.command(c.command,'impronta della CA sul nodo'));
+      const label=document.createElement('label');label.className='fl';label.htmlFor='tls-fp';label.textContent='Risultato del comando sul nodo';
+      const input=document.createElement('textarea');input.id='tls-fp';input.className='inp';input.rows=2;input.spellcheck=false;input.autocomplete='off';
+      input.placeholder='SHA256:...';input.style.width='100%';input.style.fontFamily='var(--mono)';
+      const verdict=document.createElement('p');verdict.setAttribute('role','status');
+      const save=document.createElement('button');save.type='button';save.className='btn ba sm';save.textContent='Salva la CA';save.disabled=true;
+      const update=()=>{
+        const r=this.compare(c.fingerprint,input.value);
+        verdict.className=r==='mismatch'?'sa-danger':'';
+        verdict.textContent=r==='match'?'✓ Coincide: la CA ricevuta e\' quella del nodo.':r==='mismatch'?'✕ DISCREPANZA: l\'impronta del nodo non corrisponde alla CA ricevuta dal cluster. Non salvare: possibile intercettazione, oppure il comando e\' stato eseguito su un altro cluster.':'Incolla il risultato del comando: deve contenere una riga SHA256:...';
+        save.disabled=r!=='match';
+      };
+      input.addEventListener('input',update);update();
+      save.addEventListener('click',()=>this.save(idx,{fingerprint:input.value}));
+      box.append(label,input,verdict,save);
+    }catch(e){box.replaceChildren(this.p(e.message,'sa-danger'));}
+    finally{button.disabled=false;}
   },
   remove(idx){
     askConfirm({minRole:'admin',level:'danger',title:'Togliere la CA del cluster?',okLabel:'Togli la CA',
