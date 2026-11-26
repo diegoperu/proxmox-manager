@@ -7911,6 +7911,8 @@ const ClusterTLSUI={
     if(st.issuer)el.append(this.p('Certificato presentato ora dal cluster, emesso da: '+st.issuer,'hint'));
     el.append(this.p(st.help||'','hint'));
     el.append(NodePrep.command('cat /etc/pve/pve-root-ca.pem','lettura della CA sul nodo'));
+    el.append(this.p('Per confrontare l\'impronta mostrata qui con quella del nodo (stesso formato):','hint'));
+    el.append(NodePrep.command("openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d '=' | sed 's/^/SHA256:/'",'impronta della CA sul nodo'));
     if(error){const e=this.p(error,'sa-danger');e.setAttribute('role','alert');el.append(e);}
     const form=document.createElement('div');form.setAttribute('data-min-role','admin');
     const label=document.createElement('label');label.className='fl';label.htmlFor='tls-pem';label.textContent='Certificato della CA (PEM)';

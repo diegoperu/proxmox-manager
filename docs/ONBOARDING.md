@@ -16,6 +16,8 @@ privata finisce nel repository; ogni modifica ai cluster si fa con un'anteprima 
 2. **Aggiungere il cluster al manager**: Impostazioni, Generale, cluster (URL e token `utente@realm!nome=valore`).
    Provare con "Test".
 3. **Rete delle VM nuove**: Impostazioni, Infrastruttura (reti con gateway, DNS, dominio di ricerca).
+   Nella stessa scheda, **Verifica TLS del cluster**: incolla l'output di `cat /etc/pve/pve-root-ca.pem` (da un nodo qualsiasi,
+   certificato pubblico) e conferma con TOTP; da li' il manager verifica il certificato del cluster (dettagli nel README).
 4. **Contenuto Snippets** sullo storage che li contiene (di solito `local`), da root su un nodo, **conservando i contenuti
    esistenti**:
    `pvesm status --storage local` per leggere i contenuti, poi `pvesm set local --content <attuali>,snippets`.
