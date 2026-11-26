@@ -722,6 +722,10 @@ td.spk{width:130px}
 .np-command{margin-top:8px;display:flex;align-items:flex-start;gap:8px}
 .np-command pre{flex:1;min-width:0;margin:0;padding:12px;background:var(--bg3);border-radius:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 .np-command button{flex-shrink:0}
+.tls-steps>*+*{margin-top:10px}
+.tls-steps .tls-step{margin-bottom:0}
+#tls-editor details{margin-top:12px}
+#tls-editor h3.sec{margin-top:18px}
 .np-clipboard{position:fixed;top:0;left:0;opacity:0;pointer-events:none}
 #np-partial{margin-bottom:12px;overflow-wrap:anywhere}
 .sa-summary{padding:var(--card-pad);font-size:13px;color:var(--text2);overflow-wrap:anywhere}
@@ -7898,6 +7902,8 @@ const ClusterTLSUI={
     }catch(e){if(seq===this.seq)el.innerHTML=errBox(e.message,'ClusterTLSUI.load()');}
   },
   p(text,cls){const p=document.createElement('p');if(cls)p.className=cls;p.textContent=text;return p;},
+  FP_CMD:"openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d \'=\' | sed \'s/^/SHA256:/\'",
+  step(n,text){const p=document.createElement('p');p.className='tls-step';const b=document.createElement('strong');b.textContent=n+'. ';p.append(b,document.createTextNode(text));return p;},
   render(st,idx,error=''){
     const el=document.getElementById('tls-editor');el.replaceChildren();
     const [glyph,word,level]=this.STATE[st.check]||['?','sconosciuto','warn'];
@@ -7907,32 +7913,34 @@ const ClusterTLSUI={
     if(st.configured){
       el.append(this.p('Impronta della chiave della CA: '+(st.fingerprint||'—'),'sa-mono'));
       if(st.subject)el.append(this.p('CA: '+st.subject+(st.not_after?' · certificato valido fino al '+st.not_after:'')));
+      // Riconfronto facoltativo con il nodo: un solo posto, richiuso.
+      const again=document.createElement('details'),sum=document.createElement('summary');sum.textContent='Confronta di nuovo l\'impronta con quella del nodo';
+      again.append(sum,this.p('Esegui sul nodo, da root: deve stampare la stessa impronta.','hint'),NodePrep.command(this.FP_CMD,'impronta della CA sul nodo'));
+      el.append(again);
     }
-    if(st.issuer)el.append(this.p('Certificato presentato ora dal cluster, emesso da: '+st.issuer,'hint'));
-    el.append(this.p(st.help||'','hint'));
-    el.append(NodePrep.command('cat /etc/pve/pve-root-ca.pem','lettura della CA sul nodo'));
-    el.append(this.p('Per confrontare l\'impronta mostrata qui con quella del nodo (stesso formato):','hint'));
-    el.append(NodePrep.command("openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d '=' | sed 's/^/SHA256:/'",'impronta della CA sul nodo'));
+    if(st.check!=='ok'&&st.issuer)el.append(this.p('Il cluster presenta ora un certificato emesso da: '+st.issuer,'hint'));
     if(error){const e=this.p(error,'sa-danger');e.setAttribute('role','alert');el.append(e);}
-    const form=document.createElement('div');form.setAttribute('data-min-role','admin');
-    // Metodo consigliato: CA letta via API, impronta letta sul nodo, confronto fatto dal manager (e rifatto dal server).
+    const form=document.createElement('div');form.className='tls-steps';form.setAttribute('data-min-role','admin');
+    const title=document.createElement('h3');title.className='sec';title.textContent=st.configured?'Sostituisci la CA':'Attiva la verifica';
+    // Percorso unico: 1 leggi la CA via API, 2 comando sul nodo, 3 incolla il risultato, 4 salva (il server rifa' il confronto).
     const read=document.createElement('button');read.type='button';read.className='btn ba sm';read.textContent='Leggi la CA dal cluster';
-    const box=document.createElement('div');box.id='tls-candidate';
+    const box=document.createElement('div');box.id='tls-candidate';box.className='tls-steps';
     read.addEventListener('click',()=>this.candidate(idx,box,read));
     const bar=document.createElement('div');bar.className='toolbar';bar.append(read);
     if(st.configured){
       const del=document.createElement('button');del.type='button';del.className='btn bg2 sm';del.textContent='Togli la CA';
       del.addEventListener('click',()=>this.remove(idx));bar.append(del);
     }
-    form.append(bar,box);
+    form.append(title,this.step(1,'Il manager legge la CA dal cluster:'),bar,box);
     // Alternativa: certificato incollato a mano (non invia il token: serve se la CA e' stata ruotata).
-    const manual=document.createElement('details'),sum=document.createElement('summary');sum.textContent='Oppure incolla il certificato della CA a mano';
-    const label=document.createElement('label');label.className='fl';label.htmlFor='tls-pem';label.textContent='Certificato della CA (PEM), output di: cat /etc/pve/pve-root-ca.pem';
+    const manual=document.createElement('details'),msum=document.createElement('summary');msum.textContent='Oppure incolla il certificato della CA a mano (serve dopo una rotazione della CA)';
+    const label=document.createElement('label');label.className='fl';label.htmlFor='tls-pem';label.textContent='Certificato della CA (PEM)';
     const area=document.createElement('textarea');area.id='tls-pem';area.className='inp';area.rows=6;area.spellcheck=false;area.autocomplete='off';
     area.placeholder='-----BEGIN CERTIFICATE-----';area.style.width='100%';area.style.fontFamily='var(--mono)';
     const save=document.createElement('button');save.type='button';save.className='btn bg2 sm';save.textContent='Verifica e salva il certificato';
     save.addEventListener('click',()=>this.save(idx,{pem:area.value}));
-    manual.append(sum,label,area,save);
+    manual.append(msum,this.p('Sul nodo, da root (SSH o Nodo → Shell nella GUI di Proxmox), copia tutto l\'output, da -----BEGIN a -----END:','hint'),
+      NodePrep.command('cat /etc/pve/pve-root-ca.pem','lettura della CA sul nodo'),label,area,save);
     form.append(manual,this.p('Il manager salva la CA solo dopo averla verificata sul cluster. Serve il codice TOTP.','hint'));
     el.append(form);
   },
@@ -7958,13 +7966,13 @@ const ClusterTLSUI={
       box.replaceChildren();
       box.append(this.p('CA ricevuta dal cluster (nodo '+c.node+'): '+c.subject+' · valida fino al '+c.not_after));
       box.append(this.p('Impronta ricevuta: '+c.fingerprint,'sa-mono'));
-      box.append(this.p('Esegui sul nodo, da root (SSH o Nodo → Shell nella GUI di Proxmox), poi incolla qui sotto il risultato:'));
+      box.append(this.step(2,'Esegui sul nodo, da root (SSH o Nodo → Shell nella GUI di Proxmox):'));
       box.append(NodePrep.command(c.command,'impronta della CA sul nodo'));
-      const label=document.createElement('label');label.className='fl';label.htmlFor='tls-fp';label.textContent='Risultato del comando sul nodo';
+      const label=document.createElement('label');label.className='fl';label.htmlFor='tls-fp';label.textContent='3. Incolla qui il risultato del comando';
       const input=document.createElement('textarea');input.id='tls-fp';input.className='inp';input.rows=2;input.spellcheck=false;input.autocomplete='off';
       input.placeholder='SHA256:...';input.style.width='100%';input.style.fontFamily='var(--mono)';
       const verdict=document.createElement('p');verdict.setAttribute('role','status');
-      const save=document.createElement('button');save.type='button';save.className='btn ba sm';save.textContent='Salva la CA';save.disabled=true;
+      const save=document.createElement('button');save.type='button';save.className='btn ba sm';save.textContent='4. Salva la CA';save.disabled=true;
       const update=()=>{
         const r=this.compare(c.fingerprint,input.value);
         verdict.className=r==='mismatch'?'sa-danger':'';
