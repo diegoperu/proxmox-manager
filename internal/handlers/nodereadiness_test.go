@@ -30,7 +30,7 @@ func (f *readinessFake) GetNodeStatus(n string) (json.RawMessage, error) {
 	if f.versions && n == "node10" {
 		v = "8.4.0"
 	}
-	return rawReadiness(fmt.Sprintf(`{"pveversion":"pve-manager/%s/hash"}`, v))
+	return rawReadiness(fmt.Sprintf(`{"pveversion":"pve-manager/%s/hash","current-kernel":{"machine":"x86_64"}}`, v))
 }
 func (f *readinessFake) GetNodeTime(n string) (json.RawMessage, error) {
 	v := 100

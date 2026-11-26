@@ -27,6 +27,7 @@ func TestSettingsClusterMenu(t *testing.T) {
 	}
 	driver := `
 const assert=require('node:assert/strict');
+global.ArchUI={clear(){},load(){}};
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const listeners=new Map(),nodes=new Map();
 global.document={activeElement:null,getElementById:id=>nodes.get(id),

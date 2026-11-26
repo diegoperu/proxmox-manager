@@ -24,6 +24,7 @@ type fakeBalance struct {
 	rrdCPU    float64           // constant cpu fraction in the month RRD
 	models    map[string]string // node -> CPU flags ("" = unknown; default: the same flags everywhere)
 	hostCPU   map[int]bool      // QEMU VMs with cpu: host
+	machines  map[string]string // node -> current-kernel.machine ("" = absent; default x86_64)
 }
 
 func (f *fakeBalance) GetNodeStatus(n string) (json.RawMessage, error) {
@@ -32,7 +33,11 @@ func (f *fakeBalance) GetNodeStatus(n string) (json.RawMessage, error) {
 	if v, ok := f.models[n]; ok {
 		fl = v
 	}
-	b, _ := json.Marshal(map[string]interface{}{"cpuinfo": map[string]string{"model": "x", "flags": fl}})
+	machine := "x86_64"
+	if v, ok := f.machines[n]; ok {
+		machine = v
+	}
+	b, _ := json.Marshal(map[string]interface{}{"cpuinfo": map[string]string{"model": "x", "flags": fl}, "current-kernel": map[string]string{"machine": machine}})
 	return b, nil
 }
 

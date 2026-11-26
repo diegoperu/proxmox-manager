@@ -16,6 +16,9 @@ const (
 	PlaceOffline     = "node_offline"
 	PlaceRAM         = "ram"               // Missing = bytes
 	PlaceVCPUThreads = "vcpu_over_threads" // Need = vCPU asked, Have = threads of the node
+	// PlaceArch: the node's CPU architecture is not the template's (or is unknown while the template's is known,
+	// D168). Arch = the node's architecture ("" = unknown).
+	PlaceArch = "arch_mismatch"
 )
 
 // PlaceRequest is the VM to place.
@@ -26,6 +29,8 @@ type PlaceRequest struct {
 	// Extra maps a node to the reasons the caller already knows (e.g. "storage_unavailable", or "disk2_no_space"
 	// with the bytes missing): the node is not eligible, the reasons are copied as they are.
 	Extra map[string][]PlaceReason
+	// Arch: CPU architecture of the template the VM is cloned from ("amd64", "arm64"; "" = unknown, no check).
+	Arch string
 }
 
 // PlaceReason is one reason, with the numbers behind it when there are any.
@@ -35,6 +40,7 @@ type PlaceReason struct {
 	Need    int    `json:"need,omitempty"`    // vcpu_over_threads
 	Have    int    `json:"have,omitempty"`
 	Detail  string `json:"detail,omitempty"` // which file or storage the reason is about (file_missing, clone_no_space)
+	Arch    string `json:"arch,omitempty"`   // arch_mismatch: the node's architecture ("" = unknown)
 }
 
 // PlaceNode is the answer for one node.
@@ -104,6 +110,10 @@ func Place(nodes []Node, vms []VM, req PlaceRequest, p Params) (PlaceResult, err
 		// same hard rule as the balance: vCPUs <= threads, and a node whose threads are unknown cannot be checked
 		if n.in.Cores <= 0 || req.VCPU > n.in.Cores {
 			pn.Reasons = append(pn.Reasons, PlaceReason{Code: PlaceVCPUThreads, Need: req.VCPU, Have: n.in.Cores})
+		}
+		// D168: the clone of a template runs only on the template's architecture; unknown node = cannot be checked
+		if req.Arch != "" && n.in.Arch != req.Arch {
+			pn.Reasons = append(pn.Reasons, PlaceReason{Code: PlaceArch, Arch: n.in.Arch})
 		}
 		pn.Reasons = append(pn.Reasons, req.Extra[name]...)
 		// the cluster spread and the CPU warnings with the VM on this node (online nodes only are destinations)

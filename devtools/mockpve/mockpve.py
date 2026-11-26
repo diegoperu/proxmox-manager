@@ -9,6 +9,16 @@ rnd = random.Random(42)
 NOW = int(time.time())
 GB = 1024 ** 3
 READINESS_SCENARIO = os.environ.get("READINESS_SCENARIO", "ok")
+# MOCK_ARCH: architettura dei nodi (x86_64 predefinito, aarch64 per provare un cluster ARM);
+# MOCK_ARCH_MIXED=1: l'ultimo nodo con l'altra architettura (cluster misto, D168)
+MOCK_ARCH = os.environ.get("MOCK_ARCH", "x86_64") if os.environ.get("MOCK_ARCH") in ("x86_64", "aarch64") else "x86_64"
+MOCK_ARCH_MIXED = os.environ.get("MOCK_ARCH_MIXED") == "1"
+
+
+def node_machine(node):
+    if MOCK_ARCH_MIXED and node == sorted(NODES)[-1]:
+        return "aarch64" if MOCK_ARCH == "x86_64" else "x86_64"
+    return MOCK_ARCH
 READINESS_PRIVILEGES = (
     "Sys.Audit Sys.PowerMgmt VM.Audit VM.PowerMgmt VM.Snapshot VM.Migrate VM.Clone VM.Allocate "
     "VM.Config.Disk VM.Config.CPU VM.Config.Memory VM.Config.Network VM.Config.Cloudinit VM.Config.Options "
@@ -270,6 +280,7 @@ def route(path, query=None):
         if rest == "status":
             return dict(cpu=b["cpu"], memory=dict(used=int(b["maxmem"] * b["mem"]), total=b["maxmem"]), uptime=86400 * 12,
                         loadavg=["1.2", "1.1", "0.9"], pveversion="pve-manager/8.2.4", kversion="Linux 6.8.8-2-pve",
+                        **{"current-kernel": dict(machine=node_machine(node), sysname="Linux", release="6.8.8-2-pve")},
                         cpuinfo=dict(cpus=b["cores"], model=CPU_MODELS.get(node, "AMD EPYC 7313"), flags=CPU_FLAGS.get(CPU_MODELS.get(node, "AMD EPYC 7313"), "")))
         if rest == "hardware/pci":
             return [dict(id="0000:01:00.0", **{"class": "0x030000"}, vendor="0x10de", iommugroup=12, vendor_name="NVIDIA Corporation", device_name="GA102 [GeForce RTX 3090]"),

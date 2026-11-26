@@ -1679,3 +1679,5 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A.
 **Risposta utente**: A (2026-11-26). **Aggiunta (richiesta utente, 2026-11-26)**: con cluster di architetture diverse nel manager, l'architettura si vede al volo: etichetta testuale "x86-64" / "ARM64" accanto al selettore del cluster nella barra in alto, architettura in ogni voce del selettore, "misto" se un cluster avesse nodi di architetture diverse (segnalato anche in Preparazione nodi), e nell'intestazione di Nuova VM, Bilanciamento e Aggiungi nodo; mostrata solo se i cluster non hanno tutti la stessa architettura; letta dallo stato dei nodi (`current-kernel.machine`) e tenuta in memoria.
 
+**Realizzato (2026-11-26)**: vincoli nel Bilanciamento, nella Nuova VM e nella migrazione manuale, controllo in Preparazione nodi, etichetta nella pagina (dettaglio nel registro di `CLAUDE.md`).
+

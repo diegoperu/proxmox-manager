@@ -186,12 +186,12 @@ func TestSettingsTabsAndClusterBinding(t *testing.T) {
 		}
 		return text[start : start+finish+len(end)]
 	}
-	source := section("const ClusterMgr={", "\n};") + "\n" + section("const PMETA=", "// pmgr:autorefresh:begin") + "\n" + section("const Settings={", "\n};") + "\n" + section("// pmgr:settings-guard:begin", "// pmgr:settings-guard:end")
+	source := archUISource(t) + section("const ClusterMgr={", "\n};") + "\n" + section("const PMETA=", "// pmgr:autorefresh:begin") + "\n" + section("const Settings={", "\n};") + "\n" + section("// pmgr:settings-guard:begin", "// pmgr:settings-guard:end")
 	driver := `
 const assert=require('node:assert/strict');
 const elements=new Map(),listeners={};
 global.Auth={locked:false};global._IS_CONSOLE=false;
-global.document={getElementById(id){if(!elements.has(id))elements.set(id,{innerHTML:'',value:'',style:{},classList:{contains:()=>false,toggle(){}},setAttribute(k,v){this[k]=v;}});return elements.get(id);},querySelectorAll:()=>[]};
+global.document={getElementById(id){if(!elements.has(id))elements.set(id,{innerHTML:'',value:'',style:{},options:[],classList:{contains:()=>false,toggle(){}},setAttribute(k,v){this[k]=v;}});return elements.get(id);},querySelectorAll:()=>[]};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings'};
 global.history={pushState(a,b,h){location.hash=h;},replaceState(a,b,h){location.hash=h;}};

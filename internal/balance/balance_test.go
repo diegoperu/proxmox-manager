@@ -362,6 +362,7 @@ func TestInvariantsRandomClusters(t *testing.T) {
 			n.Online = r.Intn(12) > 0
 			n.CPUP95 = float64(r.Intn(100))
 			n.CPUFlags = []map[string]bool{nil, flagSet("a b"), flagSet("a b c"), flagSet("a d"), flagSet("a b c d")}[r.Intn(5)]
+			n.Arch = []string{"amd64", "amd64", "amd64", "arm64", ""}[r.Intn(5)]
 			nodes = append(nodes, n)
 		}
 		var vms []VM
@@ -506,6 +507,15 @@ func checkInvariants(t *testing.T, round int, nodes []Node, vms []VM, p Params, 
 	if len(p.Evacuate) == 0 && pl.SpreadAfter > pl.SpreadBefore {
 		t.Fatalf("round %d: spread worse %v > %v", round, pl.SpreadAfter, pl.SpreadBefore)
 	}
+	archOf := map[string]string{}
+	for _, n := range nodes {
+		archOf[n.Name] = n.Arch
+	}
+	for _, s := range pl.Steps {
+		if archOf[s.From] != archOf[s.To] {
+			t.Fatalf("round %d: step across architectures %#v (%q -> %q)", round, s, archOf[s.From], archOf[s.To])
+		}
+	}
 }
 
 func flagSet(s string) map[string]bool {
@@ -626,5 +636,46 @@ func TestVCPUsNeverBeyondTheThreadsOfTheDestination(t *testing.T) {
 	pl = mustPlan(t, []Node{big, unk}, []VM{vm("n10", 5, 400, 2), vm("n10", 6, 400, 2)}, noReserve())
 	if len(pl.Steps) != 0 {
 		t.Fatalf("moved to a node with unknown threads: %#v", pl.Steps)
+	}
+}
+
+func TestNeverAcrossArchitectures(t *testing.T) {
+	x1, x2, a1 := node("x1", 1000, 64, 0), node("x2", 1000, 64, 0), node("a1", 1000, 64, 0)
+	x1.Arch, x2.Arch, a1.Arch = "amd64", "amd64", "arm64"
+	// x1 overloaded, the ARM node empty: everything must go to x2, nothing to a1, even cold
+	vms := []VM{vm("x1", 1, 300, 4), vm("x1", 2, 300, 4), vm("x1", 3, 300, 4)}
+	p := noReserve()
+	p.Cold = true
+	p.ColdVMs = []int{1, 2, 3}
+	pl := mustPlan(t, []Node{x1, x2, a1}, vms, p)
+	if len(pl.Steps) == 0 {
+		t.Fatal("no step at all")
+	}
+	for _, s := range pl.Steps {
+		if s.To != "x2" {
+			t.Fatalf("moved across architectures: %#v", s)
+		}
+	}
+	// the only other node is ARM: blocked with the reason
+	pl = mustPlan(t, []Node{x1, a1}, vms, p)
+	if len(pl.Steps) != 0 {
+		t.Fatalf("moved to ARM: %#v", pl.Steps)
+	}
+	for _, b := range pl.Blocked {
+		if !contains(b.Reasons, BlockArch) {
+			t.Fatalf("missing arch reason: %#v", b)
+		}
+	}
+	// known architecture never goes to an unknown one
+	u := node("u", 1000, 64, 0)
+	pl = mustPlan(t, []Node{x1, u}, vms, p)
+	if len(pl.Steps) != 0 {
+		t.Fatalf("moved to a node with unknown architecture: %#v", pl.Steps)
+	}
+	// all unknown (as before D168): unchanged behaviour
+	y1, y2 := node("y1", 1000, 64, 0), node("y2", 1000, 64, 0)
+	pl = mustPlan(t, []Node{y1, y2}, []VM{vm("y1", 1, 300, 4), vm("y1", 2, 300, 4)}, noReserve())
+	if len(pl.Steps) == 0 {
+		t.Fatal("unknown architectures everywhere must not block")
 	}
 }
