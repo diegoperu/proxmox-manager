@@ -434,7 +434,7 @@ machine. Protect or remove staging copies once the backup and login checks pass.
 
 ## Security
 
-- TLS certificate verification is **intentionally disabled** for Proxmox connections — Proxmox VE ships with self-signed certificates. See [`SECURITY.md`](SECURITY.md).
+- **TLS to Proxmox**: paste the cluster CA (`cat /etc/pve/pve-root-ca.pem` on a node, public) in **Impostazioni → Infrastruttura → Verifica TLS del cluster**: from then on every connection must present a certificate signed by it. Without it the certificate is not verified (the Node preparation page warns). See [`SECURITY.md`](SECURITY.md).
 - Restrict the listen address to loopback if running on a shared host: `"listen_addr": "127.0.0.1:8080"`.
 - `config.json` contains API tokens in plaintext — the server writes it with `0600`; check the permissions of a file created by hand: `chmod 600 config.json`.
 - The only outbound Internet traffic is the optional **"Check price lists"** button (fixed public Azure and OVHcloud URLs) and the **update check** (the public GitHub API of this repository; it sends only the public commit hash it was built from). Both use TLS with verification and send nothing about your organisation. Everything else talks only to Proxmox.

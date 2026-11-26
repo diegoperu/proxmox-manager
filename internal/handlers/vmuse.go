@@ -69,7 +69,7 @@ type vmUseCollector struct {
 
 var vmUse = &vmUseCollector{
 	now:       time.Now,
-	newClient: func(cl config.ClusterConfig) vmUseAPI { return api.NewClient(cl.URL, cl.APIToken) },
+	newClient: func(cl config.ClusterConfig) vmUseAPI { return api.NewClientCA(cl.URL, cl.APIToken, cl.TLSCA) },
 }
 
 // missingDays lists the complete days of the window that are not stored, oldest first.

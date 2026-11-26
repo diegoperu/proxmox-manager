@@ -198,3 +198,19 @@ func SetNetworkSettings(idx int, n *NetworkSettings) error {
 	}
 	return nil
 }
+
+// SetClusterTLSCA stores (caPEM already normalized by the caller) or clears ("") the CA of a cluster.
+func SetClusterTLSCA(idx int, caPEM string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if idx < 0 || idx >= len(current.Clusters) {
+		return ErrNetworkCluster
+	}
+	old := current.Clusters[idx].TLSCA
+	current.Clusters[idx].TLSCA = caPEM
+	if err := save(); err != nil {
+		current.Clusters[idx].TLSCA = old
+		return err
+	}
+	return nil
+}
