@@ -1677,5 +1677,5 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Perché conta**: protegge anche con cluster separati (un nodo sbagliato aggiunto per errore, un template di un'altra architettura); il nodo ARM riporta via API `cpus: 12` corretto ma `cores: 1`, `sockets: 1`, flag CPU vuoti, modello "ARM part 0xd81" (big.LITTLE: 4 Cortex-A520 + 8 Cortex-A720).
 **Opzioni**: A) architettura dei nodi in Preparazione nodi e Aggiungi nodo (controllo: stessa architettura del cluster), Nuova VM solo su nodi della stessa architettura del template (`machine: virt` = aarch64), Bilanciamento e migrazioni mai fra architetture; B) nulla.
 **Suggerimento**: A.
-**Risposta utente**: A (2026-11-26).
+**Risposta utente**: A (2026-11-26). **Aggiunta (richiesta utente, 2026-11-26)**: con cluster di architetture diverse nel manager, l'architettura si vede al volo: etichetta testuale "x86-64" / "ARM64" accanto al selettore del cluster nella barra in alto, architettura in ogni voce del selettore, "misto" se un cluster avesse nodi di architetture diverse (segnalato anche in Preparazione nodi), e nell'intestazione di Nuova VM, Bilanciamento e Aggiungi nodo; mostrata solo se i cluster non hanno tutti la stessa architettura; letta dallo stato dei nodi (`current-kernel.machine`) e tenuta in memoria.
 

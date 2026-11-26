@@ -839,7 +839,7 @@ Domande D64-D67 in `DOMANDE.md` (fino a dove arriva il disco: collegato o anche 
 
 **Piano a step:**
 1. **[FATTO 2026-11-26, prova `--dry-run` sul nodo ARM da fare]** Script unici x86/ARM (D165 + `TEMPLATE_IPCONFIG` di D166): `arch.d/`, rilevamento dell'architettura, segnaposto, `ARCHES=`, test anche in arm64, comandi x86 invariati; prova `--dry-run` sul nodo ARM — [Modello suggerito: Sonnet — ragionamento: alto — motivo: script ben specificati; via Codex, revisione mia]
-2. Architettura nel manager (D168): nodi, template, Nuova VM, Bilanciamento e migrazioni mai fra architetture, Aggiungi nodo — [Modello suggerito: Opus — ragionamento: medio — motivo: vincoli di sicurezza su migrazioni e creazione]
+2. Architettura nel manager (D168): nodi, template, Nuova VM, Bilanciamento e migrazioni mai fra architetture, Aggiungi nodo; **etichetta dell'architettura** nella barra in alto e nel selettore del cluster ("x86-64" / "ARM64" / "misto"), mostrata solo con cluster di architetture diverse, e nelle intestazioni di Nuova VM, Bilanciamento, Aggiungi nodo (approvata dall'utente) — [Modello suggerito: Opus — ragionamento: medio — motivo: vincoli di sicurezza su migrazioni e creazione]
 3. Modalita' DHCP nella Nuova VM (D166): impostazioni, validazione Go/JS, modulo, cloud-init, IP letto dall'agent a fine creazione — [Modello suggerito: Sonnet — ragionamento: alto — motivo: estende impostazioni e Nuova VM; via Codex]
 4. Consegna degli script al nodo ARM dal manager (accesso SSH, impronta, sincronizzazione), sostituzione della copia modificata a mano, prova di creazione di un template e di una VM — [Modello suggerito: Opus — ragionamento: medio — motivo: prima consegna su un'architettura nuova]
 
