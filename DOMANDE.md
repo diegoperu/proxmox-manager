@@ -1762,3 +1762,39 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A: chi ha un problema sale in alto. Un cluster non raggiungibile conta come "attenzione".
 **Risposta utente**: (vuoto)
 
+### D178 — Limiti di RAM: dove si configurano
+**Stato**: APERTA
+**Bloccante**: no (nessun codice finche' non si discute)
+**Domanda**: la riserva di RAM dell'host (oggi 8 GiB fissi + 4 GiB per OSD Ceph, uguale per tutti i nodi di tutti i cluster) si imposta per cluster, per singolo nodo, o entrambi?
+**Perché conta**: il nodo del cluster ARM e' una scheda di sviluppo con 16 GiB: con 8 GiB di riserva ne restano 8 assegnabili (meta'), quindi poche VM di prova; un nodo da 1 TiB perde lo 0,8%. Oggi solo il Bilanciamento accetta una riserva diversa per nodo, e solo per la singola richiesta (`reserve=nodo:gb`, mai salvata); la Nuova VM e il controllo prima dell'avvio usano sempre i valori predefiniti, senza possibilita' di cambiarli.
+**Opzioni**: A) per cluster in `config.json` (sezione limiti del cluster, scheda Infrastruttura) con eccezioni facoltative per nodo; B) solo per cluster; C) solo per nodo.
+**Suggerimento**: A: il valore del cluster copre il caso normale (tutti i nodi simili) e l'eccezione per nodo serve ai cluster eterogenei (come CALCOLO, con nodi da 252 GB a 2 TB).
+**Risposta utente**: (vuoto)
+
+### D179 — Limiti di RAM: fissi o dinamici (percentuale)
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: la riserva dell'host puo' essere espressa anche come percentuale della RAM del nodo, con un minimo e un massimo (es. 12,5% con minimo 2 GiB e massimo 8 GiB), oltre al valore fisso di oggi?
+**Perché conta**: una percentuale si adatta da sola a nodi di taglie diverse e a una scheda piccola, ma e' meno prevedibile di un numero fisso e va spiegata bene nella pagina (la riserva effettiva di ogni nodo deve vedersi). Il minimo evita che un nodo piccolo resti senza memoria per il sistema; il massimo evita che un nodo enorme riservi troppo.
+**Opzioni**: A) due modalita' per cluster: "fissa" (come oggi, predefinita) e "percentuale con minimo e massimo"; la riserva per OSD resta in GiB; B) solo fissa, con eccezione per nodo; C) solo percentuale.
+**Suggerimento**: A: i cluster esistenti non cambiano (fissa 8 GiB + 4 per OSD) e chi ha nodi piccoli sceglie la percentuale; nella pagina ogni nodo mostra "riserva: X GiB (Y%)".
+**Risposta utente**: (vuoto)
+
+### D180 — Limiti di RAM: la riserva minima per eseguire
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: oggi il Bilanciamento rifiuta di eseguire (400 `reserve_too_low`) con una riserva host sotto 8 GiB: era una difesa decisa il 2026-11-04 contro piani troppo aggressivi. Con nodi piccoli o riserve in percentuale, il minimo per eseguire resta 8 GiB fissi, segue il limite configurato, o ha un pavimento proprio (es. 1 GiB)?
+**Perché conta**: su un nodo da 16 GiB un minimo di 8 GiB rende impossibile eseguire spostamenti con una riserva ragionevole; abbassarlo toglie una difesa nata da un incidente (la RAM del nodo sovraccarica).
+**Opzioni**: A) il minimo e' il valore configurato dell'amministratore, ma mai sotto un pavimento fisso di 1 GiB e mai a zero (lo zero resta "solo simulazione"); B) resta 8 GiB; C) nessun minimo.
+**Suggerimento**: A.
+**Risposta utente**: (vuoto)
+
+### D181 — Limiti di RAM: una sola fonte per tutte le operazioni
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: la riserva effettiva di ogni nodo si calcola in un solo punto (cluster -> eccezione del nodo -> regola fissa o percentuale -> + OSD) e la usano insieme la Nuova VM (consiglio e controllo prima del clone), il controllo prima dell'avvio di una VM e il Bilanciamento, con i parametri a mano del Bilanciamento che restano come "simulazione" sopra al valore salvato?
+**Perché conta**: oggi i tre usano gli stessi valori predefiniti scritti nel codice; se la configurazione cambia in un posto solo, le tre pagine darebbero risposte diverse sulla stessa VM.
+**Opzioni**: A) una funzione unica `effective reserve` che legge la configurazione del cluster, usata da tutti e tre, con la riserva effettiva mostrata nelle pagine; B) configurazione solo per il Bilanciamento; C) valori diversi per operazione.
+**Suggerimento**: A.
+**Risposta utente**: (vuoto)
+
