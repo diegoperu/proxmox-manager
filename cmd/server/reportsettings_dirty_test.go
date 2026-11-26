@@ -30,7 +30,7 @@ func TestReportSettingsUnsavedChanges(t *testing.T) {
 		return text[start : start+finish+len(end)]
 	}
 	source := section("// pmgr:report-settings:begin", "// pmgr:report-settings:end") + "\n" +
-		section("const ClusterMgr={", "\n};") + "\n" +
+		archUISource(t) + section("const ClusterMgr={", "\n};") + "\n" +
 		section("const PMETA=", "// pmgr:autorefresh:begin") + "\n" +
 		section("const AutoRefresh={", "\n};") + "\n" +
 		section("const AutoRefreshUI={", "\n};") + "\n" +
@@ -42,7 +42,7 @@ func TestReportSettingsUnsavedChanges(t *testing.T) {
 const assert=require('node:assert/strict');
 const nodes=new Map(),listeners={};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},
+function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},options:[],
  classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},
  addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};

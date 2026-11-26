@@ -209,6 +209,7 @@ func buildRouter(h *handlers.Handler, authH *auth.Handlers, accounts *auth.Store
 		r.Get("/clusters", h.GetClusters)
 		r.Get("/clusters/{idx}/network-settings", h.GetNetworkSettings)
 		r.Get("/clusters/{idx}/node-readiness", h.GetNodeReadiness)
+		r.Get("/clusters/arch", h.GetClustersArch)
 		r.Get("/clusters/{idx}/tls", h.GetClusterTLS)
 		r.Get("/clusters/{idx}/tls/candidate", h.GetClusterTLSCandidate)
 		r.Put("/clusters/{idx}/tls", h.PutClusterTLS)

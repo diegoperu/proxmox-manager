@@ -226,3 +226,36 @@ func TestPlaceUnknownThreadsIsNotEligible(t *testing.T) {
 		t.Fatalf("%+v", r.Nodes)
 	}
 }
+
+func TestPlaceOnlyOnTheTemplateArchitecture(t *testing.T) {
+	x, a, u := node("x", 100, 32, 0), node("a", 100, 32, 0), node("u", 100, 32, 0)
+	x.Arch, a.Arch = "amd64", "arm64"
+	r, err := Place([]Node{x, a, u}, nil, PlaceRequest{Mem: GiB, VCPU: 2, Arch: "arm64"}, noReserve())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Recommended != "a" {
+		t.Fatalf("recommended %q", r.Recommended)
+	}
+	for _, n := range r.Nodes {
+		mism := false
+		for _, rs := range n.Reasons {
+			if rs.Code == PlaceArch {
+				mism = true
+				if rs.Arch != map[string]string{"x": "amd64", "u": ""}[n.Name] {
+					t.Fatalf("%s: arch %q", n.Name, rs.Arch)
+				}
+			}
+		}
+		if mism != (n.Name != "a") || n.Eligible == mism {
+			t.Fatalf("%s: mismatch %v eligible %v", n.Name, mism, n.Eligible)
+		}
+	}
+	// template architecture unknown: no check (as before D168)
+	r, _ = Place([]Node{x, a}, nil, PlaceRequest{Mem: GiB, VCPU: 2}, noReserve())
+	for _, n := range r.Nodes {
+		if !n.Eligible {
+			t.Fatalf("%s not eligible without a template architecture", n.Name)
+		}
+	}
+}

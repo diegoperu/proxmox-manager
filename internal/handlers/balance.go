@@ -615,6 +615,7 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 		})
 	}
 	nodeFlags := make([]map[string]bool, len(nodes))
+	nodeArch := make([]string, len(nodes))
 	for i := range nodes {
 		i := i
 		if !nodes[i].online {
@@ -633,6 +634,7 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 			if json.Unmarshal(raw, &st) == nil {
 				nodeFlags[i] = cpuFlags(st.CPUInfo.Flags)
 			}
+			nodeArch[i] = nodeStatusArch(raw)
 		})
 	}
 	nodeCPU := make([]float64, len(nodes))
@@ -657,7 +659,10 @@ func buildBalance(c balanceAPI, clusterLabel string, idx int, q balanceQuery, no
 		if n.online && len(nodeFlags[i]) == 0 && !containsStr(meta.Partial, "cpu_flags") {
 			meta.Partial = append(meta.Partial, "cpu_flags") // unknown flags: no live destination for host-CPU VMs there
 		}
-		in = append(in, balance.Node{Name: n.name, Online: n.online, MemTotal: n.mem, Cores: int(n.cores), OSDs: osds[n.name], CPUP95: nodeCPU[i], Reserve: res, CPUFlags: nodeFlags[i]})
+		if n.online && nodeArch[i] == "" && !containsStr(meta.Partial, "arch") {
+			meta.Partial = append(meta.Partial, "arch") // unknown architecture: never a destination for a known one (D168)
+		}
+		in = append(in, balance.Node{Name: n.name, Online: n.online, MemTotal: n.mem, Cores: int(n.cores), OSDs: osds[n.name], CPUP95: nodeCPU[i], Reserve: res, CPUFlags: nodeFlags[i], Arch: nodeArch[i]})
 	}
 	vms := make([]balance.VM, 0, len(guests))
 	for i, g := range guests {

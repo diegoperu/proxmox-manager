@@ -56,6 +56,9 @@ const (
 	// BlockVCPU: the VM has more vCPUs than the threads of every node that could receive it. Proxmox refuses to
 	// run a VM with more vCPUs than the host has (found on 2026-11-04: an 80-vCPU VM planned to a 64-thread node).
 	BlockVCPU = "vcpu_over_threads"
+	// BlockArch: no other node has the CPU architecture of the VM's node (x86-64 vs ARM64, D168): a guest never
+	// runs on another architecture, neither live nor cold.
+	BlockArch = "arch"
 )
 
 // Node is one node of the cluster as seen now.
@@ -72,6 +75,9 @@ type Node struct {
 	// migration only on a node that has ALL the flags of the source (D63 B, checked on 2026-11-05 on every pair
 	// of CPU models of the cluster). Empty = unknown: never a live destination for a host-CPU VM.
 	CPUFlags map[string]bool
+	// Arch: CPU architecture of the node, "amd64" or "arm64" (D168); "" = unknown. A VM moves only between nodes
+	// with the same value: a known architecture never goes to an unknown one.
+	Arch string
 }
 
 // VM is one guest (QEMU or LXC). Blockers are filled by the caller from the config and from Proxmox's
@@ -367,6 +373,9 @@ func (st *state) blockersOf(r *vmRT, nd *nodeRT) []string {
 	if !st.enoughThreadsExists(r, nd) {
 		set[BlockVCPU] = true
 	}
+	if !st.sameArchExists(r, nd) {
+		set[BlockArch] = true
+	}
 	for _, b := range v.Blockers {
 		set[b] = true
 	}
@@ -399,6 +408,26 @@ func (st *state) sameCPUExists(r *vmRT, from *nodeRT) bool {
 		}
 	}
 	return false
+}
+
+// sameArch: hard rule, a guest runs only on the CPU architecture it was created for (D168).
+func sameArch(a, b *nodeRT) bool { return a.in.Arch == b.in.Arch }
+
+// sameArchExists: another destination node with the same architecture that Proxmox allows. With no allowed
+// destination at all it answers true: the other reasons (no_target, node offline) explain it, "arch" would be noise.
+func (st *state) sameArchExists(r *vmRT, from *nodeRT) bool {
+	any := false
+	for _, name := range st.names {
+		n := st.nodes[name]
+		if n == from || !st.dest(n) || (r.in.Allowed != nil && !contains(r.in.Allowed, name)) {
+			continue
+		}
+		any = true
+		if sameArch(from, n) {
+			return true
+		}
+	}
+	return !any
 }
 
 // enoughThreads: hard rule, a node runs a VM only if it has at least as many threads as the VM has vCPUs.
@@ -512,6 +541,9 @@ func (st *state) fits(v *vmRT, n *nodeRT) bool {
 		return false
 	}
 	if !enoughThreads(v.in, n) {
+		return false
+	}
+	if !sameArch(st.nodes[v.at], n) {
 		return false
 	}
 	if v.counted && n.load+v.in.Mem > n.assign {

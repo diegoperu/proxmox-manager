@@ -686,6 +686,11 @@ func (h *Handler) VMMigrate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err, http.StatusBadRequest)
 		return
 	}
+	// D168: never across CPU architectures (a known one never goes to an unknown one either)
+	if from, to := readNodeArch(client, node), readNodeArch(client, body.Target); from != to {
+		writeError(w, errors.New("migrazione rifiutata: "+node+" e "+body.Target+" hanno architetture diverse ("+archLabelOrUnknown(from)+", "+archLabelOrUnknown(to)+")"), http.StatusConflict)
+		return
+	}
 	data, err := client.VMMigrate(node, vmid, body.Target, body.Online)
 	if err != nil {
 		log.Printf("migrate qemu=%d %s -> %s: %v", vmid, node, body.Target, err)

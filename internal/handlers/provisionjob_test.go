@@ -23,8 +23,9 @@ import (
 // Cluster resources are derived from the VMs, so the RAM check sees what the procedure creates.
 type fakeProv struct {
 	mu              sync.Mutex
-	resizeAsync     bool         // Proxmox 9: resize answers with a task that rewrites the config when it ends
-	resizePending   map[int]bool // resize task not yet finished
+	machines        map[string]string // node -> current-kernel.machine (default x86_64)
+	resizeAsync     bool              // Proxmox 9: resize answers with a task that rewrites the config when it ends
+	resizePending   map[int]bool      // resize task not yet finished
 	vms             map[int]*fvm
 	ver             map[int]int
 	writes          []string // "op vmid key=value..." (no secret values: they are recorded as ***)
@@ -147,7 +148,11 @@ func (f *fakeProv) GetCephOSD(n string) (json.RawMessage, error) {
 	return nil, errors.New("proxmox 500: binary not installed")
 }
 func (f *fakeProv) GetNodeStatus(n string) (json.RawMessage, error) {
-	return json.RawMessage(`{"cpuinfo":{"model":"Intel Xeon"}}`), nil
+	machine := "x86_64"
+	if v, ok := f.machines[n]; ok {
+		machine = v
+	}
+	return json.RawMessage(`{"cpuinfo":{"model":"Intel Xeon"},"current-kernel":{"machine":"` + machine + `"}}`), nil
 }
 func (f *fakeProv) GetNodePCI(node string) (json.RawMessage, error) {
 	if node != "n2" {
@@ -1365,5 +1370,32 @@ func TestProvisionSELinuxMissingHelpers(t *testing.T) {
 		if !strings.Contains(args[2], `[ -x "$1" ]`) {
 			t.Fatalf("unexpected inline script: %v", args)
 		}
+	}
+}
+
+// D168: a template on an ARM node is never cloned to an x86 node (nor to a node whose architecture is unknown);
+// the refusal comes before any write. Same architecture: created as usual.
+func TestProvisionNeverAcrossArchitectures(t *testing.T) {
+	provFast(t)
+	for name, machine := range map[string]string{"x86 target": "x86_64", "unknown target": ""} {
+		f := newFakeProv()
+		f.machines = map[string]string{"n1": "aarch64", "n2": machine}
+		_, err := startProv(f, 31, "C", mustPlanProv(t, baseReq()), noOpts, time.Now())
+		var ref *provRefusal
+		if !errors.As(err, &ref) || ref.Reason != "node_not_eligible" || !containsStr(ref.Reasons, "arch_mismatch") {
+			t.Errorf("%s: %v %+v", name, err, ref)
+		}
+		if w := f.log(); w != "" {
+			t.Errorf("%s: written:\n%s", name, w)
+		}
+	}
+	f := newFakeProv()
+	f.machines = map[string]string{"n1": "aarch64", "n2": "aarch64"}
+	j, err := startProv(f, 31, "C", mustPlanProv(t, baseReq()), noOpts, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := waitProv(t, j); v.Result != provOK {
+		t.Fatalf("%+v", v)
 	}
 }

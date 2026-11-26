@@ -55,6 +55,8 @@ body{background:linear-gradient(180deg,var(--sky-glow) 0,var(--bg) 380px) var(--
 #crumb-cluster{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .top-title{font-size:15px;font-weight:600;letter-spacing:-.005em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top-badge{display:none}
+.arch-chip{padding:2px 6px;border:1px solid var(--border);border-radius:var(--r-badge);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.arch-chip.warn{color:var(--warn);border-color:var(--warn)}
 .conn{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);padding:0 4px;white-space:nowrap}
 #cdot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
 #cdot.ok{background:var(--green)}
@@ -1083,6 +1085,7 @@ html.role-admin .role-readonly{display:none!important}
   <button type="button" class="btn bg2 sm menu-btn" id="menu-btn" aria-label="Apri menu" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <div class="brand">Proxmox<span>Manager</span></div>
   <select id="cluster-select" aria-label="Cluster" class="inp sm" onchange="ClusterMgr.switchTo(this.value)" style="display:none;min-width:120px"></select>
+  <span id="arch-chip" class="arch-chip" hidden></span>
   <nav class="crumb" aria-label="Posizione">
     <span id="crumb-cluster"></span><span class="sepc" id="crumb-sep" aria-hidden="true">›</span>
     <h1 class="top-title" id="ptitle">Panoramica</h1>
@@ -1226,6 +1229,7 @@ html.role-admin .role-readonly{display:none!important}
     <!-- ██ BILANCIAMENTO ██ -->
     <div class="page" id="page-balance">
       <div class="cond" id="bal-cond" aria-live="polite"></div>
+      <p class="cnote" id="bal-arch" hidden></p>
       <div class="toolbar" style="margin-top:18px">
         <label class="bal-opt"><input type="checkbox" class="chk" id="bal-stopped" onchange="Balance.changed()"> Le VM spente contano</label>
         <label class="bal-opt"><input type="checkbox" class="chk" id="bal-cold" onchange="Balance.changed()"> Includi i container (riavvio breve)</label>
@@ -1271,6 +1275,7 @@ html.role-admin .role-readonly{display:none!important}
     </div>
 
     <div class="page" id="page-nodeadd">
+      <p class="cnote" id="na-arch" hidden></p>
       <p class="cnote">Il manager legge i controlli e mostra i comandi. Eseguili manualmente come root sul nodo indicato.</p>
       <div class="toolbar"><button type="button" class="btn bg2 sm" id="na-recheck">Ricontrolla</button></div>
       <div id="na-body" aria-live="polite" aria-busy="false"></div>
@@ -1384,6 +1389,7 @@ html.role-admin .role-readonly{display:none!important}
 
     <!-- ██ PROVISION ██ -->
     <div class="page" id="page-provision">
+      <p class="cnote" id="pv-arch" hidden></p>
       <div class="pv-steps" id="pv-steps" aria-label="Avanzamento">
         <button type="button" class="pv-step" data-s="1" onclick="Provision.goto(1)">1 · Template</button>
         <button type="button" class="pv-step" data-s="2" onclick="Provision.goto(2)">2 · VM</button>
@@ -2698,6 +2704,45 @@ if (!_IS_CONSOLE) setInterval(()=>{document.getElementById('clk').textContent=ne
 // ════════════════════════════════════════════════════════════════════════════
 // CLUSTER MANAGER
 // ════════════════════════════════════════════════════════════════════════════
+// pmgr:arch:begin
+const ArchUI={
+  by:new Map(),seq:0,
+  label(a){switch(a){case 'amd64':return 'x86-64';case 'arm64':return 'ARM64';case 'mixed':return 'misto';default:return '';}},
+  shouldShow(list){return list.includes('mixed')||new Set(list.filter(a=>a==='amd64'||a==='arm64')).size>=2;},
+  optionText(clusterLabel,arch,show){const name=ArchUI.label(arch);return show&&name?clusterLabel+' · '+name:clusterLabel;},
+  of(idx){return this.by.get(idx)||'';},
+  clear(){this.seq++;this.by.clear();this.paint();},
+  async load(){
+    const seq=++this.seq,epoch=Auth.epoch,indices=new Set(ClusterMgr.clusters.map(c=>c.idx));
+    let by=new Map();
+    try{
+      const data=await api('/clusters/arch',{quiet:true,timeoutMs:15000});
+      if(!Array.isArray(data)||data.length!==indices.size)throw new Error('Risposta architetture non valida.');
+      for(const row of data){
+        if(!row||!Number.isSafeInteger(row.index)||!indices.has(row.index)||by.has(row.index)||
+          !['','amd64','arm64','mixed'].includes(row.arch))throw new Error('Risposta architetture non valida.');
+        by.set(row.index,row.arch);
+      }
+    }catch(e){by=new Map();} // Unavailable architectures stay unknown; page startup must continue.
+    if(seq!==this.seq||Auth.locked||epoch!==Auth.epoch)return;
+    this.by=by;this.paint();
+  },
+  paint(){
+    const show=this.shouldShow(ClusterMgr.clusters.map(c=>this.of(c.idx))),arch=this.of(ClusterMgr.current),name=this.label(arch);
+    const chip=document.getElementById('arch-chip');
+    chip.hidden=!show||!name;chip.textContent=name;chip.classList.toggle('warn',arch==='mixed');
+    const description=arch==='mixed'?'Il cluster ha nodi di architetture diverse: le VM non si spostano fra architetture':'Architettura del cluster: '+name;
+    chip.title=description;chip.setAttribute('aria-label',description);
+    for(const option of document.getElementById('cluster-select').options){
+      const cluster=ClusterMgr.clusters.find(c=>c.idx===Number(option.value));
+      if(cluster)option.textContent=this.optionText(cluster.label,this.of(cluster.idx),show);
+    }
+    for(const id of ['pv-arch','bal-arch','na-arch']){
+      const hint=document.getElementById(id);hint.hidden=!show||!name;hint.textContent=name?'Architettura: '+name:'';
+    }
+  }
+};
+// pmgr:arch:end
 const ClusterMgr={
   clusters:[],
   current:0,
@@ -2711,11 +2756,13 @@ const ClusterMgr={
     const data=await api('/clusters',{quiet:true});
     this.clusters=Array.isArray(data)?data:[];
     const sel=document.getElementById('cluster-select');
-    sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(c.label)}</option>`).join('');
+    const show=ArchUI.shouldShow(this.clusters.map(c=>ArchUI.of(c.idx)));
+    sel.innerHTML=this.clusters.map(c=>`<option value="${esc(c.idx)}">${esc(ArchUI.optionText(c.label,ArchUI.of(c.idx),show))}</option>`).join('');
     const def=this.clusters.find(c=>c.default);
     this.current=preserveCurrent&&this.clusters.some(c=>c.idx===this.current)?this.current:(def?def.idx:0);
     sel.value=this.current;
     sel.style.display=this.clusters.length>1?'':'none';
+    ArchUI.paint();
   },
   switchTo(idx){
     const selected=Number(idx);
@@ -2725,6 +2772,7 @@ const ClusterMgr={
     if(SettingsGuard.guardLeave(()=>this.switchTo(selected)))return;
     this.current=selected;
     select.value=selected;
+    ArchUI.paint();
     Provision.resetNetwork();
     VMs.clearCache&&VMs.clearCache();
     Nodes.clearCache&&Nodes.clearCache();
@@ -2733,7 +2781,10 @@ const ClusterMgr={
     AutoRefreshUI.reset();
   },
   async renderList(){
+    // Deletion can reindex clusters: discard cached and pending architecture results first.
+    ArchUI.clear();
     await this.load(true);
+    ArchUI.load();
     const list=document.getElementById('cluster-list');
     if(!list)return;
     this.closeMenu(false);
@@ -3272,6 +3323,7 @@ const App={
       }
       UpdateUI.load();
       await ClusterMgr.load();if(Auth.locked||epoch!==Auth.epoch)return;
+      ArchUI.load();
       await Settings.load();if(Auth.locked||epoch!==Auth.epoch)return;
       Reports.init();Route.apply();AutoRefreshUI.init();App.checkConn();
       clearInterval(this.connTimer);this.connTimer=setInterval(()=>App.checkConn(),30000);
@@ -4553,6 +4605,7 @@ const Balance={
     no_target:'Proxmox non consente nessun altro nodo',node_offline:'Il suo nodo e\' fuori linea',not_counted:'Spenta e non conteggiata: spostarla non cambia il carico',
     unverified:'Non e\' stato possibile verificarla: non si sposta',
     vcpu_over_threads:'Ha piu\' vCPU dei thread di ogni altro nodo che potrebbe riceverla: Proxmox non la avvierebbe',
+    arch:'Nessun altro nodo ha la stessa architettura (x86-64 o ARM64): una VM non si sposta mai fra architetture diverse',
     cpu_host:'CPU "host": a caldo va solo su un nodo con tutte le istruzioni del processore di partenza (stessa generazione o piu\' nuova), e non ce n\'e\' uno libero (spunta "spegni e sposta" per spostarla a freddo)'},
   WHY:{evacuate:'Svuotamento del nodo',over_limit:'Il nodo supera la RAM assegnabile',balance:'Pareggio del carico'},
   gb(b){return Math.round((b||0)/1073741824);},
@@ -4605,6 +4658,7 @@ const Balance={
     if(!m.ha_known)notes.push('HA non letta: le VM gestite dall\'HA potrebbero non risultare bloccate.');
     if(!m.cpu_known)notes.push('CPU storica non letta: gli avvisi di CPU reale mancano.');
     if((m.partial||[]).includes('cpu_flags'))notes.push('Istruzioni del processore di qualche nodo non lette: quei nodi non ricevono a caldo le VM con CPU "host".');
+    if((m.partial||[]).includes('arch'))notes.push('Architettura di qualche nodo non letta: quei nodi non ricevono VM da nodi di architettura nota.');
     if(Balance.onlyBad)notes.push('Nel filtro "Solo queste VM" ci sono valori che non sono VMID: ignorati.');
     if(p.only)notes.push(`Filtro attivo: si spostano solo le VM ${p.only.split(',').join(', ')}.`);
     if(m.unverified)notes.push(`${m.unverified} ${Dashboard.plural(m.unverified,'VM non verificabile','VM non verificabili')}: non si spostano.`);
@@ -4898,7 +4952,7 @@ const NodePrep={
       const problem=!n.online||!n.checks.length||n.checks.some(c=>c.status!=='ok');
       const status=n.checks.some(c=>c.status==='fail')||!n.online?'fail':n.checks.some(c=>c.status==='warn')?'warn':problem?'unknown':'ok';
       const [glyph,word]=this.state(status),panel=document.createElement('details');panel.className='panel np-node';panel.open=problem;
-      panel.innerHTML=`<summary><strong>${esc(n.node)}</strong><span class="np-meta">${esc(n.version||'versione non verificabile')} · ${n.online?'in linea':'fuori linea'}</span> <span class="np-state ${status}"><span aria-hidden="true">${glyph}</span> ${problem?word:'tutto a posto'}</span></summary>`;
+      panel.innerHTML=`<summary><strong>${esc(n.node)}</strong><span class="np-meta">${esc(n.version||'versione non verificabile')}${ArchUI.label(n.arch)?' · '+esc(ArchUI.label(n.arch)):''} · ${n.online?'in linea':'fuori linea'}</span> <span class="np-state ${status}"><span aria-hidden="true">${glyph}</span> ${problem?word:'tutto a posto'}</span></summary>`;
       panel.append(this.checks(n.checks));body.append(panel);
     }
     if(!body.children.length)body.innerHTML=`<div class="panel"><div class="empty">${this.onlyProblems?'Nessun nodo con problemi. Togli il filtro per vedere tutti i nodi.':'Nessun nodo disponibile.'}</div></div>`;
@@ -4988,6 +5042,13 @@ const NodeAdd={
   paint(d){
     const body=document.getElementById('na-body');body.replaceChildren();
     const facts=document.createElement('section'),title=document.createElement('h2');facts.className='panel ns-facts';title.textContent='Cluster '+d.cluster;facts.append(title);
+    const arch=ArchUI.label(d.facts.arch);
+    if(arch){
+      const notice=document.createElement('p');notice.className='cnote';
+      const text=document.createElement('span');text.className=d.facts.arch==='mixed'?'w':'';
+      text.textContent=d.facts.arch==='mixed'?'Il cluster ha nodi di architetture diverse.':`Il nuovo nodo deve essere ${arch}: un nodo di un'altra architettura va in un cluster separato.`;
+      notice.append(text);facts.append(notice);
+    }
     for(const line of ['Proxmox: '+(d.facts.version||'versione comune non verificabile'),'Ceph: '+({none:'non configurato',unknown:'non verificabile'}[d.facts.ceph_release]||d.facts.ceph_release),
       'Indirizzi per pvecm add: '+(d.facts.addresses.join(', ')||'nessuno disponibile'),...d.facts.versions.map(v=>v.node+': Proxmox '+(v.version||'non verificabile')+' · '+(v.address||'indirizzo non disponibile')),...d.facts.issues]){
       const p=document.createElement('p');p.textContent=line;facts.append(p);
@@ -6641,6 +6702,7 @@ const Provision=(()=>{
     case 'node_offline':return'nodo fuori linea';
     case 'ram':return`mancano ${gbTxt(r.missing||0)} GB di RAM`;
     case 'vcpu_over_threads':return r.have?`servono ${r.need} thread, il nodo ne ha ${r.have}`:'thread del nodo non noti';
+    case 'arch_mismatch':return r.arch?`architettura diversa da quella del template (il nodo e' ${ArchUI.label(r.arch)})`:'architettura del nodo non leggibile';
     case 'storage_unavailable':return'lo storage del template non e\' disponibile su questo nodo';
     case 'storage_not_shared':return'lo storage del template non e\' condiviso: serve il nodo del template';
     case 'storage_no_images':return'lo storage non puo\' contenere dischi di VM';
@@ -6915,7 +6977,7 @@ const Provision=(()=>{
         html+='</fieldset>';
       }
       if((adv.meta.partial||[]).length){
-        const PW={files_unverified:'gli snippet o le ISO del template non si possono verificare sui nodi: lo storage che li contiene non ha abilitato quel tipo di contenuto in Proxmox (abilitandolo il controllo diventa possibile)',files:'l\'elenco dei file di uno storage non e\' leggibile',template:'il template non e\' leggibile',ceph:'i dischi Ceph non sono letti',cpu_flags:'le istruzioni CPU di un nodo',gpu:'l\'inventario delle schede e\' incompleto'};
+        const PW={files_unverified:'gli snippet o le ISO del template non si possono verificare sui nodi: lo storage che li contiene non ha abilitato quel tipo di contenuto in Proxmox (abilitandolo il controllo diventa possibile)',files:'l\'elenco dei file di uno storage non e\' leggibile',template:'il template non e\' leggibile',ceph:'i dischi Ceph non sono letti',cpu_flags:'le istruzioni CPU di un nodo',arch:'l\'architettura di un nodo',gpu:'l\'inventario delle schede e\' incompleto'};
         html+=`<p class="cnote" style="margin-top:8px">Non verificato: ${adv.meta.partial.map(x=>esc(Object.hasOwn(PW,x)?PW[x]:x)).join('; ')}. Il server ricontrolla quello che puo' prima di creare.</p>`;
       }
       box.innerHTML=html;

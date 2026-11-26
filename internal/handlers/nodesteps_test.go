@@ -30,7 +30,7 @@ func taskFake() *nodeTaskFake {
 		"status": `[{"type":"node","name":"n1","ip":"192.0.2.1","online":0},{"type":"node","name":"n2","ip":"192.0.2.2","online":1},{"type":"node","name":"n3","ip":"192.0.2.3","online":1}]`,
 		"guests": `[]`, "ha": `[]`, "rules": `[]`, "groups": `[]`, "replication": `[]`, "storage": `[]`, "mappings": `[]`,
 		"ceph": `{"health":{"status":"HEALTH_OK"}}`, "osds": `{"root":{"type":"root","children":[]}}`, "mon": `[]`, "mgr": `[]`, "mds": `[]`,
-		"apt": `[]`, "pci": `[]`, "version": `{"pveversion":"pve-manager/9.2.1/abc"}`,
+		"apt": `[]`, "pci": `[]`, "version": `{"pveversion":"pve-manager/9.2.1/abc","current-kernel":{"machine":"x86_64"}}`,
 	}, failures: map[string]bool{}, calls: map[string]int{}}
 }
 func (f *nodeTaskFake) get(key string) (json.RawMessage, error) {
@@ -339,13 +339,16 @@ func TestNodeAddFactsJoinGPUAndPending(t *testing.T) {
 	if res.Facts.Version != "9.2" || !res.Facts.VersionsMatch || res.Facts.CephRelease != "squid" {
 		t.Fatal(res.Facts)
 	}
+	if res.Facts.Arch != "amd64" || res.Facts.Versions[0].Arch != "amd64" {
+		t.Fatal(res.Facts)
+	}
 	if !reflect.DeepEqual(res.Steps[2].Commands, []string{"pvecm add 192.0.2.2", "pvecm add 192.0.2.3"}) {
 		t.Fatal(res.Steps[2])
 	}
 	if len(res.NewNodes) != 3 || len(res.Steps) != 6 || !strings.Contains(strings.Join(res.Steps[5].Items, " "), "n3: 1 schede Nvidia senza mapping") {
 		t.Fatal(res)
 	}
-	f.data["version-n3"] = `{"pveversion":"8.4.1"}`
+	f.data["version-n3"] = `{"pveversion":"8.4.1","current-kernel":{"machine":"aarch64"}}`
 	f.data["status"] = `[{"type":"node","name":"n2","ip":"192.0.2.2;id","online":1},{"type":"node","name":"n3","ip":"2001:db8::3","online":1}]`
 	res, err = BuildNodeAdd(f, "C", "", buildinfo.BuildInfo{})
 	if err != nil {
@@ -353,6 +356,9 @@ func TestNodeAddFactsJoinGPUAndPending(t *testing.T) {
 	}
 	if res.Facts.VersionsMatch || len(res.Steps[1].Commands) != 0 || !reflect.DeepEqual(res.Steps[2].Commands, []string{"pvecm add 2001:db8::3"}) {
 		t.Fatal(res)
+	}
+	if res.Facts.Arch != "mixed" || !strings.Contains(strings.Join(res.Facts.Issues, " "), "n3 (ARM64)") {
+		t.Fatal(res.Facts)
 	}
 	f.failures["apt"] = true
 	res, err = BuildNodeAdd(f, "C", "", buildinfo.BuildInfo{Known: true, Commit: strings.Repeat("a", 40)})

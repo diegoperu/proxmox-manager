@@ -8,7 +8,7 @@ import (
 
 func nodeStepsSource(t *testing.T) string {
 	t.Helper()
-	return settingsJS(t, "/* pmgr:nodesteps:begin */", "/* pmgr:nodesteps:end */") +
+	return archUISource(t) + settingsJS(t, "/* pmgr:nodesteps:begin */", "/* pmgr:nodesteps:end */") +
 		settingsJS(t, "const NodeStepsView={", "\n};") +
 		settingsJS(t, "const NodeAdd={", "\n};") +
 		settingsJS(t, "const NodeRemove={", "\n};")

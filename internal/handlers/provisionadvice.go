@@ -290,10 +290,14 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 		meta.Partial = append(meta.Partial, "ceph")
 	}
 	cpu := make([]float64, len(nodes))
-	jobs := make([]func(), 0, len(nodes))
+	arch := make([]string, len(nodes))
+	jobs := make([]func(), 0, 2*len(nodes))
 	for i := range nodes {
 		i := i
 		jobs = append(jobs, func() { cpu[i] = nodeCPUP95(c, nodes[i].name) })
+		if nodes[i].online {
+			jobs = append(jobs, func() { arch[i] = readNodeArch(c, nodes[i].name) })
+		}
 	}
 	runLimited(jobs)
 	in := make([]balance.Node, 0, len(nodes))
@@ -301,7 +305,17 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 		if cpu[i] >= 0 {
 			meta.CPUKnown = true
 		}
-		in = append(in, balance.Node{Name: n.name, Online: n.online, MemTotal: n.mem, Cores: int(n.cores), OSDs: osds[n.name], CPUP95: cpu[i], Reserve: -1})
+		in = append(in, balance.Node{Name: n.name, Online: n.online, MemTotal: n.mem, Cores: int(n.cores), OSDs: osds[n.name], CPUP95: cpu[i], Reserve: -1, Arch: arch[i]})
+	}
+	// D168: the clone runs on the template's architecture, the one of the node holding the template
+	tplArch := ""
+	for i, n := range nodes {
+		if n.name == q.TemplateNode {
+			tplArch = arch[i]
+		}
+	}
+	if q.TemplateNode != "" && tplArch == "" {
+		meta.Partial = append(meta.Partial, "arch")
 	}
 
 	// reasons known here, per node: storage, and a free card with a mapping when a GPU is wanted
@@ -481,7 +495,7 @@ func buildAdvice(c balanceAPI, inv *GPUInventory, label string, q adviceQuery, r
 	// start of one of them is checked on its own, see startcheck.go)
 	params := balance.DefaultParams()
 	params.CountStopped = false
-	place, err := balance.Place(in, vms, balance.PlaceRequest{Mem: q.MemMB << 20, VCPU: q.Cores, Groups: groups, Extra: extra}, params)
+	place, err := balance.Place(in, vms, balance.PlaceRequest{Mem: q.MemMB << 20, VCPU: q.Cores, Groups: groups, Extra: extra, Arch: tplArch}, params)
 	if err != nil {
 		return adviceResult{}, err
 	}

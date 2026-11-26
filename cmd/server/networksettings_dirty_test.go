@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestNetworkSettingsUnsavedChanges(t *testing.T) {
-	source := authUISource(t, "// pmgr:auth-ui:begin", "// pmgr:auth-ui:end") +
+	source := archUISource(t) + authUISource(t, "// pmgr:auth-ui:begin", "// pmgr:auth-ui:end") +
 		settingsJS(t, "// pmgr:network:begin", "// pmgr:network:end") +
 		settingsJS(t, "// pmgr:network-settings:begin", "// pmgr:network-settings:end") +
 		settingsJS(t, "// pmgr:settings-guard:begin", "// pmgr:settings-guard:end") +
@@ -17,7 +17,7 @@ func TestNetworkSettingsUnsavedChanges(t *testing.T) {
 	runSettingsJS(t, `
 const assert=require('node:assert/strict'),nodes=new Map(),listeners={};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
+function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},options:[],classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
 global.Auth={locked:false,role:'admin'};global.RoleUI={readonly(){},canPage:()=>true};global._IS_CONSOLE=false;
 global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:selector==='#ns-manager-from [data-manager-from]'?get('ns-manager-from').children:selector==='#ns-profile-seg button'?profilePicks:[],querySelector:()=>null};

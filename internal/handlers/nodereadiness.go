@@ -37,6 +37,7 @@ type readinessNode struct {
 	Node    string           `json:"node"`
 	Online  bool             `json:"online"`
 	Version string           `json:"version"`
+	Arch    string           `json:"arch"` // amd64 | arm64 | "" (D168)
 	Checks  []readinessCheck `json:"checks"`
 }
 type readinessSummary struct {
@@ -349,6 +350,7 @@ func readinessNodeCheck(c readinessAPI, name string, online bool, templates []re
 		if m := readinessVersion.FindStringSubmatch(status.Version); m != nil {
 			out.node.Version = m[1]
 		}
+		out.node.Arch = nodeStatusArch(raw)
 	}
 	if out.node.Version == "" {
 		out.partial = append(out.partial, "versions")
@@ -493,6 +495,7 @@ func BuildReadiness(c readinessAPI, cluster int, label, token string, now time.T
 		vc.Detail = "Versioni non completamente leggibili: " + strings.Join(versions, ", ")
 	}
 	result.ClusterChecks = append(result.ClusterChecks, vc)
+	result.ClusterChecks = append(result.ClusterChecks, readinessArchCheck(result.Nodes))
 	clock := readinessCheckOf("clock", "unknown", "Orologi", "Meno di due orologi leggibili.")
 	if len(times) >= 2 {
 		sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
@@ -627,4 +630,24 @@ func withTLSCheck(res readinessResult, configured bool) readinessResult {
 	out.ClusterChecks = append(append([]readinessCheck{}, res.ClusterChecks...), check)
 	readinessCount(&out.Summary, check.Status)
 	return out
+}
+
+// readinessArchCheck: every online node has the same CPU architecture (D167: x86-64 and ARM64 are separate clusters;
+// guests never migrate across architectures).
+func readinessArchCheck(nodes []readinessNode) readinessCheck {
+	archs := map[string]string{}
+	for _, n := range nodes {
+		if n.Online {
+			archs[n.Node] = n.Arch
+		}
+	}
+	arch, complete := clusterArchOf(archs)
+	switch {
+	case arch == archMixed:
+		return readinessCheckOf("arch", "warn", "Architettura", "Nodi di architetture diverse: "+strings.Join(sortedArchNodes(archs), ", ")+
+			". Le VM non si spostano mai fra architetture diverse; x86-64 e ARM64 vanno tenuti in cluster separati.")
+	case arch == "" || !complete:
+		return readinessCheckOf("arch", "unknown", "Architettura", "Architettura non leggibile su tutti i nodi: "+strings.Join(sortedArchNodes(archs), ", ")+".")
+	}
+	return readinessCheckOf("arch", "ok", "Architettura", "Tutti i nodi sono "+archLabel(arch)+".")
 }

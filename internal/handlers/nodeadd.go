@@ -28,6 +28,7 @@ type nodeAddVersion struct {
 	Node    string `json:"node"`
 	Version string `json:"version"`
 	Address string `json:"address"`
+	Arch    string `json:"arch"` // amd64 | arm64 | "" (D168)
 }
 type nodeAddPending struct {
 	Node   string `json:"node"`
@@ -39,6 +40,7 @@ type nodeAddFacts struct {
 	Version       string           `json:"version"`
 	VersionsMatch bool             `json:"versions_match"`
 	CephRelease   string           `json:"ceph_release"`
+	Arch          string           `json:"arch"` // architecture of the cluster: a new node must have the same (D167)
 	Addresses     []string         `json:"addresses"`
 	Issues        []string         `json:"issues"`
 }
@@ -239,12 +241,25 @@ func BuildNodeAdd(c nodeAddAPI, label, token string, build buildinfo.BuildInfo) 
 				v.Version = m[1]
 				versions[v.Version] = true
 			}
+			v.Arch = nodeStatusArch(raw)
 		}
 		if v.Version == "" {
 			allVersions = false
 			res.Facts.Issues = append(res.Facts.Issues, n.Name+": versione Proxmox non leggibile")
 		}
 		res.Facts.Versions = append(res.Facts.Versions, v)
+	}
+	archs := map[string]string{}
+	for _, v := range res.Facts.Versions {
+		archs[v.Node] = v.Arch
+	}
+	if arch, complete := clusterArchOf(archs); arch == archMixed {
+		res.Facts.Arch = archMixed
+		res.Facts.Issues = append(res.Facts.Issues, "Il cluster ha nodi di architetture diverse: "+strings.Join(sortedArchNodes(archs), ", "))
+	} else if complete && arch != "" {
+		res.Facts.Arch = arch
+	} else if len(archs) > 0 {
+		res.Facts.Issues = append(res.Facts.Issues, "Architettura non leggibile su tutti i nodi")
 	}
 	res.Facts.VersionsMatch = allVersions && len(versions) == 1
 	if res.Facts.VersionsMatch {

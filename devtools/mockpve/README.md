@@ -41,6 +41,8 @@ Il token e' finto: non usarlo contro un Proxmox vero e non copiare qui il `confi
 
 ## Preparazione nodi
 
+`MOCK_ARCH=x86_64|aarch64` sceglie l'architettura dei nodi (predefinita `x86_64`); `MOCK_ARCH=aarch64 python3 devtools/mockpve/mockpve.py 18006` simula un cluster ARM. Aggiungi `MOCK_ARCH_MIXED=1` per assegnare all'ultimo nodo l'altra architettura e provare gli avvisi di cluster misto.
+
 La pagina `#/nodeprep` legge anche i permessi effettivi (`GET /access/permissions?path=...`) e gli orologi (`GET /nodes/{n}/time`). Per impostazione predefinita tutti i controlli di preparazione sono a posto: nodi online, storage e snippet disponibili, bridge `vmbr0`, versioni uguali, permessi completi e orologi allineati.
 
 Avvia `READINESS_SCENARIO=problems python3 devtools/mockpve/mockpve.py 18006` per simulare: contenuto `snippets` assente da `local` sul nodo 1, file `vendor.yaml` mancante sul nodo 2, bridge `vmbr0` assente e orologio avanti di 45 secondi sul nodo 3, privilegio `Datastore.AllocateSpace` mancante. Riavvia il mock e premi **Ricontrolla** per cambiare scenario senza attendere la cache. Il mock non esegue i comandi mostrati dalla pagina.
