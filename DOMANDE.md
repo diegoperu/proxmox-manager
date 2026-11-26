@@ -1644,3 +1644,38 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A; la politica del datacenter si attiva solo dopo aver aggiornato tutti i nodi del cluster.
 **Risposta utente**: A (2026-11-26); la politica dei token del datacenter si attiva solo dopo l'aggiornamento di tutti i nodi a 9.3.
 
+### D165 — Un solo set di script per x86 e ARM
+**Stato**: RISPOSTA
+**Bloccante**: si'
+**Domanda**: come gestire con un solo set di script i template di nodi amd64 e arm64?
+**Perché conta**: sul nodo ARM l'utente ha modificato a mano una copia degli script (macchina `virt` invece di `q35`, disco cloud-init `scsi2` invece di `ide2`, immagini arm64/aarch64); due copie divergono.
+**Opzioni**: A) architettura rilevata sul nodo (`dpkg --print-architecture`, `--arch` per i test), file `arch.d/<arch>.conf` con le sole differenze hardware (macchina, bus del cloud-init), segnaposto `{arch}` (amd64/arm64) e `{march}` (x86_64/aarch64) negli indirizzi degli `os.d`, campo facoltativo `ARCHES=` per escludere una release; per x86 comandi identici a oggi; B) due copie separate.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-26).
+
+### D166 — Indirizzi delle VM nuove: statico, DHCP o entrambi
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: gestire cluster su reti con server DHCP?
+**Opzioni**: A) nel manager, Impostazioni, Infrastruttura, campo "Indirizzi delle VM nuove": Statico (predefinito, come oggi), DHCP (`ip=dhcp`, DNS solo se configurati, IP letto poi dal guest agent), Entrambi (IP facoltativo, vuoto = DHCP); negli script chiave facoltativa `TEMPLATE_IPCONFIG=ip=dhcp` in `cluster.conf` per i template (serve a chi clona a mano); B) solo negli script.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-26).
+
+### D167 — Cluster ARM separato o cluster misto
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: un nodo ARM entra in un cluster x86 o resta in un cluster ARM a parte?
+**Perché conta**: le migrazioni fra architetture sono impossibili e Proxmox non le blocca (una migrazione a freddo porta a una VM che non parte); HA potrebbe spostare una risorsa sull'altra architettura; template e storage vanno separati.
+**Opzioni**: A) cluster separato (il manager gestisce gia' piu' cluster); B) cluster misto con controlli del manager.
+**Suggerimento**: A.
+**Risposta utente**: A, cluster separato (2026-11-26).
+
+### D168 — Il manager conosce l'architettura
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: rendere il manager consapevole dell'architettura dei nodi e dei template?
+**Perché conta**: protegge anche con cluster separati (un nodo sbagliato aggiunto per errore, un template di un'altra architettura); il nodo ARM riporta via API `cpus: 12` corretto ma `cores: 1`, `sockets: 1`, flag CPU vuoti, modello "ARM part 0xd81" (big.LITTLE: 4 Cortex-A520 + 8 Cortex-A720).
+**Opzioni**: A) architettura dei nodi in Preparazione nodi e Aggiungi nodo (controllo: stessa architettura del cluster), Nuova VM solo su nodi della stessa architettura del template (`machine: virt` = aarch64), Bilanciamento e migrazioni mai fra architetture; B) nulla.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-26).
+
