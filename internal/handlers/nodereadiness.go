@@ -621,7 +621,7 @@ func withTLSCheck(res readinessResult, configured bool) readinessResult {
 	check := readinessCheckOf("tls", "ok", "Verifica TLS", "Il certificato del cluster e' verificato con la CA configurata.")
 	if !configured {
 		check.Status = "warn"
-		check.Detail = "Il certificato del cluster non viene verificato. Incolla la CA del cluster in Impostazioni, Infrastruttura (sul nodo: cat /etc/pve/pve-root-ca.pem)."
+		check.Detail = "Il certificato del cluster non viene verificato. Attivalo in Impostazioni, Infrastruttura, Verifica TLS del cluster: \"Leggi la CA dal cluster\" e conferma con il comando sul nodo."
 	}
 	out := res
 	out.ClusterChecks = append(append([]readinessCheck{}, res.ClusterChecks...), check)
