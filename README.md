@@ -202,6 +202,23 @@ No IP addresses, no guest content, no processes. VMIDs are reused by Proxmox, so
 
 ---
 
+## Verifying the Proxmox certificate (cluster CA)
+
+Proxmox nodes use certificates signed by the private CA of their cluster (`PVE Cluster Manager CA`), the same for every node of the cluster. To make the manager verify them (recommended):
+
+1. On **any node** of the cluster, as root (SSH, or **Node → Shell** in the Proxmox web interface):
+   ```bash
+   cat /etc/pve/pve-root-ca.pem
+   ```
+   Copy the whole output, from `-----BEGIN CERTIFICATE-----` to `-----END CERTIFICATE-----`. It is a public certificate, not a secret.
+2. In the manager, **Impostazioni → Infrastruttura → Verifica TLS del cluster** (with the cluster selected at the top): paste it and press **Verifica e salva**, then confirm with the TOTP code. The manager stores it only if the certificate the cluster presents at that moment is signed by it; otherwise nothing is saved.
+3. The panel then shows "✓ verificato" and the fingerprint of the CA key. To compare it with the node (same format), run on the node:
+   ```bash
+   openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d '=' | sed 's/^/SHA256:/'
+   ```
+
+Works with Proxmox VE 9.2 and 9.3 (checked on the 9.2 clusters: the CA is accepted, verified connections succeed, the fingerprints match the command above). Renewals of the CA certificate (automatic in 9.3, same key) need nothing; after `pvecm ca rotate` (new key) the manager refuses the cluster until the new CA is pasted. Repeat for every cluster.
+
 ## Manager SSH access to the nodes
 
 To copy scripts and cloud-init snippets to the nodes (onboarding, see `docs/ONBOARDING.md`) the manager logs in to each node as `pmgr-sync`, an account restricted by a forced command to listing and writing two folders. The manager key and the node host keys it trusts are in `ssh_dir` (default `ssh/` next to `config.json`, mode 0700; back it up with the configuration). In **Operazioni → Preparazione nodi**:
@@ -434,7 +451,7 @@ machine. Protect or remove staging copies once the backup and login checks pass.
 
 ## Security
 
-- TLS certificate verification is **intentionally disabled** for Proxmox connections — Proxmox VE ships with self-signed certificates. See [`SECURITY.md`](SECURITY.md).
+- **TLS to Proxmox**: paste the cluster CA (`cat /etc/pve/pve-root-ca.pem` on a node, public) in **Impostazioni → Infrastruttura → Verifica TLS del cluster**: from then on every connection must present a certificate signed by it. Without it the certificate is not verified (the Node preparation page warns). See [`SECURITY.md`](SECURITY.md).
 - Restrict the listen address to loopback if running on a shared host: `"listen_addr": "127.0.0.1:8080"`.
 - `config.json` contains API tokens in plaintext — the server writes it with `0600`; check the permissions of a file created by hand: `chmod 600 config.json`.
 - The only outbound Internet traffic is the optional **"Check price lists"** button (fixed public Azure and OVHcloud URLs) and the **update check** (the public GitHub API of this repository; it sends only the public commit hash it was built from). Both use TLS with verification and send nothing about your organisation. Everything else talks only to Proxmox.

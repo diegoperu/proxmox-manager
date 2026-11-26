@@ -231,7 +231,7 @@ func takeMissingSnapshots(store *history.Store, clusters []config.ClusterConfig,
 
 // StartSnapshots runs the daily snapshot loop until ctx is cancelled: first check shortly after start, then hourly.
 func StartSnapshots(ctx context.Context, store *history.Store) {
-	newClient := func(cl config.ClusterConfig) snapshotAPI { return api.NewClient(cl.URL, cl.APIToken) }
+	newClient := func(cl config.ClusterConfig) snapshotAPI { return api.NewClientCA(cl.URL, cl.APIToken, cl.TLSCA) }
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {

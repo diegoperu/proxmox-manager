@@ -1,12 +1,12 @@
 package api
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"proxmox-manager/internal/pvetls"
 	"strings"
 	"time"
 )
@@ -21,17 +21,18 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(baseURL, token string) *Client {
+// NewClient connects without verifying the certificate (legacy; prefer NewClientCA).
+func NewClient(baseURL, token string) *Client { return NewClientCA(baseURL, token, "") }
+
+// NewClientCA connects to a cluster whose certificate must be signed by caPEM (empty = not verified, D163).
+func NewClientCA(baseURL, token, caPEM string) *Client {
 	return &Client{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 		Token:   token,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				// InsecureSkipVerify is intentional: Proxmox VE uses self-signed TLS
-			// certificates by default. Do not remove without configuring a valid
-			// certificate on the Proxmox host.
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+				TLSClientConfig:     pvetls.Config(caPEM),
 				MaxIdleConns:        20,
 				MaxIdleConnsPerHost: 10,
 				IdleConnTimeout:     90 * time.Second,
@@ -40,8 +41,8 @@ func NewClient(baseURL, token string) *Client {
 	}
 }
 
-func NewClientWithCredentials(baseURL, username, password string) (*Client, error) {
-	c := NewClient(baseURL, "")
+func NewClientWithCredentials(baseURL, username, password, caPEM string) (*Client, error) {
+	c := NewClientCA(baseURL, "", caPEM)
 	c.Username = username
 	c.Password = password
 	if err := c.Login(); err != nil {
@@ -119,7 +120,9 @@ func (c *Client) Get(path string) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct{ Data json.RawMessage `json:"data"` }
+	var r struct {
+		Data json.RawMessage `json:"data"`
+	}
 	if err := json.Unmarshal(b, &r); err != nil {
 		return nil, err
 	}
@@ -131,7 +134,9 @@ func (c *Client) Post(path string, params url.Values) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct{ Data json.RawMessage `json:"data"` }
+	var r struct {
+		Data json.RawMessage `json:"data"`
+	}
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
@@ -141,7 +146,9 @@ func (c *Client) Put(path string, params url.Values) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct{ Data json.RawMessage `json:"data"` }
+	var r struct {
+		Data json.RawMessage `json:"data"`
+	}
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
@@ -151,7 +158,9 @@ func (c *Client) Delete(path string) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r struct{ Data json.RawMessage `json:"data"` }
+	var r struct {
+		Data json.RawMessage `json:"data"`
+	}
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
@@ -169,8 +178,8 @@ func (c *Client) GetClusterResources(resType string) (json.RawMessage, error) {
 	}
 	return c.Get(path)
 }
-func (c *Client) GetClusterTasks() (json.RawMessage, error)  { return c.Get("/cluster/tasks") }
-func (c *Client) GetNextVMID() (json.RawMessage, error)      { return c.Get("/cluster/nextid") }
+func (c *Client) GetClusterTasks() (json.RawMessage, error) { return c.Get("/cluster/tasks") }
+func (c *Client) GetNextVMID() (json.RawMessage, error)     { return c.Get("/cluster/nextid") }
 
 // ── Nodes ─────────────────────────────────────────────────────────────────────
 
@@ -224,6 +233,7 @@ func (c *Client) VMMigrate(node string, vmid int, target string, online bool) (j
 	}
 	return c.Post(fmt.Sprintf("/nodes/%s/qemu/%d/migrate", node, vmid), v)
 }
+
 // GetMigratePrecheck is Proxmox's own check before a QEMU migration (read only): allowed_nodes, local_disks,
 // local_resources, mapped-resources.
 func (c *Client) GetMigratePrecheck(node string, vmid int) (json.RawMessage, error) {
@@ -353,17 +363,17 @@ func (c *Client) TermproxyCreate(node string, vmid int, proxmoxBaseURL string) (
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("proxmox %d: %s", resp.StatusCode, string(b))
 	}
-	var r struct{ Data json.RawMessage `json:"data"` }
+	var r struct {
+		Data json.RawMessage `json:"data"`
+	}
 	json.Unmarshal(b, &r)
 	return r.Data, nil
 }
 
 // GetAccessTicket autentica con username+password e ritorna (PVEAuthCookie, CSRFToken, error).
 // Necessario per autenticare il WebSocket vncwebsocket, che non accetta API token.
-func GetAccessTicket(baseURL, username, password string) (string, string, error) {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-	}
+func GetAccessTicket(baseURL, username, password, caPEM string) (string, string, error) {
+	tr := &http.Transport{TLSClientConfig: pvetls.Config(caPEM)}
 	c := &http.Client{Timeout: 10 * time.Second, Transport: tr}
 	data := url.Values{}
 	data.Set("username", username)
@@ -459,6 +469,7 @@ func (c *Client) GetCephFlags() (json.RawMessage, error)  { return c.Get("/clust
 func (c *Client) GetCephOSD(node string) (json.RawMessage, error) {
 	return c.Get("/nodes/" + node + "/ceph/osd")
 }
+
 // GetCephCrush returns the decompiled CRUSH map (a JSON string with the text).
 func (c *Client) GetCephCrush(node string) (json.RawMessage, error) {
 	return c.Get("/nodes/" + node + "/ceph/crush")

@@ -137,11 +137,11 @@ func newGPUUseCollector() *gpuUseCollector {
 		probe: map[string]gpuUseProbe{},
 		now:   time.Now,
 		newClient: func(cl config.ClusterConfig) gpuUseAPI {
-			return api.NewClient(cl.URL, cl.APIToken)
+			return api.NewClientCA(cl.URL, cl.APIToken, cl.TLSCA)
 		},
 		// The same cached inventory as the GPU page: no extra reads of every VM config.
 		inventory: func(idx int, cl config.ClusterConfig) (GPUInventory, error) {
-			c := api.NewClient(cl.URL, cl.APIToken)
+			c := api.NewClientCA(cl.URL, cl.APIToken, cl.TLSCA)
 			v, err := cephCached("gpus|"+strconv.Itoa(idx), gpuCacheTTL, func() (interface{}, error) {
 				return fetchGPUInventory(c, time.Now())
 			})

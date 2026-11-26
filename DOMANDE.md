@@ -1609,3 +1609,38 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A.
 **Risposta utente**: A, da realizzare dopo lo step 8 (2026-11-25).
 
+### D161 — Identita' dei guest con l'`uid` di Proxmox VE 9.3
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: come usare l'`uid` dei guest introdotto da PVE 9.3 (unico, stabile dopo migrazioni, rollback, backup e restore anche con un altro VMID) al posto del nostro identificativo di istanza (D121)?
+**Perché conta**: per le VM oggi usiamo l'UUID di `smbios1` (buono), per i container un'euristica (primo giorno + nome) fragile. L'`uid` compare in `/cluster/resources`, quindi non serve leggere la configurazione di ogni guest. Le VM esistenti lo ricevono solo quando un nodo 9.3 riscrive la loro configurazione: per un periodo ci saranno guest con e senza `uid`.
+**Opzioni**: A) nuova colonna `uid` nelle righe di `vm_use_day` e `gpu_use_day`; le istanze gia' registrate si collegano all'`uid` appena compare (storico intatto), le nuove istanze si identificano con l'`uid`, chi non lo ha usa il metodo attuale; B) passare solo all'`uid` dal momento dell'aggiornamento (lo storico precedente resta separato); C) non usarlo.
+**Suggerimento**: A, dopo la verifica del formato su Magi aggiornato.
+**Risposta utente**: A (2026-11-26); formato dell'`uid` da verificare su Magi aggiornato a 9.3 prima del codice.
+
+### D162 — Storico legato al Cluster ID
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: legare fotografie e storico al Cluster ID di PVE 9.3 (`/cluster/status`) invece che all'etichetta del cluster?
+**Perché conta**: oggi rinominare l'etichetta in Impostazioni spezza le serie storiche.
+**Opzioni**: A) chiave = Cluster ID quando disponibile, etichetta solo come nome mostrato; le righe esistenti si collegano al Cluster ID alla prima lettura; B) lasciare l'etichetta.
+**Suggerimento**: A.
+**Risposta utente**: A (2026-11-26); da fare con D161 dopo l'aggiornamento di Magi.
+
+### D163 — Verifica TLS verso Proxmox con la chiave della CA fissata
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: smettere di ignorare il certificato di Proxmox e verificare la chiave pubblica della CA di ogni cluster, confermata da un amministratore come le impronte SSH?
+**Perché conta**: oggi il manager parla con Proxmox senza verificare il certificato (`skip verify`), un punto debole noto: chi si mette in mezzo sulla rete potrebbe leggere il token. Da PVE 9.3 la CA si rinnova da sola mantenendo la stessa chiave; `pvecm ca rotate` la cambia (caso voluto e raro).
+**Opzioni**: A) alla prima connessione la pagina mostra l'impronta della chiave della CA (da confrontare con `openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | sha256sum` sul nodo), l'amministratore la conferma con TOTP, poi ogni connessione la verifica; un cambio blocca il cluster con un avviso; B) CA importata come file; C) lasciare com'e'.
+**Suggerimento**: A (vale anche su 9.2: la chiave della CA non cambia con i rinnovi dei certificati dei nodi).
+**Risposta utente**: A (2026-11-26). **Realizzazione**: i nodi Proxmox presentano solo il proprio certificato (verificato su Magi, CALCOLO, HOSTING), non la CA, quindi il manager non puo' leggere l'impronta della CA dalla connessione. L'amministratore incolla il certificato pubblico della CA copiato da un nodo (`cat /etc/pve/pve-root-ca.pem`, canale fidato), il manager verifica subito che il certificato presentato dal cluster sia firmato da quella CA, mostra l'impronta della chiave (SHA-256 della chiave pubblica, uguale dopo i rinnovi di 9.3) e salva con conferma TOTP. Da li' ogni connessione verifica la firma; senza CA la connessione resta non verificata e la pagina lo dice.
+
+### D164 — Scadenza dei token API del manager
+**Stato**: RISPOSTA
+**Bloccante**: no
+**Domanda**: dare una scadenza ai token `pmgr@pve!manager` e `pmgr@pve!local` (PVE 9.3 introduce la politica dei token) e avvisare prima che scadano?
+**Opzioni**: A) scadenza di un anno, README aggiornato con la rotazione, avviso in Preparazione nodi a 30 giorni dalla scadenza se il token puo' leggere la propria scadenza; B) nessuna scadenza.
+**Suggerimento**: A; la politica del datacenter si attiva solo dopo aver aggiornato tutti i nodi del cluster.
+**Risposta utente**: A (2026-11-26); la politica dei token del datacenter si attiva solo dopo l'aggiornamento di tutti i nodi a 9.3.
+

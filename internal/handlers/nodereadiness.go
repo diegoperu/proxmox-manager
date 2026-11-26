@@ -602,7 +602,7 @@ func (h *Handler) GetNodeReadiness(w http.ResponseWriter, r *http.Request) {
 	}
 	value, _ := readinessEntries.LoadOrStore(idx, &readinessEntry{})
 	entry := value.(*readinessEntry)
-	identity := cl.URL + "\x00" + cl.APIToken + "\x00" + cl.Label
+	identity := cl.URL + "\x00" + cl.APIToken + "\x00" + cl.Label + "\x00" + cl.TLSCA
 	result, err := cachedReadiness(entry, client, idx, cl.Label, cl.APIToken, identity, r.URL.Query().Get("fresh") == "1")
 	if err != nil {
 		if errors.Is(err, errReadinessBusy) {
@@ -613,5 +613,18 @@ func (h *Handler) GetNodeReadiness(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("impossibile leggere i nodi del cluster"), http.StatusBadGateway)
 		return
 	}
-	writeJSON(w, result)
+	writeJSON(w, withTLSCheck(result, cl.TLSCA != ""))
+}
+
+// withTLSCheck adds the TLS verification state of the cluster (D163) to a copy of the readiness result.
+func withTLSCheck(res readinessResult, configured bool) readinessResult {
+	check := readinessCheckOf("tls", "ok", "Verifica TLS", "Il certificato del cluster e' verificato con la CA configurata.")
+	if !configured {
+		check.Status = "warn"
+		check.Detail = "Il certificato del cluster non viene verificato. Incolla la CA del cluster in Impostazioni, Infrastruttura (sul nodo: cat /etc/pve/pve-root-ca.pem)."
+	}
+	out := res
+	out.ClusterChecks = append(append([]readinessCheck{}, res.ClusterChecks...), check)
+	readinessCount(&out.Summary, check.Status)
+	return out
 }

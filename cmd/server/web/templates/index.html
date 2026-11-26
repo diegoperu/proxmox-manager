@@ -1808,6 +1808,10 @@ html.role-admin .role-readonly{display:none!important}
           <div class="panel-h"><h2 class="rs-heading" id="ns-heading">Infrastruttura</h2></div>
           <div class="panel-b"><div id="ns-editor"></div></div>
         </div>
+        <div class="panel" id="tls-panel">
+          <div class="panel-h"><h2 class="rs-heading">Verifica TLS del cluster</h2></div>
+          <div class="panel-b"><div id="tls-editor"></div></div>
+        </div>
       </div>
       <div id="settings-report" role="tabpanel" aria-labelledby="settings-tab-report" hidden>
         <div class="panel" id="report-settings-panel">
@@ -2966,6 +2970,8 @@ const AUDIT_LABELS={
   "POST /api/clusters/{idx}/sync-access/pin":"Conferma impronta SSH di un nodo",
   "DELETE /api/clusters/{idx}/sync-access/pin/{node}":"Rimozione impronta SSH di un nodo",
   "POST /api/clusters/{idx}/sync-run":"Sincronizzazione di snippet e script sui nodi",
+  "PUT /api/clusters/{idx}/tls":"Impostazione della CA del cluster (verifica TLS)",
+  "DELETE /api/clusters/{idx}/tls":"Rimozione della CA del cluster (verifica TLS)",
   "PUT /api/clusters/{idx}/report-settings":"Modifica impostazioni report",
   "POST /api/clusters/{idx}/report-settings/price-check":"Controllo listini",
   login:'Accesso',logout:'Uscita',setup:'Configurazione iniziale',password:'Cambio password'
@@ -7877,6 +7883,66 @@ window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>
 });
 
 // pmgr:network-settings:begin
+// Verifica TLS verso Proxmox con la CA del cluster (D163). Tutto il testo del server passa da textContent.
+const ClusterTLSUI={
+  seq:0,busy:false,
+  STATE:{ok:['✓','verificato','ok'],failed:['✕','verifica non riuscita','bad'],unverified:['!','non verificato','warn']},
+  async load(){
+    const el=document.getElementById('tls-editor');if(!el)return;
+    const idx=ClusterMgr.current,seq=++this.seq;
+    if(!ClusterMgr.clusters.some(c=>c.idx===idx)){el.textContent='Nessun cluster configurato';return;}
+    el.textContent='Controllo del certificato del cluster…';
+    try{
+      const st=await api(`/clusters/${idx}/tls`,{quiet:true,timeoutMs:20000});
+      if(seq===this.seq&&idx===ClusterMgr.current)this.render(st,idx);
+    }catch(e){if(seq===this.seq)el.innerHTML=errBox(e.message,'ClusterTLSUI.load()');}
+  },
+  p(text,cls){const p=document.createElement('p');if(cls)p.className=cls;p.textContent=text;return p;},
+  render(st,idx,error=''){
+    const el=document.getElementById('tls-editor');el.replaceChildren();
+    const [glyph,word,level]=this.STATE[st.check]||['?','sconosciuto','warn'];
+    const head=document.createElement('p'),state=document.createElement('strong');
+    state.className='np-state '+level;state.textContent=glyph+' '+word;head.append(state);el.append(head);
+    el.append(this.p(st.message||''));
+    if(st.configured){
+      el.append(this.p('Impronta della chiave della CA: '+(st.fingerprint||'—'),'sa-mono'));
+      if(st.subject)el.append(this.p('CA: '+st.subject+(st.not_after?' · certificato valido fino al '+st.not_after:'')));
+    }
+    if(st.issuer)el.append(this.p('Certificato presentato ora dal cluster, emesso da: '+st.issuer,'hint'));
+    el.append(this.p(st.help||'','hint'));
+    el.append(NodePrep.command('cat /etc/pve/pve-root-ca.pem','lettura della CA sul nodo'));
+    el.append(this.p('Per confrontare l\'impronta mostrata qui con quella del nodo (stesso formato):','hint'));
+    el.append(NodePrep.command("openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d '=' | sed 's/^/SHA256:/'",'impronta della CA sul nodo'));
+    if(error){const e=this.p(error,'sa-danger');e.setAttribute('role','alert');el.append(e);}
+    const form=document.createElement('div');form.setAttribute('data-min-role','admin');
+    const label=document.createElement('label');label.className='fl';label.htmlFor='tls-pem';label.textContent='Certificato della CA (PEM)';
+    const area=document.createElement('textarea');area.id='tls-pem';area.className='inp';area.rows=6;area.spellcheck=false;area.autocomplete='off';
+    area.placeholder='-----BEGIN CERTIFICATE-----';area.style.width='100%';area.style.fontFamily='var(--mono)';
+    const save=document.createElement('button');save.type='button';save.className='btn ba sm';save.textContent=st.configured?'Verifica e sostituisci la CA':'Verifica e salva';
+    save.addEventListener('click',()=>this.save(idx,area.value));
+    const actions=document.createElement('div');actions.className='toolbar';actions.append(save);
+    if(st.configured){
+      const del=document.createElement('button');del.type='button';del.className='btn bg2 sm';del.textContent='Togli la CA';
+      del.addEventListener('click',()=>this.remove(idx));actions.append(del);
+    }
+    form.append(label,area,actions,this.p('Il manager salva la CA solo se il certificato presentato ora dal cluster e\' firmato da lei. Serve il codice TOTP.','hint'));
+    el.append(form);
+  },
+  async save(idx,pem){
+    if(this.busy)return;this.busy=true;
+    try{
+      const st=await api(`/clusters/${idx}/tls`,{method:'PUT',body:JSON.stringify({pem}),quiet:true,timeoutMs:30000});
+      toast('CA del cluster salvata: connessioni verificate','ok');if(idx===ClusterMgr.current)this.render(st,idx);
+    }catch(e){
+      try{const st=await api(`/clusters/${idx}/tls`,{quiet:true,timeoutMs:20000});if(idx===ClusterMgr.current)this.render(st,idx,e.message);}catch(_){toast(e.message,'err');}
+    }finally{this.busy=false;}
+  },
+  remove(idx){
+    askConfirm({minRole:'admin',level:'danger',title:'Togliere la CA del cluster?',okLabel:'Togli la CA',
+      lines:['Le connessioni a questo cluster non verranno piu\' verificate.'],consequence:'Chi si mettesse in mezzo sulla rete potrebbe leggere il token del manager.'},
+      async()=>{try{const st=await api(`/clusters/${idx}/tls`,{method:'DELETE',quiet:true,timeoutMs:20000});if(idx===ClusterMgr.current)this.render(st,idx);}catch(e){toast(e.message,'err');}});
+  }
+};
 const NetworkSettingsUI={
   idx:null,generation:0,baseline:null,label:'',saving:false,reloading:false,
   serialize(value){
@@ -7900,6 +7966,7 @@ const NetworkSettingsUI={
   heading(){document.getElementById('ns-heading').innerHTML='Infrastruttura · '+esc(ClusterMgr.currentLabel()??'Nessun cluster');},
   clear(){this.generation++;this.idx=null;this.baseline=null;this.heading();document.getElementById('ns-editor').textContent='Caricamento…';},
   async load(){
+    ClusterTLSUI.load();
     if(this.isDirty())return;
     this.clear();
     const idx=ClusterMgr.current,generation=this.generation,editor=document.getElementById('ns-editor');

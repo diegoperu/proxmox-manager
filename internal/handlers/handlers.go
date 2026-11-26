@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +18,7 @@ import (
 	"proxmox-manager/internal/api"
 	"proxmox-manager/internal/config"
 	"proxmox-manager/internal/history"
+	"proxmox-manager/internal/pvetls"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
@@ -48,7 +48,7 @@ func (h *Handler) getClientFor(idx int) (*api.Client, error) {
 	if err != nil || cl.URL == "" {
 		return nil, fmt.Errorf("cluster non configurato")
 	}
-	return api.NewClient(cl.URL, cl.APIToken), nil
+	return api.NewClientCA(cl.URL, cl.APIToken, cl.TLSCA), nil
 }
 
 func (h *Handler) getClient() (*api.Client, error) {
@@ -56,7 +56,7 @@ func (h *Handler) getClient() (*api.Client, error) {
 	if err != nil || cl.URL == "" {
 		return nil, fmt.Errorf("nessun cluster configurato")
 	}
-	return api.NewClient(cl.URL, cl.APIToken), nil
+	return api.NewClientCA(cl.URL, cl.APIToken, cl.TLSCA), nil
 }
 
 func clusterIdx(r *http.Request) int {
@@ -1649,7 +1649,7 @@ func (h *Handler) TermproxyCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Use username+password client — the PVEVNC ticket must belong to the same
 	// user that presents the PVEAuthCookie on vncwebsocket, otherwise Proxmox returns 401.
-	consoleClient, err := api.NewClientWithCredentials(cfg.URL, cfg.Username, cfg.Password)
+	consoleClient, err := api.NewClientWithCredentials(cfg.URL, cfg.Username, cfg.Password, cfg.TLSCA)
 	if err != nil {
 		writeError(w, fmt.Errorf("autenticazione console fallita: %w", err), 502)
 		return
@@ -1687,7 +1687,7 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("[termproxy-ws] authenticating as %s for vncwebsocket", clCfg.Username)
-	pveTicket, _, err := api.GetAccessTicket(clCfg.URL, clCfg.Username, clCfg.Password)
+	pveTicket, _, err := api.GetAccessTicket(clCfg.URL, clCfg.Username, clCfg.Password, clCfg.TLSCA)
 	if err != nil {
 		log.Printf("[termproxy-ws] GetAccessTicket failed: %v", err)
 		writeError(w, fmt.Errorf("autenticazione console fallita: %w", err), 502)
@@ -1715,7 +1715,7 @@ func (h *Handler) TermproxyWS(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[termproxy-ws] dialing proxmox: %s", proxmoxWS)
 
 	dialer := websocket.Dialer{
-		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		TLSClientConfig:  pvetls.Config(clCfg.TLSCA),
 		Subprotocols:     []string{"binary"},
 		HandshakeTimeout: 10 * time.Second,
 	}

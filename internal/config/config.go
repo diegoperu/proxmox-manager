@@ -21,6 +21,9 @@ type ClusterConfig struct {
 	Username string           `json:"username"`
 	Password string           `json:"password"`
 	Default  bool             `json:"default"`
+	// TLSCA: PEM of the cluster CA (/etc/pve/pve-root-ca.pem); when set, the certificate of the cluster must be
+	// signed by it (D163). Empty = not verified. Changed only through SetClusterTLSCA (admin + TOTP).
+	TLSCA string `json:"tls_ca,omitempty"`
 }
 
 type Config struct {

@@ -5,9 +5,15 @@ ProxmoxManager runs as a local proxy between the browser and Proxmox VE API.
 It is designed for trusted local network / VPN use only.
 
 ## Known design decisions
-- TLS certificate verification is disabled for Proxmox connections (`InsecureSkipVerify`).
-  This is intentional to support the self-signed certificates used by default in
-  Proxmox VE. Do not expose the proxy to untrusted networks.
+- TLS to Proxmox (D163): Proxmox nodes present a certificate signed by the private CA of the cluster and the
+  manager connects by IP, so the usual hostname check cannot apply. When the cluster CA is configured
+  (Settings > Infrastructure: the public `/etc/pve/pve-root-ca.pem` copied from a node), every connection (API,
+  console ticket, console WebSocket, background collectors) requires a certificate signed by that CA key and
+  currently valid; otherwise it fails (fail closed, also when the stored CA is unreadable). The CA is stored only
+  if the cluster presents a certificate signed by it at that moment, and only by an administrator with the TOTP
+  step-up. The CA certificate's own dates are not checked: PVE 9.3 renews it with the same key; a key rotation
+  (`pvecm ca rotate`) blocks the cluster until the new CA is entered. **Without a configured CA the connection
+  is not verified** (legacy) and the Node preparation page warns about it.
 - The application listens on `0.0.0.0` by default. Restrict with `listen_addr`
   in `config.json` (e.g. `"127.0.0.1:8080"`) if running on a shared host.
 - `config.json` contains API tokens in plaintext. Ensure file permissions
