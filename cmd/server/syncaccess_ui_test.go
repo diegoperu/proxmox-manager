@@ -31,6 +31,7 @@ func syncAccessUISource(t *testing.T) string {
 
 const syncAccessHarness = `
 const assert=require('node:assert/strict'),controls=new Map();
+global.planReloads=0;global.SyncPlan={load(){planReloads++;return Promise.resolve();}};
 const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 function element(tag='div'){
  return {tag,children:[],attrs:{},events:{},textContent:'',innerHTML:'',disabled:false,
@@ -107,9 +108,11 @@ const reset=()=>{ui.idx=ClusterMgr.current;ui.d=structuredClone(report);ui.busy=
  replies.push(scan,report);await ui.scan(node.node);ui.pin(node.node);
  const pinned={...report,nodes:[{...node,pinned:true,fingerprint:fp,state:'ok'}]};replies.push({ok:true},pinned);await confirmation.ok();
  assert(!ui.scans.has(node.node));assert(!ui.messages.has(node.node));assert(ui.target(node.node).pinned);
+ assert(planReloads>=1,'the snippet plan is read again after a confirmed key');
  before=calls.length;ui.forget(node.node);assert.equal(calls.length,before);assert.equal(confirmation.options.level,'danger');assert.equal(confirmation.options.minRole,'admin');
  replies.push({ok:true},report);await confirmation.ok();assert.equal(calls[before].path,'/clusters/0/sync-access/pin/node-1');assert.equal(calls[before].method,'DELETE');
  assert.equal(calls[before+1].path,'/clusters/0/sync-access?fresh=1');
+ assert(planReloads>=2,'and after a forgotten key');
  // Confirmation callbacks cannot write after a cluster, page, session or role change, or a refresh.
  for(const change of [()=>ClusterMgr.current++,()=>ui.leave(),()=>Auth.epoch++,()=>Auth.role='reader',()=>ui.seq++]){
   reset();ui.scans.set(node.node,scan);ui.pin(node.node);before=calls.length;change();await confirmation.ok();assert.equal(calls.length,before);Auth.role='admin';

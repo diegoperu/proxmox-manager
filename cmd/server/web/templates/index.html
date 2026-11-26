@@ -5314,7 +5314,8 @@ const SyncAccess={
       if(!this.current(seq,idx,epoch))return;
       this.messages.set(node,e.message);
     }finally{
-      if(this.current(seq,idx,epoch)){this.busy=false;await this.load(true,true);}
+      // a confirmed or forgotten key changes which nodes can be synced: the snippet plan is read again too
+      if(this.current(seq,idx,epoch)){this.busy=false;await Promise.all([this.load(true,true),SyncPlan.load()]);}
     }
   }
 };
