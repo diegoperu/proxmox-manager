@@ -1726,3 +1726,39 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Suggerimento**: A, riusando l'esecuzione sul nodo gia' prevista dalla voce 14 (comandi compilati da incollare da root finche' non c'e' un esecutore dedicato).
 **Risposta utente**: (vuoto)
 
+### D174 — Home multi-cluster: regola di apertura
+**Stato**: APERTA
+**Bloccante**: no (nessun codice finche' non si discute)
+**Domanda**: con piu' di un cluster configurato, l'app si apre sulla pagina "tutti i cluster"; con un cluster solo si apre sulla panoramica di oggi. La panoramica del singolo cluster resta raggiungibile con piu' cluster (clic sulla scheda del cluster, o dal selettore), e la pagina "tutti i cluster" da un'apposita voce di menu?
+**Perché conta**: cambia il punto di arrivo di ogni utente e il significato del selettore del cluster in alto (oggi sceglie il cluster per tutte le pagine).
+**Opzioni**: A) come descritto: pagina `#/home` (con piu' cluster) come apertura e prima voce di menu "Tutti i cluster"; il selettore in alto resta e un clic su una scheda sceglie quel cluster e apre la sua panoramica; B) la pagina "tutti i cluster" e' solo una voce di menu, l'app si apre sempre sulla panoramica del cluster predefinito; C) come A ma con una preferenza (apri sempre sul cluster predefinito) salvata nel config.
+**Suggerimento**: A, senza preferenza (niente `localStorage`, per la regola del progetto): si valuta C solo se serve.
+**Risposta utente**: (vuoto)
+
+### D175 — Home multi-cluster: cosa mostra ogni cluster
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: quali informazioni ha la scheda di un cluster?
+**Perché conta**: e' la pagina piu' vista: deve dare la risposta "va tutto bene?" in un secondo, senza diventare un cruscotto illeggibile; ogni dato in piu' e' una chiamata a Proxmox per ogni cluster.
+**Opzioni**: A) stile Bollettino: nome e architettura ("x86-64"/"ARM64"), frase di condizione con il glifo meteo (sereno / quasi sereno / attenzione, stessa regola della panoramica: nodi fuori linea, RAM e CPU >= 85%, task falliti in 24 ore, Ceph, schede GPU da correggere), una riga di numeri (nodi in linea/totali, VM in esecuzione, RAM assegnata %, GPU assegnate/totali), una sparkline di CPU o RAM su 24 ore; B) solo condizione e nodi; C) come A con in piu' task in corso e ultimo backup.
+**Suggerimento**: A. Se un cluster non risponde la scheda dice "non raggiungibile" con l'ora dell'ultimo dato, mai un errore che blocca la pagina.
+**Risposta utente**: (vuoto)
+
+### D176 — Home multi-cluster: da dove arrivano i dati
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: il browser chiede i dati cluster per cluster con le chiamate della panoramica di oggi, oppure il server prepara un riepilogo unico (`GET /api/overview`) con cache breve?
+**Perché conta**: con 4 cluster la pagina farebbe decine di chiamate; un cluster lento o spento non deve rallentare gli altri; il riepilogo lato server si puo' limitare nei tempi (come `GET /api/clusters/arch`: 8 secondi per cluster) e non espone nulla di piu' di quello che i ruoli gia' vedono.
+**Opzioni**: A) endpoint unico `GET /api/overview` (tutti i ruoli, sola lettura): un oggetto per cluster con condizione, numeri e andamento, lettura in parallelo con tetto di tempo per cluster e cache di 30 secondi; B) chiamate dal browser; C) endpoint unico ma con la condizione calcolata nel browser.
+**Suggerimento**: A, con la regola di condizione scritta una volta sola in Go (la panoramica del singolo cluster potra' usarla in seguito, oggi la calcola il browser).
+**Risposta utente**: (vuoto)
+
+### D177 — Home multi-cluster: condizione generale e ordine delle schede
+**Stato**: APERTA
+**Bloccante**: no
+**Domanda**: in cima alla pagina c'e' una frase di condizione generale ("Tutti i cluster sereni" / "N cluster richiedono attenzione") e come si ordinano le schede?
+**Perché conta**: la prima riga e' quella che si legge; l'ordine decide cosa si vede per primo quando i cluster sono molti.
+**Opzioni**: A) frase generale = il caso peggiore; schede ordinate con i problemi per primi (attenzione, quasi sereno, sereno), poi per nome; B) ordine fisso della configurazione; C) A ma con il cluster predefinito sempre per primo.
+**Suggerimento**: A: chi ha un problema sale in alto. Un cluster non raggiungibile conta come "attenzione".
+**Risposta utente**: (vuoto)
+
