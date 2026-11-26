@@ -35,15 +35,12 @@ type tlsStatus struct {
 	Check       string `json:"check"` // ok | failed | unverified
 	Message     string `json:"message"`
 	Issuer      string `json:"issuer"` // issuer of the certificate the cluster presents (to recognise the cluster CA)
-	Help        string `json:"help"`
 }
 
 // tlsFingerprintCommand prints, on a node, the CA key fingerprint in the same format as pvetls.Fingerprint.
 const tlsFingerprintCommand = "openssl x509 -in /etc/pve/pve-root-ca.pem -noout -pubkey | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 | tr -d '=' | sed 's/^/SHA256:/'"
 
 var fingerprintLine = regexp.MustCompile(`SHA256:[A-Za-z0-9+/]{43}`)
-
-const tlsHelp = "Sul nodo, da root: cat /etc/pve/pve-root-ca.pem (certificato pubblico della CA del cluster). Copia tutto il testo, da -----BEGIN a -----END."
 
 // probeTLS opens a TLS connection to the cluster with the CA (or unverified when caPEM is empty) and returns
 // the issuer of the certificate the server presents.
@@ -75,12 +72,12 @@ func probeTLS(rawURL, caPEM string) (string, error) {
 }
 
 func buildTLSStatus(cl config.ClusterConfig) tlsStatus {
-	st := tlsStatus{Help: tlsHelp}
+	st := tlsStatus{}
 	issuer, err := probeTLS(cl.URL, cl.TLSCA)
 	st.Issuer = issuer
 	if cl.TLSCA == "" {
 		st.Check = "unverified"
-		st.Message = "Il certificato del cluster non viene verificato: chi si mettesse in mezzo sulla rete potrebbe leggere il token. Incolla la CA del cluster per attivare la verifica."
+		st.Message = "Il certificato del cluster non viene verificato: chi si mettesse in mezzo sulla rete potrebbe leggere il token. Per attivare la verifica segui i passi qui sotto, a partire da \"Leggi la CA dal cluster\"."
 		if err != nil {
 			st.Message = "Il cluster non risponde in TLS: " + err.Error()
 		}
@@ -92,7 +89,7 @@ func buildTLSStatus(cl config.ClusterConfig) tlsStatus {
 		st.NotAfter = ca.NotAfter.UTC().Format("2006-01-02")
 	}
 	if err != nil {
-		st.Check, st.Message = "failed", "Verifica non riuscita: "+err.Error()+". Le connessioni a questo cluster sono bloccate finche' la CA non e' corretta (se la CA e' stata ruotata con pvecm ca rotate, incolla quella nuova)."
+		st.Check, st.Message = "failed", "Verifica non riuscita: "+err.Error()+". Le connessioni a questo cluster sono bloccate finche' la CA non e' corretta. Se la CA e' stata ruotata (pvecm ca rotate), usa \"Oppure incolla il certificato della CA a mano\" qui sotto."
 		return st
 	}
 	st.Check, st.Message = "ok", "Certificato del cluster verificato con la CA configurata."
