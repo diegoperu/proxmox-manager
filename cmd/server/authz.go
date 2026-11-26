@@ -56,7 +56,7 @@ var routeAccess = map[string]access{
 	"GET /api/clusters/{idx}/network-settings": reader, "GET /api/clusters/{idx}/report-settings": reader,
 	"GET /api/clusters/{idx}/node-readiness": reader,
 	// TLS verification of the cluster (D163): status for everyone, setting or removing the CA asks for the TOTP code.
-	"GET /api/clusters/{idx}/tls": reader, "PUT /api/clusters/{idx}/tls": adminTOTP, "DELETE /api/clusters/{idx}/tls": adminTOTP,
+	"GET /api/clusters/{idx}/tls": reader, "GET /api/clusters/{idx}/tls/candidate": admin, "PUT /api/clusters/{idx}/tls": adminTOTP, "DELETE /api/clusters/{idx}/tls": adminTOTP,
 	"GET /api/clusters/{idx}/node-add": reader, "GET /api/clusters/{idx}/node-removal": reader,
 	// Manager SSH access to the nodes: status for everyone, reading a host key for administrators,
 	// confirming or forgetting one asks the TOTP code again (D152, D153).

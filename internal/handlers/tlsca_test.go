@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"proxmox-manager/internal/config"
+	"proxmox-manager/internal/pvetls"
 )
 
 type testCA struct {
@@ -54,15 +55,24 @@ func (ca testCA) leaf(t *testing.T) tls.Certificate {
 }
 
 // A fake Proxmox over TLS whose certificate can be swapped (to simulate a MITM or a CA rotation).
-type swappableCert struct{ cur *tls.Certificate }
+type swappableCert struct {
+	cur   *tls.Certificate
+	caPEM string // CA returned by the fake API (what a node or a MITM would serve)
+}
 
 func tlsTestRouter(t *testing.T, ca testCA) (http.Handler, *swappableCert) {
 	t.Helper()
-	sw := &swappableCert{}
+	sw := &swappableCert{caPEM: ca.pem}
 	leaf := ca.leaf(t)
 	sw.cur = &leaf
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"data":[{"node":"n1","status":"online"}]}`))
+		switch r.URL.Path {
+		case "/api2/json/nodes/n1/certificates/info":
+			b, _ := json.Marshal(map[string]any{"data": []map[string]string{{"filename": "pve-ssl.pem", "pem": "x"}, {"filename": "pve-root-ca.pem", "pem": sw.caPEM}}})
+			w.Write(b)
+		default:
+			w.Write([]byte(`{"data":[{"node":"n1","status":"online"}]}`))
+		}
 	}))
 	// GetConfigForClient is consulted on every handshake (GetCertificate is skipped without SNI, as with an IP).
 	srv.TLS = &tls.Config{Certificates: []tls.Certificate{leaf}, GetConfigForClient: func(*tls.ClientHelloInfo) (*tls.Config, error) {
@@ -79,6 +89,7 @@ func tlsTestRouter(t *testing.T, ca testCA) (http.Handler, *swappableCert) {
 	h := &Handler{}
 	r := chi.NewRouter()
 	r.Get("/api/clusters/{idx}/tls", h.GetClusterTLS)
+	r.Get("/api/clusters/{idx}/tls/candidate", h.GetClusterTLSCandidate)
 	r.Put("/api/clusters/{idx}/tls", h.PutClusterTLS)
 	r.Delete("/api/clusters/{idx}/tls", h.DeleteClusterTLS)
 	r.Put("/api/clusters/{idx}", h.UpdateCluster)
@@ -165,3 +176,60 @@ func TestReadinessReportsTLSState(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func fpOfPEM(t *testing.T, ca testCA) string {
+	t.Helper()
+	return pvetlsFingerprint(ca.cert)
+}
+
+// The CA read through the API is saved only if its fingerprint equals the one printed on the node.
+func TestClusterTLSFromAPIWithNodeFingerprint(t *testing.T) {
+	ca, other := makeTestCA(t), makeTestCA(t)
+	r, sw := tlsTestRouter(t, ca)
+	putFP := func(fp string) *httptest.ResponseRecorder {
+		b, _ := json.Marshal(map[string]string{"fingerprint": fp})
+		return reportRequest(r, "PUT", "/api/clusters/0/tls", string(b))
+	}
+	w := reportRequest(r, "GET", "/api/clusters/0/tls/candidate", "")
+	var cand tlsCandidate
+	json.Unmarshal(w.Body.Bytes(), &cand)
+	if w.Code != 200 || cand.Fingerprint != fpOfPEM(t, ca) || cand.Node != "n1" || !strings.Contains(cand.Command, "pve-root-ca.pem") || cand.Verified {
+		t.Fatalf("candidate %d %+v", w.Code, cand)
+	}
+	// wrong fingerprint (another cluster, or a MITM): nothing saved
+	if w = putFP(fpOfPEM(t, other)); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "DISCREPANZA") || config.Get().Clusters[0].TLSCA != "" {
+		t.Fatalf("mismatch %d %s", w.Code, w.Body)
+	}
+	for _, body := range []string{`{}`, `{"pem":"x","fingerprint":"SHA256:x"}`, `{"fingerprint":"not a fingerprint"}`} {
+		if w = reportRequest(r, "PUT", "/api/clusters/0/tls", body); w.Code != http.StatusBadRequest {
+			t.Fatalf("%s: %d", body, w.Code)
+		}
+	}
+	// the whole terminal output pasted (prompt included) is accepted: the fingerprint line is found
+	pasted := "root@n1:~# openssl x509 ... \n" + fpOfPEM(t, ca) + "\nroot@n1:~# "
+	if w = putFP(pasted); w.Code != 200 || config.Get().Clusters[0].TLSCA != ca.pem {
+		t.Fatalf("match %d %s", w.Code, w.Body)
+	}
+	// with a CA configured, a server that now presents a foreign certificate is never read unverified
+	foreign := other.leaf(t)
+	sw.cur, sw.caPEM = &foreign, other.pem
+	if w = reportRequest(r, "GET", "/api/clusters/0/tls/candidate", ""); w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "incolla manuale") {
+		t.Fatalf("no unverified fallback expected: %d %s", w.Code, w.Body)
+	}
+}
+
+// A man in the middle before any CA is configured: it presents its own certificate and serves its own CA through
+// the API; the fingerprint printed on the real node does not match, so nothing is saved.
+func TestClusterTLSFromAPIDetectsMITM(t *testing.T) {
+	ca, mitm := makeTestCA(t), makeTestCA(t)
+	r, sw := tlsTestRouter(t, ca)
+	leaf := mitm.leaf(t)
+	sw.cur, sw.caPEM = &leaf, mitm.pem
+	b, _ := json.Marshal(map[string]string{"fingerprint": fpOfPEM(t, ca)})
+	w := reportRequest(r, "PUT", "/api/clusters/0/tls", string(b))
+	if w.Code != http.StatusConflict || config.Get().Clusters[0].TLSCA != "" {
+		t.Fatalf("MITM not detected: %d %s", w.Code, w.Body)
+	}
+}
+
+var pvetlsFingerprint = pvetls.Fingerprint

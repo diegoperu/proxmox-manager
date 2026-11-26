@@ -204,7 +204,11 @@ No IP addresses, no guest content, no processes. VMIDs are reused by Proxmox, so
 
 ## Verifying the Proxmox certificate (cluster CA)
 
-Proxmox nodes use certificates signed by the private CA of their cluster (`PVE Cluster Manager CA`), the same for every node of the cluster. To make the manager verify them (recommended):
+Proxmox nodes use certificates signed by the private CA of their cluster (`PVE Cluster Manager CA`), the same for every node of the cluster. To make the manager verify them (recommended), in **Impostazioni → Infrastruttura → Verifica TLS del cluster** (with the cluster selected at the top):
+
+**Recommended: read the CA from the cluster and confirm it on a node.** Press **Leggi la CA dal cluster**: the manager reads the CA through the API and shows the command to run on a node. Run it as root on any node (SSH, or **Node → Shell** in the Proxmox web interface), paste its output (the `SHA256:...` line; the prompt around it does no harm) and the manager shows at once whether it matches ("✓ Coincide") or not ("✕ DISCREPANZA": do not save; someone may be in the middle, or the command ran on another cluster). **Salva la CA** is enabled only on a match, asks for the TOTP code, and the server repeats the comparison itself before saving. With a CA already configured the read uses only the verified connection (never an unverified one, which would expose the API token).
+
+**Alternative: paste the certificate by hand** (needed after a CA key rotation, and it never sends the token):
 
 1. On **any node** of the cluster, as root (SSH, or **Node → Shell** in the Proxmox web interface):
    ```bash
