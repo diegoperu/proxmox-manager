@@ -4,5 +4,5 @@ package pmgrscripts
 
 import "embed"
 
-//go:embed bin lib os.d profiles snippets.d helpers README.md cluster.conf.example update.sh update_all.sh update_debian_template.sh update_rocky_template.sh update_ubuntu_template.sh
+//go:embed bin lib arch.d os.d profiles snippets.d helpers README.md cluster.conf.example update.sh update_all.sh update_debian_template.sh update_rocky_template.sh update_ubuntu_template.sh
 var FS embed.FS

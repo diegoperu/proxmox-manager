@@ -71,6 +71,7 @@ declare -A PMGR_CLUSTER_RULES=(
   [DISK_SIZE]='^[0-9]{1,5}G$'
   [MEMORY_MB]='^[0-9]{3,6}$'
   [PROFILE]='^(standard|hosting)$'
+  [TEMPLATE_IPCONFIG]='^(ip=dhcp)?$'
 )
 PMGR_CLUSTER_REQUIRED=(VMID_BASE STORAGE BRIDGE NAMESERVER SEARCH_DOMAIN CI_USER SSH_KEYS_FILE PASSWORD_FILE)
 
@@ -79,6 +80,7 @@ declare -A PMGR_OS_RULES=(
   [LABEL]='^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,63}$'
   [SLOT]='^[1-9][0-9]{0,2}$'
   [ENABLED]='^[01]$'
+  [ARCHES]='^(amd64|arm64|amd64 arm64|arm64 amd64)$'
   [IMAGE_URL]="$PMGR_URL_RE"
   [IMAGE_FILE]='^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
   [IMAGE_CHECKSUM_URL]="$PMGR_URL_RE"
@@ -90,6 +92,11 @@ declare -A PMGR_OS_RULES=(
 )
 PMGR_OS_REQUIRED=(FAMILY LABEL SLOT IMAGE_URL IMAGE_FILE TEMPLATE_NAME TAGS SNIPPET)
 readonly PMGR_OS_ID_RE='^(ubuntu|debian|rocky)-[0-9][0-9.]{0,10}$'
+
+declare -A PMGR_ARCH_RULES=(
+  [MACHINE]='^(q35|virt)$'
+  [CLOUDINIT_DRIVE]='^(ide|scsi|sata)[0-9]$'
+)
 
 # ------------------------------------------------------------------ lettura delle configurazioni
 # pmgr_parse_conf FILE NOME_ARRAY_REGOLE: riempie l'array globale CONF con CHIAVE=VALORE validati.
@@ -107,6 +114,19 @@ pmgr_parse_conf() {
     val="${BASH_REMATCH[2]}"
     [[ -n "${rules[$key]+x}" ]] || pmgr_die "$file riga $n: chiave sconosciuta: $key"
     [[ -z "${CONF[$key]+x}" ]] || pmgr_die "$file riga $n: chiave ripetuta: $key"
+    # I soli segnaposto ammessi si espandono prima della whitelist originale: mai codice o valori liberi.
+    if [ "$2" = PMGR_OS_RULES ]; then
+      case "$key" in
+        IMAGE_URL | IMAGE_FILE | IMAGE_CHECKSUM_URL)
+          if [[ "$val" == *'{arch}'* || "$val" == *'{march}'* ]]; then
+            [[ "${PMGR_ARCH:-}" =~ ^(amd64|arm64)$ ]] && [[ "${PMGR_MARCH:-}" =~ ^(x86_64|aarch64)$ ]] \
+              || pmgr_die "caricare l'architettura prima dei segnaposto in $file"
+            val="${val//\{arch\}/$PMGR_ARCH}"
+            val="${val//\{march\}/$PMGR_MARCH}"
+          fi
+          ;;
+      esac
+    fi
     [[ "$val" =~ ${rules[$key]} ]] || pmgr_die "$file riga $n: valore non valido per $key"
     case "$key" in
       SNIPPETS_DIR | IMAGES_DIR | SSH_KEYS_FILE | PASSWORD_FILE)
@@ -115,6 +135,27 @@ pmgr_parse_conf() {
     esac
     CONF[$key]="$val"
   done <"$file"
+}
+
+# pmgr_load_arch [ARCH]: rileva sul nodo, oppure usa l'override esplicito; mai esegue arch.d/*.conf.
+pmgr_load_arch() {
+  local arch="${1:-}" k
+  if [ -z "$arch" ]; then
+    pmgr_need_cmds dpkg
+    arch="$(dpkg --print-architecture)" || pmgr_die "impossibile rilevare l'architettura con dpkg --print-architecture"
+  fi
+  case "$arch" in
+    amd64) PMGR_MARCH=x86_64 ;;
+    arm64) PMGR_MARCH=aarch64 ;;
+    *) pmgr_die "architettura non supportata: sono ammesse solo amd64 e arm64" ;;
+  esac
+  PMGR_ARCH="$arch"
+  pmgr_parse_conf "$PMGR_BASE/arch.d/$arch.conf" PMGR_ARCH_RULES
+  declare -gA ARCH=()
+  for k in MACHINE CLOUDINIT_DRIVE; do
+    [ -n "${CONF[$k]:-}" ] || pmgr_die "arch.d/$arch.conf: manca $k"
+    ARCH[$k]="${CONF[$k]}"
+  done
 }
 
 pmgr_valid_ipv4_list() {
@@ -145,6 +186,7 @@ pmgr_load_cluster() {
   : "${CL[DISK_SIZE]:=32G}"
   : "${CL[MEMORY_MB]:=1024}"
   : "${CL[PROFILE]:=standard}"
+  : "${CL[TEMPLATE_IPCONFIG]:=}"
 }
 
 # pmgr_load_os ID: carica os.d/ID.conf in OS[] e calcola VMID. Richiede pmgr_load_cluster.
@@ -159,6 +201,7 @@ pmgr_load_os() {
   done
   : "${OS[ENABLED]:=1}"
   : "${OS[HELPERS]:=}"
+  : "${OS[ARCHES]:=amd64 arm64}"
   if [ -n "${OS[IMAGE_CHECKSUM_URL]:-}" ] || [ -n "${OS[IMAGE_CHECKSUM_ALGO]:-}" ]; then
     { [ -n "${OS[IMAGE_CHECKSUM_URL]:-}" ] && [ -n "${OS[IMAGE_CHECKSUM_ALGO]:-}" ]; } \
       || pmgr_die "os.d/$id.conf: IMAGE_CHECKSUM_URL e IMAGE_CHECKSUM_ALGO vanno insieme"
@@ -167,6 +210,10 @@ pmgr_load_os() {
   OS[ID]="$id"
   VMID=$((10#${CL[VMID_BASE]} + 10#${OS[SLOT]}))
   [ -f "$PMGR_BASE/snippets.d/$id.yaml" ] || pmgr_die "manca il corpo dello snippet: snippets.d/$id.yaml"
+}
+
+pmgr_os_available() {
+  [[ " ${OS[ARCHES]} " == *" $PMGR_ARCH "* ]]
 }
 
 # pmgr_all_os_ids [FAMIGLIA]: riempie PMGR_IDS con gli identificativi abilitati, in ordine di SLOT.

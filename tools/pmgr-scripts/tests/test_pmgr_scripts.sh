@@ -2,6 +2,7 @@
 # Test degli script dei template con qm/pvesm/curl/qemu-img FINTI: nessun contatto con Proxmox ne' con la rete.
 # Gira in un user namespace (unshare -r) per apparire "root" senza esserlo. Solo ASCII.
 set -uo pipefail
+export LC_ALL=C
 
 if [ "$(id -u)" != 0 ]; then
   command -v unshare >/dev/null 2>&1 || { echo "serve unshare (util-linux) o root"; exit 1; }
@@ -25,7 +26,7 @@ check() { # descrizione comando...
 # ------------------------------------------------------------------ ambiente finto
 TREE="$WORK/tree"
 mkdir -p "$TREE" "$WORK/bin" "$WORK/state" "$WORK/snippets" "$WORK/images"
-cp -r "$SRC/bin" "$SRC/lib" "$SRC/os.d" "$SRC/snippets.d" "$SRC/helpers" "$SRC/profiles" "$TREE/"
+cp -r "$SRC/bin" "$SRC/lib" "$SRC/arch.d" "$SRC/os.d" "$SRC/snippets.d" "$SRC/helpers" "$SRC/profiles" "$TREE/"
 cp "$SRC"/update*.sh "$TREE/"
 
 cat >"$WORK/bin/qm" <<'STUB'
@@ -50,7 +51,7 @@ case "$cmd" in
     v="$1"; shift; echo "set: $*" >>"$(cfg "$v")"
     while [ "$#" -gt 0 ]; do
       case "$1" in
-        --virtio0 | --ide2 | --tags | --ciuser | --cicustom | --nameserver | --searchdomain) echo "${1#--}: $2" >>"$(cfg "$v")"; shift ;;
+        --virtio0 | --ide2 | --scsi2 | --tags | --ciuser | --cicustom | --nameserver | --searchdomain) echo "${1#--}: $2" >>"$(cfg "$v")"; shift ;;
       esac
       shift
     done ;;
@@ -95,12 +96,19 @@ case "$url" in
 esac
 STUB
 printf '#!/bin/bash\nexit 0\n' >"$WORK/bin/logger"
+cat >"$WORK/bin/dpkg" <<'STUB'
+#!/bin/bash
+[ "$#" = 1 ] && [ "$1" = --print-architecture ] || exit 2
+[ "${STUB_DPKG_FAIL:-0}" = 0 ] || exit 1
+printf '%s\n' "${STUB_ARCH:-amd64}"
+STUB
 chmod 755 "$WORK"/bin/*
 export PATH="$WORK/bin:$PATH"
 export STUB_LOG="$WORK/stub.log" STUB_STATE="$WORK/state"
 export STUB_PVESM_images="pool:active cipool:active" STUB_PVESM_snippets="local:active"
 export PMGR_LOCK_FILE="$WORK/lock"
 export PMGR_CLUSTER_CONF="$WORK/cluster.conf"
+export STUB_ARCH=amd64
 
 PW='S3cretPassw0rd!'
 printf '%s\n' "$PW" >"$WORK/pw"; chmod 600 "$WORK/pw"
@@ -246,6 +254,26 @@ check "tag" logged "qm set 1003 --tags ubuntu-template,24.04,cloudinit"
 check "diventa template" logged "qm template 1003"
 check "password impostata come hash" grep -qF 'qm set 1003 --cipassword $6$' "$STUB_LOG"
 check "la password non compare ne' nel log ne' nell'output" bash -c "! grep -qF -- '$PW' '$STUB_LOG' '$WORK/out'"
+# Confronto completo dei comandi amd64 preesistenti (l'hash della password ha un sale casuale).
+cat >"$WORK/expected-qm" <<EOF
+qm create 1003 --name ubuntu-2404-cloudinit-template --ostype l26 --memory 1024 --agent 1 --bios ovmf --machine q35 --efidisk0 pool:0,pre-enrolled-keys=0 --cpu host --sockets 1 --cores 1 --vga serial0 --serial0 socket --net0 virtio,bridge=lo
+qm importdisk 1003 $WORK/images/ubuntu-24.04/noble-server-cloudimg-amd64.img pool
+qm set 1003 --scsihw virtio-scsi-pci --virtio0 pool:vm-1003-disk-1,discard=on,cache=writeback
+qm set 1003 --boot order=virtio0
+qm set 1003 --ide2 pool:cloudinit
+qm set 1003 --autostart 1 --onboot 1
+qm set 1003 --numa 1
+qm set 1003 --searchdomain test.local
+qm set 1003 --cicustom vendor=local:snippets/vendor_ubuntu_24.04.yaml
+qm set 1003 --tags ubuntu-template,24.04,cloudinit
+qm set 1003 --ciuser tecnico
+qm set 1003 --cipassword <hash>
+qm set 1003 --sshkeys $WORK/keys.pub
+qm set 1003 --nameserver 10.0.0.1 10.0.0.2
+qm template 1003
+EOF
+grep -E '^qm (create|importdisk|set|template)' "$STUB_LOG" | sed 's/--cipassword .*/--cipassword <hash>/' >"$WORK/actual-qm"
+check "amd64: comandi qm identici al comportamento precedente" cmp -s "$WORK/expected-qm" "$WORK/actual-qm"
 # seconda esecuzione: template esistente ricreato, snippet invariato
 run ubuntu-24.04
 if [ "$RC" = 0 ]; then ok; else ko "seconda esecuzione (uscita $RC)"; fi
@@ -298,36 +326,39 @@ expect_die "finalize rifiutato su VM incompleta" "incompleta"
 check "VM incompleta non diventa template" bash -c "! grep -q '^qm template' '$STUB_LOG'"
 
 # ------------------------------------------------------------------ 6. controlli prima di toccare qualunque cosa
-pre() { # descrizione, testo atteso, comando di preparazione
+pre() { # descrizione, testo atteso, comando di preparazione e argomenti separati
+  local description="$1" expected="$2"
+  shift 2
   reset_state
   printf '%s  %s\n' "$HASH256" "noble-server-cloudimg-amd64.img" >"$STUB_CKFILE"
   write_cluster
   printf '%s\n' "$PW" >"$WORK/pw"; chmod 600 "$WORK/pw"
-  eval "$3"
+  "$@"
   run ubuntu-24.04
-  expect_die "$1" "$2"
-  check "$1: nessuna chiamata distruttiva" no_dangerous_calls
-  check "$1: nessun download" bash -c "! grep -q '^curl.* -o ' '$STUB_LOG'"
+  expect_die "$description" "$expected"
+  check "$description: nessuna chiamata distruttiva" no_dangerous_calls
+  check "$description: nessun download" bash -c "! grep -q '^curl.* -o ' '$STUB_LOG'"
 }
-pre "storage dei dischi inesistente" "non esiste, non e' attivo" "write_cluster STORAGE=nope"
-pre "storage dei dischi non attivo" "non esiste, non e' attivo" "export STUB_PVESM_images='pool:inactive cipool:active'"
+write_test_password() { printf '%s\n' "$@" >"$WORK/pw"; }
+pre "storage dei dischi inesistente" "non esiste, non e' attivo" write_cluster STORAGE=nope
+pre "storage dei dischi non attivo" "non esiste, non e' attivo" export 'STUB_PVESM_images=pool:inactive cipool:active'
 export STUB_PVESM_images="pool:active cipool:active"
-pre "storage cloud-init inesistente" "non esiste, non e' attivo" "write_cluster CI_STORAGE=nope"
-pre "storage degli snippet senza il contenuto snippets" "non accetta snippets" "export STUB_PVESM_snippets='altro:active'"
+pre "storage cloud-init inesistente" "non esiste, non e' attivo" write_cluster CI_STORAGE=nope
+pre "storage degli snippet senza il contenuto snippets" "non accetta snippets" export STUB_PVESM_snippets=altro:active
 export STUB_PVESM_snippets="local:active"
-pre "bridge inesistente" "bridge nope0 non esiste" "write_cluster; sed -i 's/^BRIDGE=.*/BRIDGE=nope0/' $PMGR_CLUSTER_CONF"
-pre "password con permessi larghi" "chmod 600" "chmod 644 $WORK/pw"
-pre "file della password mancante" "file della password non trovato" "rm -f $WORK/pw"
-pre "password troppo corta" "8-128" "printf 'corta\n' >$WORK/pw"
-pre "password su due righe" "una sola riga" "printf 'unaPasswordLunga1\naltra\n' >$WORK/pw"
-pre "chiavi ssh mancanti" "file delle chiavi ssh non leggibile" "rm -f $WORK/keys.pub"
+pre "bridge inesistente" "bridge nope0 non esiste" write_cluster BRIDGE=nope0
+pre "password con permessi larghi" "chmod 600" chmod 644 "$WORK/pw"
+pre "file della password mancante" "file della password non trovato" rm -f "$WORK/pw"
+pre "password troppo corta" "8-128" write_test_password corta
+pre "password su due righe" "una sola riga" write_test_password unaPasswordLunga1 altra
+pre "chiavi ssh mancanti" "file delle chiavi ssh non leggibile" rm -f "$WORK/keys.pub"
 printf 'ssh-ed25519 AAAA test\n' >"$WORK/keys.pub"
-pre "cartella degli snippet mancante" "cartella degli snippet non esiste" "rmdir $WORK/snippets"
+pre "cartella degli snippet mancante" "cartella degli snippet non esiste" rmdir "$WORK/snippets"
 write_cluster; printf '%s\n' "$PW" >"$WORK/pw"; chmod 600 "$WORK/pw"
 
 # helper non ASCII (rocky): si ferma, nessun file scritto
 reset_state
-printf '%s\n' "# prova àè" >>"$TREE/helpers/disk.sh"
+printf '# prova \303\240\303\250\n' >>"$TREE/helpers/disk.sh"
 run rocky-9 --step snippet
 expect_die "helper non ASCII rifiutato" "non ASCII"
 check "helper non ASCII: nessuno snippet scritto" bash -c "[ -z \"\$(ls -A $WORK/snippets)\" ]"
@@ -379,6 +410,187 @@ for t in '--step nonvalido ubuntu-24.04' '--family windows' 'ubuntu-24.04 debian
 done
 run
 if [ "$RC" = 2 ]; then ok; else ko "senza argomenti: uscita $RC"; fi
+
+# ------------------------------------------------------------------ architetture e ipconfig facoltativo
+# URL attesi espliciti: amd64 conserva gli originali, arm64 coincide con la copia ARM dell'utente.
+while IFS='|' read -r release url64 file64 urlarm filearm checksum; do
+  for arch in amd64 arm64; do
+    url="$url64"; image="$file64"
+    if [ "$arch" = arm64 ]; then url="$urlarm"; image="$filearm"; fi
+    run "$release" --arch "$arch" --step image --dry-run
+    if [ "$RC" = 0 ]; then ok; else ko "$release/$arch: dry-run immagine"; fi
+    check "$release/$arch: URL esatto" grep -qF "scaricherei $url in $WORK/images/$release/$image," "$WORK/out"
+    # Verifica anche i valori caricati (checksum compreso), senza download.
+    bash -euo pipefail -c 'source "$1/lib/pmgr-lib.sh"; pmgr_load_arch "$2"; pmgr_load_cluster; pmgr_load_os "$3"; printf "%s|%s|%s\n" "${OS[IMAGE_URL]}" "${OS[IMAGE_FILE]}" "${OS[IMAGE_CHECKSUM_URL]:-}"' bash "$TREE" "$arch" "$release" >"$WORK/values" 2>"$WORK/values.err"
+    printf '%s|%s|%s\n' "$url" "$image" "$checksum" >"$WORK/expected-values"
+    check "$release/$arch: valori espansi esatti" cmp -s "$WORK/expected-values" "$WORK/values"
+  done
+done <<'URLS'
+ubuntu-22.04|https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img|jammy-server-cloudimg-amd64.img|https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-arm64.img|jammy-server-cloudimg-arm64.img|https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS
+ubuntu-24.04|https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img|noble-server-cloudimg-amd64.img|https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-arm64.img|noble-server-cloudimg-arm64.img|https://cloud-images.ubuntu.com/noble/current/SHA256SUMS
+ubuntu-26.04|https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img|resolute-server-cloudimg-amd64.img|https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-arm64.img|resolute-server-cloudimg-arm64.img|https://cloud-images.ubuntu.com/resolute/current/SHA256SUMS
+debian-12|https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2|debian-12-generic-amd64.qcow2|https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-arm64.qcow2|debian-12-generic-arm64.qcow2|https://cloud.debian.org/images/cloud/bookworm/latest/SHA512SUMS
+debian-13|https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-amd64.qcow2|debian-13-generic-amd64.qcow2|https://cloud.debian.org/images/cloud/trixie/latest/debian-13-generic-arm64.qcow2|debian-13-generic-arm64.qcow2|https://cloud.debian.org/images/cloud/trixie/latest/SHA512SUMS
+rocky-8|https://dl.rockylinux.org/pub/rocky/8.10/images/x86_64/Rocky-8-GenericCloud-Base.latest.x86_64.qcow2|Rocky-8-GenericCloud-Base.latest.x86_64.qcow2|https://dl.rockylinux.org/pub/rocky/8.10/images/aarch64/Rocky-8-GenericCloud-Base.latest.aarch64.qcow2|Rocky-8-GenericCloud-Base.latest.aarch64.qcow2|
+rocky-9|https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2|Rocky-9-GenericCloud-Base.latest.x86_64.qcow2|https://dl.rockylinux.org/pub/rocky/9/images/aarch64/Rocky-9-GenericCloud-Base.latest.aarch64.qcow2|Rocky-9-GenericCloud-Base.latest.aarch64.qcow2|
+rocky-10|https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2|Rocky-10-GenericCloud-Base.latest.x86_64.qcow2|https://dl.rockylinux.org/pub/rocky/10/images/aarch64/Rocky-10-GenericCloud-Base.latest.aarch64.qcow2|Rocky-10-GenericCloud-Base.latest.aarch64.qcow2|
+URLS
+
+# Percorso completo ARM sia con override sia con rilevamento dal nodo.
+# Un hash errato per amd64 prova che il lookup cerca il nome arm64.
+printf '%064d  noble-server-cloudimg-amd64.img\n' 0 >"$STUB_CKFILE"
+printf '%s  noble-server-cloudimg-arm64.img\n' "$HASH256" >>"$STUB_CKFILE"
+for detection in override dpkg; do
+  reset_state
+  if [ "$detection" = override ]; then
+    STUB_DPKG_FAIL=1 run ubuntu-24.04 --arch arm64
+  else
+    STUB_ARCH=arm64 run ubuntu-24.04
+  fi
+  if [ "$RC" = 0 ]; then ok; else ko "arm64/$detection completo: $(tail -4 "$WORK/out")"; fi
+  check "arm64/$detection: macchina virt" logged '--bios ovmf --machine virt --efidisk0'
+  check "arm64/$detection: cloud-init scsi2" logged '^qm set 1003 --scsi2 pool:cloudinit$'
+  check "arm64/$detection: nessun ide2" bash -c '! grep -q -- --ide2 "$1"' bash "$STUB_LOG"
+  check "arm64/$detection: checksum verificato per nome arm64" grep -q 'checksum sha256 verificato' "$WORK/out"
+  check "arm64/$detection: immagine arm64 importata" logged "qm importdisk 1003 $WORK/images/ubuntu-24.04/noble-server-cloudimg-arm64.img pool"
+  check "arm64/$detection: finalize controlla scsi2" logged '^qm template 1003$'
+  sed -e 's/--machine q35/--machine virt/' -e 's/--ide2 /--scsi2 /' -e 's/noble-server-cloudimg-amd64.img/noble-server-cloudimg-arm64.img/' "$WORK/expected-qm" >"$WORK/expected-arm-qm"
+  grep -E '^qm (create|importdisk|set|template)' "$STUB_LOG" | sed 's/--cipassword .*/--cipassword <hash>/' >"$WORK/actual-qm"
+  check "arm64/$detection: solo le differenze hardware e immagine attese" cmp -s "$WORK/expected-arm-qm" "$WORK/actual-qm"
+done
+# Un ide2 residuo non deve mascherare un cloud-init scsi2 mancante.
+sed -i '/^template:/d; /^scsi2:/d' "$WORK/state/vm-1003.cfg"
+printf 'ide2: pool:cloudinit\n' >>"$WORK/state/vm-1003.cfg"
+run ubuntu-24.04 --arch arm64 --step finalize
+expect_die "arm64: finalize senza scsi2 rifiutato" 'manca scsi2'
+check "arm64 incompleta: nessuna scrittura qm" no_dangerous_calls
+
+reset_state
+printf '%0128d  debian-13-generic-amd64.qcow2\n' 0 >"$STUB_CKFILE"
+printf '%s  debian-13-generic-arm64.qcow2\n' "$HASH512" >>"$STUB_CKFILE"
+STUB_ARCH=arm64 run debian-13
+if [ "$RC" = 0 ]; then ok; else ko "Debian arm64 completo: $(tail -4 "$WORK/out")"; fi
+check "Debian arm64: checksum SHA512 per nome arm64" grep -q 'checksum sha512 verificato' "$WORK/out"
+
+# ARCHES limita le operazioni sui template, non i manifest degli snippet.
+printf '\nARCHES=amd64\n' >>"$TREE/os.d/ubuntu-24.04.conf"
+for selection in all family; do
+  if [ "$selection" = all ]; then
+    run --all --arch arm64 --dry-run
+  else
+    run --family ubuntu --arch arm64 --dry-run
+  fi
+  if [ "$RC" = 0 ]; then ok; else ko "ARCHES/$selection: uscita $RC"; fi
+  check "ARCHES/$selection: messaggio di skip" grep -q 'ubuntu-24.04 saltata: non disponibile' "$WORK/out"
+  check "ARCHES/$selection: nessun passo della release incompatibile" bash -c '! grep -qE "scaricherei .*noble|qm .* 1003" "$1"' bash "$WORK/out"
+  check "ARCHES/$selection: altra release completata" grep -q 'template 1001 .* pronto' "$WORK/out"
+done
+run ubuntu-24.04 --arch arm64
+expect_die "ARCHES: ID incompatibile rifiutato" 'ubuntu-24.04 non disponibile'
+check "ARCHES: rifiuto prima di qualsiasi comando del cluster" test ! -s "$STUB_LOG"
+run --list --arch arm64
+check "list: release incompatibile visibile" grep -q '^ubuntu-24.04 .*arm64: non disponibile' "$WORK/out"
+check "list: release compatibile visibile" grep -q '^ubuntu-22.04 .*arm64: disponibile' "$WORK/out"
+
+for profile in standard hosting; do
+  mkdir -p "$WORK/render-amd64" "$WORK/render-arm64" "$WORK/render-nodpkg"
+  run --render "$WORK/render-amd64" --profile "$profile" --arch amd64 --all
+  if [ "$RC" = 0 ]; then ok; else ko "render amd64/$profile"; fi
+  run --render "$WORK/render-arm64" --profile "$profile" --arch arm64 --all
+  if [ "$RC" = 0 ]; then ok; else ko "render arm64/$profile"; fi
+  check "render $profile: otto file identici anche con ARCHES limitato" diff -r "$WORK/render-amd64" "$WORK/render-arm64"
+  check "render $profile: release esclusa presente" test -s "$WORK/render-arm64/vendor_ubuntu_24.04.yaml"
+  STUB_DPKG_FAIL=1 run --render "$WORK/render-nodpkg" --profile "$profile" --all
+  if [ "$RC" = 0 ]; then ok; else ko "render $profile senza dpkg"; fi
+  check "render $profile indipendente da dpkg" diff -r "$WORK/render-amd64" "$WORK/render-nodpkg"
+done
+cp "$SRC/os.d/ubuntu-24.04.conf" "$TREE/os.d/ubuntu-24.04.conf"
+
+for bad in '' 'riscv64' 'amd64 riscv64' 'amd64;id' 'amd64 amd64' 'amd64  arm64'; do
+  printf '\nARCHES=%s\n' "$bad" >>"$TREE/os.d/ubuntu-24.04.conf"
+  run --all --arch arm64
+  expect_die "ARCHES non valido: $bad" 'valore non valido per ARCHES'
+  check "ARCHES non valido: nessun comando" test ! -s "$STUB_LOG"
+  cp "$SRC/os.d/ubuntu-24.04.conf" "$TREE/os.d/ubuntu-24.04.conf"
+done
+for arches in 'arm64' 'amd64 arm64' 'arm64 amd64'; do
+  printf '\nARCHES=%s\n' "$arches" >>"$TREE/os.d/ubuntu-24.04.conf"
+  run ubuntu-24.04 --arch arm64 --dry-run
+  if [ "$RC" = 0 ]; then ok; else ko "ARCHES valido rifiutato: $arches"; fi
+  cp "$SRC/os.d/ubuntu-24.04.conf" "$TREE/os.d/ubuntu-24.04.conf"
+done
+
+# Valori di architettura ostili non diventano mai percorsi o opzioni qm.
+for bad in '' riscv64 '../amd64' 'amd64;id'; do
+  run ubuntu-24.04 --arch "$bad"
+  expect_die "--arch non valido: $bad" '--arch deve essere'
+  check "--arch non valido: nessun comando" test ! -s "$STUB_LOG"
+done
+STUB_ARCH=riscv64 run ubuntu-24.04
+expect_die "architettura dpkg sconosciuta" 'architettura non supportata'
+check "architettura sconosciuta: nessun comando" test ! -s "$STUB_LOG"
+STUB_DPKG_FAIL=1 run ubuntu-24.04
+expect_die "dpkg fallito" "impossibile rilevare l'architettura"
+check "dpkg fallito: nessun comando" test ! -s "$STUB_LOG"
+
+for bad in 'MACHINE=pc' 'CLOUDINIT_DRIVE=ide22' 'CLOUDINIT_DRIVE=scsi2;id' 'EXTRA=1'; do
+  printf '%s\n' "$bad" >"$TREE/arch.d/arm64.conf"
+  run ubuntu-24.04 --arch arm64
+  expect_die "arch.d non valido: $bad" 'non valido\|sconosciuta'
+  check "arch.d non valido: nessun comando" test ! -s "$STUB_LOG"
+done
+printf 'MACHINE=virt\n' >"$TREE/arch.d/arm64.conf"
+run ubuntu-24.04 --arch arm64
+expect_die "arch.d incompleto" 'manca CLOUDINIT_DRIVE'
+printf 'MACHINE=virt\nMACHINE=virt\nCLOUDINIT_DRIVE=scsi2\n' >"$TREE/arch.d/arm64.conf"
+run ubuntu-24.04 --arch arm64
+expect_die "arch.d chiave ripetuta" 'chiave ripetuta'
+rm "$TREE/arch.d/arm64.conf"
+ln -s "$SRC/arch.d/arm64.conf" "$TREE/arch.d/arm64.conf"
+run ubuntu-24.04 --arch arm64
+expect_die "arch.d link simbolico" 'link simbolico'
+rm "$TREE/arch.d/arm64.conf"
+cp "$SRC/arch.d/arm64.conf" "$TREE/arch.d/arm64.conf"
+
+# Tutti e tre i campi immagine supportano i segnaposto, poi applicano le regex originali.
+printf '%s  noble-server-cloudimg-arm64.img\n' "$HASH256" >"$STUB_CKFILE"
+sed -i 's|^IMAGE_CHECKSUM_URL=.*|IMAGE_CHECKSUM_URL=https://example.org/{arch}/{march}/SHA256SUMS|' "$TREE/os.d/ubuntu-24.04.conf"
+run ubuntu-24.04 --arch arm64 --step image
+if [ "$RC" = 0 ]; then ok; else ko "segnaposto nel checksum URL: $(tail -3 "$WORK/out")"; fi
+check "checksum URL espanso prima di curl" logged 'https://example.org/arm64/aarch64/SHA256SUMS'
+cp "$SRC/os.d/ubuntu-24.04.conf" "$TREE/os.d/ubuntu-24.04.conf"
+for bad in 'IMAGE_FILE=bad-{unknown}.img' 'IMAGE_FILE=../{arch}.img' 'IMAGE_FILE=$(id)-{arch}.img' 'IMAGE_URL=http://example.org/{arch}.img' 'IMAGE_CHECKSUM_URL=https://example.org/{unknown}/SHA256SUMS'; do
+  key="${bad%%=*}"
+  sed -i "/^${key}=/d" "$TREE/os.d/ubuntu-24.04.conf"
+  printf '%s\n' "$bad" >>"$TREE/os.d/ubuntu-24.04.conf"
+  run ubuntu-24.04 --arch arm64
+  expect_die "campo immagine ostile: $key" "valore non valido per $key"
+  check "campo immagine ostile: nessun comando" test ! -s "$STUB_LOG"
+  cp "$SRC/os.d/ubuntu-24.04.conf" "$TREE/os.d/ubuntu-24.04.conf"
+done
+
+for arch in amd64 arm64; do
+  reset_state
+  run rocky-9 --arch "$arch"
+  if [ "$RC" = 0 ]; then ok; else ko "Rocky/$arch completo"; fi
+  check "ipconfig assente: nessuna impostazione" bash -c '! grep -q -- --ipconfig0 "$1"' bash "$STUB_LOG"
+  write_cluster TEMPLATE_IPCONFIG=
+  run rocky-9 --arch "$arch"
+  if [ "$RC" = 0 ]; then ok; else ko "TEMPLATE_IPCONFIG vuoto/$arch"; fi
+  check "ipconfig vuoto: nessuna impostazione" bash -c '! grep -q -- --ipconfig0 "$1"' bash "$STUB_LOG"
+  write_cluster TEMPLATE_IPCONFIG=ip=dhcp
+  run rocky-9 --arch "$arch"
+  if [ "$RC" = 0 ]; then ok; else ko "TEMPLATE_IPCONFIG DHCP/$arch"; fi
+  check "DHCP prima di qm template/$arch" awk '/^qm set 1004 --ipconfig0 ip=dhcp$/ {ip=NR} /^qm template 1004$/ {ok=(ip>0 && ip<NR)} END {exit !ok}' "$STUB_LOG"
+  write_cluster
+done
+for bad in ip=auto ip=dhcp6 'ip=dhcp,ip6=dhcp' 'ip=dhcp;id' ' ip=dhcp'; do
+  write_cluster "TEMPLATE_IPCONFIG=$bad"
+  run ubuntu-24.04 --arch arm64
+  expect_die "TEMPLATE_IPCONFIG non valido: $bad" 'valore non valido per TEMPLATE_IPCONFIG'
+  check "TEMPLATE_IPCONFIG non valido: nessun comando" test ! -s "$STUB_LOG"
+done
+write_cluster
 
 # ------------------------------------------------------------------ 10. pmgr-add-release.sh (su una copia dell'albero)
 ADD="$TREE/bin/pmgr-add-release.sh"

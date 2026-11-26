@@ -8,6 +8,7 @@
 #   pmgr-os.sh <id> [--step image|snippet|template|finalize|all] [--dry-run]
 #   pmgr-os.sh --family ubuntu|debian|rocky | --all   [--dry-run]
 #   pmgr-os.sh --list
+#   --arch amd64|arm64: override di dpkg --print-architecture, valido per ogni modo
 #   pmgr-os.sh --render DIR [--profile standard|hosting] <id>|--family F|--all
 #       scrive gli snippet nella cartella DIR (niente cluster, niente root): serve a preparare le
 #       varianti da sincronizzare verso un cluster di hosting
@@ -25,7 +26,7 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/pmgr-lib.sh"
 
 usage() {
-  sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+  sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
 }
 
 # ------------------------------------------------------------------ file temporanei
@@ -257,7 +258,7 @@ step_template() {
   pmgr_log "creo il template $VMID ${OS[TEMPLATE_NAME]}"
   pmgr_run qm create "$VMID" --name "${OS[TEMPLATE_NAME]}" --ostype l26 \
     --memory "$mem" --agent 1 \
-    --bios ovmf --machine q35 --efidisk0 "${CL[STORAGE]}:0,pre-enrolled-keys=0" \
+    --bios ovmf --machine "${ARCH[MACHINE]}" --efidisk0 "${CL[STORAGE]}:0,pre-enrolled-keys=0" \
     --cpu "${CL[CPU_TYPE]}" --sockets 1 --cores 1 \
     --vga serial0 --serial0 socket \
     --net0 "virtio,bridge=${CL[BRIDGE]}"
@@ -273,7 +274,7 @@ step_template() {
   fi
   pmgr_run qm set "$VMID" --scsihw virtio-scsi-pci --virtio0 "$disk,discard=on,cache=writeback"
   pmgr_run qm set "$VMID" --boot order=virtio0
-  pmgr_run qm set "$VMID" --ide2 "${CL[CI_STORAGE]}:cloudinit"
+  pmgr_run qm set "$VMID" "--${ARCH[CLOUDINIT_DRIVE]}" "${CL[CI_STORAGE]}:cloudinit"
   # autostart = riavvio dopo un crash; onboot = avvio con il nodo (le VM clonate lo ereditano: senza, non ripartono dopo il riavvio di un nodo)
   pmgr_run qm set "$VMID" --autostart 1 --onboot 1
   pmgr_run qm set "$VMID" --numa 1
@@ -289,7 +290,7 @@ step_finalize() {
     local cfg
     cfg="$(qm config "$VMID")"
     local k
-    for k in efidisk0 virtio0 ide2; do
+    for k in efidisk0 virtio0 "${ARCH[CLOUDINIT_DRIVE]}"; do
       grep -q "^$k:" <<<"$cfg" || pmgr_die "la VM $VMID e' incompleta (manca $k): rifai il passo template, non la trasformo in template"
     done
     [ -s "${CL[SNIPPETS_DIR]}/${OS[SNIPPET]}" ] || pmgr_die "snippet mancante: ${CL[SNIPPETS_DIR]}/${OS[SNIPPET]}"
@@ -305,6 +306,9 @@ step_finalize() {
   fi
   pmgr_run qm set "$VMID" --sshkeys "${CL[SSH_KEYS_FILE]}"
   pmgr_run qm set "$VMID" --nameserver "${CL[NAMESERVER]}"
+  if [ -n "${CL[TEMPLATE_IPCONFIG]}" ]; then
+    pmgr_run qm set "$VMID" --ipconfig0 "${CL[TEMPLATE_IPCONFIG]}"
+  fi
   pmgr_run qm template "$VMID"
   pmgr_log "template $VMID ${OS[TEMPLATE_NAME]} pronto"
 }
@@ -334,6 +338,7 @@ MODE=""
 TARGET=""
 FAMILY=""
 PROFILE_OPT=""
+ARCH_OPT=""
 RENDER_DIR=""
 
 while [ "$#" -gt 0 ]; do
@@ -353,6 +358,12 @@ while [ "$#" -gt 0 ]; do
     --profile)
       [ "$#" -ge 2 ] || { usage; exit 2; }
       PROFILE_OPT="$2"
+      shift 2
+      ;;
+    --arch)
+      [ "$#" -ge 2 ] || { usage; exit 2; }
+      [[ "$2" =~ ^(amd64|arm64)$ ]] || pmgr_die "--arch deve essere amd64 o arm64"
+      ARCH_OPT="$2"
       shift 2
       ;;
     --render)
@@ -384,6 +395,14 @@ if [ -n "$RENDER_DIR" ]; then
   [ "$MODE" != list ] || { echo "--render e --list non vanno insieme" >&2; exit 2; }
 fi
 
+if [ -n "$RENDER_DIR" ]; then
+  # Il manager genera gli snippet anche senza dpkg: nessun hardware dipende dal render.
+  # Senza override, amd64 serve solo a validare i campi immagine inutilizzati.
+  pmgr_load_arch "${ARCH_OPT:-amd64}"
+else
+  pmgr_load_arch "$ARCH_OPT"
+fi
+
 if [ -n "$RENDER_DIR" ] && ! [ -r "$PMGR_CLUSTER_CONF" ]; then
   # --render genera solo testo e non ha bisogno del cluster: se cluster.conf non e' leggibile (sulla sorgente della
   # sincronizzazione e' di root 0600 e pmgr-sync non lo legge) si usa "standard"; chi vuole un profilo preciso
@@ -398,7 +417,9 @@ if [ "$MODE" = list ]; then
   pmgr_all_os_ids
   for id in "${PMGR_IDS[@]}"; do
     pmgr_load_os "$id"
-    printf '%-14s VMID %-6s %-8s %s\n' "$id" "$VMID" "${OS[FAMILY]}" "${OS[LABEL]}"
+    available=disponibile
+    if ! pmgr_os_available; then available='non disponibile'; fi
+    printf '%-14s VMID %-6s %-8s %s (%s: %s)\n' "$id" "$VMID" "${OS[FAMILY]}" "${OS[LABEL]}" "$PMGR_ARCH" "$available"
   done
   exit 0
 fi
@@ -434,6 +455,21 @@ if [ -n "$RENDER_DIR" ]; then
   pmgr_cleanup
   exit 0
 fi
+
+AVAILABLE_IDS=()
+for id in "${IDS[@]}"; do
+  pmgr_load_os "$id"
+  if pmgr_os_available; then
+    AVAILABLE_IDS+=("$id")
+  elif [ "$MODE" = one ]; then
+    pmgr_die "$id non disponibile per l'architettura $PMGR_ARCH (ARCHES=${OS[ARCHES]})"
+  else
+    pmgr_log "$id saltata: non disponibile per l'architettura $PMGR_ARCH (ARCHES=${OS[ARCHES]})"
+  fi
+done
+IDS=("${AVAILABLE_IDS[@]}")
+# Un gruppo senza release compatibili non richiede alcuna operazione sul nodo.
+[ "${#IDS[@]}" -gt 0 ] || exit 0
 
 if [ "$PMGR_DRY" != 1 ]; then
   [ "$(id -u)" = 0 ] || pmgr_die "va lanciato come root (oppure usa --dry-run)"

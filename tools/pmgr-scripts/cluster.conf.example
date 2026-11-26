@@ -28,3 +28,7 @@ PASSWORD_FILE=/etc/pmgr/template-password
 # CPU_TYPE=host
 # DISK_SIZE=32G
 # MEMORY_MB=1024
+# Vuoto (predefinito): nessun ipconfig nel template.
+# TEMPLATE_IPCONFIG=
+# Unica alternativa: DHCP sulle VM clonate anche a mano.
+# TEMPLATE_IPCONFIG=ip=dhcp

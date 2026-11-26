@@ -22,6 +22,7 @@ pmgr-scripts/
   bin/pmgr-os.sh           crea/aggiorna i template (una release, una famiglia, tutte)
   bin/pmgr-add-release.sh  aggiunge una release nuova (os.d + snippets.d)
   lib/pmgr-lib.sh          funzioni comuni (configurazione, controlli, lock, download)
+  arch.d/<arch>.conf       macchina e disco cloud-init per amd64 e arm64
   os.d/<id>.conf           una per release: ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, debian-12,
                            debian-13, rocky-8, rocky-9
   snippets.d/<id>.yaml     corpo dello snippet cloud-init di ogni release
@@ -44,6 +45,28 @@ bin/pmgr-os.sh --family rocky               # tutte le release Rocky abilitate
 
 Il VMID di un template e' `VMID_BASE` (cluster.conf) + `SLOT` (os.d): con 1000 si ottengono gli stessi
 1001-1007 di oggi. Una release si esclude dagli aggiornamenti con `ENABLED=0` nel suo file.
+
+## Architetture (amd64 e arm64)
+
+Gli stessi file funzionano su entrambe le architetture, rilevate con `dpkg --print-architecture` sul nodo.
+Altre architetture sono rifiutate prima di chiamare `qm`. `--arch amd64|arm64` forza la scelta, anche per
+`--list`, `--dry-run` e `--render` eseguiti su un'altra macchina.
+`arch.d/amd64.conf` usa macchina `q35` e cloud-init su `ide2`; `arch.d/arm64.conf` usa `virt` e `scsi2`.
+Entrambi i file sono validati con whitelist e mai eseguiti.
+
+In `os.d/*.conf`, `IMAGE_URL`, `IMAGE_FILE` e `IMAGE_CHECKSUM_URL` ammettono `{arch}` (`amd64` o `arm64`)
+e `{march}` (`x86_64` o `aarch64`), sostituiti prima della validazione di URL e nomi file.
+Ubuntu 22.04/24.04/26.04 e Debian 12/13 usano `{arch}` in URL e nome dell'immagine;
+Rocky 8/9/10 usa `{march}` nella directory e nel nome dell'immagine. Gli URL dei checksum restano invariati.
+La chiave facoltativa `ARCHES=amd64 arm64` e' il default; `ARCHES=amd64` o `ARCHES=arm64` limita una release.
+`--list` mostra la disponibilita' per l'architettura scelta; `--all` e `--family` segnalano e saltano le release
+incompatibili, mentre una richiesta per ID le rifiuta. `--render` genera tutti gli snippet selezionati anche
+se `ARCHES` li esclude: contenuto e insieme degli snippet restano indipendenti dall'architettura, come richiesto dal sync.
+Il render non richiede `dpkg`: senza override usa amd64 solo per validare i campi immagine inutilizzati.
+
+In `/etc/pmgr/cluster.conf`, `TEMPLATE_IPCONFIG` vuoto o assente conserva il comportamento precedente.
+L'unico valore non vuoto ammesso e' `TEMPLATE_IPCONFIG=ip=dhcp`: nella finalizzazione esegue
+`qm set <vmid> --ipconfig0 ip=dhcp` prima di `qm template`. Serve anche alle clonazioni manuali.
 
 ## Aggiungere una release nuova
 
