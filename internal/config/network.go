@@ -20,6 +20,8 @@ type NetworkSettings struct {
 	// SnippetProfile: cloud-init snippets the manager delivers to the nodes of this cluster (D90): "standard" or
 	// "hosting" (key-only SSH, firewall, hardening). Empty is read as "standard".
 	SnippetProfile string `json:"snippet_profile"`
+	// IPMode controls addressing for new VMs: static (default), dhcp or both.
+	IPMode string `json:"ip_mode"`
 }
 
 type VMNetwork struct {
@@ -141,7 +143,15 @@ func ValidNetworkSettings(n *NetworkSettings) error {
 	if profile != "standard" && profile != "hosting" {
 		return errors.New("profilo degli snippet non valido (standard o hosting)")
 	}
+	mode := n.IPMode
+	if mode == "" {
+		mode = "static"
+	}
+	if mode != "static" && mode != "dhcp" && mode != "both" {
+		return errors.New("ip_mode non valido (static, dhcp o both)")
+	}
 	n.Networks, n.DNS, n.SearchDomain, n.ManagerFrom, n.SnippetProfile = networks, dns, domain, from, profile
+	n.IPMode = mode
 	return nil
 }
 

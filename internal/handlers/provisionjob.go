@@ -52,8 +52,9 @@ var provTiming = struct {
 	SettlePoll time.Duration
 	// DiskScanWait: pause between two searches for the new disk in the guest
 	DiskScanWait time.Duration
+	DHCPRetry    time.Duration // pause before the second guest IPv4 read
 	Keep         time.Duration // a finished procedure stays readable this long
-}{15 * time.Minute, 5 * time.Minute, 10 * time.Minute, 10 * time.Second, 15 * time.Minute, 5 * time.Second, 2 * time.Second, time.Hour}
+}{15 * time.Minute, 5 * time.Minute, 10 * time.Minute, 10 * time.Second, 15 * time.Minute, 5 * time.Second, 2 * time.Second, 10 * time.Second, time.Hour}
 
 // phases and results (codes: the page writes the sentences)
 const (
@@ -97,6 +98,7 @@ type provReq struct {
 	DiskGB       int       `json:"disk_gb"` // desired total size of disk_device; 0 = as the template
 	DiskDevice   string    `json:"disk_device"`
 	IP           string    `json:"ip"` // a.b.c.d[/nn]; "" = leave the template's
+	DHCP         bool      `json:"dhcp"`
 	Gateway      string    `json:"gateway"`
 	SearchDomain string    `json:"search_domain"`
 	DNS          string    `json:"dns"` // up to 3 addresses, space or comma separated
@@ -167,7 +169,12 @@ func validateProvReq(r provReq) (provPlan, error) {
 	if !diskDevPattern.MatchString(p.DiskDevice) {
 		return bad("dispositivo del disco")
 	}
-	if r.IP != "" {
+	if r.DHCP && (r.IP != "" || r.Gateway != "") {
+		return provPlan{}, errors.New("con il DHCP non si indicano IP e gateway")
+	}
+	if r.DHCP {
+		p.ipcfg = "ip=dhcp"
+	} else if r.IP != "" {
 		ip := r.IP
 		if !strings.Contains(ip, "/") {
 			ip += "/24"
@@ -421,6 +428,7 @@ type provJob struct {
 	vmid      int
 	node      string
 	name      string
+	ip        string
 	card      string // reserved card key ("" = none)
 	steps     []provStep
 	warnings  []string
@@ -437,6 +445,7 @@ type provView struct {
 	VMID      int        `json:"vmid"`
 	Node      string     `json:"node"`
 	Name      string     `json:"name"`
+	IP        string     `json:"ip,omitempty"`
 	Steps     []provStep `json:"steps"`
 	Warnings  []string   `json:"warnings"`
 	StartedAt int64      `json:"started_at"`
@@ -446,7 +455,7 @@ func (j *provJob) view() provView {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	return provView{ID: j.ID, Phase: j.phase, Result: j.result, FailedAt: j.failedAt, VMCreated: j.vmCreated, VMID: j.vmid,
-		Node: j.node, Name: j.name, Steps: append([]provStep{}, j.steps...), Warnings: append([]string{}, j.warnings...), StartedAt: j.started.Unix()}
+		Node: j.node, Name: j.name, IP: j.ip, Steps: append([]provStep{}, j.steps...), Warnings: append([]string{}, j.warnings...), StartedAt: j.started.Unix()}
 }
 
 func (j *provJob) enter(phase string) {
@@ -561,6 +570,7 @@ type provAPI interface {
 	VMClone(node string, vmid, newid int, params url.Values) (json.RawMessage, error)
 	VMResizeDisk(node string, vmid int, disk, size string) (json.RawMessage, error)
 	VMSetCloudInit(node string, vmid int, params url.Values) (json.RawMessage, error)
+	GetVMNetworkInterfaces(node string, vmid int) (json.RawMessage, error)
 }
 
 var _ provAPI = (*api.Client)(nil)
@@ -740,6 +750,11 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		}
 	}()
 	node, vmid := p.TargetNode, p.NewVMID
+	if !p.DHCP && p.IP != "" {
+		j.mu.Lock()
+		j.ip = strings.SplitN(p.IP, "/", 2)[0]
+		j.mu.Unlock()
+	}
 
 	// 1. clone, directly on the target node (D56)
 	j.enter(provPhClone)
@@ -894,6 +909,9 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 		if p.disk2 != nil { // formatting needs the guest: the disk stays attached and empty
 			j.warn("mount_skipped", provPhMount, coldMsg("la VM non e' stata avviata: il disco e' collegato ma non formattato"))
 		}
+		if p.DHCP {
+			j.warn("dhcp_ip_unknown", provPhAgent, nil)
+		}
 		j.finish()
 		return
 	}
@@ -909,7 +927,7 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	markStarted(j.Cluster, node, "qemu", vmid, time.Now())
 	releasePending(j.ID)
 	mountWanted := p.disk2 != nil
-	if p.ExtraUser == nil && !mountWanted {
+	if p.ExtraUser == nil && !mountWanted && !p.DHCP {
 		j.finish()
 		return
 	}
@@ -941,6 +959,9 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 			what = "il montaggio del disco"
 		}
 		j.warn("agent_timeout", provPhAgent, coldMsg("il guest agent non ha risposto in 20 minuti: "+what+" si fanno dal pannello della VM"))
+		if p.DHCP {
+			j.warn("dhcp_ip_unknown", provPhAgent, nil)
+		}
 		j.finish()
 		return
 	}
@@ -950,15 +971,21 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	// reboots: whatever runs in the guest in that window can be killed half way (user created
 	// without sudo). Wait until cloud-init has finished in the current boot.
 	var diskProbeErr error
-	needSettle := userProbeErr == nil
+	needSettle := p.DHCP || userProbeErr == nil
 	if userProbeErr != nil && mountWanted {
 		_, diskProbeErr = diskTool.probeHelper(c, node, vmid)
-		needSettle = diskProbeErr == nil
+		needSettle = p.DHCP || diskProbeErr == nil
 	}
 	if needSettle && !waitGuestSettled(c, node, vmid, provTiming.Settle, provTiming.SettlePoll) {
 		j.warn("cloud_init_timeout", provPhAgent, coldMsg("cloud-init non e' terminato in tempo: nella VM non ho toccato niente, utente e disco si fanno dal pannello della VM"))
+		if p.DHCP {
+			j.warn("dhcp_ip_unknown", provPhAgent, nil)
+		}
 		j.finish()
 		return
+	}
+	if p.DHCP {
+		j.readDHCPIP(c, node, vmid)
 	}
 
 	// 9. additional user: same script and rules as the "Aggiungi utente" button
@@ -1005,7 +1032,57 @@ func runProv(c provAPI, j *provJob, p provPlan, createLock *sync.Mutex, optionsF
 	j.finish()
 }
 
+// readDHCPIP runs only after cloud-init has settled. Guest data uses the same bounded normalizer as netinfo.
+func (j *provJob) readDHCPIP(c provAPI, node string, vmid int) {
+	for attempt := 0; attempt < 2; attempt++ {
+		if attempt > 0 {
+			time.Sleep(provTiming.DHCPRetry)
+		}
+		raw, err := c.GetVMNetworkInterfaces(node, vmid)
+		if err != nil {
+			continue // the agent may be restarting: try once more, without exposing its error
+		}
+		ip := normalizeNetInfo(raw).PrimaryIPv4
+		if ip == "" {
+			continue
+		}
+		j.mu.Lock()
+		j.ip = ip
+		for i := range j.steps {
+			if j.steps[i].Phase == provPhAgent && j.steps[i].OK {
+				j.steps[i].Note = "IP assegnato dal DHCP: " + ip
+				break
+			}
+		}
+		j.mu.Unlock()
+		return
+	}
+	j.warn("dhcp_ip_unknown", provPhAgent, nil)
+}
+
 // ── HTTP ──────────────────────────────────────────────────────────────────────
+
+// validateProvClusterReq applies the selected cluster's policy before any Proxmox operation.
+func validateProvClusterReq(req provReq, network *config.NetworkSettings) (provPlan, error) {
+	mode := "static"
+	if network != nil && network.IPMode != "" {
+		mode = network.IPMode
+	}
+	if mode == "dhcp" {
+		if req.IP != "" && !req.DHCP {
+			return provPlan{}, errors.New("il cluster usa il DHCP: non indicare un IP")
+		}
+		req.DHCP = true
+	}
+	plan, err := validateProvReq(req)
+	if err != nil {
+		return provPlan{}, err
+	}
+	if mode == "static" && req.DHCP {
+		return provPlan{}, errors.New("il cluster usa indirizzi statici: DHCP non abilitato in Impostazioni, Infrastruttura")
+	}
+	return plan, nil
+}
 
 // PostProvisionJob: POST /api/provision/job  body: provReq. 202 {job} or 400 / 409 {error, reason, reasons}.
 func (h *Handler) PostProvisionJob(w http.ResponseWriter, r *http.Request) {
@@ -1017,14 +1094,14 @@ func (h *Handler) PostProvisionJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("richiesta non valida"), http.StatusBadRequest)
 		return
 	}
-	plan, err := validateProvReq(req)
+	idx := clusterIdx(r)
+	cl, clusterErr := config.GetCluster(idx)
+	plan, err := validateProvClusterReq(req, cl.Network)
 	if err != nil {
 		writeError(w, err, http.StatusBadRequest)
 		return
 	}
-	idx := clusterIdx(r)
-	cl, err := config.GetCluster(idx)
-	if err != nil || cl.URL == "" {
+	if clusterErr != nil || cl.URL == "" {
 		writeError(w, errors.New("cluster non configurato"), http.StatusBadRequest)
 		return
 	}

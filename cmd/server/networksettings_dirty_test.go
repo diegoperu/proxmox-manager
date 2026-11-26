@@ -20,7 +20,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 function element(){return {value:'',textContent:'',innerHTML:'',hidden:false,disabled:false,style:{},events:{},options:[],classList:{contains:()=>false,toggle(){}},setAttribute(){},removeAttribute(){},focus(){},addEventListener(event,fn){this.events[event]=fn;},querySelector:()=>null,querySelectorAll:()=>[]};}
 const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
 global.Auth={locked:false,role:'admin'};global.RoleUI={readonly(){},canPage:()=>true};global._IS_CONSOLE=false;
-global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:selector==='#ns-manager-from [data-manager-from]'?get('ns-manager-from').children:selector==='#ns-profile-seg button'?profilePicks:[],querySelector:()=>null};
+global.document={hidden:false,activeElement:null,getElementById:get,querySelectorAll:selector=>selector==='#ns-networks [data-network]'?get('ns-networks').children:selector==='#ns-manager-from [data-manager-from]'?get('ns-manager-from').children:selector==='#ns-profile-seg button'?profilePicks:selector==='#ns-ip-mode-seg button'?modePicks:[],querySelector:()=>null};
 global.window={addEventListener:(event,fn)=>listeners[event]=fn};
 global.location={hash:'#/settings/infra'};
 global.history={pushState(a,b,h){location.hash=h;},replaceState(a,b,h){location.hash=h;}};
@@ -37,6 +37,8 @@ global.UpdateUI={load(){}};
 const ui=NetworkSettingsUI;
 const profilePicks=['standard','hosting'].map(profile=>({...element(),dataset:{profile}}));
 const profileButton=profile=>({target:{closest:()=>({hasAttribute:a=>a==='data-profile',dataset:{profile}})}});
+const modePicks=['static','dhcp','both'].map(ipMode=>({...element(),dataset:{ipMode}}));
+const modeButton=ipMode=>({target:{closest:()=>({hasAttribute:a=>a==='data-ip-mode',dataset:{ipMode}})}});
 const empty=()=>({networks:[],dns:[],search_domain:''});
 function row(value){
  const controls={cidr:{value:value.cidr,focus(){}},gateway:{value:value.gateway}};
@@ -49,6 +51,7 @@ ui.render=settings=>{
  nodes.set('ns-networks',root);get('ns-dns').value=settings.dns.join(' ');get('ns-search').value=settings.search_domain;get('ns-save-error').textContent='';
  nodes.set('ns-manager-from',{...element(),children:(settings.manager_from??[]).map(managerRow),querySelectorAll(){return this.children;},insertAdjacentHTML(){this.children.push(managerRow(''));this.lastElementChild=this.children.at(-1);}});
  get('ns-profile').value=settings.snippet_profile||'standard';
+ get('ns-ip-mode').value=settings.ip_mode||'static';
  render(settings);
 };
 const edit=(id,value)=>{get(id).value=value;get('ns-form').events.input();};
@@ -63,6 +66,21 @@ let saved=empty();global.api=async()=>structuredClone(saved);
  assert.equal(get('ns-heading').innerHTML,'Infrastruttura · &lt;Cluster &amp; &quot;test&quot;&gt;');
  assert(get('ns-editor').innerHTML.includes('<details class="rs-section" open>'));
  assert(get('ns-editor').innerHTML.includes('role="alert"'));
+ assert(get('ns-editor').innerHTML.includes('Indirizzi delle VM nuove'));
+ assert(get('ns-editor').innerHTML.includes('data-ip-mode="static" class="on" aria-pressed="true"'));
+ assert.equal(ui.read().ip_mode,'static');
+ for(const role of ['reader','operator']){Auth.role=role;ui.click(modeButton('dhcp'));assert.equal(ui.read().ip_mode,'static');assert(!ui.isDirty());}
+ Auth.role='admin';ui.click(modeButton('unexpected'));assert(!ui.isDirty());
+ for(const mode of ['dhcp','both']){
+  ui.click(modeButton(mode));assert(ui.isDirty());assert.equal(ui.read().ip_mode,mode);
+  assert(ui.guardLeave(()=>{}));assert.equal(confirmation.options.level,'warn');
+  global.api=async(path,options)=>{saved=JSON.parse(options.body);assert.equal(saved.ip_mode,mode);return {status:'ok'};};
+  await ui.save();assert(!ui.isDirty());
+  ui.click(modeButton('static'));assert(ui.isDirty());global.api=async()=>structuredClone(saved);await ui.cancel();
+  assert.equal(ui.read().ip_mode,mode);assert(!ui.isDirty());
+  assert(get('ns-editor').innerHTML.includes('data-ip-mode="'+mode+'" class="on" aria-pressed="true"'));
+ }
+ ui.render(empty());
  assert(get('ns-editor').innerHTML.includes('Profilo degli snippet'));
  assert(get('ns-editor').innerHTML.includes('data-profile="standard" class="on" aria-pressed="true"'));
  assert(get('ns-editor').innerHTML.includes('<p class="role-readonly">Profilo: Standard</p>'));

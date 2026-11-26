@@ -20,7 +20,7 @@ func TestNetworkSettingsAPI(t *testing.T) {
 	r.Put("/api/clusters/{idx}", h.UpdateCluster)
 	path := "/api/clusters/0/network-settings"
 	w := reportRequest(r, "GET", path, "")
-	if w.Code != 200 || w.Body.String() != `{"networks":[],"dns":[],"search_domain":"","manager_from":[],"snippet_profile":"standard"}`+"\n" {
+	if w.Code != 200 || w.Body.String() != `{"networks":[],"dns":[],"search_domain":"","manager_from":[],"snippet_profile":"standard","ip_mode":"static"}`+"\n" {
 		t.Fatalf("empty %d %s", w.Code, w.Body)
 	}
 	body := `{"networks":[{"cidr":"10.75.4.0/24","gateway":"10.75.4.254"}],"dns":["2001:0DB8::1"],"search_domain":"EXAMPLE.COM"}`
@@ -63,5 +63,30 @@ func TestNetworkSettingsAPI(t *testing.T) {
 	var got config.NetworkSettings
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || !reflect.DeepEqual(&got, want) {
 		t.Fatalf("GET %v %+v", err, got)
+	}
+	for _, mode := range []string{"dhcp", "both", "static", ""} {
+		w = reportRequest(r, "PUT", path, `{"ip_mode":"`+mode+`"}`)
+		if w.Code != 200 {
+			t.Fatalf("mode %q: %d %s", mode, w.Code, w.Body)
+		}
+		if err := config.Load(); err != nil {
+			t.Fatal(err)
+		}
+		w = reportRequest(r, "GET", path, "")
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		expected := mode
+		if expected == "" {
+			expected = "static"
+		}
+		if w.Code != 200 || got.IPMode != expected || config.Get().Clusters[0].Network.IPMode != expected {
+			t.Fatalf("mode round trip %q: %d %+v", mode, w.Code, got)
+		}
+	}
+	for _, body := range []string{`{"ip_mode":"DHCP"}`, `{"ip_mode":"unexpected"}`, `{"ip_mode":true}`} {
+		if w := reportRequest(r, "PUT", path, body); w.Code != 400 {
+			t.Fatalf("invalid ip_mode accepted: %d", w.Code)
+		}
 	}
 }

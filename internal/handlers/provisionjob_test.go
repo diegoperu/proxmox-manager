@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"proxmox-manager/internal/config"
 )
 
 // fakeProv is an in-memory cluster for the creation procedure: two nodes of 100 GB / 16 threads, a shared
@@ -38,7 +40,11 @@ type fakeProv struct {
 	userExit        int
 	settlePending   int // number of settle probes that still answer "pending" (cloud-init running)
 	settleProbes    int
-	settleAt        []int // exec count when a settle probe ran (to check order against the user step)
+	settleAt        []int             // exec count when a settle probe ran (to check order against the user step)
+	networkAnswers  []json.RawMessage // successive agent replies; nil entries simulate an agent error
+	networkReads    int
+	networkSettled  []int // completed settle probes at each network read
+	networkReadAt   []time.Time
 	failClone       bool
 	failStart       int // the next N start requests fail
 	onClone         func()
@@ -370,6 +376,27 @@ func (f *fakeProv) AgentExec(node string, id int, args []string) (json.RawMessag
 	f.execs = append(f.execs, args)
 	return json.RawMessage(`{"pid":` + strconv.Itoa(len(f.execs)) + `}`), nil
 }
+func (f *fakeProv) GetVMNetworkInterfaces(node string, id int) (json.RawMessage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.networkReads++
+	f.networkSettled = append(f.networkSettled, f.settleProbes)
+	f.networkReadAt = append(f.networkReadAt, time.Now())
+	if !f.agentUp || time.Now().Before(f.agentFrom) {
+		return nil, errors.New("agent unavailable")
+	}
+	if len(f.networkAnswers) > 0 {
+		i := f.networkReads - 1
+		if i >= len(f.networkAnswers) {
+			i = len(f.networkAnswers) - 1
+		}
+		if f.networkAnswers[i] == nil {
+			return nil, errors.New("agent unavailable")
+		}
+		return f.networkAnswers[i], nil
+	}
+	return json.RawMessage(`{"result":[{"name":"lo","ip-addresses":[{"ip-address":"127.0.0.1"}]},{"name":"docker0","ip-addresses":[{"ip-address":"172.17.0.1"}]},{"name":"ens18","ip-addresses":[{"ip-address":"192.0.2.42"}]}]}`), nil
+}
 func (f *fakeProv) AgentExecStatus(node string, id, pid int) (json.RawMessage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -428,6 +455,7 @@ func provFast(t *testing.T) {
 	old := provTiming
 	provTiming.Clone, provTiming.Task, provTiming.Agent, provTiming.AgentPoll = time.Second, time.Second, 40*time.Millisecond, 5*time.Millisecond
 	provTiming.DiskScanWait = time.Millisecond
+	provTiming.DHCPRetry = time.Millisecond
 	provTiming.Settle, provTiming.SettlePoll = 400*time.Millisecond, 3*time.Millisecond
 	oldPoll := guestPollInterval
 	guestPollInterval = 2 * time.Millisecond // each guest command polls for its result
@@ -1397,5 +1425,209 @@ func TestProvisionNeverAcrossArchitectures(t *testing.T) {
 	}
 	if v := waitProv(t, j); v.Result != provOK {
 		t.Fatalf("%+v", v)
+	}
+}
+
+func TestProvisionDHCP(t *testing.T) {
+	if provTiming.DHCPRetry != 10*time.Second {
+		t.Fatalf("DHCP retry must wait 10 seconds, got %v", provTiming.DHCPRetry)
+	}
+	provFast(t)
+	for _, tc := range []struct {
+		name    string
+		answers []json.RawMessage
+		wantIP  string
+		reads   int
+	}{
+		{name: "primary IPv4", wantIP: "192.0.2.42", reads: 1},
+		{name: "retry after error", answers: []json.RawMessage{nil, json.RawMessage(`{"result":[{"name":"eth0","ip-addresses":[{"ip-address":"198.51.100.7"}]}]}`)}, wantIP: "198.51.100.7", reads: 2},
+		{name: "retry after empty", answers: []json.RawMessage{json.RawMessage(`{"result":[]}`), json.RawMessage(`{"result":[{"name":"eth0","ip-addresses":[{"ip-address":"203.0.113.8"}]}]}`)}, wantIP: "203.0.113.8", reads: 2},
+		{name: "agent error", answers: []json.RawMessage{nil}, reads: 2},
+		{name: "invalid data", answers: []json.RawMessage{json.RawMessage(`{"result":"<script>"}`)}, reads: 2},
+		{name: "no primary IPv4", answers: []json.RawMessage{json.RawMessage(`{"result":[{"name":"lo","ip-addresses":[{"ip-address":"127.0.0.1"}]},{"name":"docker0","ip-addresses":[{"ip-address":"172.17.0.1"}]},{"name":"eth0","ip-addresses":[{"ip-address":"169.254.1.2"},{"ip-address":"2001:db8::1"},{"ip-address":"<script>"}]}]}`)}, reads: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFakeProv()
+			f.networkAnswers = tc.answers
+			f.settlePending = 2
+			r := baseReq()
+			r.DHCP, r.IP, r.Gateway, r.DNS = true, "", "", ""
+			p := mustPlanProv(t, r)
+			if p.ipcfg != "ip=dhcp" {
+				t.Fatalf("plan: %+v", p)
+			}
+			j, err := startProv(f, 0, "C", p, noOpts, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			v := waitProv(t, j)
+			if v.IP != tc.wantIP || f.cloudInit.Get("ipconfig0") != "ip=dhcp" || f.cloudInit.Has("nameserver") {
+				t.Fatalf("DHCP result: %+v, cloud-init: %v", v, f.cloudInit)
+			}
+			if f.networkReads != tc.reads {
+				t.Fatalf("network reads %d, want %d", f.networkReads, tc.reads)
+			}
+			if tc.reads == 2 && f.networkReadAt[1].Sub(f.networkReadAt[0]) < provTiming.DHCPRetry {
+				t.Fatal("DHCP retry ran before the configured delay")
+			}
+			for _, probes := range f.networkSettled {
+				if probes < 2+settleStable {
+					t.Fatalf("network read before cloud-init settled: %v", f.networkSettled)
+				}
+			}
+			if tc.wantIP == "" {
+				if v.Result != provWarnings || len(v.Warnings) != 1 || v.Warnings[0] != "dhcp_ip_unknown" {
+					t.Fatalf("expected a warning, not failure: %+v", v)
+				}
+			} else {
+				if v.Result != provOK || len(v.Warnings) != 0 {
+					t.Fatalf("unexpected warning: %+v", v)
+				}
+				found := false
+				for _, s := range v.Steps {
+					if s.Phase == provPhAgent && s.OK && s.Note == "IP assegnato dal DHCP: "+tc.wantIP {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("missing DHCP agent note: %+v", v.Steps)
+				}
+			}
+			w := httptest.NewRecorder()
+			(&Handler{}).GetProvisionJob(w, httptest.NewRequest("GET", "/api/provision/job?id="+j.ID, nil))
+			var view map[string]interface{}
+			if err := json.Unmarshal(w.Body.Bytes(), &view); err != nil {
+				t.Fatal(err)
+			}
+			if tc.wantIP != "" && view["ip"] != tc.wantIP || tc.wantIP == "" && view["ip"] != nil {
+				t.Fatalf("view.ip: %v", view["ip"])
+			}
+		})
+	}
+}
+
+func TestProvisionDHCPAgentUnavailable(t *testing.T) {
+	provFast(t)
+	for _, scenario := range []string{"agent timeout", "cloud-init timeout", "stopped"} {
+		t.Run(scenario, func(t *testing.T) {
+			f := newFakeProv()
+			r := baseReq()
+			r.DHCP, r.IP, r.Gateway = true, "", ""
+			switch scenario {
+			case "agent timeout":
+				f.agentUp = false
+			case "cloud-init timeout":
+				f.settlePending = 100000
+			case "stopped":
+				no := false
+				r.Start = &no
+			}
+			j, err := startProv(f, 0, "C", mustPlanProv(t, r), noOpts, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			v := waitProv(t, j)
+			if v.Result != provWarnings || v.IP != "" || !containsStr(v.Warnings, "dhcp_ip_unknown") || f.networkReads != 0 {
+				t.Fatalf("unexpected unavailable IP result: %+v", v)
+			}
+		})
+	}
+}
+
+func TestProvisionStaticIPView(t *testing.T) {
+	provFast(t)
+	for _, address := range []string{"10.75.4.20/24", "10.75.4.20"} {
+		f := newFakeProv()
+		r := baseReq()
+		r.IP = address
+		j, err := startProv(f, 0, "C", mustPlanProv(t, r), noOpts, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		v := waitProv(t, j)
+		if v.Result != provOK || v.IP != "10.75.4.20" || f.networkReads != 0 || len(f.execs) != 0 {
+			t.Fatalf("static behavior changed: %+v", v)
+		}
+	}
+}
+
+func TestProvisionDHCPValidation(t *testing.T) {
+	for _, values := range [][2]string{{"10.75.4.20/24", ""}, {"", "10.75.4.1"}, {"invalid", "invalid"}} {
+		r := baseReq()
+		r.DHCP, r.IP, r.Gateway = true, values[0], values[1]
+		if _, err := validateProvReq(r); err == nil || err.Error() != "con il DHCP non si indicano IP e gateway" {
+			t.Fatalf("DHCP conflict: %v", err)
+		}
+	}
+}
+
+func TestProvisionClusterIPModes(t *testing.T) {
+	reportSettingsTestRouter(t)
+	provFast(t)
+	for _, tc := range []struct {
+		name, mode, ip, gateway string
+		dhcp, noSettings        bool
+		wantError, wantConfig   string
+	}{
+		{name: "legacy refuses DHCP", noSettings: true, dhcp: true, wantError: "il cluster usa indirizzi statici: DHCP non abilitato in Impostazioni, Infrastruttura"},
+		{name: "default refuses DHCP", dhcp: true, wantError: "il cluster usa indirizzi statici: DHCP non abilitato in Impostazioni, Infrastruttura"},
+		{name: "static refuses DHCP", mode: "static", dhcp: true, wantError: "il cluster usa indirizzi statici: DHCP non abilitato in Impostazioni, Infrastruttura"},
+		{name: "DHCP conflicts with IP", mode: "both", dhcp: true, ip: "192.0.2.20/24", wantError: "con il DHCP non si indicano IP e gateway"},
+		{name: "DHCP conflicts with gateway", mode: "both", dhcp: true, gateway: "192.0.2.1", wantError: "con il DHCP non si indicano IP e gateway"},
+		{name: "DHCP cluster refuses IP", mode: "dhcp", ip: "192.0.2.20/24", wantError: "il cluster usa il DHCP: non indicare un IP"},
+		{name: "DHCP cluster refuses invalid IP", mode: "dhcp", ip: "<script>", wantError: "il cluster usa il DHCP: non indicare un IP"},
+		{name: "DHCP cluster forces flag", mode: "dhcp", wantConfig: "ip=dhcp"},
+		{name: "DHCP cluster explicit flag", mode: "dhcp", dhcp: true, wantConfig: "ip=dhcp"},
+		{name: "DHCP cluster gateway refused", mode: "dhcp", gateway: "192.0.2.1", wantError: "con il DHCP non si indicano IP e gateway"},
+		{name: "both accepts DHCP", mode: "both", dhcp: true, wantConfig: "ip=dhcp"},
+		{name: "both accepts static", mode: "both", ip: "192.0.2.20/24", gateway: "192.0.2.1", wantConfig: "ip=192.0.2.20/24,gw=192.0.2.1"},
+		{name: "both empty leaves template", mode: "both"},
+		{name: "static unchanged", mode: "static", ip: "192.0.2.20/24", gateway: "192.0.2.1", wantConfig: "ip=192.0.2.20/24,gw=192.0.2.1"},
+		{name: "static empty unchanged", mode: "static"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFakeProv()
+			cfg := config.Get()
+			cfg.Clusters[0].URL = "https://pve.example"
+			cfg.Clusters[0].Network = nil
+			if !tc.noSettings {
+				cfg.Clusters[0].Network = &config.NetworkSettings{IPMode: tc.mode}
+			}
+			if err := config.Update(cfg); err != nil {
+				t.Fatal(err)
+			}
+			r := baseReq()
+			r.IP, r.Gateway, r.DHCP = tc.ip, tc.gateway, tc.dhcp
+			no := false
+			r.Start = &no
+			body, err := json.Marshal(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.wantError != "" {
+				w := httptest.NewRecorder()
+				(&Handler{}).PostProvisionJob(w, httptest.NewRequest("POST", "/api/provision/job", bytes.NewReader(body)))
+				var reply map[string]string
+				if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil {
+					t.Fatal(err)
+				}
+				if w.Code != 400 || reply["error"] != tc.wantError || f.log() != "" {
+					t.Fatalf("refusal %d %s, writes %s", w.Code, w.Body, f.log())
+				}
+				return
+			}
+			plan, err := validateProvClusterReq(r, config.Get().Clusters[0].Network)
+			if err != nil {
+				t.Fatal(err)
+			}
+			j, err := startProv(f, 0, "C", plan, noOpts, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			v := waitProv(t, j)
+			if v.Result == provFailed || f.cloudInit.Get("ipconfig0") != tc.wantConfig {
+				t.Fatalf("cloud-init %v, result %+v", f.cloudInit, v)
+			}
+		})
 	}
 }

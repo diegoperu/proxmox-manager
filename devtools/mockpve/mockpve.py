@@ -341,7 +341,7 @@ def route(path, query=None):
                 cfg["digest"] = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:40]  # come Proxmox: cambia se cambia il config
                 return cfg
             if seg[2] == "agent" and seg[3] == "network-get-interfaces":
-                if v["status"] != "running" or v["type"] != "qemu" or v["vmid"] % 14 == 0: return None  # agent muto
+                if v["status"] != "running" or v["type"] != "qemu" or (v["vmid"] % 14 == 0 and not v.get("cloned")): return None  # agent muto
                 return dict(result=[
                     {"name": "lo", "ip-addresses": [{"ip-address": "127.0.0.1", "ip-address-type": "ipv4", "prefix": 8}]},
                     {"name": "docker0", "ip-addresses": [{"ip-address": "172.17.0.1", "ip-address-type": "ipv4", "prefix": 16}]},
@@ -437,6 +437,8 @@ class H(BaseHTTPRequestHandler):
                 EXEC[pid] = (0, "" if (vm_id in NOBLANK and vm_id not in RESTARTED) else "vdb\n")
             elif any('[ -x "$1" ]' in c for c in cmd):
                 EXEC[pid] = (0, "INLINE\n")
+            elif any("boot-finished" in c for c in cmd):
+                EXEC[pid] = (0, "mock-boot finished\n")
             elif any("nvidia-smi --query-gpu=" in c for c in cmd) or (cmd and cmd[0].endswith("/gpuuse.sh")):
                 vm_id = path.split("/")[-3]
                 EXEC[pid] = fake_gpu_usage(int(vm_id)) if vm_id.isdigit() else (0, "")
@@ -488,7 +490,7 @@ class H(BaseHTTPRequestHandler):
             newid = form.get("newid", [""])[0]; tgt = form.get("target", [parts[1]])[0]
             if src is None or not newid.isdigit() or any(x["vmid"] == int(newid) for x in VMS) or tgt not in NODES or NODES[tgt]["status"] != "online":
                 return self._json({"data": None, "message": "clone refused"}, 500)
-            VMS.append(dict(src, vmid=int(newid), name=form.get("name", ["clone"])[0], node=tgt, status="stopped", mem=0, cpu=0, template=0, tags="", ip=""))
+            VMS.append(dict(src, vmid=int(newid), name=form.get("name", ["clone"])[0], node=tgt, status="stopped", mem=0, cpu=0, template=0, tags="", ip="", cloned=True))
             up = "UPID:%s:0000ABCD:00123456:65F0A1B2:qmclone:%s:root@pam!mock:" % (parts[1], parts[3])
             MIG_TASKS.pop(up, None)
             return self._json({"data": up}, 200)

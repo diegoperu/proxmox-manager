@@ -1463,9 +1463,17 @@ html.role-admin .role-readonly{display:none!important}
         <div>
           <h2 class="sec">3. Cloud-Init</h2>
           <div class="card mb14">
-            <div class="g g2 g8 mb12">
+            <div class="fr" id="pv-address-choice" hidden>
+              <span class="fl" id="pv-address-label">Indirizzo</span>
+              <div class="seg" role="group" aria-labelledby="pv-address-label">
+                <button type="button" id="pv-address-static" class="on" aria-pressed="true" onclick="Provision.setAddressMode('static')">Statico</button>
+                <button type="button" id="pv-address-dhcp" aria-pressed="false" onclick="Provision.setAddressMode('dhcp')">DHCP</button>
+              </div>
+            </div>
+            <p class="hint" id="pv-dhcp-note" role="status" hidden>Indirizzo dal DHCP della rete: lo leggo dal guest agent a fine creazione</p>
+            <div class="g g2 g8 mb12" id="pv-static-fields">
               <div class="fr">
-                <label class="fl" for="pv-ip">IP statico (CIDR obbligatorio)</label>
+                <label class="fl" id="pv-ip-label" for="pv-ip">IP statico (CIDR obbligatorio)</label>
                 <input class="inp w" id="pv-ip" type="text" placeholder="192.168.1.50/24" value="" title="Formato richiesto: IP/prefisso — es. 192.168.1.50/24" aria-describedby="pv-net-warning" oninput="Provision.calcGw()">
                 <div class="hint" id="pv-net-warning" role="status" hidden></div>
               </div>
@@ -6663,7 +6671,9 @@ function validateNetwork(settings){
   if(domain===null)throw new Error('dominio di ricerca non valido (lettere, cifre e trattini separati da punti)');
   const profile=settings?.snippet_profile??'';
   if(profile!==''&&profile!=='standard'&&profile!=='hosting')throw new Error('profilo degli snippet non valido (standard o hosting)');
-  return {networks:normalized,dns:addresses,search_domain:domain,manager_from:managerFrom,snippet_profile:profile||'standard'};
+  const mode=settings?.ip_mode??'';
+  if(!['','static','dhcp','both'].includes(mode))throw new Error('ip_mode non valido (static, dhcp o both)');
+  return {networks:normalized,dns:addresses,search_domain:domain,manager_from:managerFrom,snippet_profile:profile||'standard',ip_mode:mode||'static'};
 }
 function findNetwork(settings,ipOrCidr){
   const ip=typeof ipOrCidr==='string'&&ipOrCidr.includes('/')?parseCIDR(ipOrCidr)?.ip:parseIPv4(ipOrCidr);
@@ -6673,7 +6683,7 @@ function findNetwork(settings,ipOrCidr){
 // pmgr:network:end
 
 // pmgr:vmnet:begin
-function chooseNetwork({settings,ip='',typedGateway=null,typedDns=null,typedSearch=null,templateDns='',templateGw='',templateSearch='',label=''}){
+function chooseNetwork({settings,ip='',dhcp=false,typedGateway=null,typedDns=null,typedSearch=null,templateDns='',templateGw='',templateSearch='',label=''}){
   const networks=settings?.networks??[],network=findNetwork(settings,ip);
   const validIP=ip.includes('/')?parseCIDR(ip)!==null:parseIPv4(ip)!==null;
   let gateway=network?.gateway??'',warning='',hint='';
@@ -6687,13 +6697,14 @@ function chooseNetwork({settings,ip='',typedGateway=null,typedDns=null,typedSear
       if(typedGateway===null)hint='gateway indovinato: configura le reti in Impostazioni → Infrastruttura';
     }
   }
-  return {gateway:typedGateway??gateway,dns:typedDns??(settings?.dns?.length?settings.dns.join(' '):templateDns),search_domain:typedSearch??(settings?.search_domain||templateSearch),warning,hint};
+  return {gateway:dhcp?'':typedGateway??gateway,dns:typedDns??(settings?.dns?.length?settings.dns.join(' '):dhcp?'':templateDns),search_domain:typedSearch??(settings?.search_domain||templateSearch),warning:dhcp?'':warning,hint:dhcp?'':hint};
 }
 // pmgr:vmnet:end
 
 const Provision=(()=>{
   let templates=[], gwManual=false, dnsManual=false, searchManual=false, ipManual=false;
   let networkSettings=null,networkCluster=null,networkSeq=0,loadSeq=0,networkFailed=false,templateNetwork={};
+  let addressMode='static';
   // consiglio del nodo (GET /provision/advice): ultima risposta, scelta dell'utente, sequenza per scartare risposte superate
   let adv=null, advSeq=0, advTimer=null, manualNode='', manualCard='', job=null;
   const GB=1073741824, LABEL={clone:'Clonazione del template sul nodo scelto',config:'Core e RAM',disk:'Dimensione del disco',disk2:'Disco aggiuntivo collegato',mount:'Disco aggiuntivo formattato e montato',cloudinit:'Cloud-init',group:'Gruppo',gpu:'Scheda video',start:'Avvio',agent:'Attesa del guest agent',user:'Utente aggiuntivo'};
@@ -6716,6 +6727,8 @@ const Provision=(()=>{
   const CARD_REASON={card_busy:'in uso',no_mapping:'nessun mapping: la app assegna solo tramite mapping',card_reserved:'in creazione (prenotata da un\'altra creazione)',node_not_eligible:'il suo nodo non puo\' ricevere la VM'};
   const WARN={cpu_vcpu:'molte vCPU gia\' assegnate (oltre 4 per thread)',cpu_p95:'CPU reale gia\' alta (oltre l\'80%)'};
   const val=id=>document.getElementById(id).value.trim();
+  const dhcpSelected=()=>networkSettings?.ip_mode==='dhcp'||(networkSettings?.ip_mode==='both'&&addressMode==='dhcp');
+  const useDHCP=()=>dhcpSelected()||(networkSettings?.ip_mode==='both'&&!val('pv-ip'));
   const tplNow=()=>templates[parseInt(document.getElementById('tpl-select').value)];
   // storage del disco principale del template (default del disco aggiuntivo, D65 A)
   const tplMainStorage=tpl=>{const d=tpl&&tpl.config&&tpl.config[val('pv-diskdev')||'virtio0'];const i=typeof d==='string'?d.indexOf(':'):-1;return i>0?d.slice(0,i):'';};
@@ -6753,8 +6766,10 @@ const Provision=(()=>{
     resetNetwork(){
       networkSeq++;loadSeq++;networkCluster=null;networkSettings=null;templateNetwork={};networkFailed=false;
       gwManual=false;dnsManual=false;searchManual=false;ipManual=false;
+      addressMode='static';
       for(const id of ['pv-ip','pv-gw','pv-dns','pv-search'])document.getElementById(id).value='';
       for(const id of ['pv-net-warning','pv-net-hint']){const el=document.getElementById(id);el.textContent='';el.hidden=true;}
+      Provision.applyNetwork();
     },
     async loadNetwork(){
       const seq=++networkSeq,cluster=ClusterMgr.current;
@@ -6772,14 +6787,27 @@ const Provision=(()=>{
       Provision.applyNetwork();
     },
     applyNetwork(){
-      const result=chooseNetwork({settings:networkSettings,ip:val('pv-ip'),typedGateway:gwManual?val('pv-gw'):null,typedDns:dnsManual?val('pv-dns'):null,typedSearch:searchManual?val('pv-search'):null,...templateNetwork,label:ClusterMgr.currentLabel()??'cluster'});
-      document.getElementById('pv-gw').value=result.gateway;
+      const dhcp=dhcpSelected(),both=networkSettings?.ip_mode==='both';
+      document.getElementById('pv-address-choice').hidden=!both;
+      document.getElementById('pv-static-fields').hidden=dhcp;
+      document.getElementById('pv-dhcp-note').hidden=!dhcp;
+      document.getElementById('pv-ip-label').textContent=both?'IP statico (opzionale: vuoto = DHCP)':'IP statico (CIDR obbligatorio)';
+      for(const mode of ['static','dhcp']){
+        const button=document.getElementById('pv-address-'+mode),on=addressMode===mode;
+        button.classList.toggle('on',on);button.setAttribute('aria-pressed',on);
+      }
+      const result=chooseNetwork({settings:networkSettings,ip:val('pv-ip'),dhcp:useDHCP(),typedGateway:gwManual?val('pv-gw'):null,typedDns:dnsManual?val('pv-dns'):null,typedSearch:searchManual?val('pv-search'):null,...templateNetwork,label:ClusterMgr.currentLabel()??'cluster'});
+      if(!dhcp)document.getElementById('pv-gw').value=result.gateway;
       document.getElementById('pv-dns').value=result.dns;
       document.getElementById('pv-search').value=result.search_domain;
       for(const [id,text] of [['pv-net-warning',result.warning],['pv-net-hint',networkFailed?'':result.hint]]){
         const el=document.getElementById(id);el.textContent=text;el.hidden=!text;
       }
       Provision.summary();
+    },
+    setAddressMode(mode){
+      if(networkSettings?.ip_mode!=='both'||!['static','dhcp'].includes(mode))return;
+      addressMode=mode;Provision.applyNetwork();
     },
 
     onSelectTemplate(){
@@ -6830,7 +6858,7 @@ const Provision=(()=>{
         if(cfg.ipconfig0){
           const ipM=cfg.ipconfig0.match(/ip=([^,\s]+)/);
           const gwM=cfg.ipconfig0.match(/gw=([^,\s]+)/);
-          if(ipM&&ipM[1]!=='dhcp'&&!ipManual) document.getElementById('pv-ip').value=ipM[1];
+          if(ipM&&ipM[1]!=='dhcp'&&!ipManual&&!dhcpSelected()) document.getElementById('pv-ip').value=ipM[1];
           if(gwM) templateNetwork.templateGw=gwM[1];
         }
         if(cfg.sshkeys){try{document.getElementById('pv-ssh').value=decodeURIComponent(cfg.sshkeys);}catch{document.getElementById('pv-ssh').value=cfg.sshkeys;}}
@@ -6867,7 +6895,7 @@ const Provision=(()=>{
       line(`Clona ${tpl.name} (${tpl.vmid}, ${tpl.node}) in ${g('pv-name')||'— nome mancante —'} sul nodo ${Provision.target()||'— da scegliere —'}`);
       if(document.getElementById('pv-gpu').checked){const c=Provision.card();line(c?`Scheda video: ${c.name} (${c.addr}, mapping ${c.mappings[0]})`:'Scheda video: — da scegliere —');}
       line(`VMID ${g('pv-vmid')&&g('pv-vmid')!=='0'?g('pv-vmid'):'automatico'} · ${g('pv-cpu')||'?'} CPU · ${g('pv-ram')||'?'} GB RAM · disco ${g('pv-disk')?g('pv-disk')+' GB':'come il template'}`);
-      line(`Rete: ${g('pv-ip')||'IP non impostato'} · gateway: ${g('pv-gw')||'non impostato'} · DNS: ${g('pv-dns')||'non impostati'} · dominio: ${g('pv-search')||'non impostato'}`);
+      line(useDHCP()?`IP: DHCP · DNS: ${g('pv-dns')||'dalla rete (o dal template)'} · dominio: ${g('pv-search')||'non impostato'}`:`Rete: ${g('pv-ip')||'IP non impostato'} · gateway: ${g('pv-gw')||'non impostato'} · DNS: ${g('pv-dns')||'non impostati'} · dominio: ${g('pv-search')||'non impostato'}`);
       const networkWarning=document.getElementById('pv-net-warning').textContent;
       if(networkWarning)line(networkWarning,'wn');
       if(g('pv-group'))line(`Gruppo: ${g('pv-group')}`);
@@ -6879,7 +6907,7 @@ const Provision=(()=>{
     // Avanzamento: un passo e' completo quando i suoi campi obbligatori sono validi (stessa validazione del nome di run()).
     steps(tpl,g){
       const nameOk=/^[A-Za-z0-9]([A-Za-z0-9.-]{0,61}[A-Za-z0-9])?$/.test(g('pv-name'));
-      const d1=!!tpl, d2=d1&&nameOk&&!!g('pv-cpu')&&!!g('pv-ram'), d3=d2&&/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(g('pv-ip'));
+      const d1=!!tpl, d2=d1&&nameOk&&!!g('pv-cpu')&&!!g('pv-ram'), d3=d2&&(useDHCP()||/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(g('pv-ip')));
       const done=[d1,d2,d3,false], cur=done.findIndex(x=>!x);
       document.querySelectorAll('#pv-steps .pv-step').forEach((b,i)=>{
         b.classList.toggle('done',done[i]); b.classList.toggle('cur',i===cur);
@@ -6889,7 +6917,7 @@ const Provision=(()=>{
       });
     },
     goto(n){
-      const id={1:'tpl-select',2:'pv-name',3:'pv-ip',4:'pv-btn'}[n], el=document.getElementById(id);
+      const id={1:'tpl-select',2:'pv-name',3:dhcpSelected()?'pv-dns':'pv-ip',4:'pv-btn'}[n], el=document.getElementById(id);
       if(!el)return;
       el.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
       el.focus({preventScroll:true});
@@ -7014,7 +7042,7 @@ const Provision=(()=>{
         new_vmid: parseInt(val('pv-vmid'))||0, name: vmName,
         cores: parseInt(val('pv-cpu'))||2, memory: Math.round((parseFloat(val('pv-ram'))||4)*1024),
         disk_gb: parseInt(val('pv-disk'))||0, disk_device: val('pv-diskdev')||'virtio0',
-        ip: val('pv-ip'), gateway: val('pv-ip')?val('pv-gw'):'', dns: val('pv-dns'), search_domain: searchDomain,
+        ...(useDHCP()?{dhcp:true}:{ip:val('pv-ip'),gateway:val('pv-ip')?val('pv-gw'):''}), dns: val('pv-dns'), search_domain: searchDomain,
         ciuser: val('pv-user'), cipassword: document.getElementById('pv-pass').value, ssh_keys: document.getElementById('pv-ssh').value,
         group: grp, group_new: grpNew,
         gpu_mapping: card?card.mappings[0]:'',
@@ -7033,7 +7061,7 @@ const Provision=(()=>{
         line(`▶ Controllo e avvio della creazione di "${payload.name}" su ${node}…`);
         try{
           const r=await api('/provision/job',{method:'POST',body:JSON.stringify(payload),quiet:true,timeoutMs:120000});
-          job={id:r.job,vmid:r.vmid,node,name:payload.name,errs:0,cluster:ClusterMgr.current??0};
+          job={id:r.job,vmid:r.vmid,node,name:payload.name,dhcp:!!payload.dhcp,errs:0,cluster:ClusterMgr.current??0};
           Provision.pollJob();
         }catch(e){
           btn.disabled=false; btn.textContent='Provisiona VM';
@@ -7061,7 +7089,7 @@ const Provision=(()=>{
       const nodes=[line(`VM ${v.vmid} · ${v.name} · ${v.node}`)];
       for(const s of v.steps)nodes.push(line(`${s.ok?'✓':'⚠'} ${LABEL[s.phase]||s.phase}${s.note?' — '+s.note:''}`,s.ok?'ok':'wn'));
       if(v.phase!=='done'){nodes.push(line(`▶ ${LABEL[v.phase]||v.phase}…`));log.replaceChildren(...nodes);setTimeout(Provision.pollJob,2000);return;}
-      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto in 20 minuti: utente e montaggio del disco si fanno dal pannello della VM (Aggiungi utente, Aggiungi disco).',cloud_init_timeout:'La VM non ha finito la prima configurazione (cloud-init) nel tempo previsto: non ho toccato niente dentro la VM, utente e disco si aggiungono dal pannello della VM quando e\' pronta.',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.',mount_failed:'Il disco aggiuntivo e\' collegato ma non formattato o montato: completalo dal pannello della VM (Aggiungi disco).',mount_skipped:'Il disco aggiuntivo e\' collegato ma vuoto, perche\' la VM non e\' stata avviata: si formatta dal pannello della VM.'};
+      const WTXT={group_failed:'Il gruppo non e\' stato impostato: si imposta dal pannello della VM.',agent_timeout:'Il guest agent non ha risposto in 20 minuti: utente e montaggio del disco si fanno dal pannello della VM (Aggiungi utente, Aggiungi disco).',cloud_init_timeout:'La VM non ha finito la prima configurazione (cloud-init) nel tempo previsto: non ho toccato niente dentro la VM, utente e disco si aggiungono dal pannello della VM quando e\' pronta.',user_exists:'L\'utente aggiuntivo esiste gia\' nella VM: nessuna modifica.',user_failed:'L\'utente aggiuntivo non e\' stato creato: aggiungilo dal pannello della VM.',mount_failed:'Il disco aggiuntivo e\' collegato ma non formattato o montato: completalo dal pannello della VM (Aggiungi disco).',mount_skipped:'Il disco aggiuntivo e\' collegato ma vuoto, perche\' la VM non e\' stata avviata: si formatta dal pannello della VM.',dhcp_ip_unknown:'IP non letto dal guest agent: controllalo nella pagina della VM'};
       for(const w of v.warnings)nodes.push(line('⚠ '+(Object.hasOwn(WTXT,w)?WTXT[w]:w),'wn'));
       if(v.result==='failed'){
         nodes.push(line(`✗ La creazione si e' fermata alla fase "${LABEL[v.failed_phase]||v.failed_phase}".`,'er'));
@@ -7069,6 +7097,7 @@ const Provision=(()=>{
         toast('Creazione non riuscita','err');
       }else{
         nodes.push(line(v.result==='ok'?`✓ VM ${v.vmid} pronta su ${v.node}`:`✓ VM ${v.vmid} creata su ${v.node}, con avvisi`,'ok'));
+        if(v.ip)nodes.push(line(`IP: ${v.ip}${j.dhcp?' (dal DHCP)':''}`));
         toast(`VM ${v.name} creata`,'ok');
       }
       log.replaceChildren(...nodes);
@@ -8060,7 +8089,7 @@ const NetworkSettingsUI={
     try{return JSON.stringify(validateNetwork(value));}catch(e){return JSON.stringify(value);}
   },
   read(validate=true){
-    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim(),manager_from:[...document.querySelectorAll('#ns-manager-from [data-manager-from]')].map(row=>row.querySelector('input').value.trim()),snippet_profile:document.getElementById('ns-profile').value};
+    const value={networks:[...document.querySelectorAll('#ns-networks [data-network]')].map(row=>({cidr:row.querySelector('[data-key="cidr"]').value.trim(),gateway:row.querySelector('[data-key="gateway"]').value.trim()})),dns:document.getElementById('ns-dns').value.trim().split(/\s+/).filter(Boolean),search_domain:document.getElementById('ns-search').value.trim(),manager_from:[...document.querySelectorAll('#ns-manager-from [data-manager-from]')].map(row=>row.querySelector('input').value.trim()),snippet_profile:document.getElementById('ns-profile').value,ip_mode:document.getElementById('ns-ip-mode').value};
     return validate?validateNetwork(value):value;
   },
   isDirty(){return this.baseline!==null&&this.baseline!==this.serialize(this.read(false));},
@@ -8097,7 +8126,16 @@ const NetworkSettingsUI={
   render(settings){
     document.getElementById('ns-editor').innerHTML=`<form id="ns-form" novalidate><fieldset class="role-fields">
       <details class="rs-section" open><summary>Rete delle VM nuove</summary>
-        <p class="hint">Nuova VM sceglie il gateway dalla rete che contiene l'IP; il DNS e il dominio vengono da qui; il template conta solo se qui manca.</p>
+        <span class="fl" id="ns-ip-mode-heading">Indirizzi delle VM nuove</span>
+        <input type="hidden" id="ns-ip-mode" value="${esc(settings.ip_mode||'static')}">
+        <p class="role-readonly">Indirizzi: ${settings.ip_mode==='dhcp'?'DHCP':settings.ip_mode==='both'?'Entrambi':'Statico'}</p>
+        <div class="seg" id="ns-ip-mode-seg" role="group" aria-labelledby="ns-ip-mode-heading" aria-describedby="ns-ip-mode-help">
+          <button data-min-role="admin" type="button" data-ip-mode="static" class="${!settings.ip_mode||settings.ip_mode==='static'?'on':''}" aria-pressed="${!settings.ip_mode||settings.ip_mode==='static'}">Statico</button>
+          <button data-min-role="admin" type="button" data-ip-mode="dhcp" class="${settings.ip_mode==='dhcp'?'on':''}" aria-pressed="${settings.ip_mode==='dhcp'}">DHCP</button>
+          <button data-min-role="admin" type="button" data-ip-mode="both" class="${settings.ip_mode==='both'?'on':''}" aria-pressed="${settings.ip_mode==='both'}">Entrambi</button>
+        </div>
+        <p class="hint" id="ns-ip-mode-help">Statico: scrivi IP e gateway. DHCP: li assegna la rete. Entrambi: scegli nella pagina Nuova VM; IP vuoto = DHCP.</p>
+        <p class="hint">Con IP statico, Nuova VM sceglie il gateway dalla rete che contiene l'IP. DNS e dominio vengono da qui; il template conta solo se qui manca. In DHCP il DNS arriva dalla rete, salvo che sia indicato qui o nel template.</p>
         <div id="ns-networks">${settings.networks.map(value=>this.row(value)).join('')}</div>
         <button data-min-role="admin" type="button" class="btn bg2 sm" id="ns-add" data-add>Aggiungi rete</button>
         <div class="rs-grid"><label class="rs-field"><span>DNS (fino a 3, separati da spazi)</span><input class="inp" id="ns-dns" maxlength="137" value="${esc(settings.dns.join(' '))}" placeholder="es. 1.1.1.1 9.9.9.9" spellcheck="false" autocomplete="off"></label>
@@ -8131,6 +8169,15 @@ const NetworkSettingsUI={
   },
   click(e){
     const button=e.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-ip-mode')){
+      const mode=button.dataset.ipMode;
+      if(!canDo(Auth.role,'admin')||!['static','dhcp','both'].includes(mode))return;
+      document.getElementById('ns-ip-mode').value=mode;
+      for(const pick of document.querySelectorAll('#ns-ip-mode-seg button')){
+        const on=pick.dataset.ipMode===mode;pick.classList.toggle('on',on);pick.setAttribute('aria-pressed',on);
+      }
+      this.updateDirty();return;
+    }
     if(button.hasAttribute('data-profile')){
       const profile=button.dataset.profile;
       if(!canDo(Auth.role,'admin')||!['standard','hosting'].includes(profile))return;

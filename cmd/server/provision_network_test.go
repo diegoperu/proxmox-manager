@@ -84,3 +84,98 @@ let payload;
 })().catch(err=>{console.error(err);process.exitCode=1;});
 `)
 }
+
+func TestProvisionDHCPUI(t *testing.T) {
+	source := settingsJS(t, "// pmgr:network:begin", "// pmgr:network:end") +
+		settingsJS(t, "// pmgr:vmnet:begin", "// pmgr:vmnet:end") +
+		settingsJS(t, "const Provision=", "\n})();")
+	runSettingsJS(t, `
+const assert=require('node:assert/strict'),nodes=new Map();
+function element(){
+ const classes=new Set();
+ return {value:'',textContent:'',innerHTML:'',hidden:false,checked:false,disabled:false,style:{},children:[],options:[],attrs:{},
+  focus(){this.focused=true;},scrollIntoView(){},add(option){this.options.push(option);},append(child){this.children.push(child);},
+  replaceChildren(...children){this.children=children;},classList:{toggle(name,on){if(on)classes.add(name);else classes.delete(name);},contains:name=>classes.has(name)},
+  setAttribute(key,value){this.attrs[key]=value;},removeAttribute(key){delete this.attrs[key];},querySelector:()=>null};
+}
+const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
+const steps=Array.from({length:4},element);
+global.document={getElementById:get,querySelectorAll:s=>s==='#pv-steps .pv-step'?steps:[],createElement:()=>element()};
+global.window={matchMedia:()=>({matches:true})};
+global.Option=function(text,value){return {text,value};};
+global.ClusterMgr={current:0,currentLabel:()=>'<cluster>'};
+global.Groups={fetch:async()=>{},parse:()=>({ok:true,groups:[]}),existing:()=>new Set()};
+global.toast=()=>{};global.esc=value=>String(value??'').replaceAll('<','&lt;');global.errBox=message=>message;
+global._tc={clear(){}};
+`+source+`
+const flush=()=>new Promise(setImmediate);
+const template={vmid:9000,node:'n1',name:'Template',config:{ipconfig0:'ip=10.75.4.20/24,gw=10.75.4.254',nameserver:'9.9.9.9',searchdomain:'template.example'}};
+const text=id=>get(id).children.map(child=>child.textContent).join('\n');
+Provision.target=()=> 'n1';Provision.advice=()=>{};
+async function load(mode,dns=[]){
+ Provision.resetNetwork();get('tpl-select').value='';
+ global.api=async path=>path.includes('network-settings')?{ip_mode:mode,networks:[{cidr:'10.75.4.0/24',gateway:'10.75.4.1'}],dns,search_domain:''}:[structuredClone(template)];
+ await Provision.load();await flush();get('tpl-select').value='0';Provision.onSelectTemplate();
+ get('pv-name').value='new-vm';get('pv-cpu').value='2';get('pv-ram').value='4';get('pv-start').checked=true;
+ Provision.summary();
+}
+let payload;
+async function submit(view={}){
+ global.api=async(path,options)=>{
+  if(path==='/provision/job'){
+   payload=JSON.parse(options.body);return {job:'job',vmid:200};
+  }
+  assert.equal(path,'/provision/job?id=job');
+  return {vmid:200,name:'new-vm',node:'n1',phase:'done',result:'ok',vm_created:true,steps:[],warnings:[],...view};
+ };
+ await Provision.run();await flush();await flush();return payload;
+}
+(async()=>{
+ // Old clusters retain static fields, template defaults and the same payload.
+ await load('');assert(get('pv-address-choice').hidden);assert(!get('pv-static-fields').hidden);assert(get('pv-dhcp-note').hidden);
+ assert.equal(get('pv-ip').value,'10.75.4.20/24');assert.equal(get('pv-dns').value,'9.9.9.9');
+ let p=await submit({ip:'10.75.4.20'});assert.equal(p.ip,'10.75.4.20/24');assert.equal(p.gateway,'10.75.4.1');assert(!Object.hasOwn(p,'dhcp'));
+ assert(text('pv-log').includes('IP: 10.75.4.20'));assert(!text('pv-log').includes('(dal DHCP)'));
+
+ // DHCP hides static fields and suppresses advice for stale static values. Configured DNS still applies.
+ await load('dhcp',['1.1.1.1']);assert(get('pv-address-choice').hidden);assert(get('pv-static-fields').hidden);assert(!get('pv-dhcp-note').hidden);
+ assert.equal(get('pv-ip').value,'','static template IP must not be copied into DHCP');assert.equal(get('pv-dns').value,'1.1.1.1');
+ get('pv-ip').value='198.51.100.20/24';get('pv-gw').value='198.51.100.1';Provision.calcGw();
+ assert(get('pv-net-warning').hidden);assert(get('pv-net-hint').hidden);assert(text('pv-summary').includes('IP: DHCP'));assert(!text('pv-summary').includes('198.51.100'));
+ assert(steps[2].classList.contains('done'),'DHCP completes network step without a static IP');
+ Provision.goto(3);assert(get('pv-dns').focused);
+ p=await submit({ip:'192.0.2.42'});assert.equal(p.dhcp,true);assert(!Object.hasOwn(p,'ip'));assert(!Object.hasOwn(p,'gateway'));assert.equal(p.dns,'1.1.1.1');
+ assert(text('pv-log').includes('IP: 192.0.2.42 (dal DHCP)'));
+
+ // Template DNS is omitted for DHCP; an explicit value or an explicit clearing is respected.
+ await load('dhcp');assert.equal(get('pv-dns').value,'');
+ get('pv-dns').value='8.8.8.8';Provision.onDns();p=await submit();assert.equal(p.dns,'8.8.8.8');
+ get('pv-dns').value='';Provision.onDns();p=await submit({result:'warnings',warnings:['dhcp_ip_unknown']});assert.equal(p.dns,'');
+ assert(text('pv-log').includes('IP non letto dal guest agent: controllalo nella pagina della VM'));
+
+ // Both starts static. DHCP can be selected explicitly, then static values return unchanged.
+ await load('both');assert(!get('pv-address-choice').hidden);assert(!get('pv-static-fields').hidden);assert(get('pv-address-static').classList.contains('on'));
+ get('pv-ip').value='192.0.2.9/24';Provision.calcGw();get('pv-gw').value='192.0.2.1';Provision.onGw(get('pv-gw'));
+ assert(!get('pv-net-warning').hidden);
+ Provision.setAddressMode('unexpected');assert(!get('pv-static-fields').hidden);
+ Provision.setAddressMode('dhcp');assert(get('pv-static-fields').hidden);assert(get('pv-net-warning').hidden);assert.equal(get('pv-address-dhcp').attrs['aria-pressed'],true);
+ p=await submit({ip:'192.0.2.42'});assert.equal(p.dhcp,true);assert(!Object.hasOwn(p,'ip'));assert(!Object.hasOwn(p,'gateway'));assert.equal(p.dns,'');
+ Provision.setAddressMode('static');assert(!get('pv-static-fields').hidden);assert.equal(get('pv-ip').value,'192.0.2.9/24');assert.equal(get('pv-gw').value,'192.0.2.1');
+ assert(!get('pv-net-warning').hidden);assert.equal(get('pv-dns').value,'9.9.9.9');
+ p=await submit();assert.equal(p.ip,'192.0.2.9/24');assert.equal(p.gateway,'192.0.2.1');assert(!Object.hasOwn(p,'dhcp'));
+ get('pv-ip').value='';Provision.calcGw();assert(text('pv-summary').includes('IP: DHCP'));
+ p=await submit();assert.equal(p.dhcp,true);assert(!Object.hasOwn(p,'ip'));assert(!Object.hasOwn(p,'gateway'));
+
+ // Cluster changes reset the choice, and a late DHCP settings response overrides template defaults.
+ Provision.setAddressMode('dhcp');await load('both');assert(!get('pv-static-fields').hidden);assert(get('pv-address-static').classList.contains('on'));
+ Provision.resetNetwork();get('tpl-select').value='';let resolve;
+ global.api=async path=>path.includes('network-settings')?new Promise(done=>resolve=done):[structuredClone(template)];
+ await Provision.load();get('tpl-select').value='0';Provision.onSelectTemplate();assert.equal(get('pv-dns').value,'9.9.9.9');
+ resolve({ip_mode:'dhcp',networks:[],dns:[],search_domain:''});await flush();
+ assert(get('pv-static-fields').hidden);assert.equal(get('pv-dns').value,'');assert(text('pv-summary').includes('IP: DHCP'));
+ p=await submit({ip:'<img src=x onerror=alert(1)>'});assert.equal(p.dhcp,true);
+ const ipLine=get('pv-log').children.find(child=>child.textContent.startsWith('IP: '));
+ assert.equal(ipLine.textContent,'IP: <img src=x onerror=alert(1)> (dal DHCP)');assert.equal(ipLine.innerHTML,'','external IP uses textContent');
+})().catch(err=>{console.error(err);process.exitCode=1;});
+`)
+}
