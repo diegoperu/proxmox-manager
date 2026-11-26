@@ -86,6 +86,9 @@ func TestNetworkSettingsValidationParity(t *testing.T) {
 	for _, profile := range []string{"", "standard", "hosting", "Hosting", "x"} {
 		cases = append(cases, config.NetworkSettings{SnippetProfile: profile})
 	}
+	for _, mode := range []string{"", "static", "dhcp", "both", "DHCP", " static", "dynamic", "both\n", "<script>"} {
+		cases = append(cases, config.NetworkSettings{IPMode: mode})
+	}
 	for _, from := range [][]string{nil, {"192.0.2.254"}, {"::ffff:198.51.100.7"}, {"0.0.0.0"}, {"224.0.0.1"}, {"255.255.255.255"},
 		{"2001:db8::1"}, {"010.0.0.1"}, {"192.0.2.1", "192.0.2.1"}, {"192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4"},
 		{"192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4", "192.0.2.5"}, {"x"}, {""}} {
@@ -166,6 +169,11 @@ for(const [ip,gateway] of [['10.75.4.20/24','10.75.4.254'],['192.0.2.1/30','192.
  assert.equal(chooseNetwork({ip,typedGateway:'manual'}).hint,'');
 }
 assert.deepEqual(chooseNetwork({}),{gateway:'',dns:'',search_domain:'',warning:'',hint:''});
+const dhcp=chooseNetwork({...base,dhcp:true,ip:'192.0.2.1/24',typedGateway:'192.0.2.254'});
+assert.deepEqual(dhcp,{gateway:'',dns:'1.1.1.1 ::1',search_domain:'cluster.example',warning:'',hint:''});
+assert.equal(chooseNetwork({...base,settings:null,dhcp:true}).dns,'','DHCP never sends template DNS');
+assert.equal(chooseNetwork({...base,settings:null,dhcp:true,typedDns:'8.8.8.8'}).dns,'8.8.8.8');
+assert.equal(chooseNetwork({...base,dhcp:true,typedDns:''}).dns,'','explicitly cleared DNS stays empty');
 assert.equal(chooseNetwork({...base,settings:{networks:[],dns:['8.8.8.8']}}).gateway,base.templateGw);
 assert.equal(chooseNetwork({...base,settings:{networks:settings.networks,dns:[]}}).dns,base.templateDns);
 `)

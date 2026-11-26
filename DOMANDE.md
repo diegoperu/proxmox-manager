@@ -1659,7 +1659,7 @@ Indicazioni dell'utente (2026-11-19): **dati anonimi** (mai nomi di gruppi, nepp
 **Domanda**: gestire cluster su reti con server DHCP?
 **Opzioni**: A) nel manager, Impostazioni, Infrastruttura, campo "Indirizzi delle VM nuove": Statico (predefinito, come oggi), DHCP (`ip=dhcp`, DNS solo se configurati, IP letto poi dal guest agent), Entrambi (IP facoltativo, vuoto = DHCP); negli script chiave facoltativa `TEMPLATE_IPCONFIG=ip=dhcp` in `cluster.conf` per i template (serve a chi clona a mano); B) solo negli script.
 **Suggerimento**: A.
-**Risposta utente**: A (2026-11-26).
+**Risposta utente**: A (2026-11-26). **Realizzato (2026-11-26)**: `ip_mode` per cluster e DHCP nella Nuova VM (manager), `TEMPLATE_IPCONFIG` negli script.
 
 ### D167 — Cluster ARM separato o cluster misto
 **Stato**: RISPOSTA

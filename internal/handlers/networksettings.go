@@ -40,7 +40,10 @@ func (h *Handler) GetNetworkSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	settings := cfg.Clusters[idx].Network
 	if settings == nil {
-		settings = &config.NetworkSettings{Networks: []config.VMNetwork{}, DNS: []string{}, ManagerFrom: []string{}, SnippetProfile: "standard"}
+		settings = &config.NetworkSettings{Networks: []config.VMNetwork{}, DNS: []string{}, ManagerFrom: []string{}, SnippetProfile: "standard", IPMode: "static"}
+	}
+	if settings.IPMode == "" {
+		settings.IPMode = "static"
 	}
 	writeJSON(w, settings)
 }

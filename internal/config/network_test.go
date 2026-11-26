@@ -1,10 +1,42 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 )
+
+func TestNetworkIPMode(t *testing.T) {
+	for _, mode := range []string{"", "static", "dhcp", "both"} {
+		t.Run("valid_"+mode, func(t *testing.T) {
+			n := NetworkSettings{IPMode: mode}
+			if err := ValidNetworkSettings(&n); err != nil {
+				t.Fatal(err)
+			}
+			want := mode
+			if want == "" {
+				want = "static"
+			}
+			if n.IPMode != want {
+				t.Fatalf("mode %q, want %q", n.IPMode, want)
+			}
+			raw, err := json.Marshal(n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var read NetworkSettings
+			if err := json.Unmarshal(raw, &read); err != nil || read.IPMode != want {
+				t.Fatalf("round trip: %+v, %v", read, err)
+			}
+		})
+	}
+	for _, mode := range []string{"DHCP", " static", "dynamic", "both\n", "<script>"} {
+		if err := ValidNetworkSettings(&NetworkSettings{IPMode: mode}); err == nil || !strings.Contains(err.Error(), "ip_mode") || strings.Contains(err.Error(), mode) {
+			t.Errorf("mode %q: expected field error without submitted text, got %v", mode, err)
+		}
+	}
+}
 
 func TestNetworkValidation(t *testing.T) {
 	valid := func() *NetworkSettings {
